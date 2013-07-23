@@ -1,0 +1,46 @@
+Index: alsa-utils-1.0.19/alsamixer/alsamixer.c
+===================================================================
+--- alsa-utils-1.0.19.orig/alsamixer/alsamixer.c
++++ alsa-utils-1.0.19/alsamixer/alsamixer.c
+@@ -2290,6 +2290,10 @@
+ {
+   int opt;
+   
++  /* We don't want to control a pulseaudio mixer, since that can be done from
++   * pulseaudio itself. */
++  setenv("PULSE_INTERNAL", "0", 1);
++
+   /* parse args
+    */
+   do
+Index: alsa-utils-1.0.19/amixer/amixer.c
+--- alsa-utils-1.0.19.orig/amixer/amixer.c
++++ alsa-utils-1.0.19/amixer/amixer.c
+@@ -1892,6 +1892,12 @@
+ {
+ 	int morehelp, level = 0;
+ 	int read_stdin = 0;
++
++ 
++ 	/* We don't want to control a pulseaudio mixer, since that can be done
++ 	 * from pulseaudio itself. */
++ 	setenv("PULSE_INTERNAL", "0", 1);
++ 
+ 	static const struct option long_option[] =
+ 	{
+ 		{"help", 0, NULL, 'h'},
+Index: alsa-utils-1.0.19/iecset/iecset.c
+===================================================================
+--- alsa-utils-1.0.19.orig/iecset/iecset.c
++++ alsa-utils-1.0.19/iecset/iecset.c
+@@ -324,6 +324,10 @@
+ 	char tmpname[32];
+ 	int parms[IDX_LAST];
+ 
++	/* We don't want to control a pulseaudio mixer, since that can be done
++	 * from pulseaudio itself. */
++	setenv("PULSE_INTERNAL", "0", 1);
++
+ 	for (i = 0; i < IDX_LAST; i++)
+ 		parms[i] = -1; /* not set */
+ 

@@ -1,0 +1,150 @@
+diff -ur xenman-0.6.orig/src/dialogs.py xenman-0.6/src/dialogs.py
+--- xenman-0.6.orig/src/dialogs.py	2007-01-06 03:32:30.000000000 +0200
++++ xenman-0.6/src/dialogs.py	2007-06-29 14:45:17.000000000 +0300
+@@ -19,7 +19,7 @@
+ import types
+ import os, sys
+ import gtk, gtk.glade, gobject
+-
++import xmlrpclib
+ import constants
+ from ManagedNode import ManagedNode, NodeException
+ from XenNode import XenNode, DomConfig
+diff -ur xenman-0.6.orig/src/NodeProxy.py xenman-0.6/src/NodeProxy.py
+--- xenman-0.6.orig/src/NodeProxy.py	2007-01-06 03:32:31.000000000 +0200
++++ xenman-0.6/src/NodeProxy.py	2007-06-29 14:45:17.000000000 +0300
+@@ -163,7 +163,7 @@
+                                      Node.DEFAULT_PATH, password=password,
+                                      transport=self.tunnel_transport)    
+         else:
+-           xen.util.xmlrpclib2.ServerProxy.__init__(self,
++           xen.util.xmlrpcclient.ServerProxy.__init__(self,
+                                         'httpu:///var/run/xend/xmlrpc.sock')
+ 
+ 
+diff -ur xenman-0.6.orig/src/utils.py xenman-0.6/src/utils.py
+--- xenman-0.6.orig/src/utils.py	2007-01-06 03:32:30.000000000 +0200
++++ xenman-0.6/src/utils.py	2007-06-29 14:45:17.000000000 +0300
+@@ -909,9 +909,49 @@
+ 
+ 
+ 
++## New Code
++def search_tree(tree, key):
++    """Retrieve a value from a tree"""
+ 
++    if tree == None or key == None or len(tree) < 1:
++        return None
+ 
+-def search_tree(tree, key):
++    # if list has a name/ctx
++    if type(tree[0]) is str:
++        if key == tree[0]:
++            if len(tree) > 2:
++                return tree[1:]
++            else:
++                return tree[1]
++        l = tree[1:]
++    else:
++        l = tree
++        
++    for elem in l:
++        #print "processing ..", elem[0], key
++        if type(elem) is list:
++            if elem[0] == key:
++                if len(elem) > 2:
++                    #print "returning [[v1],[v2],..] from NV"
++                    return elem[1:]
++                else:
++                    #print "returning V from NV"
++                    return elem[1]
++            elif len(elem) >=2 and type(elem[1]) is list:
++                if len(elem) == 2:
++                    #print "recursing with [V] " # , elem[1]
++                    v = search_tree(elem[1],key)
++                    if v is not None:
++                        return v
++                else:
++                    #print "recursing with [[v1],[v2],...]" #, elem[1:]
++                    v = search_tree(elem[1:],key)
++                    if v is not None:
++                        return v
++    return None
++
++# retire OLD code
++def search_tree_old(tree, key):
+     """Retrieve a value from a tree"""
+ 
+     if tree == None or key == None:
+diff -ur xenman-0.6.orig/src/xenman.py xenman-0.6/src/xenman.py
+--- xenman-0.6.orig/src/xenman.py	2007-06-29 14:44:45.000000000 +0300
++++ xenman-0.6/src/xenman.py	2007-06-29 14:45:17.000000000 +0300
+@@ -977,7 +977,18 @@
+         # get the display if found in dom info
+         if dom["vncdisplay"] is not None:
+             self.vnc_display = dom["vncdisplay"]
+-            
++
++        # try to get vnc-port from the store
++        # workaround for xen 3.1 vncunused bug
++        if self.vnc == 1:
++            path = '/local/domain/' + str(dom.id) + '/console/vnc-port'
++            cmd = 'xenstore-read -p '
++            (output, status) = dom.node.node_proxy.exec_cmd(cmd + path)
++            if status == 0 and output is not None:
++                (p, port) = output.split(":")
++                if port is not None:
++                    self.vnc_display = port
++
+         #cfg = dom.get_config()
+         #if cfg is not None and cfg["vncdisplay"]:
+         #    self.vnc_display = cfg["vncdisplay"]
+diff -ur xenman-0.6.orig/src/XenServerProxy.py xenman-0.6/src/XenServerProxy.py
+--- xenman-0.6.orig/src/XenServerProxy.py	2007-01-06 03:32:30.000000000 +0200
++++ xenman-0.6/src/XenServerProxy.py	2007-06-29 14:45:17.000000000 +0300
+@@ -30,7 +30,7 @@
+ import xen.xend.XendClient
+ from xen.xend.XendLogging import log
+ 
+-from xen.util.xmlrpclib2 import ServerProxy 
++from xen.util.xmlrpcclient import ServerProxy 
+ from getpass import getuser
+ 
+ from phelper import PHelper
+@@ -42,7 +42,7 @@
+ # ssh_tunnel://user@host:port/RPC2
+ #
+ # It assumes that the RPC handler is /RPC2.  
+-# This is implemented in a fashion similar to other transports in xmlrpclib2.
++# This is implemented in a fashion similar to other transports in xmlrpcclient.
+ # Note : This one does not require corresponding server side implementation
+ #        as it uses the ssh tunneling mechanism. It would be nice though to
+ #        have another paramiko based server implemeted and shipped by Xen
+@@ -105,6 +105,7 @@
+ 
+     # static variable. TODO : Need to be protected by mutex
+     current_local_port = DEFAULT_LOCAL_PORT_START
++    _use_datetime = False
+       
+     def __init__(self,hostname,port,user=None, password=None,
+                  ssh_transport=None):
+@@ -198,8 +199,8 @@
+ # TODO : Improve parsing.. may be just used http url parsing code from
+ #        say httplib
+ 
+-class ServerProxy(xen.util.xmlrpclib2.ServerProxy):
+-   """ Class derives from  xen.util.xmlrpclib2 and adds paramiko ssh_tunnel
++class ServerProxy(xen.util.xmlrpcclient.ServerProxy):
++   """ Class derives from  xen.util.xmlrpcclient and adds paramiko ssh_tunnel
+        access to a remote Xen managed node
+    """
+    def __init__(self, uri, transport=None, encoding=None, verbose=0,
+@@ -239,7 +240,7 @@
+          uri = 'http://%s:%s/%s' % (host, port,path)
+ 
+       # now call the base class with transport
+-      xen.util.xmlrpclib2.ServerProxy.__init__(self, uri,
++      xen.util.xmlrpcclient.ServerProxy.__init__(self, uri,
+                                               transport, encoding,
+                                               verbose, allow_none)
+ 

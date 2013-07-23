@@ -1,0 +1,35 @@
+Index: kdebase-workspace-4.2.4/plasma/applets/systemtray/ui/applet.cpp
+===================================================================
+--- kdebase-workspace-4.2.4.orig/plasma/applets/systemtray/ui/applet.cpp
++++ kdebase-workspace-4.2.4/plasma/applets/systemtray/ui/applet.cpp
+@@ -404,27 +404,15 @@ void Applet::hidePopupIfEmpty()
+ {
+     if (d->extenderTask && extender()->attachedItems().isEmpty()) {
+         hidePopup();
+-
+-        // even though there is code to do this in popupEvent... we may need to delete
+-        // here anyways because the popup may already be hidden, resultin gin no
+-        // popupEvent
+-        delete d->extenderTask;
+-        d->extenderTask = 0;
+     }
+ }
+ 
+ void Applet::popupEvent(bool visibility)
+ {
+     kDebug() << visibility << extender()->attachedItems().isEmpty();
+-    if (extender()->attachedItems().isEmpty()) {
+-        delete d->extenderTask;
+-        d->extenderTask = 0;
+-    } else {
+-        if (!d->extenderTask) {
+-            d->extenderTask = new SystemTray::ExtenderTask(this);
+-            d->extenderTask->setIcon("help-about");
+-        }
+-
++    if (!d->extenderTask) {
++        d->extenderTask = new SystemTray::ExtenderTask(this);
++        d->extenderTask->setIcon("help-about");
+         Private::s_manager->addTask(d->extenderTask);
+     }
+ }

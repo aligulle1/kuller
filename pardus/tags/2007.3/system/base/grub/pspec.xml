@@ -1,0 +1,380 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>grub</Name>
+        <Homepage>http://www.gnu.org/software/grub/</Homepage>
+        <Packager>
+            <Name>Onur Küçük</Name>
+            <Email>onur@pardus.org.tr</Email>
+        </Packager>
+        <License>GPL-2</License>
+        <IsA>app:console</IsA>
+        <Summary>GNU GRUB boot loader</Summary>
+        <Description>GNU GRUB is a Multiboot boot loader. It was derived from GRUB, GRand Unified Bootloader, which was originally designed and implemented by Erich Stefan Boleyn. Briefly, boot loader is the first software program that runs when a computer starts. It is responsible for loading and transferring control to the operating system kernel software (such as the Hurd,Windows or the Linux). The kernel, in turn, initializes the rest of the operating system.</Description>
+        <Archive sha1sum="2580626c4579bd99336d3af4482c346c95dac4fb" type="targz">ftp://alpha.gnu.org/gnu/grub/grub-0.97.tar.gz</Archive>
+        <BuildDependencies>
+            <Dependency versionFrom="5.2">ncurses</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <Patch>use_ferror.diff</Patch>
+            <Patch level="1">bad-assert-sideeffect.patch</Patch>
+            <Patch level="1">grub-linux-setup-fix.patch</Patch>
+            <Patch level="1">grub-0.97-initrdaddr.diff</Patch>
+            <Patch level="1">grub-0.95.20040823-splash.patch</Patch>
+            <Patch level="1">grub-0.96-PIC.patch</Patch>
+            <Patch level="1">grub-0.96-bounced-checks.patch</Patch>
+            <Patch level="1">grub-0.96-pardus.patch</Patch>
+            <Patch level="1">grub-0.96-unsigned-addresses.patch</Patch>
+            <Patch level="1">grub-silent.patch</Patch>
+            <Patch level="1">grub-R</Patch>
+            <Patch level="1">ptable-fix.patch</Patch>
+            <Patch level="1">intelmac.patch</Patch>
+            <Patch level="1">i2o-raid.patch</Patch>
+            <Patch level="1">grub-0.97-geometry-26kernel.patch</Patch>
+            <Patch level="1">nxstack.patch</Patch>
+            <Patch level="1">special_device_names.patch</Patch>
+            <Patch level="1">grub-0.97-16-disks.patch</Patch>
+            <!-- Add a sync to solve misc. XFS problems -->
+            <Patch level="1">xfs_sync.patch</Patch>
+            <!-- https://savannah.gnu.org/bugs/?8899  -->
+            <Patch level="1">cciss-devicemap.patch</Patch>
+            <!-- https://bugs.launchpad.net/ubuntu/+bug/106887 -->
+            <Patch level="1">grub-0.95-mem_lower.patch</Patch>
+            <!-- Use O_DIRECT to avoid hitting oddities with caching -->
+            <Patch level="1">grub-0.95-odirect.patch</Patch>
+            <!-- Work on EZ-Drive storage stuff -->
+            <Patch level="1">grub-0.5.96.1-ezd.patch</Patch>
+            <!-- Be safe on splash image troubles -->
+            <Patch level="1">grub-0.95-xpmjunk.patch</Patch>
+            <Patch level="1">grub-0.95-splash-error-term.patch</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>grub</Name>
+        <RuntimeDependencies>
+            <Dependency versionFrom="5.2">ncurses</Dependency>
+            <Dependency versionFrom="1.16">comar</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="executable">/bin</Path>
+            <Path fileType="library">/lib/grub</Path>
+            <Path fileType="executable">/sbin/</Path>
+            <Path fileType="executable">/usr/sbin/</Path>
+            <Path fileType="doc">/usr/share/doc/</Path>
+            <Path fileType="data">/usr/share/grub/</Path>
+            <Path fileType="info">/usr/share/info/</Path>
+            <Path fileType="man">/usr/share/man/</Path>
+            <Path fileType="data">/boot</Path>
+        </Files>
+        <AdditionalFiles>
+            <AdditionalFile owner="root" permission="0644" target="/boot/grub/splash.xpm.gz">splash.xpm.gz</AdditionalFile>
+            <AdditionalFile owner="root" permission="0755" target="/usr/sbin/grubonce">grubonce</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/usr/share/grub/templates/menu.lst">menu.lst</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/usr/share/grub/templates/menu-tr.lst">menu-tr.lst</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/usr/share/grub/templates/menu-en.lst">menu-en.lst</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/usr/share/grub/templates/menu-nl.lst">menu-nl.lst</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/usr/share/grub/templates/menu-de.lst">menu-de.lst</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/usr/share/grub/templates/menu-es.lst">menu-es.lst</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/usr/share/grub/templates/menu-pt_BR.lst">menu-pt_BR.lst</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/usr/share/grub/templates/menu-it.lst">menu-it.lst</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/usr/share/grub/templates/menu-fr.lst">menu-fr.lst</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/usr/share/grub/templates/menu-ca.lst">menu-ca.lst</AdditionalFile>
+        </AdditionalFiles>
+        <Provides>
+            <COMAR script="package.py">System.Package</COMAR>
+            <COMAR script="bootloader.py">Boot.Loader</COMAR>
+        </Provides>
+    </Package>
+
+    <History>
+        <Update release="41">
+            <Date>2007-08-13</Date>
+            <Version>0.97</Version>
+            <Comment>Boot.Loader: Better input validation for kernel version argument.</Comment>
+            <Name>Bahadır Kandemir</Name>
+            <Email>bahadir@pardus.org.tr</Email>
+        </Update>
+        <Update release="40">
+            <Date>2007-07-09</Date>
+            <Version>0.97</Version>
+            <Comment>Boot.Loader: Support for removing old kernels.</Comment>
+            <Name>Bahadır Kandemir</Name>
+            <Email>bahadir@pardus.org.tr</Email>
+        </Update>
+        <Update release="39">
+            <Date>2007-07-02</Date>
+            <Version>0.97</Version>
+            <Comment>Added Catalan menu entry</Comment>
+            <Name>Onur Küçük</Name>
+            <Email>onur@pardus.org.tr</Email>
+        </Update>
+        <Update release="38">
+            <Date>2007-06-26</Date>
+            <Version>0.97</Version>
+            <Comment>Fix terminal when splash is garbled or not reachable (like written wrong in grub), fix booting from EZ flash drives</Comment>
+            <Name>Onur Küçük</Name>
+            <Email>onur@pardus.org.tr</Email>
+        </Update>
+        <Update release="37">
+            <Date>2007-06-12</Date>
+            <Version>0.97</Version>
+            <Comment>Boot.Loader: Fixed a typo in updateGrub code.</Comment>
+            <Name>Bahadır Kandemir</Name>
+            <Email>bahadir@pardus.org.tr</Email>
+        </Update>
+        <Update release="36">
+            <Date>2007-06-06</Date>
+            <Version>0.97</Version>
+            <Comment>Boot.Loader: Don't use device.map, create your own!</Comment>
+            <Name>Bahadır Kandemir</Name>
+            <Email>bahadir@pardus.org.tr</Email>
+        </Update>
+        <Update release="35">
+            <Date>2007-06-05</Date>
+            <Version>0.97</Version>
+            <Comment>Added menu-it and menu-fr</Comment>
+            <Name>Onur Küçük</Name>
+            <Email>onur@pardus.org.tr</Email>
+        </Update>
+        <Update release="34">
+            <Date>2007-05-31</Date>
+            <Version>0.97</Version>
+            <Comment>Use O_DIRECT on file access, use syslinux style memory management on failure, add sync to more places in install</Comment>
+            <Name>Onur Küçük</Name>
+            <Email>onur@pardus.org.tr</Email>
+        </Update>
+        <Update release="33">
+            <Date>2007-05-30</Date>
+            <Version>0.97</Version>
+            <Comment>Revert last. Boot.Loader fails if no device.map exists.</Comment>
+            <Name>Bahadır Kandemir</Name>
+            <Email>bahadir@pardus.org.tr</Email>
+        </Update>
+        <Update release="32">
+            <Date>2007-05-30</Date>
+            <Version>0.97</Version>
+            <Comment>Boot.Loader: Create device.map</Comment>
+            <Name>Bahadır Kandemir</Name>
+            <Email>bahadir@pardus.org.tr</Email>
+        </Update>
+        <Update release="31">
+            <Date>2007-05-26</Date>
+            <Version>0.97</Version>
+            <Comment>Boot.Loader: Support for RAID disks and Xen.</Comment>
+            <Name>Bahadır Kandemir</Name>
+            <Email>bahadir@pardus.org.tr</Email>
+        </Update>
+        <Update release="30">
+            <Date>2007-05-23</Date>
+            <Version>0.97</Version>
+            <Comment>Boot.Loader script</Comment>
+            <Name>Bahadır Kandemir</Name>
+            <Email>bahadir@pardus.org.tr</Email>
+        </Update>
+        <Update release="29">
+            <Date>2007-05-16</Date>
+            <Version>0.97</Version>
+            <Comment>Fix device.map creation for cciss</Comment>
+            <Name>Onur Küçük</Name>
+            <Email>onur@pardus.org.tr</Email>
+        </Update>
+        <Update release="28">
+            <Date>2007-04-02</Date>
+            <Version>0.97</Version>
+            <Comment>Remove cd entries to fix bug #4409, grub shall not probe devices</Comment>
+            <Name>Onur Küçük</Name>
+            <Email>onur@pardus.org.tr</Email>
+        </Update>
+        <Update release="27">
+            <Date>2007-04-02</Date>
+            <Version>0.97</Version>
+            <Comment>Add a sync to solve misc. XFS problems</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="26">
+            <Date>2007-03-08</Date>
+            <Version>0.97</Version>
+            <Comment>First menu is Language menu, next comes the others</Comment>
+            <Name>Onur Küçük</Name>
+            <Email>onur@pardus.org.tr</Email>
+        </Update>
+        <Update release="25">
+            <Date>2007-03-01</Date>
+            <Version>0.97</Version>
+            <Comment>Really added pt_BR support</Comment>
+            <Name>Onur Küçük</Name>
+            <Email>onur@pardus.org.tr</Email>
+        </Update>
+        <Update release="24">
+            <Date>2007-03-01</Date>
+            <Version>0.97</Version>
+            <Comment>Added pt_BR support</Comment>
+            <Name>Onur Küçük</Name>
+            <Email>onur@pardus.org.tr</Email>
+        </Update>
+        <Update release="23">
+            <Date>2006-12-12</Date>
+            <Version>0.97</Version>
+            <Comment>Updated splash by Umutsan</Comment>
+            <Name>Onur Küçük</Name>
+            <Email>onur@pardus.org.tr</Email>
+        </Update>
+        <Update release="22">
+            <Date>2006-12-05</Date>
+            <Version>0.97</Version>
+            <Comment>Set device limitation from 8 to 16</Comment>
+            <Name>Onur Küçük</Name>
+            <Email>onur@pardus.org.tr</Email>
+        </Update>
+        <Update release="21">
+            <Date>2006-12-01</Date>
+            <Version>0.97</Version>
+            <Comment>Typo fix, add fadein as a splash workaround</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="20">
+            <Date>2006-11-29</Date>
+            <Version>0.97</Version>
+            <Comment>Add maxcpus=0 to safemode parametres, add ES to menu stuff</Comment>
+            <Name>Onur Küçük</Name>
+            <Email>onur@pardus.org.tr</Email>
+        </Update>
+        <Update release="19">
+            <Date>2006-11-21</Date>
+            <Version>0.97</Version>
+            <Comment>Add missing menu-all</Comment>
+            <Name>Onur Küçük</Name>
+            <Email>onur@pardus.org.tr</Email>
+        </Update>
+        <Update release="18">
+            <Date>2006-11-20</Date>
+            <Version>0.97</Version>
+            <Comment>Tidy up menu files</Comment>
+            <Name>Onur Küçük</Name>
+            <Email>onur@pardus.org.tr</Email>
+        </Update>
+        <Update release="17">
+            <Date>2006-11-14</Date>
+            <Version>0.97</Version>
+            <Comment>Bugfixes in menu files</Comment>
+            <Name>Onur Küçük</Name>
+            <Email>onur@pardus.org.tr</Email>
+        </Update>
+        <Update release="16">
+            <Date>2006-10-16</Date>
+            <Version>0.97</Version>
+            <Comment>DE support added</Comment>
+            <Name>Onur Küçük</Name>
+            <Email>onur@pardus.org.tr</Email>
+        </Update>
+        <Update release="15">
+            <Date>2006-10-16</Date>
+            <Version>0.97</Version>
+            <Comment>Typo and language fixes in menu templates</Comment>
+            <Name>Gürer Özen</Name>
+            <Email>gurer@pardus.org.tr</Email>
+        </Update>
+        <Update release="14">
+            <Date>2006-10-13</Date>
+            <Version>0.97</Version>
+            <Comment>Update menu-nl, add memtest entries</Comment>
+            <Name>Onur Küçük</Name>
+            <Email>onur@pardus.org.tr</Email>
+        </Update>
+        <Update release="13">
+            <Date>2006-10-11</Date>
+            <Version>0.97</Version>
+            <Comment>Update menu-nl.lst</Comment>
+            <Name>Onur Küçük</Name>
+            <Email>onur@pardus.org.tr</Email>
+        </Update>
+        <Update release="12">
+            <Date>2006-10-11</Date>
+            <Version>0.97</Version>
+            <Comment>Add new splash + lotssss of fix</Comment>
+            <Name>Onur Küçük</Name>
+            <Email>onur@pardus.org.tr</Email>
+        </Update>
+        <Update release="11">
+            <Date>2006-10-10</Date>
+            <Version>0.97</Version>
+            <Comment>Add needed templates for Pardusman</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="10">
+            <Date>2006-06-20</Date>
+            <Version>0.97</Version>
+            <Comment>missing grubonce patch added</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="9">
+            <Date>2006-06-20</Date>
+            <Version>0.97</Version>
+            <Comment>Use grubonce for one time default selection, used by kdm</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="8">
+            <Date>2006-04-09</Date>
+            <Version>0.97</Version>
+            <Comment>Replace grub version string, to make countdown less ugly</Comment>
+            <Name>Onur Küçük</Name>
+            <Email>onur@pardus.org.tr</Email>
+        </Update>
+        <Update release="7">
+            <Date>2006-04-08</Date>
+            <Version>0.97</Version>
+            <Comment>Version bump, removed unneeded patches (like raid or amd64 compile support) and some more added</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="6">
+            <Date>2006-03-12</Date>
+            <Version>0.96</Version>
+            <Comment>Remove debuglike info messages + small cosmetics to menu</Comment>
+            <Name>Onur Küçük</Name>
+            <Email>onur@pardus.org.tr</Email>
+        </Update>
+        <Update release="5" type="bug">
+            <Date>2006-02-19</Date>
+            <Version>0.96</Version>
+            <Comment>Remove the static "countdown message" so it will not be language dependent</Comment>
+            <Name>Onur Küçük</Name>
+            <Email>onur@pardus.org.tr</Email>
+        </Update>
+        <Update release="4" type="bug">
+            <Date>2005-12-26</Date>
+            <Version>0.96</Version>
+            <Comment>Don't give segfault on xfs</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="3" type="bug">
+            <Date>2005-12-01</Date>
+            <Version>0.96</Version>
+            <Comment>Newer splash + comar script fix</Comment>
+            <Name>Onur Küçük</Name>
+            <Email>onur@pardus.org.tr</Email>
+        </Update>
+        <Update release="2">
+            <Date>2005-11-24</Date>
+            <Version>0.96</Version>
+            <Comment>New splash</Comment>
+            <Name>Onur Küçük</Name>
+            <Email>onur@pardus.org.tr</Email>
+        </Update>
+        <Update release="1">
+            <Date>2005-09-04</Date>
+            <Version>0.96</Version>
+            <Comment>First release.</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+    </History>
+</PISI>

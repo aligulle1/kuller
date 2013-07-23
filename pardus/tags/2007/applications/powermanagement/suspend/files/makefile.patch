@@ -1,0 +1,76 @@
+diff -ur suspend-0.5.orig/Makefile suspend-0.5/Makefile
+--- suspend-0.5.orig/Makefile	2006-11-12 16:43:54.000000000 +0200
++++ suspend-0.5/Makefile	2006-11-18 03:04:20.000000000 +0200
+@@ -1,12 +1,11 @@
+ #CONFIG_COMPRESS=yes
+-#CONFIG_ENCRYPT=yes
++CONFIG_ENCRYPT=yes
+ #CONFIG_SPLASHY=yes
+-#CONFIG_UDEV=yes
+ 
+ ARCH:=$(shell uname -m)
+ 
+-CC_FLAGS=-I/usr/local/include
+-LD_FLAGS=-L/usr/local/lib
++CC_FLAGS=-I/usr/include
++LD_FLAGS=-L/usr/lib
+ 
+ CFLAGS := -O2 -Wall
+ 
+@@ -22,7 +21,7 @@
+ LD_FLAGS	+= $(GCRYPT_LD_FLAGS)
+ endif
+ 
+-SUSPEND_DIR=/usr/local/sbin
++SUSPEND_DIR=/usr/sbin
+ CONFIG_DIR=/etc
+ RESUME_DEVICE=<path_to_resume_device_file>
+ BOOT_DIR=/boot
+@@ -31,10 +30,6 @@
+ S2DISK=s2disk
+ CONFIGFILE=suspend.conf
+ 
+-ifndef CONFIG_UDEV
+-SNAPSHOT=$(DESTDIR)/dev/snapshot
+-endif
+-
+ ifdef CONFIG_ENCRYPT
+ all: $(S2DISK) $(S2BOTH) swap-offset suspend-keygen resume s2ram
+ else
+@@ -126,12 +121,12 @@
+ suspend-keygen:	md5.o keygen.c encrypt.h md5.h
+ 	$(CC) $(CFLAGS) -DHAVE_INTTYPES_H -DHAVE_STDINT_H $(CC_FLAGS) md5.o keygen.c -o suspend-keygen $(LD_FLAGS)
+ 
+-install-s2disk: $(S2DISK) suspend-keygen swap-offset conf/$(CONFIGFILE) $(SNAPSHOT)
++install-s2disk: $(S2DISK) suspend-keygen swap-offset conf/$(CONFIGFILE)
+ 	install --mode=755 suspend-keygen $(DESTDIR)$(SUSPEND_DIR)
+ 	install --mode=755 $(S2DISK) $(DESTDIR)$(SUSPEND_DIR)
+ 	if [ -f $(DESTDIR)$(CONFIG_DIR)/$(CONFIGFILE) ]; then install --mode=644 conf/$(CONFIGFILE) $(DESTDIR)$(CONFIG_DIR)/$(CONFIGFILE).new; else install --mode=644 conf/$(CONFIGFILE) $(DESTDIR)$(CONFIG_DIR); fi
+ 
+-install: $(S2DISK) $(S2BOTH) suspend-keygen swap-offset conf/$(CONFIGFILE) $(SNAPSHOT)
++install: $(S2DISK) $(S2BOTH) suspend-keygen swap-offset conf/$(CONFIGFILE)
+ 	install --mode=755 suspend-keygen $(DESTDIR)$(SUSPEND_DIR)
+ 	install --mode=755 $(S2DISK) $(DESTDIR)$(SUSPEND_DIR)
+ 	install --mode=755 $(S2BOTH) $(DESTDIR)$(SUSPEND_DIR)
+@@ -140,11 +135,11 @@
+ 	install --mode=755 resume $(DESTDIR)$(SUSPEND_DIR)
+ 	install --mode=755 swap-offset $(DESTDIR)$(SUSPEND_DIR)
+ else
+-install-s2disk: $(S2DISK) swap-offset conf/$(CONFIGFILE) $(SNAPSHOT)
++install-s2disk: $(S2DISK) swap-offset conf/$(CONFIGFILE)
+ 	install --mode=755 $(S2DISK) $(DESTDIR)$(SUSPEND_DIR)
+ 	if [ -f $(DESTDIR)$(CONFIG_DIR)/$(CONFIGFILE) ]; then install --mode=644 conf/$(CONFIGFILE) $(DESTDIR)$(CONFIG_DIR)/$(CONFIGFILE).new; else install --mode=644 conf/$(CONFIGFILE) $(DESTDIR)$(CONFIG_DIR); fi
+ 
+-install: $(S2DISK) $(S2BOTH) swap-offset conf/$(CONFIGFILE) $(SNAPSHOT)
++install: $(S2DISK) $(S2BOTH) swap-offset conf/$(CONFIGFILE)
+ 	install --mode=755 $(S2DISK) $(DESTDIR)$(SUSPEND_DIR)
+ 	install --mode=755 $(S2BOTH) $(DESTDIR)$(SUSPEND_DIR)
+ 	if [ -f $(DESTDIR)$(CONFIG_DIR)/$(CONFIGFILE) ]; then install --mode=644 conf/$(CONFIGFILE) $(DESTDIR)$(CONFIG_DIR)/$(CONFIGFILE).new; else install --mode=644 conf/$(CONFIGFILE) $(DESTDIR)$(CONFIG_DIR); fi
+@@ -158,7 +153,3 @@
+ 
+ install-resume:		resume 
+ 	./scripts/install-resume.sh
+-
+-$(SNAPSHOT):
+-	mknod $(SNAPSHOT) c 10 231;
+-	

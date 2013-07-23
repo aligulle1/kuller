@@ -1,0 +1,3777 @@
+diff -Naur glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/byteswap.h glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/byteswap.h
+--- glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/byteswap.h	1970-01-01 02:00:00.000000000 +0200
++++ glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/byteswap.h	2010-03-08 16:00:17.095076714 +0200
+@@ -0,0 +1,87 @@
++/* Macros to swap the order of bytes in integer values.
++   Copyright (C) 1997,1998,2000-2002,2005,2008 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, write to the Free
++   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
++   02111-1307 USA.  */
++
++#if !defined _BYTESWAP_H && !defined _NETINET_IN_H && !defined _ENDIAN_H
++# error "Never use <bits/byteswap.h> directly; include <byteswap.h> instead."
++#endif
++
++#ifndef _BITS_BYTESWAP_H
++#define _BITS_BYTESWAP_H 1
++
++/* Swap bytes in 16 bit value.  */
++#define __bswap_constant_16(x) \
++     ((((x) >> 8) & 0xffu) | (((x) & 0xffu) << 8))
++
++#ifdef __GNUC__
++# define __bswap_16(x) \
++    (__extension__							      \
++     ({ unsigned short int __bsx = (x); __bswap_constant_16 (__bsx); }))
++#else
++static __inline unsigned short int
++__bswap_16 (unsigned short int __bsx)
++{
++  return __bswap_constant_16 (__bsx);
++}
++#endif
++
++/* Swap bytes in 32 bit value.  */
++#define __bswap_constant_32(x) \
++     ((((x) & 0xff000000u) >> 24) | (((x) & 0x00ff0000u) >>  8) |	      \
++      (((x) & 0x0000ff00u) <<  8) | (((x) & 0x000000ffu) << 24))
++
++#ifdef __GNUC__
++# define __bswap_32(x) \
++  (__extension__							      \
++   ({ register unsigned int __bsx = (x); __bswap_constant_32 (__bsx); }))
++#else
++static __inline unsigned int
++__bswap_32 (unsigned int __bsx)
++{
++  return __bswap_constant_32 (__bsx);
++}
++#endif
++
++#if defined __GNUC__ && __GNUC__ >= 2
++/* Swap bytes in 64 bit value.  */
++# define __bswap_constant_64(x) \
++     ((((x) & 0xff00000000000000ull) >> 56)				      \
++      | (((x) & 0x00ff000000000000ull) >> 40)				      \
++      | (((x) & 0x0000ff0000000000ull) >> 24)				      \
++      | (((x) & 0x000000ff00000000ull) >> 8)				      \
++      | (((x) & 0x00000000ff000000ull) << 8)				      \
++      | (((x) & 0x0000000000ff0000ull) << 24)				      \
++      | (((x) & 0x000000000000ff00ull) << 40)				      \
++      | (((x) & 0x00000000000000ffull) << 56))
++
++# define __bswap_64(x) \
++     (__extension__							      \
++      ({ union { __extension__ unsigned long long int __ll;		      \
++		 unsigned int __l[2]; } __w, __r;			      \
++         if (__builtin_constant_p (x))					      \
++	   __r.__ll = __bswap_constant_64 (x);				      \
++	 else								      \
++	   {								      \
++	     __w.__ll = (x);						      \
++	     __r.__l[0] = __bswap_32 (__w.__l[1]);			      \
++	     __r.__l[1] = __bswap_32 (__w.__l[0]);			      \
++	   }								      \
++	 __r.__ll; }))
++#endif
++
++#endif /* _BITS_BYTESWAP_H */
+diff -Naur glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/confname.h glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/confname.h
+--- glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/confname.h	1970-01-01 02:00:00.000000000 +0200
++++ glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/confname.h	2010-03-08 16:00:17.100075396 +0200
+@@ -0,0 +1,672 @@
++/* `sysconf', `pathconf', and `confstr' NAME values.  Generic version.
++   Copyright (C) 1993,1995-1998,2000,2001,2003,2004,2007,2009
++   Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, write to the Free
++   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
++   02111-1307 USA.  */
++
++#ifndef _UNISTD_H
++# error "Never use <bits/confname.h> directly; include <unistd.h> instead."
++#endif
++
++/* Values for the NAME argument to `pathconf' and `fpathconf'.  */
++enum
++  {
++    _PC_LINK_MAX,
++#define	_PC_LINK_MAX			_PC_LINK_MAX
++    _PC_MAX_CANON,
++#define	_PC_MAX_CANON			_PC_MAX_CANON
++    _PC_MAX_INPUT,
++#define	_PC_MAX_INPUT			_PC_MAX_INPUT
++    _PC_NAME_MAX,
++#define	_PC_NAME_MAX			_PC_NAME_MAX
++    _PC_PATH_MAX,
++#define	_PC_PATH_MAX			_PC_PATH_MAX
++    _PC_PIPE_BUF,
++#define	_PC_PIPE_BUF			_PC_PIPE_BUF
++    _PC_CHOWN_RESTRICTED,
++#define	_PC_CHOWN_RESTRICTED		_PC_CHOWN_RESTRICTED
++    _PC_NO_TRUNC,
++#define	_PC_NO_TRUNC			_PC_NO_TRUNC
++    _PC_VDISABLE,
++#define _PC_VDISABLE			_PC_VDISABLE
++    _PC_SYNC_IO,
++#define	_PC_SYNC_IO			_PC_SYNC_IO
++    _PC_ASYNC_IO,
++#define	_PC_ASYNC_IO			_PC_ASYNC_IO
++    _PC_PRIO_IO,
++#define	_PC_PRIO_IO			_PC_PRIO_IO
++    _PC_SOCK_MAXBUF,
++#define	_PC_SOCK_MAXBUF			_PC_SOCK_MAXBUF
++    _PC_FILESIZEBITS,
++#define _PC_FILESIZEBITS		_PC_FILESIZEBITS
++    _PC_REC_INCR_XFER_SIZE,
++#define _PC_REC_INCR_XFER_SIZE		_PC_REC_INCR_XFER_SIZE
++    _PC_REC_MAX_XFER_SIZE,
++#define _PC_REC_MAX_XFER_SIZE		_PC_REC_MAX_XFER_SIZE
++    _PC_REC_MIN_XFER_SIZE,
++#define _PC_REC_MIN_XFER_SIZE		_PC_REC_MIN_XFER_SIZE
++    _PC_REC_XFER_ALIGN,
++#define _PC_REC_XFER_ALIGN		_PC_REC_XFER_ALIGN
++    _PC_ALLOC_SIZE_MIN,
++#define _PC_ALLOC_SIZE_MIN		_PC_ALLOC_SIZE_MIN
++    _PC_SYMLINK_MAX,
++#define _PC_SYMLINK_MAX			_PC_SYMLINK_MAX
++    _PC_2_SYMLINKS
++#define _PC_2_SYMLINKS			_PC_2_SYMLINKS
++  };
++
++/* Values for the argument to `sysconf'.  */
++enum
++  {
++    _SC_ARG_MAX,
++#define	_SC_ARG_MAX			_SC_ARG_MAX
++    _SC_CHILD_MAX,
++#define	_SC_CHILD_MAX			_SC_CHILD_MAX
++    _SC_CLK_TCK,
++#define	_SC_CLK_TCK			_SC_CLK_TCK
++    _SC_NGROUPS_MAX,
++#define	_SC_NGROUPS_MAX			_SC_NGROUPS_MAX
++    _SC_OPEN_MAX,
++#define	_SC_OPEN_MAX			_SC_OPEN_MAX
++    _SC_STREAM_MAX,
++#define	_SC_STREAM_MAX			_SC_STREAM_MAX
++    _SC_TZNAME_MAX,
++#define	_SC_TZNAME_MAX			_SC_TZNAME_MAX
++    _SC_JOB_CONTROL,
++#define	_SC_JOB_CONTROL			_SC_JOB_CONTROL
++    _SC_SAVED_IDS,
++#define	_SC_SAVED_IDS			_SC_SAVED_IDS
++    _SC_REALTIME_SIGNALS,
++#define	_SC_REALTIME_SIGNALS		_SC_REALTIME_SIGNALS
++    _SC_PRIORITY_SCHEDULING,
++#define	_SC_PRIORITY_SCHEDULING		_SC_PRIORITY_SCHEDULING
++    _SC_TIMERS,
++#define	_SC_TIMERS			_SC_TIMERS
++    _SC_ASYNCHRONOUS_IO,
++#define	_SC_ASYNCHRONOUS_IO		_SC_ASYNCHRONOUS_IO
++    _SC_PRIORITIZED_IO,
++#define	_SC_PRIORITIZED_IO		_SC_PRIORITIZED_IO
++    _SC_SYNCHRONIZED_IO,
++#define	_SC_SYNCHRONIZED_IO		_SC_SYNCHRONIZED_IO
++    _SC_FSYNC,
++#define	_SC_FSYNC			_SC_FSYNC
++    _SC_MAPPED_FILES,
++#define	_SC_MAPPED_FILES		_SC_MAPPED_FILES
++    _SC_MEMLOCK,
++#define	_SC_MEMLOCK			_SC_MEMLOCK
++    _SC_MEMLOCK_RANGE,
++#define	_SC_MEMLOCK_RANGE		_SC_MEMLOCK_RANGE
++    _SC_MEMORY_PROTECTION,
++#define	_SC_MEMORY_PROTECTION		_SC_MEMORY_PROTECTION
++    _SC_MESSAGE_PASSING,
++#define	_SC_MESSAGE_PASSING		_SC_MESSAGE_PASSING
++    _SC_SEMAPHORES,
++#define	_SC_SEMAPHORES			_SC_SEMAPHORES
++    _SC_SHARED_MEMORY_OBJECTS,
++#define	_SC_SHARED_MEMORY_OBJECTS	_SC_SHARED_MEMORY_OBJECTS
++    _SC_AIO_LISTIO_MAX,
++#define	_SC_AIO_LISTIO_MAX		_SC_AIO_LISTIO_MAX
++    _SC_AIO_MAX,
++#define	_SC_AIO_MAX			_SC_AIO_MAX
++    _SC_AIO_PRIO_DELTA_MAX,
++#define	_SC_AIO_PRIO_DELTA_MAX		_SC_AIO_PRIO_DELTA_MAX
++    _SC_DELAYTIMER_MAX,
++#define	_SC_DELAYTIMER_MAX		_SC_DELAYTIMER_MAX
++    _SC_MQ_OPEN_MAX,
++#define	_SC_MQ_OPEN_MAX			_SC_MQ_OPEN_MAX
++    _SC_MQ_PRIO_MAX,
++#define	_SC_MQ_PRIO_MAX			_SC_MQ_PRIO_MAX
++    _SC_VERSION,
++#define	_SC_VERSION			_SC_VERSION
++    _SC_PAGESIZE,
++#define	_SC_PAGESIZE			_SC_PAGESIZE
++#define	_SC_PAGE_SIZE			_SC_PAGESIZE
++    _SC_RTSIG_MAX,
++#define	_SC_RTSIG_MAX			_SC_RTSIG_MAX
++    _SC_SEM_NSEMS_MAX,
++#define	_SC_SEM_NSEMS_MAX		_SC_SEM_NSEMS_MAX
++    _SC_SEM_VALUE_MAX,
++#define	_SC_SEM_VALUE_MAX		_SC_SEM_VALUE_MAX
++    _SC_SIGQUEUE_MAX,
++#define	_SC_SIGQUEUE_MAX		_SC_SIGQUEUE_MAX
++    _SC_TIMER_MAX,
++#define	_SC_TIMER_MAX			_SC_TIMER_MAX
++
++    /* Values for the argument to `sysconf'
++       corresponding to _POSIX2_* symbols.  */
++    _SC_BC_BASE_MAX,
++#define	_SC_BC_BASE_MAX			_SC_BC_BASE_MAX
++    _SC_BC_DIM_MAX,
++#define	_SC_BC_DIM_MAX			_SC_BC_DIM_MAX
++    _SC_BC_SCALE_MAX,
++#define	_SC_BC_SCALE_MAX		_SC_BC_SCALE_MAX
++    _SC_BC_STRING_MAX,
++#define	_SC_BC_STRING_MAX		_SC_BC_STRING_MAX
++    _SC_COLL_WEIGHTS_MAX,
++#define	_SC_COLL_WEIGHTS_MAX		_SC_COLL_WEIGHTS_MAX
++    _SC_EQUIV_CLASS_MAX,
++#define	_SC_EQUIV_CLASS_MAX		_SC_EQUIV_CLASS_MAX
++    _SC_EXPR_NEST_MAX,
++#define	_SC_EXPR_NEST_MAX		_SC_EXPR_NEST_MAX
++    _SC_LINE_MAX,
++#define	_SC_LINE_MAX			_SC_LINE_MAX
++    _SC_RE_DUP_MAX,
++#define	_SC_RE_DUP_MAX			_SC_RE_DUP_MAX
++    _SC_CHARCLASS_NAME_MAX,
++#define	_SC_CHARCLASS_NAME_MAX		_SC_CHARCLASS_NAME_MAX
++
++    _SC_2_VERSION,
++#define	_SC_2_VERSION			_SC_2_VERSION
++    _SC_2_C_BIND,
++#define	_SC_2_C_BIND			_SC_2_C_BIND
++    _SC_2_C_DEV,
++#define	_SC_2_C_DEV			_SC_2_C_DEV
++    _SC_2_FORT_DEV,
++#define	_SC_2_FORT_DEV			_SC_2_FORT_DEV
++    _SC_2_FORT_RUN,
++#define	_SC_2_FORT_RUN			_SC_2_FORT_RUN
++    _SC_2_SW_DEV,
++#define	_SC_2_SW_DEV			_SC_2_SW_DEV
++    _SC_2_LOCALEDEF,
++#define	_SC_2_LOCALEDEF			_SC_2_LOCALEDEF
++
++    _SC_PII,
++#define	_SC_PII				_SC_PII
++    _SC_PII_XTI,
++#define	_SC_PII_XTI			_SC_PII_XTI
++    _SC_PII_SOCKET,
++#define	_SC_PII_SOCKET			_SC_PII_SOCKET
++    _SC_PII_INTERNET,
++#define	_SC_PII_INTERNET		_SC_PII_INTERNET
++    _SC_PII_OSI,
++#define	_SC_PII_OSI			_SC_PII_OSI
++    _SC_POLL,
++#define	_SC_POLL			_SC_POLL
++    _SC_SELECT,
++#define	_SC_SELECT			_SC_SELECT
++    _SC_UIO_MAXIOV,
++#define	_SC_UIO_MAXIOV			_SC_UIO_MAXIOV
++    _SC_IOV_MAX = _SC_UIO_MAXIOV,
++#define _SC_IOV_MAX			_SC_IOV_MAX
++    _SC_PII_INTERNET_STREAM,
++#define	_SC_PII_INTERNET_STREAM		_SC_PII_INTERNET_STREAM
++    _SC_PII_INTERNET_DGRAM,
++#define	_SC_PII_INTERNET_DGRAM		_SC_PII_INTERNET_DGRAM
++    _SC_PII_OSI_COTS,
++#define	_SC_PII_OSI_COTS		_SC_PII_OSI_COTS
++    _SC_PII_OSI_CLTS,
++#define	_SC_PII_OSI_CLTS		_SC_PII_OSI_CLTS
++    _SC_PII_OSI_M,
++#define	_SC_PII_OSI_M			_SC_PII_OSI_M
++    _SC_T_IOV_MAX,
++#define	_SC_T_IOV_MAX			_SC_T_IOV_MAX
++
++    /* Values according to POSIX 1003.1c (POSIX threads).  */
++    _SC_THREADS,
++#define	_SC_THREADS			_SC_THREADS
++    _SC_THREAD_SAFE_FUNCTIONS,
++#define _SC_THREAD_SAFE_FUNCTIONS	_SC_THREAD_SAFE_FUNCTIONS
++    _SC_GETGR_R_SIZE_MAX,
++#define	_SC_GETGR_R_SIZE_MAX		_SC_GETGR_R_SIZE_MAX
++    _SC_GETPW_R_SIZE_MAX,
++#define	_SC_GETPW_R_SIZE_MAX		_SC_GETPW_R_SIZE_MAX
++    _SC_LOGIN_NAME_MAX,
++#define	_SC_LOGIN_NAME_MAX		_SC_LOGIN_NAME_MAX
++    _SC_TTY_NAME_MAX,
++#define	_SC_TTY_NAME_MAX		_SC_TTY_NAME_MAX
++    _SC_THREAD_DESTRUCTOR_ITERATIONS,
++#define	_SC_THREAD_DESTRUCTOR_ITERATIONS _SC_THREAD_DESTRUCTOR_ITERATIONS
++    _SC_THREAD_KEYS_MAX,
++#define	_SC_THREAD_KEYS_MAX		_SC_THREAD_KEYS_MAX
++    _SC_THREAD_STACK_MIN,
++#define	_SC_THREAD_STACK_MIN		_SC_THREAD_STACK_MIN
++    _SC_THREAD_THREADS_MAX,
++#define	_SC_THREAD_THREADS_MAX		_SC_THREAD_THREADS_MAX
++    _SC_THREAD_ATTR_STACKADDR,
++#define	_SC_THREAD_ATTR_STACKADDR	_SC_THREAD_ATTR_STACKADDR
++    _SC_THREAD_ATTR_STACKSIZE,
++#define	_SC_THREAD_ATTR_STACKSIZE	_SC_THREAD_ATTR_STACKSIZE
++    _SC_THREAD_PRIORITY_SCHEDULING,
++#define	_SC_THREAD_PRIORITY_SCHEDULING	_SC_THREAD_PRIORITY_SCHEDULING
++    _SC_THREAD_PRIO_INHERIT,
++#define	_SC_THREAD_PRIO_INHERIT		_SC_THREAD_PRIO_INHERIT
++    _SC_THREAD_PRIO_PROTECT,
++#define	_SC_THREAD_PRIO_PROTECT		_SC_THREAD_PRIO_PROTECT
++    _SC_THREAD_PROCESS_SHARED,
++#define	_SC_THREAD_PROCESS_SHARED	_SC_THREAD_PROCESS_SHARED
++
++    _SC_NPROCESSORS_CONF,
++#define _SC_NPROCESSORS_CONF		_SC_NPROCESSORS_CONF
++    _SC_NPROCESSORS_ONLN,
++#define _SC_NPROCESSORS_ONLN		_SC_NPROCESSORS_ONLN
++    _SC_PHYS_PAGES,
++#define _SC_PHYS_PAGES			_SC_PHYS_PAGES
++    _SC_AVPHYS_PAGES,
++#define _SC_AVPHYS_PAGES		_SC_AVPHYS_PAGES
++    _SC_ATEXIT_MAX,
++#define _SC_ATEXIT_MAX			_SC_ATEXIT_MAX
++    _SC_PASS_MAX,
++#define _SC_PASS_MAX			_SC_PASS_MAX
++
++    _SC_XOPEN_VERSION,
++#define _SC_XOPEN_VERSION		_SC_XOPEN_VERSION
++    _SC_XOPEN_XCU_VERSION,
++#define _SC_XOPEN_XCU_VERSION		_SC_XOPEN_XCU_VERSION
++    _SC_XOPEN_UNIX,
++#define _SC_XOPEN_UNIX			_SC_XOPEN_UNIX
++    _SC_XOPEN_CRYPT,
++#define _SC_XOPEN_CRYPT			_SC_XOPEN_CRYPT
++    _SC_XOPEN_ENH_I18N,
++#define _SC_XOPEN_ENH_I18N		_SC_XOPEN_ENH_I18N
++    _SC_XOPEN_SHM,
++#define _SC_XOPEN_SHM			_SC_XOPEN_SHM
++
++    _SC_2_CHAR_TERM,
++#define _SC_2_CHAR_TERM			_SC_2_CHAR_TERM
++    _SC_2_C_VERSION,
++#define _SC_2_C_VERSION			_SC_2_C_VERSION
++    _SC_2_UPE,
++#define _SC_2_UPE			_SC_2_UPE
++
++    _SC_XOPEN_XPG2,
++#define _SC_XOPEN_XPG2			_SC_XOPEN_XPG2
++    _SC_XOPEN_XPG3,
++#define _SC_XOPEN_XPG3			_SC_XOPEN_XPG3
++    _SC_XOPEN_XPG4,
++#define _SC_XOPEN_XPG4			_SC_XOPEN_XPG4
++
++    _SC_CHAR_BIT,
++#define	_SC_CHAR_BIT			_SC_CHAR_BIT
++    _SC_CHAR_MAX,
++#define	_SC_CHAR_MAX			_SC_CHAR_MAX
++    _SC_CHAR_MIN,
++#define	_SC_CHAR_MIN			_SC_CHAR_MIN
++    _SC_INT_MAX,
++#define	_SC_INT_MAX			_SC_INT_MAX
++    _SC_INT_MIN,
++#define	_SC_INT_MIN			_SC_INT_MIN
++    _SC_LONG_BIT,
++#define	_SC_LONG_BIT			_SC_LONG_BIT
++    _SC_WORD_BIT,
++#define	_SC_WORD_BIT			_SC_WORD_BIT
++    _SC_MB_LEN_MAX,
++#define	_SC_MB_LEN_MAX			_SC_MB_LEN_MAX
++    _SC_NZERO,
++#define	_SC_NZERO			_SC_NZERO
++    _SC_SSIZE_MAX,
++#define	_SC_SSIZE_MAX			_SC_SSIZE_MAX
++    _SC_SCHAR_MAX,
++#define	_SC_SCHAR_MAX			_SC_SCHAR_MAX
++    _SC_SCHAR_MIN,
++#define	_SC_SCHAR_MIN			_SC_SCHAR_MIN
++    _SC_SHRT_MAX,
++#define	_SC_SHRT_MAX			_SC_SHRT_MAX
++    _SC_SHRT_MIN,
++#define	_SC_SHRT_MIN			_SC_SHRT_MIN
++    _SC_UCHAR_MAX,
++#define	_SC_UCHAR_MAX			_SC_UCHAR_MAX
++    _SC_UINT_MAX,
++#define	_SC_UINT_MAX			_SC_UINT_MAX
++    _SC_ULONG_MAX,
++#define	_SC_ULONG_MAX			_SC_ULONG_MAX
++    _SC_USHRT_MAX,
++#define	_SC_USHRT_MAX			_SC_USHRT_MAX
++
++    _SC_NL_ARGMAX,
++#define	_SC_NL_ARGMAX			_SC_NL_ARGMAX
++    _SC_NL_LANGMAX,
++#define	_SC_NL_LANGMAX			_SC_NL_LANGMAX
++    _SC_NL_MSGMAX,
++#define	_SC_NL_MSGMAX			_SC_NL_MSGMAX
++    _SC_NL_NMAX,
++#define	_SC_NL_NMAX			_SC_NL_NMAX
++    _SC_NL_SETMAX,
++#define	_SC_NL_SETMAX			_SC_NL_SETMAX
++    _SC_NL_TEXTMAX,
++#define	_SC_NL_TEXTMAX			_SC_NL_TEXTMAX
++
++    _SC_XBS5_ILP32_OFF32,
++#define _SC_XBS5_ILP32_OFF32		_SC_XBS5_ILP32_OFF32
++    _SC_XBS5_ILP32_OFFBIG,
++#define _SC_XBS5_ILP32_OFFBIG		_SC_XBS5_ILP32_OFFBIG
++    _SC_XBS5_LP64_OFF64,
++#define _SC_XBS5_LP64_OFF64		_SC_XBS5_LP64_OFF64
++    _SC_XBS5_LPBIG_OFFBIG,
++#define _SC_XBS5_LPBIG_OFFBIG		_SC_XBS5_LPBIG_OFFBIG
++
++    _SC_XOPEN_LEGACY,
++#define _SC_XOPEN_LEGACY		_SC_XOPEN_LEGACY
++    _SC_XOPEN_REALTIME,
++#define _SC_XOPEN_REALTIME		_SC_XOPEN_REALTIME
++    _SC_XOPEN_REALTIME_THREADS,
++#define _SC_XOPEN_REALTIME_THREADS	_SC_XOPEN_REALTIME_THREADS
++
++    _SC_ADVISORY_INFO,
++#define _SC_ADVISORY_INFO		_SC_ADVISORY_INFO
++    _SC_BARRIERS,
++#define _SC_BARRIERS			_SC_BARRIERS
++    _SC_BASE,
++#define _SC_BASE			_SC_BASE
++    _SC_C_LANG_SUPPORT,
++#define _SC_C_LANG_SUPPORT		_SC_C_LANG_SUPPORT
++    _SC_C_LANG_SUPPORT_R,
++#define _SC_C_LANG_SUPPORT_R		_SC_C_LANG_SUPPORT_R
++    _SC_CLOCK_SELECTION,
++#define _SC_CLOCK_SELECTION		_SC_CLOCK_SELECTION
++    _SC_CPUTIME,
++#define _SC_CPUTIME			_SC_CPUTIME
++    _SC_THREAD_CPUTIME,
++#define _SC_THREAD_CPUTIME		_SC_THREAD_CPUTIME
++    _SC_DEVICE_IO,
++#define _SC_DEVICE_IO			_SC_DEVICE_IO
++    _SC_DEVICE_SPECIFIC,
++#define _SC_DEVICE_SPECIFIC		_SC_DEVICE_SPECIFIC
++    _SC_DEVICE_SPECIFIC_R,
++#define _SC_DEVICE_SPECIFIC_R		_SC_DEVICE_SPECIFIC_R
++    _SC_FD_MGMT,
++#define _SC_FD_MGMT			_SC_FD_MGMT
++    _SC_FIFO,
++#define _SC_FIFO			_SC_FIFO
++    _SC_PIPE,
++#define _SC_PIPE			_SC_PIPE
++    _SC_FILE_ATTRIBUTES,
++#define _SC_FILE_ATTRIBUTES		_SC_FILE_ATTRIBUTES
++    _SC_FILE_LOCKING,
++#define _SC_FILE_LOCKING		_SC_FILE_LOCKING
++    _SC_FILE_SYSTEM,
++#define _SC_FILE_SYSTEM			_SC_FILE_SYSTEM
++    _SC_MONOTONIC_CLOCK,
++#define _SC_MONOTONIC_CLOCK		_SC_MONOTONIC_CLOCK
++    _SC_MULTI_PROCESS,
++#define _SC_MULTI_PROCESS		_SC_MULTI_PROCESS
++    _SC_SINGLE_PROCESS,
++#define _SC_SINGLE_PROCESS		_SC_SINGLE_PROCESS
++    _SC_NETWORKING,
++#define _SC_NETWORKING			_SC_NETWORKING
++    _SC_READER_WRITER_LOCKS,
++#define _SC_READER_WRITER_LOCKS		_SC_READER_WRITER_LOCKS
++    _SC_SPIN_LOCKS,
++#define _SC_SPIN_LOCKS			_SC_SPIN_LOCKS
++    _SC_REGEXP,
++#define _SC_REGEXP			_SC_REGEXP
++    _SC_REGEX_VERSION,
++#define _SC_REGEX_VERSION		_SC_REGEX_VERSION
++    _SC_SHELL,
++#define _SC_SHELL			_SC_SHELL
++    _SC_SIGNALS,
++#define _SC_SIGNALS			_SC_SIGNALS
++    _SC_SPAWN,
++#define _SC_SPAWN			_SC_SPAWN
++    _SC_SPORADIC_SERVER,
++#define _SC_SPORADIC_SERVER		_SC_SPORADIC_SERVER
++    _SC_THREAD_SPORADIC_SERVER,
++#define _SC_THREAD_SPORADIC_SERVER	_SC_THREAD_SPORADIC_SERVER
++    _SC_SYSTEM_DATABASE,
++#define _SC_SYSTEM_DATABASE		_SC_SYSTEM_DATABASE
++    _SC_SYSTEM_DATABASE_R,
++#define _SC_SYSTEM_DATABASE_R		_SC_SYSTEM_DATABASE_R
++    _SC_TIMEOUTS,
++#define _SC_TIMEOUTS			_SC_TIMEOUTS
++    _SC_TYPED_MEMORY_OBJECTS,
++#define _SC_TYPED_MEMORY_OBJECTS	_SC_TYPED_MEMORY_OBJECTS
++    _SC_USER_GROUPS,
++#define _SC_USER_GROUPS			_SC_USER_GROUPS
++    _SC_USER_GROUPS_R,
++#define _SC_USER_GROUPS_R		_SC_USER_GROUPS_R
++    _SC_2_PBS,
++#define _SC_2_PBS			_SC_2_PBS
++    _SC_2_PBS_ACCOUNTING,
++#define _SC_2_PBS_ACCOUNTING		_SC_2_PBS_ACCOUNTING
++    _SC_2_PBS_LOCATE,
++#define _SC_2_PBS_LOCATE		_SC_2_PBS_LOCATE
++    _SC_2_PBS_MESSAGE,
++#define _SC_2_PBS_MESSAGE		_SC_2_PBS_MESSAGE
++    _SC_2_PBS_TRACK,
++#define _SC_2_PBS_TRACK			_SC_2_PBS_TRACK
++    _SC_SYMLOOP_MAX,
++#define _SC_SYMLOOP_MAX			_SC_SYMLOOP_MAX
++    _SC_STREAMS,
++#define _SC_STREAMS			_SC_STREAMS
++    _SC_2_PBS_CHECKPOINT,
++#define _SC_2_PBS_CHECKPOINT		_SC_2_PBS_CHECKPOINT
++
++    _SC_V6_ILP32_OFF32,
++#define _SC_V6_ILP32_OFF32		_SC_V6_ILP32_OFF32
++    _SC_V6_ILP32_OFFBIG,
++#define _SC_V6_ILP32_OFFBIG		_SC_V6_ILP32_OFFBIG
++    _SC_V6_LP64_OFF64,
++#define _SC_V6_LP64_OFF64		_SC_V6_LP64_OFF64
++    _SC_V6_LPBIG_OFFBIG,
++#define _SC_V6_LPBIG_OFFBIG		_SC_V6_LPBIG_OFFBIG
++
++    _SC_HOST_NAME_MAX,
++#define _SC_HOST_NAME_MAX		_SC_HOST_NAME_MAX
++    _SC_TRACE,
++#define _SC_TRACE			_SC_TRACE
++    _SC_TRACE_EVENT_FILTER,
++#define _SC_TRACE_EVENT_FILTER		_SC_TRACE_EVENT_FILTER
++    _SC_TRACE_INHERIT,
++#define _SC_TRACE_INHERIT		_SC_TRACE_INHERIT
++    _SC_TRACE_LOG,
++#define _SC_TRACE_LOG			_SC_TRACE_LOG
++
++    _SC_LEVEL1_ICACHE_SIZE,
++#define _SC_LEVEL1_ICACHE_SIZE		_SC_LEVEL1_ICACHE_SIZE
++    _SC_LEVEL1_ICACHE_ASSOC,
++#define _SC_LEVEL1_ICACHE_ASSOC		_SC_LEVEL1_ICACHE_ASSOC
++    _SC_LEVEL1_ICACHE_LINESIZE,
++#define _SC_LEVEL1_ICACHE_LINESIZE	_SC_LEVEL1_ICACHE_LINESIZE
++    _SC_LEVEL1_DCACHE_SIZE,
++#define _SC_LEVEL1_DCACHE_SIZE		_SC_LEVEL1_DCACHE_SIZE
++    _SC_LEVEL1_DCACHE_ASSOC,
++#define _SC_LEVEL1_DCACHE_ASSOC		_SC_LEVEL1_DCACHE_ASSOC
++    _SC_LEVEL1_DCACHE_LINESIZE,
++#define _SC_LEVEL1_DCACHE_LINESIZE	_SC_LEVEL1_DCACHE_LINESIZE
++    _SC_LEVEL2_CACHE_SIZE,
++#define _SC_LEVEL2_CACHE_SIZE		_SC_LEVEL2_CACHE_SIZE
++    _SC_LEVEL2_CACHE_ASSOC,
++#define _SC_LEVEL2_CACHE_ASSOC		_SC_LEVEL2_CACHE_ASSOC
++    _SC_LEVEL2_CACHE_LINESIZE,
++#define _SC_LEVEL2_CACHE_LINESIZE	_SC_LEVEL2_CACHE_LINESIZE
++    _SC_LEVEL3_CACHE_SIZE,
++#define _SC_LEVEL3_CACHE_SIZE		_SC_LEVEL3_CACHE_SIZE
++    _SC_LEVEL3_CACHE_ASSOC,
++#define _SC_LEVEL3_CACHE_ASSOC		_SC_LEVEL3_CACHE_ASSOC
++    _SC_LEVEL3_CACHE_LINESIZE,
++#define _SC_LEVEL3_CACHE_LINESIZE	_SC_LEVEL3_CACHE_LINESIZE
++    _SC_LEVEL4_CACHE_SIZE,
++#define _SC_LEVEL4_CACHE_SIZE		_SC_LEVEL4_CACHE_SIZE
++    _SC_LEVEL4_CACHE_ASSOC,
++#define _SC_LEVEL4_CACHE_ASSOC		_SC_LEVEL4_CACHE_ASSOC
++    _SC_LEVEL4_CACHE_LINESIZE,
++#define _SC_LEVEL4_CACHE_LINESIZE	_SC_LEVEL4_CACHE_LINESIZE
++    /* Leave room here, maybe we need a few more cache levels some day.  */
++
++    _SC_IPV6 = _SC_LEVEL1_ICACHE_SIZE + 50,
++#define _SC_IPV6			_SC_IPV6
++    _SC_RAW_SOCKETS,
++#define _SC_RAW_SOCKETS			_SC_RAW_SOCKETS
++
++    _SC_V7_ILP32_OFF32,
++#define _SC_V7_ILP32_OFF32		_SC_V7_ILP32_OFF32
++    _SC_V7_ILP32_OFFBIG,
++#define _SC_V7_ILP32_OFFBIG		_SC_V7_ILP32_OFFBIG
++    _SC_V7_LP64_OFF64,
++#define _SC_V7_LP64_OFF64		_SC_V7_LP64_OFF64
++    _SC_V7_LPBIG_OFFBIG,
++#define _SC_V7_LPBIG_OFFBIG		_SC_V7_LPBIG_OFFBIG
++
++    _SC_SS_REPL_MAX,
++#define _SC_SS_REPL_MAX			_SC_SS_REPL_MAX
++
++    _SC_TRACE_EVENT_NAME_MAX,
++#define _SC_TRACE_EVENT_NAME_MAX	_SC_TRACE_EVENT_NAME_MAX
++    _SC_TRACE_NAME_MAX,
++#define _SC_TRACE_NAME_MAX		_SC_TRACE_NAME_MAX
++    _SC_TRACE_SYS_MAX,
++#define _SC_TRACE_SYS_MAX		_SC_TRACE_SYS_MAX
++    _SC_TRACE_USER_EVENT_MAX,
++#define _SC_TRACE_USER_EVENT_MAX	_SC_TRACE_USER_EVENT_MAX
++
++    _SC_XOPEN_STREAMS,
++#define _SC_XOPEN_STREAMS		_SC_XOPEN_STREAMS
++
++    _SC_THREAD_ROBUST_PRIO_INHERIT,
++#define _SC_THREAD_ROBUST_PRIO_INHERIT	_SC_THREAD_ROBUST_PRIO_INHERIT
++    _SC_THREAD_ROBUST_PRIO_PROTECT,
++#define _SC_THREAD_ROBUST_PRIO_PROTECT	_SC_THREAD_ROBUST_PRIO_PROTECT
++  };
++
++/* Values for the NAME argument to `confstr'.  */
++enum
++  {
++    _CS_PATH,			/* The default search path.  */
++#define _CS_PATH		_CS_PATH
++
++    _CS_V6_WIDTH_RESTRICTED_ENVS,
++#define _CS_V6_WIDTH_RESTRICTED_ENVS	_CS_V6_WIDTH_RESTRICTED_ENVS
++#define _CS_POSIX_V6_WIDTH_RESTRICTED_ENVS	_CS_V6_WIDTH_RESTRICTED_ENVS
++
++    _CS_GNU_LIBC_VERSION,
++#define _CS_GNU_LIBC_VERSION	_CS_GNU_LIBC_VERSION
++    _CS_GNU_LIBPTHREAD_VERSION,
++#define _CS_GNU_LIBPTHREAD_VERSION	_CS_GNU_LIBPTHREAD_VERSION
++
++    _CS_V5_WIDTH_RESTRICTED_ENVS,
++#define _CS_V5_WIDTH_RESTRICTED_ENVS	_CS_V5_WIDTH_RESTRICTED_ENVS
++#define _CS_POSIX_V5_WIDTH_RESTRICTED_ENVS	_CS_V5_WIDTH_RESTRICTED_ENVS
++
++    _CS_V7_WIDTH_RESTRICTED_ENVS,
++#define _CS_V7_WIDTH_RESTRICTED_ENVS	_CS_V7_WIDTH_RESTRICTED_ENVS
++#define _CS_POSIX_V7_WIDTH_RESTRICTED_ENVS	_CS_V7_WIDTH_RESTRICTED_ENVS
++
++    _CS_LFS_CFLAGS = 1000,
++#define _CS_LFS_CFLAGS	_CS_LFS_CFLAGS
++    _CS_LFS_LDFLAGS,
++#define _CS_LFS_LDFLAGS	_CS_LFS_LDFLAGS
++    _CS_LFS_LIBS,
++#define _CS_LFS_LIBS		_CS_LFS_LIBS
++    _CS_LFS_LINTFLAGS,
++#define _CS_LFS_LINTFLAGS	_CS_LFS_LINTFLAGS
++    _CS_LFS64_CFLAGS,
++#define _CS_LFS64_CFLAGS	_CS_LFS64_CFLAGS
++    _CS_LFS64_LDFLAGS,
++#define _CS_LFS64_LDFLAGS	_CS_LFS64_LDFLAGS
++    _CS_LFS64_LIBS,
++#define _CS_LFS64_LIBS	_CS_LFS64_LIBS
++    _CS_LFS64_LINTFLAGS,
++#define _CS_LFS64_LINTFLAGS	_CS_LFS64_LINTFLAGS
++
++    _CS_XBS5_ILP32_OFF32_CFLAGS = 1100,
++#define _CS_XBS5_ILP32_OFF32_CFLAGS _CS_XBS5_ILP32_OFF32_CFLAGS
++    _CS_XBS5_ILP32_OFF32_LDFLAGS,
++#define _CS_XBS5_ILP32_OFF32_LDFLAGS _CS_XBS5_ILP32_OFF32_LDFLAGS
++    _CS_XBS5_ILP32_OFF32_LIBS,
++#define _CS_XBS5_ILP32_OFF32_LIBS _CS_XBS5_ILP32_OFF32_LIBS
++    _CS_XBS5_ILP32_OFF32_LINTFLAGS,
++#define _CS_XBS5_ILP32_OFF32_LINTFLAGS _CS_XBS5_ILP32_OFF32_LINTFLAGS
++    _CS_XBS5_ILP32_OFFBIG_CFLAGS,
++#define _CS_XBS5_ILP32_OFFBIG_CFLAGS _CS_XBS5_ILP32_OFFBIG_CFLAGS
++    _CS_XBS5_ILP32_OFFBIG_LDFLAGS,
++#define _CS_XBS5_ILP32_OFFBIG_LDFLAGS _CS_XBS5_ILP32_OFFBIG_LDFLAGS
++    _CS_XBS5_ILP32_OFFBIG_LIBS,
++#define _CS_XBS5_ILP32_OFFBIG_LIBS _CS_XBS5_ILP32_OFFBIG_LIBS
++    _CS_XBS5_ILP32_OFFBIG_LINTFLAGS,
++#define _CS_XBS5_ILP32_OFFBIG_LINTFLAGS _CS_XBS5_ILP32_OFFBIG_LINTFLAGS
++    _CS_XBS5_LP64_OFF64_CFLAGS,
++#define _CS_XBS5_LP64_OFF64_CFLAGS _CS_XBS5_LP64_OFF64_CFLAGS
++    _CS_XBS5_LP64_OFF64_LDFLAGS,
++#define _CS_XBS5_LP64_OFF64_LDFLAGS _CS_XBS5_LP64_OFF64_LDFLAGS
++    _CS_XBS5_LP64_OFF64_LIBS,
++#define _CS_XBS5_LP64_OFF64_LIBS _CS_XBS5_LP64_OFF64_LIBS
++    _CS_XBS5_LP64_OFF64_LINTFLAGS,
++#define _CS_XBS5_LP64_OFF64_LINTFLAGS _CS_XBS5_LP64_OFF64_LINTFLAGS
++    _CS_XBS5_LPBIG_OFFBIG_CFLAGS,
++#define _CS_XBS5_LPBIG_OFFBIG_CFLAGS _CS_XBS5_LPBIG_OFFBIG_CFLAGS
++    _CS_XBS5_LPBIG_OFFBIG_LDFLAGS,
++#define _CS_XBS5_LPBIG_OFFBIG_LDFLAGS _CS_XBS5_LPBIG_OFFBIG_LDFLAGS
++    _CS_XBS5_LPBIG_OFFBIG_LIBS,
++#define _CS_XBS5_LPBIG_OFFBIG_LIBS _CS_XBS5_LPBIG_OFFBIG_LIBS
++    _CS_XBS5_LPBIG_OFFBIG_LINTFLAGS,
++#define _CS_XBS5_LPBIG_OFFBIG_LINTFLAGS _CS_XBS5_LPBIG_OFFBIG_LINTFLAGS
++
++    _CS_POSIX_V6_ILP32_OFF32_CFLAGS,
++#define _CS_POSIX_V6_ILP32_OFF32_CFLAGS _CS_POSIX_V6_ILP32_OFF32_CFLAGS
++    _CS_POSIX_V6_ILP32_OFF32_LDFLAGS,
++#define _CS_POSIX_V6_ILP32_OFF32_LDFLAGS _CS_POSIX_V6_ILP32_OFF32_LDFLAGS
++    _CS_POSIX_V6_ILP32_OFF32_LIBS,
++#define _CS_POSIX_V6_ILP32_OFF32_LIBS _CS_POSIX_V6_ILP32_OFF32_LIBS
++    _CS_POSIX_V6_ILP32_OFF32_LINTFLAGS,
++#define _CS_POSIX_V6_ILP32_OFF32_LINTFLAGS _CS_POSIX_V6_ILP32_OFF32_LINTFLAGS
++    _CS_POSIX_V6_ILP32_OFFBIG_CFLAGS,
++#define _CS_POSIX_V6_ILP32_OFFBIG_CFLAGS _CS_POSIX_V6_ILP32_OFFBIG_CFLAGS
++    _CS_POSIX_V6_ILP32_OFFBIG_LDFLAGS,
++#define _CS_POSIX_V6_ILP32_OFFBIG_LDFLAGS _CS_POSIX_V6_ILP32_OFFBIG_LDFLAGS
++    _CS_POSIX_V6_ILP32_OFFBIG_LIBS,
++#define _CS_POSIX_V6_ILP32_OFFBIG_LIBS _CS_POSIX_V6_ILP32_OFFBIG_LIBS
++    _CS_POSIX_V6_ILP32_OFFBIG_LINTFLAGS,
++#define _CS_POSIX_V6_ILP32_OFFBIG_LINTFLAGS _CS_POSIX_V6_ILP32_OFFBIG_LINTFLAGS
++    _CS_POSIX_V6_LP64_OFF64_CFLAGS,
++#define _CS_POSIX_V6_LP64_OFF64_CFLAGS _CS_POSIX_V6_LP64_OFF64_CFLAGS
++    _CS_POSIX_V6_LP64_OFF64_LDFLAGS,
++#define _CS_POSIX_V6_LP64_OFF64_LDFLAGS _CS_POSIX_V6_LP64_OFF64_LDFLAGS
++    _CS_POSIX_V6_LP64_OFF64_LIBS,
++#define _CS_POSIX_V6_LP64_OFF64_LIBS _CS_POSIX_V6_LP64_OFF64_LIBS
++    _CS_POSIX_V6_LP64_OFF64_LINTFLAGS,
++#define _CS_POSIX_V6_LP64_OFF64_LINTFLAGS _CS_POSIX_V6_LP64_OFF64_LINTFLAGS
++    _CS_POSIX_V6_LPBIG_OFFBIG_CFLAGS,
++#define _CS_POSIX_V6_LPBIG_OFFBIG_CFLAGS _CS_POSIX_V6_LPBIG_OFFBIG_CFLAGS
++    _CS_POSIX_V6_LPBIG_OFFBIG_LDFLAGS,
++#define _CS_POSIX_V6_LPBIG_OFFBIG_LDFLAGS _CS_POSIX_V6_LPBIG_OFFBIG_LDFLAGS
++    _CS_POSIX_V6_LPBIG_OFFBIG_LIBS,
++#define _CS_POSIX_V6_LPBIG_OFFBIG_LIBS _CS_POSIX_V6_LPBIG_OFFBIG_LIBS
++    _CS_POSIX_V6_LPBIG_OFFBIG_LINTFLAGS,
++#define _CS_POSIX_V6_LPBIG_OFFBIG_LINTFLAGS _CS_POSIX_V6_LPBIG_OFFBIG_LINTFLAGS
++
++    _CS_POSIX_V7_ILP32_OFF32_CFLAGS,
++#define _CS_POSIX_V7_ILP32_OFF32_CFLAGS _CS_POSIX_V7_ILP32_OFF32_CFLAGS
++    _CS_POSIX_V7_ILP32_OFF32_LDFLAGS,
++#define _CS_POSIX_V7_ILP32_OFF32_LDFLAGS _CS_POSIX_V7_ILP32_OFF32_LDFLAGS
++    _CS_POSIX_V7_ILP32_OFF32_LIBS,
++#define _CS_POSIX_V7_ILP32_OFF32_LIBS _CS_POSIX_V7_ILP32_OFF32_LIBS
++    _CS_POSIX_V7_ILP32_OFF32_LINTFLAGS,
++#define _CS_POSIX_V7_ILP32_OFF32_LINTFLAGS _CS_POSIX_V7_ILP32_OFF32_LINTFLAGS
++    _CS_POSIX_V7_ILP32_OFFBIG_CFLAGS,
++#define _CS_POSIX_V7_ILP32_OFFBIG_CFLAGS _CS_POSIX_V7_ILP32_OFFBIG_CFLAGS
++    _CS_POSIX_V7_ILP32_OFFBIG_LDFLAGS,
++#define _CS_POSIX_V7_ILP32_OFFBIG_LDFLAGS _CS_POSIX_V7_ILP32_OFFBIG_LDFLAGS
++    _CS_POSIX_V7_ILP32_OFFBIG_LIBS,
++#define _CS_POSIX_V7_ILP32_OFFBIG_LIBS _CS_POSIX_V7_ILP32_OFFBIG_LIBS
++    _CS_POSIX_V7_ILP32_OFFBIG_LINTFLAGS,
++#define _CS_POSIX_V7_ILP32_OFFBIG_LINTFLAGS _CS_POSIX_V7_ILP32_OFFBIG_LINTFLAGS
++    _CS_POSIX_V7_LP64_OFF64_CFLAGS,
++#define _CS_POSIX_V7_LP64_OFF64_CFLAGS _CS_POSIX_V7_LP64_OFF64_CFLAGS
++    _CS_POSIX_V7_LP64_OFF64_LDFLAGS,
++#define _CS_POSIX_V7_LP64_OFF64_LDFLAGS _CS_POSIX_V7_LP64_OFF64_LDFLAGS
++    _CS_POSIX_V7_LP64_OFF64_LIBS,
++#define _CS_POSIX_V7_LP64_OFF64_LIBS _CS_POSIX_V7_LP64_OFF64_LIBS
++    _CS_POSIX_V7_LP64_OFF64_LINTFLAGS,
++#define _CS_POSIX_V7_LP64_OFF64_LINTFLAGS _CS_POSIX_V7_LP64_OFF64_LINTFLAGS
++    _CS_POSIX_V7_LPBIG_OFFBIG_CFLAGS,
++#define _CS_POSIX_V7_LPBIG_OFFBIG_CFLAGS _CS_POSIX_V7_LPBIG_OFFBIG_CFLAGS
++    _CS_POSIX_V7_LPBIG_OFFBIG_LDFLAGS,
++#define _CS_POSIX_V7_LPBIG_OFFBIG_LDFLAGS _CS_POSIX_V7_LPBIG_OFFBIG_LDFLAGS
++    _CS_POSIX_V7_LPBIG_OFFBIG_LIBS,
++#define _CS_POSIX_V7_LPBIG_OFFBIG_LIBS _CS_POSIX_V7_LPBIG_OFFBIG_LIBS
++    _CS_POSIX_V7_LPBIG_OFFBIG_LINTFLAGS
++#define _CS_POSIX_V7_LPBIG_OFFBIG_LINTFLAGS _CS_POSIX_V7_LPBIG_OFFBIG_LINTFLAGS
++  };
+diff -Naur glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/dlfcn.h glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/dlfcn.h
+--- glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/dlfcn.h	1970-01-01 02:00:00.000000000 +0200
++++ glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/dlfcn.h	2010-03-08 16:00:17.108076159 +0200
+@@ -0,0 +1,65 @@
++/* System dependent definitions for run-time dynamic loading.
++   Copyright (C) 1996-2001, 2004 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, write to the Free
++   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
++   02111-1307 USA.  */
++
++#ifndef _DLFCN_H
++# error "Never use <bits/dlfcn.h> directly; include <dlfcn.h> instead."
++#endif
++
++/* The MODE argument to `dlopen' contains one of the following: */
++#define RTLD_LAZY	0x00001	/* Lazy function call binding.  */
++#define RTLD_NOW	0x00002	/* Immediate function call binding.  */
++#define	RTLD_BINDING_MASK   0x3	/* Mask of binding time value.  */
++#define RTLD_NOLOAD	0x00004	/* Do not load the object.  */
++#define RTLD_DEEPBIND	0x00008	/* Use deep binding.  */
++
++/* If the following bit is set in the MODE argument to `dlopen',
++   the symbols of the loaded object and its dependencies are made
++   visible as if the object were linked directly into the program.  */
++#define RTLD_GLOBAL	0x00100
++
++/* Unix98 demands the following flag which is the inverse to RTLD_GLOBAL.
++   The implementation does this by default and so we can define the
++   value to zero.  */
++#define RTLD_LOCAL	0
++
++/* Do not delete object when closed.  */
++#define RTLD_NODELETE	0x01000
++
++#ifdef __USE_GNU
++/* To support profiling of shared objects it is a good idea to call
++   the function found using `dlsym' using the following macro since
++   these calls do not use the PLT.  But this would mean the dynamic
++   loader has no chance to find out when the function is called.  The
++   macro applies the necessary magic so that profiling is possible.
++   Rewrite
++	foo = (*fctp) (arg1, arg2);
++   into
++        foo = DL_CALL_FCT (fctp, (arg1, arg2));
++*/
++# define DL_CALL_FCT(fctp, args) \
++  (_dl_mcount_wrapper_check ((void *) (fctp)), (*(fctp)) args)
++
++__BEGIN_DECLS
++
++/* This function calls the profiling functions.  */
++extern void _dl_mcount_wrapper_check (void *__selfpc) __THROW;
++
++__END_DECLS
++
++#endif
+diff -Naur glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/elfclass.h glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/elfclass.h
+--- glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/elfclass.h	1970-01-01 02:00:00.000000000 +0200
++++ glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/elfclass.h	2010-03-08 16:00:17.111075361 +0200
+@@ -0,0 +1,14 @@
++/* This file specifies the native word size of the machine, which indicates
++   the ELF file class used for executables and shared objects on this
++   machine.  */
++
++#ifndef _LINK_H
++# error "Never use <bits/elfclass.h> directly; include <link.h> instead."
++#endif
++
++#include <bits/wordsize.h>
++
++#define __ELF_NATIVE_CLASS __WORDSIZE
++
++/* The entries in the .hash table always have a size of 32 bits.  */
++typedef uint32_t Elf_Symndx;
+diff -Naur glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/environments.h glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/environments.h
+--- glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/environments.h	1970-01-01 02:00:00.000000000 +0200
++++ glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/environments.h	2010-03-08 16:00:17.118074965 +0200
+@@ -0,0 +1,88 @@
++/* Copyright (C) 1999, 2001, 2004, 2009 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, write to the Free
++   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
++   02111-1307 USA.  */
++
++#ifndef _UNISTD_H
++# error "Never include this file directly.  Use <unistd.h> instead"
++#endif
++
++#include <bits/wordsize.h>
++
++/* This header should define the following symbols under the described
++   situations.  A value `1' means that the model is always supported,
++   `-1' means it is never supported.  Undefined means it cannot be
++   statically decided.
++
++   _POSIX_V7_ILP32_OFF32   32bit int, long, pointers, and off_t type
++   _POSIX_V7_ILP32_OFFBIG  32bit int, long, and pointers and larger off_t type
++
++   _POSIX_V7_LP64_OFF32	   64bit long and pointers and 32bit off_t type
++   _POSIX_V7_LPBIG_OFFBIG  64bit long and pointers and large off_t type
++
++   The macros _POSIX_V6_ILP32_OFF32, _POSIX_V6_ILP32_OFFBIG,
++   _POSIX_V6_LP64_OFF32, _POSIX_V6_LPBIG_OFFBIG, _XBS5_ILP32_OFF32,
++   _XBS5_ILP32_OFFBIG, _XBS5_LP64_OFF32, and _XBS5_LPBIG_OFFBIG were
++   used in previous versions of the Unix standard and are available
++   only for compatibility.
++*/
++
++#if __WORDSIZE == 64
++
++/* We can never provide environments with 32-bit wide pointers.  */
++# define _POSIX_V7_ILP32_OFF32	-1
++# define _POSIX_V7_ILP32_OFFBIG	-1
++# define _POSIX_V6_ILP32_OFF32	-1
++# define _POSIX_V6_ILP32_OFFBIG	-1
++# define _XBS5_ILP32_OFF32	-1
++# define _XBS5_ILP32_OFFBIG	-1
++/* We also have no use (for now) for an environment with bigger pointers
++   and offsets.  */
++# define _POSIX_V7_LPBIG_OFFBIG	-1
++# define _POSIX_V6_LPBIG_OFFBIG	-1
++# define _XBS5_LPBIG_OFFBIG	-1
++
++/* By default we have 64-bit wide `long int', pointers and `off_t'.  */
++# define _POSIX_V7_LP64_OFF64	1
++# define _POSIX_V6_LP64_OFF64	1
++# define _XBS5_LP64_OFF64	1
++
++#else /* __WORDSIZE == 32 */
++
++/* By default we have 32-bit wide `int', `long int', pointers and `off_t'
++   and all platforms support LFS.  */
++# define _POSIX_V7_ILP32_OFF32	1
++# define _POSIX_V7_ILP32_OFFBIG	1
++# define _POSIX_V6_ILP32_OFF32	1
++# define _POSIX_V6_ILP32_OFFBIG	1
++# define _XBS5_ILP32_OFF32	1
++# define _XBS5_ILP32_OFFBIG	1
++
++/* We optionally provide an environment with the above size but an 64-bit
++   side `off_t'.  Therefore we don't define _POSIX_V7_ILP32_OFFBIG.  */
++
++/* We can never provide environments with 64-bit wide pointers.  */
++# define _POSIX_V7_LP64_OFF64	-1
++# define _POSIX_V7_LPBIG_OFFBIG	-1
++# define _POSIX_V6_LP64_OFF64	-1
++# define _POSIX_V6_LPBIG_OFFBIG	-1
++# define _XBS5_LP64_OFF64	-1
++# define _XBS5_LPBIG_OFFBIG	-1
++
++/* CFLAGS.  */
++#define __ILP32_OFFBIG_CFLAGS   "-D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64"
++
++#endif /* __WORDSIZE == 32 */
+diff -Naur glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/fenvinline.h glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/fenvinline.h
+--- glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/fenvinline.h	1970-01-01 02:00:00.000000000 +0200
++++ glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/fenvinline.h	2010-03-08 16:00:17.142075618 +0200
+@@ -0,0 +1,8 @@
++/* This file provides inline versions of floating-pint environment
++   handling functions.  If there were any.  */
++
++#ifndef __NO_MATH_INLINES
++
++/* Here is where the code would go.  */
++
++#endif
+diff -Naur glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/huge_vall.h glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/huge_vall.h
+--- glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/huge_vall.h	1970-01-01 02:00:00.000000000 +0200
++++ glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/huge_vall.h	2010-03-08 16:00:17.151076182 +0200
+@@ -0,0 +1,29 @@
++/* Default `HUGE_VALL' constant.
++   Used by <stdlib.h> and <math.h> functions for overflow.
++   Copyright (C) 1992, 1996, 1997, 2004 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, write to the Free
++   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
++   02111-1307 USA.  */
++
++#ifndef _MATH_H
++# error "Never use <bits/huge_vall.h> directly; include <math.h> instead."
++#endif
++
++#if __GNUC_PREREQ(3,3)
++# define HUGE_VALL	(__builtin_huge_vall())
++#else
++# define HUGE_VALL	((long double) HUGE_VAL)
++#endif
+diff -Naur glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/ipctypes.h glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/ipctypes.h
+--- glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/ipctypes.h	1970-01-01 02:00:00.000000000 +0200
++++ glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/ipctypes.h	2010-03-08 16:00:17.169080268 +0200
+@@ -0,0 +1,37 @@
++/* bits/ipctypes.h -- Define some types used by SysV IPC/MSG/SHM.  Generic.
++   Copyright (C) 2002 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, write to the Free
++   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
++   02111-1307 USA.  */
++
++/*
++ * Never include <bits/ipctypes.h> directly.
++ */
++
++#ifndef _BITS_IPCTYPES_H
++#define _BITS_IPCTYPES_H	1
++
++#include <bits/types.h>
++
++/* Used in `struct shmid_ds'.  */
++# if __WORDSIZE == 32
++typedef unsigned short int __ipc_pid_t;
++# else
++typedef int __ipc_pid_t;
++# endif
++
++
++#endif /* bits/ipctypes.h */
+diff -Naur glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/libc-tsd.h glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/libc-tsd.h
+--- glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/libc-tsd.h	1970-01-01 02:00:00.000000000 +0200
++++ glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/libc-tsd.h	2010-03-08 16:00:17.177075870 +0200
+@@ -0,0 +1,70 @@
++/* libc-internal interface for thread-specific data.  Stub or TLS version.
++   Copyright (C) 1998,2001,2002,2008 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, write to the Free
++   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
++   02111-1307 USA.  */
++
++#ifndef _GENERIC_BITS_LIBC_TSD_H
++#define _GENERIC_BITS_LIBC_TSD_H 1
++
++/* This file defines the following macros for accessing a small fixed
++   set of thread-specific `void *' data used only internally by libc.
++
++   __libc_tsd_define(CLASS, TYPE, KEY)	-- Define or declare a datum with TYPE
++   					   for KEY.  CLASS can be `static' for
++					   keys used in only one source file,
++					   empty for global definitions, or
++					   `extern' for global declarations.
++   __libc_tsd_address(TYPE, KEY)	-- Return the `TYPE *' pointing to
++   					   the current thread's datum for KEY.
++   __libc_tsd_get(TYPE, KEY)		-- Return the `TYPE' datum for KEY.
++   __libc_tsd_set(TYPE, KEY, VALUE)	-- Set the datum for KEY to VALUE.
++
++   The set of available KEY's will usually be provided as an enum,
++   and contains (at least):
++		_LIBC_TSD_KEY_MALLOC
++		_LIBC_TSD_KEY_DL_ERROR
++		_LIBC_TSD_KEY_RPC_VARS
++   All uses must be the literal _LIBC_TSD_* name in the __libc_tsd_* macros.
++   Some implementations may not provide any enum at all and instead
++   using string pasting in the macros.  */
++
++#include <tls.h>
++
++/* When full support for __thread variables is available, this interface is
++   just a trivial wrapper for it.  Without TLS, this is the generic/stub
++   implementation for wholly single-threaded systems.
++
++   We don't define an enum for the possible key values, because the KEYs
++   translate directly into variables by macro magic.  */
++
++#if USE___THREAD
++# define __libc_tsd_define(CLASS, TYPE, KEY)	\
++  CLASS __thread TYPE __libc_tsd_##KEY attribute_tls_model_ie;
++
++# define __libc_tsd_address(TYPE, KEY)		(&__libc_tsd_##KEY)
++# define __libc_tsd_get(TYPE, KEY)		(__libc_tsd_##KEY)
++# define __libc_tsd_set(TYPE, KEY, VALUE)	(__libc_tsd_##KEY = (VALUE))
++#else
++# define __libc_tsd_define(CLASS, TYPE, KEY)	\
++  CLASS TYPE __libc_tsd_##KEY##_data;
++
++# define __libc_tsd_address(TYPE, KEY)		(&__libc_tsd_##KEY##_data)
++# define __libc_tsd_get(TYPE, KEY)		(__libc_tsd_##KEY##_data)
++# define __libc_tsd_set(TYPE, KEY, VALUE)	(__libc_tsd_##KEY##_data = (VALUE))
++#endif
++
++#endif	/* bits/libc-tsd.h */
+diff -Naur glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/mathinline.h glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/mathinline.h
+--- glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/mathinline.h	1970-01-01 02:00:00.000000000 +0200
++++ glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/mathinline.h	2010-03-08 16:00:17.190075233 +0200
+@@ -0,0 +1,12 @@
++/* This file should provide inline versions of math functions.
++
++   Surround GCC-specific parts with #ifdef __GNUC__, and use `__extern_inline'.
++
++   This file should define __MATH_INLINES if functions are actually defined as
++   inlines.  */
++
++#if !defined __NO_MATH_INLINES && defined __OPTIMIZE__
++
++/* Here goes the real code.  */
++
++#endif
+diff -Naur glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/netdb.h glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/netdb.h
+--- glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/netdb.h	1970-01-01 02:00:00.000000000 +0200
++++ glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/netdb.h	2010-03-08 16:00:17.204078635 +0200
+@@ -0,0 +1,33 @@
++/* Copyright (C) 1996, 1997, 1998, 1999, 2000 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, write to the Free
++   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
++   02111-1307 USA.  */
++
++#ifndef _NETDB_H
++# error "Never include <bits/netdb.h> directly; use <netdb.h> instead."
++#endif
++
++
++/* Description of data base entry for a single network.  NOTE: here a
++   poor assumption is made.  The network number is expected to fit
++   into an unsigned long int variable.  */
++struct netent
++{
++  char *n_name;			/* Official name of network.  */
++  char **n_aliases;		/* Alias list.  */
++  int n_addrtype;		/* Net address type.  */
++  uint32_t n_net;		/* Network number.  */
++};
+diff -Naur glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/pthreadtypes.h glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/pthreadtypes.h
+--- glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/pthreadtypes.h	1970-01-01 02:00:00.000000000 +0200
++++ glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/pthreadtypes.h	2010-03-08 16:00:17.241075793 +0200
+@@ -0,0 +1 @@
++/* No thread support.  */
+diff -Naur glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/select.h glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/select.h
+--- glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/select.h	1970-01-01 02:00:00.000000000 +0200
++++ glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/select.h	2010-03-08 16:00:17.075072945 +0200
+@@ -0,0 +1,35 @@
++/* Copyright (C) 1997, 1998, 2001 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, write to the Free
++   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
++   02111-1307 USA.  */
++
++#ifndef _SYS_SELECT_H
++# error "Never use <bits/select.h> directly; include <sys/select.h> instead."
++#endif
++
++
++/* We don't use `memset' because this would require a prototype and
++   the array isn't too big.  */
++#define __FD_ZERO(s) \
++  do {									      \
++    unsigned int __i;							      \
++    fd_set *__arr = (s);						      \
++    for (__i = 0; __i < sizeof (fd_set) / sizeof (__fd_mask); ++__i)	      \
++      __FDS_BITS (__arr)[__i] = 0;					      \
++  } while (0)
++#define __FD_SET(d, s)     (__FDS_BITS (s)[__FDELT(d)] |= __FDMASK(d))
++#define __FD_CLR(d, s)     (__FDS_BITS (s)[__FDELT(d)] &= ~__FDMASK(d))
++#define __FD_ISSET(d, s)   ((__FDS_BITS (s)[__FDELT(d)] & __FDMASK(d)) != 0)
+diff -Naur glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/sigthread.h glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/sigthread.h
+--- glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/sigthread.h	1970-01-01 02:00:00.000000000 +0200
++++ glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/sigthread.h	2010-03-08 16:00:17.071074424 +0200
+@@ -0,0 +1,38 @@
++/* Signal handling function for threaded programs.
++   Copyright (C) 1998, 1999, 2000, 2002 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public License as
++   published by the Free Software Foundation; either version 2.1 of the
++   License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; see the file COPYING.LIB.  If not,
++   write to the Free Software Foundation, Inc., 59 Temple Place - Suite 330,
++   Boston, MA 02111-1307, USA.  */
++
++#ifndef _BITS_SIGTHREAD_H
++#define _BITS_SIGTHREAD_H	1
++
++#if !defined _SIGNAL_H && !defined _PTHREAD_H
++# error "Never include this file directly.  Use <pthread.h> instead"
++#endif
++
++/* Functions for handling signals. */
++
++/* Modify the signal mask for the calling thread.  The arguments have
++   the same meaning as for sigprocmask(2). */
++extern int pthread_sigmask (int __how,
++			    __const __sigset_t *__restrict __newmask,
++			    __sigset_t *__restrict __oldmask)__THROW;
++
++/* Send signal SIGNO to the given thread. */
++extern int pthread_kill (pthread_t __threadid, int __signo) __THROW;
++
++#endif	/* bits/sigthread.h */
+diff -Naur glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/sockaddr.h glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/sockaddr.h
+--- glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/sockaddr.h	1970-01-01 02:00:00.000000000 +0200
++++ glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/sockaddr.h	2010-03-08 16:00:17.292076506 +0200
+@@ -0,0 +1,40 @@
++/* Definition of `struct sockaddr_*' common members.  Generic/4.2 BSD version.
++   Copyright (C) 1995,1996,1997,1998,2000,2001 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, write to the Free
++   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
++   02111-1307 USA.  */
++
++/*
++ * Never include this file directly; use <sys/socket.h> instead.
++ */
++
++#ifndef _BITS_SOCKADDR_H
++#define _BITS_SOCKADDR_H	1
++
++
++/* POSIX.1g specifies this type name for the `sa_family' member.  */
++typedef unsigned short int sa_family_t;
++
++/* This macro is used to declare the initial common members
++   of the data types used for socket addresses, `struct sockaddr',
++   `struct sockaddr_in', `struct sockaddr_un', etc.  */
++
++#define	__SOCKADDR_COMMON(sa_prefix) \
++  sa_family_t sa_prefix##family
++
++#define __SOCKADDR_COMMON_SIZE	(sizeof (unsigned short int))
++
++#endif	/* bits/sockaddr.h */
+diff -Naur glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/stdio-lock.h glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/stdio-lock.h
+--- glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/stdio-lock.h	1970-01-01 02:00:00.000000000 +0200
++++ glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/stdio-lock.h	2010-03-08 16:00:17.323077019 +0200
+@@ -0,0 +1,58 @@
++/* Thread package specific definitions of stream lock type.  Generic version.
++   Copyright (C) 2000, 2001, 2002, 2003 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, write to the Free
++   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
++   02111-1307 USA.  */
++
++#ifndef _BITS_STDIO_LOCK_H
++#define _BITS_STDIO_LOCK_H 1
++
++#include <bits/libc-lock.h>
++
++__libc_lock_define_recursive (typedef, _IO_lock_t)
++
++/* We need recursive (counting) mutexes.  */
++#ifdef _LIBC_LOCK_RECURSIVE_INITIALIZER
++# define _IO_lock_initializer _LIBC_LOCK_RECURSIVE_INITIALIZER
++#elif _IO_MTSAFE_IO
++ #error libio needs recursive mutexes for _IO_MTSAFE_IO
++#endif
++
++#define _IO_lock_init(_name)	__libc_lock_init_recursive (_name)
++#define _IO_lock_fini(_name)	__libc_lock_fini_recursive (_name)
++#define _IO_lock_lock(_name)	__libc_lock_lock_recursive (_name)
++#define _IO_lock_trylock(_name)	__libc_lock_trylock_recursive (_name)
++#define _IO_lock_unlock(_name)	__libc_lock_unlock_recursive (_name)
++
++
++#define _IO_cleanup_region_start(_fct, _fp) \
++  __libc_cleanup_region_start (((_fp)->_flags & _IO_USER_LOCK) == 0, _fct, _fp)
++#define _IO_cleanup_region_start_noarg(_fct) \
++  __libc_cleanup_region_start (1, _fct, NULL)
++#define _IO_cleanup_region_end(_doit) \
++  __libc_cleanup_region_end (_doit)
++
++#if defined _LIBC && !defined NOT_IN_libc
++# define _IO_acquire_lock(_fp) \
++  _IO_cleanup_region_start ((void (*) (void *)) _IO_funlockfile, (_fp));      \
++  _IO_flockfile (_fp)
++
++# define _IO_release_lock(_fp) \
++  _IO_funlockfile (_fp);						      \
++  _IO_cleanup_region_end (0)
++#endif
++
++#endif /* bits/stdio-lock.h */
+diff -Naur glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/stropts.h glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/stropts.h
+--- glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/stropts.h	1970-01-01 02:00:00.000000000 +0200
++++ glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/stropts.h	2010-03-08 16:00:17.340074810 +0200
+@@ -0,0 +1,231 @@
++/* Copyright (C) 1998, 1999, 2000, 2002 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, write to the Free
++   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
++   02111-1307 USA.  */
++
++#ifndef _STROPTS_H
++# error "Never include <bits/stropts.h> directly; use <stropts.h> instead."
++#endif
++
++#ifndef _BITS_STROPTS_H
++#define _BITS_STROPTS_H	1
++
++#include <bits/types.h>
++
++/* Macros used as `request' argument to `ioctl'.  */
++#define __SID		('S' << 8)
++
++#define I_NREAD	    (__SID | 1)	/* Counts the number of data bytes in the data
++				   block in the first message.  */
++#define I_PUSH	    (__SID | 2)	/* Push STREAMS module onto top of the current
++				   STREAM, just below the STREAM head.  */
++#define I_POP	    (__SID | 3)	/* Remove STREAMS module from just below the
++				   STREAM head.  */
++#define I_LOOK	    (__SID | 4)	/* Retrieve the name of the module just below
++				   the STREAM head and place it in a character
++				   string.  */
++#define I_FLUSH	    (__SID | 5)	/* Flush all input and/or output.  */
++#define I_SRDOPT    (__SID | 6)	/* Sets the read mode.  */
++#define I_GRDOPT    (__SID | 7)	/* Returns the current read mode setting.  */
++#define I_STR	    (__SID | 8)	/* Construct an internal STREAMS `ioctl'
++				   message and send that message downstream. */
++#define I_SETSIG    (__SID | 9)	/* Inform the STREAM head that the process
++				   wants the SIGPOLL signal issued.  */
++#define I_GETSIG    (__SID |10) /* Return the events for which the calling
++				   process is currently registered to be sent
++				   a SIGPOLL signal.  */
++#define I_FIND	    (__SID |11) /* Compares the names of all modules currently
++				   present in the STREAM to the name pointed to
++				   by `arg'.  */
++#define I_LINK	    (__SID |12) /* Connect two STREAMs.  */
++#define I_UNLINK    (__SID |13) /* Disconnects the two STREAMs.  */
++#define I_PEEK	    (__SID |15) /* Allows a process to retrieve the information
++				   in the first message on the STREAM head read
++				   queue without taking the message off the
++				   queue.  */
++#define I_FDINSERT  (__SID |16) /* Create a message from the specified
++				   buffer(s), adds information about another
++				   STREAM, and send the message downstream.  */
++#define I_SENDFD    (__SID |17) /* Requests the STREAM associated with `fildes'
++				   to send a message, containing a file
++				   pointer, to the STREAM head at the other end
++				   of a STREAMS pipe.  */
++#define I_RECVFD    (__SID |14) /* Non-EFT definition.  */
++#define I_SWROPT    (__SID |19) /* Set the write mode.  */
++#define I_GWROPT    (__SID |20) /* Return the current write mode setting.  */
++#define I_LIST	    (__SID |21) /* List all the module names on the STREAM, up
++				   to and including the topmost driver name. */
++#define I_PLINK	    (__SID |22) /* Connect two STREAMs with a persistent
++				   link.  */
++#define I_PUNLINK   (__SID |23) /* Disconnect the two STREAMs that were
++				   connected with a persistent link.  */
++#define I_FLUSHBAND (__SID |28) /* Flush only band specified.  */
++#define I_CKBAND    (__SID |29) /* Check if the message of a given priority
++				   band exists on the STREAM head read
++				   queue.  */
++#define I_GETBAND   (__SID |30) /* Return the priority band of the first
++				   message on the STREAM head read queue.  */
++#define I_ATMARK    (__SID |31) /* See if the current message on the STREAM
++				   head read queue is "marked" by some module
++				   downstream.  */
++#define I_SETCLTIME (__SID |32) /* Set the time the STREAM head will delay when
++				   a STREAM is closing and there is data on
++				   the write queues.  */
++#define I_GETCLTIME (__SID |33) /* Get current value for closing timeout.  */
++#define I_CANPUT    (__SID |34) /* Check if a certain band is writable.  */
++
++
++/* Used in `I_LOOK' request.  */
++#define FMNAMESZ	8	/* compatibility w/UnixWare/Solaris.  */
++
++/* Flush options.  */
++#define FLUSHR		0x01	/* Flush read queues.  */
++#define FLUSHW		0x02	/* Flush write queues.  */
++#define FLUSHRW		0x03	/* Flush read and write queues.  */
++#ifdef __USE_GNU
++# define FLUSHBAND	0x04	/* Flush only specified band.  */
++#endif
++
++/* Possible arguments for `I_SETSIG'.  */
++#define S_INPUT		0x0001	/* A message, other than a high-priority
++				   message, has arrived.  */
++#define S_HIPRI		0x0002	/* A high-priority message is present.  */
++#define S_OUTPUT	0x0004	/* The write queue for normal data is no longer
++				   full.  */
++#define S_MSG		0x0008	/* A STREAMS signal message that contains the
++				   SIGPOLL signal reaches the front of the
++				   STREAM head read queue.  */
++#define S_ERROR		0x0010	/* Notification of an error condition.  */
++#define S_HANGUP	0x0020	/* Notification of a hangup.  */
++#define S_RDNORM	0x0040	/* A normal message has arrived.  */
++#define S_WRNORM	S_OUTPUT
++#define S_RDBAND	0x0080	/* A message with a non-zero priority has
++				   arrived.  */
++#define S_WRBAND	0x0100	/* The write queue for a non-zero priority
++				   band is no longer full.  */
++#define S_BANDURG	0x0200	/* When used in conjunction with S_RDBAND,
++				   SIGURG is generated instead of SIGPOLL when
++				   a priority message reaches the front of the
++				   STREAM head read queue.  */
++
++/* Option for `I_PEEK'.  */
++#define RS_HIPRI	0x01	/* Only look for high-priority messages.  */
++
++/* Options for `I_SRDOPT'.  */
++#define RNORM		0x0000	/* Byte-STREAM mode, the default.  */
++#define RMSGD		0x0001	/* Message-discard mode.   */
++#define RMSGN		0x0002	/* Message-nondiscard mode.   */
++#define RPROTDAT	0x0004	/* Deliver the control part of a message as
++				   data.  */
++#define RPROTDIS	0x0008	/* Discard the control part of a message,
++				   delivering any data part.  */
++#define RPROTNORM	0x0010	/* Fail `read' with EBADMSG if a message
++				   containing a control part is at the front
++				   of the STREAM head read queue.  */
++#ifdef __USE_GNU
++# define RPROTMASK	0x001C	/* The RPROT bits */
++#endif
++
++/* Possible mode for `I_SWROPT'.  */
++#define SNDZERO		0x001	/* Send a zero-length message downstream when a
++				   `write' of 0 bytes occurs.  */
++#ifdef __USE_GNU
++# define SNDPIPE	0x002	/* Send SIGPIPE on write and putmsg if
++				   sd_werror is set.  */
++#endif
++
++/* Arguments for `I_ATMARK'.  */
++#define ANYMARK		0x01	/* Check if the message is marked.  */
++#define LASTMARK	0x02	/* Check if the message is the last one marked
++				   on the queue.  */
++
++/* Argument for `I_UNLINK'.  */
++#ifdef __USE_GNU
++# define MUXID_ALL	(-1)	/* Unlink all STREAMs linked to the STREAM
++				   associated with `fildes'.  */
++#endif
++
++
++/* Macros for `getmsg', `getpmsg', `putmsg' and `putpmsg'.  */
++#define MSG_HIPRI	0x01	/* Send/receive high priority message.  */
++#define MSG_ANY		0x02	/* Receive any message.  */
++#define MSG_BAND	0x04	/* Receive message from specified band.  */
++
++/* Values returned by getmsg and getpmsg */
++#define MORECTL		1	/* More control information is left in
++				   message.  */
++#define MOREDATA	2	/* More data is left in message.  */
++
++
++/* Structure used for the I_FLUSHBAND ioctl on streams.  */
++struct bandinfo
++  {
++    unsigned char bi_pri;
++    int bi_flag;
++  };
++
++struct strbuf
++  {
++    int maxlen;		/* Maximum buffer length.  */
++    int len;		/* Length of data.  */
++    char *buf;		/* Pointer to buffer.  */
++  };
++
++struct strpeek
++  {
++    struct strbuf ctlbuf;
++    struct strbuf databuf;
++    t_uscalar_t flags;			/* UnixWare/Solaris compatibility.  */
++  };
++
++struct strfdinsert
++  {
++    struct strbuf ctlbuf;
++    struct strbuf databuf;
++    t_uscalar_t flags;			/* UnixWare/Solaris compatibility.  */
++    int fildes;
++    int offset;
++  };
++
++struct strioctl
++  {
++    int ic_cmd;
++    int ic_timout;
++    int ic_len;
++    char *ic_dp;
++  };
++
++struct strrecvfd
++  {
++    int fd;
++    uid_t uid;
++    gid_t gid;
++    char __fill[8];			/* UnixWare/Solaris compatibility */
++  };
++
++
++struct str_mlist
++  {
++    char l_name[FMNAMESZ + 1];
++  };
++
++struct str_list
++  {
++    int sl_nmods;
++    struct str_mlist *sl_modlist;
++  };
++
++#endif /* bits/stropts.h */
+diff -Naur glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/syslog-path.h glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/syslog-path.h
+--- glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/syslog-path.h	1970-01-01 02:00:00.000000000 +0200
++++ glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/syslog-path.h	2010-03-08 16:00:17.349074164 +0200
+@@ -0,0 +1,29 @@
++/* <bits/syslog-path.h> -- _PATH_LOG definition
++   Copyright (C) 2006 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, write to the Free
++   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
++   02111-1307 USA.  */
++
++#ifndef _SYS_SYSLOG_H
++# error "Never include this file directly.  Use <sys/syslog.h> instead"
++#endif
++
++#ifndef _BITS_SYSLOG_PATH_H
++#define _BITS_SYSLOG_PATH_H 1
++
++#define	_PATH_LOG	"/dev/log"
++
++#endif /* bits/syslog-path.h */
+diff -Naur glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/time.h glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/time.h
+--- glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/time.h	1970-01-01 02:00:00.000000000 +0200
++++ glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/time.h	2010-03-08 16:00:17.081075228 +0200
+@@ -0,0 +1,75 @@
++/* System-dependent timing definitions.  Generic version.
++   Copyright (C) 1996,1997,1999-2002,2003 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, write to the Free
++   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
++   02111-1307 USA.  */
++
++/*
++ * Never include this file directly; use <time.h> instead.
++ */
++
++#ifndef __need_timeval
++# ifndef _BITS_TIME_H
++#  define _BITS_TIME_H	1
++
++/* ISO/IEC 9899:1990 7.12.1: <time.h>
++   The macro `CLOCKS_PER_SEC' is the number per second of the value
++   returned by the `clock' function. */
++/* CAE XSH, Issue 4, Version 2: <time.h>
++   The value of CLOCKS_PER_SEC is required to be 1 million on all
++   XSI-conformant systems. */
++#  define CLOCKS_PER_SEC  1000000l
++
++#  if !defined __STRICT_ANSI__ && !defined __USE_XOPEN2K
++/* Even though CLOCKS_PER_SEC has such a strange value CLK_TCK
++   presents the real value for clock ticks per second for the system.  */
++#   include <bits/types.h>
++extern long int __sysconf (int);
++#   define CLK_TCK ((__clock_t) __sysconf (2))	/* 2 is _SC_CLK_TCK */
++#  endif
++
++#  ifdef __USE_POSIX199309
++/* Identifier for system-wide realtime clock.  */
++#   define CLOCK_REALTIME		0
++/* Monotonic system-wide clock.  */
++#   define CLOCK_MONOTONIC		1
++/* High-resolution timer from the CPU.  */
++#   define CLOCK_PROCESS_CPUTIME_ID	2
++/* Thread-specific CPU-time clock.  */
++#   define CLOCK_THREAD_CPUTIME_ID	3
++
++/* Flag to indicate time is absolute.  */
++#   define TIMER_ABSTIME		1
++#  endif
++
++# endif	/* bits/time.h */
++#endif
++
++#ifdef __need_timeval
++# undef __need_timeval
++# ifndef _STRUCT_TIMEVAL
++#  define _STRUCT_TIMEVAL	1
++#  include <bits/types.h>
++
++/* A time value that is accurate to the nearest
++   microsecond but also has a range of years.  */
++struct timeval
++  {
++    __time_t tv_sec;		/* Seconds.  */
++    __suseconds_t tv_usec;	/* Microseconds.  */
++  };
++# endif	/* struct timeval */
++#endif	/* need timeval */
+diff -Naur glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/types.h glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/types.h
+--- glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/types.h	1970-01-01 02:00:00.000000000 +0200
++++ glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/types.h	2010-03-08 16:00:17.077074707 +0200
+@@ -0,0 +1,200 @@
++/* bits/types.h -- definitions of __*_t types underlying *_t types.
++   Copyright (C) 2002, 2003, 2004, 2005 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, write to the Free
++   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
++   02111-1307 USA.  */
++
++/*
++ * Never include this file directly; use <sys/types.h> instead.
++ */
++
++#ifndef	_BITS_TYPES_H
++#define	_BITS_TYPES_H	1
++
++#include <features.h>
++#include <bits/wordsize.h>
++
++#define __need_size_t
++#include <stddef.h>
++
++/* Convenience types.  */
++typedef unsigned char __u_char;
++typedef unsigned short int __u_short;
++typedef unsigned int __u_int;
++typedef unsigned long int __u_long;
++
++/* Fixed-size types, underlying types depend on word size and compiler.  */
++typedef signed char __int8_t;
++typedef unsigned char __uint8_t;
++typedef signed short int __int16_t;
++typedef unsigned short int __uint16_t;
++typedef signed int __int32_t;
++typedef unsigned int __uint32_t;
++#if __WORDSIZE == 64
++typedef signed long int __int64_t;
++typedef unsigned long int __uint64_t;
++#elif defined __GLIBC_HAVE_LONG_LONG
++__extension__ typedef signed long long int __int64_t;
++__extension__ typedef unsigned long long int __uint64_t;
++#endif
++
++/* quad_t is also 64 bits.  */
++#if __WORDSIZE == 64
++typedef long int __quad_t;
++typedef unsigned long int __u_quad_t;
++#elif defined __GLIBC_HAVE_LONG_LONG
++__extension__ typedef long long int __quad_t;
++__extension__ typedef unsigned long long int __u_quad_t;
++#else
++typedef struct
++{
++  long __val[2];
++} __quad_t;
++typedef struct
++{
++  __u_long __val[2];
++} __u_quad_t;
++#endif
++
++
++/* The machine-dependent file <bits/typesizes.h> defines __*_T_TYPE
++   macros for each of the OS types we define below.  The definitions
++   of those macros must use the following macros for underlying types.
++   We define __S<SIZE>_TYPE and __U<SIZE>_TYPE for the signed and unsigned
++   variants of each of the following integer types on this machine.
++
++	16		-- "natural" 16-bit type (always short)
++	32		-- "natural" 32-bit type (always int)
++	64		-- "natural" 64-bit type (long or long long)
++	LONG32		-- 32-bit type, traditionally long
++	QUAD		-- 64-bit type, always long long
++	WORD		-- natural type of __WORDSIZE bits (int or long)
++	LONGWORD	-- type of __WORDSIZE bits, traditionally long
++
++   We distinguish WORD/LONGWORD, 32/LONG32, and 64/QUAD so that the
++   conventional uses of `long' or `long long' type modifiers match the
++   types we define, even when a less-adorned type would be the same size.
++   This matters for (somewhat) portably writing printf/scanf formats for
++   these types, where using the appropriate l or ll format modifiers can
++   make the typedefs and the formats match up across all GNU platforms.  If
++   we used `long' when it's 64 bits where `long long' is expected, then the
++   compiler would warn about the formats not matching the argument types,
++   and the programmer changing them to shut up the compiler would break the
++   program's portability.
++
++   Here we assume what is presently the case in all the GCC configurations
++   we support: long long is always 64 bits, long is always word/address size,
++   and int is always 32 bits.  */
++
++#define	__S16_TYPE		short int
++#define __U16_TYPE		unsigned short int
++#define	__S32_TYPE		int
++#define __U32_TYPE		unsigned int
++#define __SLONGWORD_TYPE	long int
++#define __ULONGWORD_TYPE	unsigned long int
++#if __WORDSIZE == 32
++# define __SQUAD_TYPE		__quad_t
++# define __UQUAD_TYPE		__u_quad_t
++# define __SWORD_TYPE		int
++# define __UWORD_TYPE		unsigned int
++# define __SLONG32_TYPE		long int
++# define __ULONG32_TYPE		unsigned long int
++# define __S64_TYPE		__quad_t
++# define __U64_TYPE		__u_quad_t
++/* We want __extension__ before typedef's that use nonstandard base types
++   such as `long long' in C89 mode.  */
++# define __STD_TYPE		__extension__ typedef
++#elif __WORDSIZE == 64
++# define __SQUAD_TYPE		long int
++# define __UQUAD_TYPE		unsigned long int
++# define __SWORD_TYPE		long int
++# define __UWORD_TYPE		unsigned long int
++# define __SLONG32_TYPE		int
++# define __ULONG32_TYPE		unsigned int
++# define __S64_TYPE		long int
++# define __U64_TYPE		unsigned long int
++/* No need to mark the typedef with __extension__.   */
++# define __STD_TYPE		typedef
++#else
++# error
++#endif
++#include <bits/typesizes.h>	/* Defines __*_T_TYPE macros.  */
++
++
++__STD_TYPE __DEV_T_TYPE __dev_t;	/* Type of device numbers.  */
++__STD_TYPE __UID_T_TYPE __uid_t;	/* Type of user identifications.  */
++__STD_TYPE __GID_T_TYPE __gid_t;	/* Type of group identifications.  */
++__STD_TYPE __INO_T_TYPE __ino_t;	/* Type of file serial numbers.  */
++__STD_TYPE __INO64_T_TYPE __ino64_t;	/* Type of file serial numbers (LFS).*/
++__STD_TYPE __MODE_T_TYPE __mode_t;	/* Type of file attribute bitmasks.  */
++__STD_TYPE __NLINK_T_TYPE __nlink_t;	/* Type of file link counts.  */
++__STD_TYPE __OFF_T_TYPE __off_t;	/* Type of file sizes and offsets.  */
++__STD_TYPE __OFF64_T_TYPE __off64_t;	/* Type of file sizes and offsets (LFS).  */
++__STD_TYPE __PID_T_TYPE __pid_t;	/* Type of process identifications.  */
++__STD_TYPE __FSID_T_TYPE __fsid_t;	/* Type of file system IDs.  */
++__STD_TYPE __CLOCK_T_TYPE __clock_t;	/* Type of CPU usage counts.  */
++__STD_TYPE __RLIM_T_TYPE __rlim_t;	/* Type for resource measurement.  */
++__STD_TYPE __RLIM64_T_TYPE __rlim64_t;	/* Type for resource measurement (LFS).  */
++__STD_TYPE __ID_T_TYPE __id_t;		/* General type for IDs.  */
++__STD_TYPE __TIME_T_TYPE __time_t;	/* Seconds since the Epoch.  */
++__STD_TYPE __USECONDS_T_TYPE __useconds_t; /* Count of microseconds.  */
++__STD_TYPE __SUSECONDS_T_TYPE __suseconds_t; /* Signed count of microseconds.  */
++
++__STD_TYPE __DADDR_T_TYPE __daddr_t;	/* The type of a disk address.  */
++__STD_TYPE __SWBLK_T_TYPE __swblk_t;	/* Type of a swap block maybe?  */
++__STD_TYPE __KEY_T_TYPE __key_t;	/* Type of an IPC key.  */
++
++/* Clock ID used in clock and timer functions.  */
++__STD_TYPE __CLOCKID_T_TYPE __clockid_t;
++
++/* Timer ID returned by `timer_create'.  */
++__STD_TYPE __TIMER_T_TYPE __timer_t;
++
++/* Type to represent block size.  */
++__STD_TYPE __BLKSIZE_T_TYPE __blksize_t;
++
++/* Types from the Large File Support interface.  */
++
++/* Type to count number of disk blocks.  */
++__STD_TYPE __BLKCNT_T_TYPE __blkcnt_t;
++__STD_TYPE __BLKCNT64_T_TYPE __blkcnt64_t;
++
++/* Type to count file system blocks.  */
++__STD_TYPE __FSBLKCNT_T_TYPE __fsblkcnt_t;
++__STD_TYPE __FSBLKCNT64_T_TYPE __fsblkcnt64_t;
++
++/* Type to count file system nodes.  */
++__STD_TYPE __FSFILCNT_T_TYPE __fsfilcnt_t;
++__STD_TYPE __FSFILCNT64_T_TYPE __fsfilcnt64_t;
++
++__STD_TYPE __SSIZE_T_TYPE __ssize_t; /* Type of a byte count, or error.  */
++
++/* These few don't really vary by system, they always correspond
++   to one of the other defined types.  */
++typedef __off64_t __loff_t;	/* Type of file sizes and offsets (LFS).  */
++typedef __quad_t *__qaddr_t;
++typedef char *__caddr_t;
++
++/* Duplicates info from stdint.h but this is used in unistd.h.  */
++__STD_TYPE __SWORD_TYPE __intptr_t;
++
++/* Duplicate info from sys/socket.h.  */
++__STD_TYPE __U32_TYPE __socklen_t;
++
++
++#undef __STD_TYPE
++
++#endif /* bits/types.h */
+diff -Naur glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/typesizes.h glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/typesizes.h
+--- glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/typesizes.h	1970-01-01 02:00:00.000000000 +0200
++++ glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/typesizes.h	2010-03-08 16:00:17.079074267 +0200
+@@ -0,0 +1,66 @@
++/* bits/typesizes.h -- underlying types for *_t.  Generic version.
++   Copyright (C) 2002, 2003 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, write to the Free
++   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
++   02111-1307 USA.  */
++
++#ifndef _BITS_TYPES_H
++# error "Never include <bits/typesizes.h> directly; use <sys/types.h> instead."
++#endif
++
++#ifndef	_BITS_TYPESIZES_H
++#define	_BITS_TYPESIZES_H	1
++
++/* See <bits/types.h> for the meaning of these macros.  This file exists so
++   that <bits/types.h> need not vary across different GNU platforms.  */
++
++#define __DEV_T_TYPE		__UQUAD_TYPE
++#define __UID_T_TYPE		__U32_TYPE
++#define __GID_T_TYPE		__U32_TYPE
++#define __INO_T_TYPE		__ULONGWORD_TYPE
++#define __INO64_T_TYPE		__UQUAD_TYPE
++#define __MODE_T_TYPE		__U32_TYPE
++#define __NLINK_T_TYPE		__UWORD_TYPE
++#define __OFF_T_TYPE		__SLONGWORD_TYPE
++#define __OFF64_T_TYPE		__SQUAD_TYPE
++#define __PID_T_TYPE		__S32_TYPE
++#define __RLIM_T_TYPE		__ULONGWORD_TYPE
++#define __RLIM64_T_TYPE		__UQUAD_TYPE
++#define	__BLKCNT_T_TYPE		__SLONGWORD_TYPE
++#define	__BLKCNT64_T_TYPE	__SQUAD_TYPE
++#define	__FSBLKCNT_T_TYPE	__ULONGWORD_TYPE
++#define	__FSBLKCNT64_T_TYPE	__UQUAD_TYPE
++#define	__FSFILCNT_T_TYPE	__ULONGWORD_TYPE
++#define	__FSFILCNT64_T_TYPE	__UQUAD_TYPE
++#define	__ID_T_TYPE		__U32_TYPE
++#define __CLOCK_T_TYPE		__SLONGWORD_TYPE
++#define __TIME_T_TYPE		__SLONGWORD_TYPE
++#define __USECONDS_T_TYPE	__U32_TYPE
++#define __SUSECONDS_T_TYPE	__SLONGWORD_TYPE
++#define __DADDR_T_TYPE		__S32_TYPE
++#define __SWBLK_T_TYPE		__SLONGWORD_TYPE
++#define __KEY_T_TYPE		__S32_TYPE
++#define __CLOCKID_T_TYPE	__S32_TYPE
++#define __TIMER_T_TYPE		void *
++#define __BLKSIZE_T_TYPE	__SLONGWORD_TYPE
++#define __FSID_T_TYPE		struct { int __val[2]; }
++#define __SSIZE_T_TYPE		__SWORD_TYPE
++
++/* Number of descriptors that can fit in an `fd_set'.  */
++#define	__FD_SETSIZE		1024
++
++
++#endif /* bits/typesizes.h */
+diff -Naur glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/ustat.h glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/ustat.h
+--- glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/ustat.h	1970-01-01 02:00:00.000000000 +0200
++++ glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/ustat.h	2010-03-08 16:00:17.369076667 +0200
+@@ -0,0 +1,31 @@
++/* Copyright (C) 1997, 2002 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, write to the Free
++   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
++   02111-1307 USA.  */
++
++#ifndef _SYS_USTAT_H
++# error "Never include <bits/ustat.h> directly; use <sys/ustat.h> instead."
++#endif
++
++#include <sys/types.h>
++
++struct ustat
++  {
++    __daddr_t f_tfree;		/* Number of free blocks.  */
++    __ino_t f_tinode;		/* Number of free inodes.  */
++    char f_fname[6];
++    char f_fpack[6];
++  };
+diff -Naur glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/waitstatus.h glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/waitstatus.h
+--- glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/waitstatus.h	1970-01-01 02:00:00.000000000 +0200
++++ glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/waitstatus.h	2010-03-08 16:00:17.387075368 +0200
+@@ -0,0 +1,106 @@
++/* Definitions of status bits for `wait' et al.
++   Copyright (C) 1992,1994,1996,1997,2000,2004 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, write to the Free
++   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
++   02111-1307 USA.  */
++
++#if !defined _SYS_WAIT_H && !defined _STDLIB_H
++# error "Never include <bits/waitstatus.h> directly; use <sys/wait.h> instead."
++#endif
++
++
++/* Everything extant so far uses these same bits.  */
++
++
++/* If WIFEXITED(STATUS), the low-order 8 bits of the status.  */
++#define	__WEXITSTATUS(status)	(((status) & 0xff00) >> 8)
++
++/* If WIFSIGNALED(STATUS), the terminating signal.  */
++#define	__WTERMSIG(status)	((status) & 0x7f)
++
++/* If WIFSTOPPED(STATUS), the signal that stopped the child.  */
++#define	__WSTOPSIG(status)	__WEXITSTATUS(status)
++
++/* Nonzero if STATUS indicates normal termination.  */
++#define	__WIFEXITED(status)	(__WTERMSIG(status) == 0)
++
++/* Nonzero if STATUS indicates termination by a signal.  */
++#define __WIFSIGNALED(status) \
++  (((signed char) (((status) & 0x7f) + 1) >> 1) > 0)
++
++/* Nonzero if STATUS indicates the child is stopped.  */
++#define	__WIFSTOPPED(status)	(((status) & 0xff) == 0x7f)
++
++/* Nonzero if STATUS indicates the child continued after a stop.  We only
++   define this if <bits/waitflags.h> provides the WCONTINUED flag bit.  */
++#ifdef WCONTINUED
++# define __WIFCONTINUED(status)	((status) == __W_CONTINUED)
++#endif
++
++/* Nonzero if STATUS indicates the child dumped core.  */
++#define	__WCOREDUMP(status)	((status) & __WCOREFLAG)
++
++/* Macros for constructing status values.  */
++#define	__W_EXITCODE(ret, sig)	((ret) << 8 | (sig))
++#define	__W_STOPCODE(sig)	((sig) << 8 | 0x7f)
++#define __W_CONTINUED		0xffff
++#define	__WCOREFLAG		0x80
++
++
++#ifdef	__USE_BSD
++
++# include <endian.h>
++
++union wait
++  {
++    int w_status;
++    struct
++      {
++# if	__BYTE_ORDER == __LITTLE_ENDIAN
++	unsigned int __w_termsig:7; /* Terminating signal.  */
++	unsigned int __w_coredump:1; /* Set if dumped core.  */
++	unsigned int __w_retcode:8; /* Return code if exited normally.  */
++	unsigned int:16;
++# endif				/* Little endian.  */
++# if	__BYTE_ORDER == __BIG_ENDIAN
++	unsigned int:16;
++	unsigned int __w_retcode:8;
++	unsigned int __w_coredump:1;
++	unsigned int __w_termsig:7;
++# endif				/* Big endian.  */
++      } __wait_terminated;
++    struct
++      {
++# if	__BYTE_ORDER == __LITTLE_ENDIAN
++	unsigned int __w_stopval:8; /* W_STOPPED if stopped.  */
++	unsigned int __w_stopsig:8; /* Stopping signal.  */
++	unsigned int:16;
++# endif				/* Little endian.  */
++# if	__BYTE_ORDER == __BIG_ENDIAN
++	unsigned int:16;
++	unsigned int __w_stopsig:8; /* Stopping signal.  */
++	unsigned int __w_stopval:8; /* W_STOPPED if stopped.  */
++# endif				/* Big endian.  */
++      } __wait_stopped;
++  };
++
++# define w_termsig	__wait_terminated.__w_termsig
++# define w_coredump	__wait_terminated.__w_coredump
++# define w_retcode	__wait_terminated.__w_retcode
++# define w_stopsig	__wait_stopped.__w_stopsig
++# define w_stopval	__wait_stopped.__w_stopval
++
++#endif	/* Use BSD.  */
+diff -Naur glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/wchar.h glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/wchar.h
+--- glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/wchar.h	1970-01-01 02:00:00.000000000 +0200
++++ glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/wchar.h	2010-03-08 16:00:17.072075224 +0200
+@@ -0,0 +1,26 @@
++/* wchar_t type related definitions.
++   Copyright (C) 2000 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, write to the Free
++   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
++   02111-1307 USA.  */
++
++#ifndef _BITS_WCHAR_H
++#define _BITS_WCHAR_H	1
++
++#define __WCHAR_MIN	(-2147483647l - 1l)
++#define __WCHAR_MAX	(2147483647l)
++
++#endif	/* bits/wchar.h */
+diff -Naur glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/wordsize.h glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/wordsize.h
+--- glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/wordsize.h	1970-01-01 02:00:00.000000000 +0200
++++ glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/wordsize.h	2010-03-08 16:00:17.074073545 +0200
+@@ -0,0 +1,19 @@
++/* Copyright (C) 1999 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, write to the Free
++   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
++   02111-1307 USA.  */
++
++#define __WORDSIZE	32
+diff -Naur glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/xtitypes.h glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/xtitypes.h
+--- glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/bits/xtitypes.h	1970-01-01 02:00:00.000000000 +0200
++++ glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/bits/xtitypes.h	2010-03-08 16:00:17.399079513 +0200
+@@ -0,0 +1,34 @@
++/* bits/xtitypes.h -- Define some types used by <bits/stropts.h>.  Generic.
++   Copyright (C) 2002 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, write to the Free
++   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
++   02111-1307 USA.  */
++
++#ifndef _STROPTS_H
++# error "Never include <bits/xtitypes.h> directly; use <stropts.h> instead."
++#endif
++
++#ifndef _BITS_XTITYPES_H
++#define _BITS_XTITYPES_H	1
++
++#include <bits/types.h>
++
++/* This type is used by some structs in <bits/stropts.h>.  */
++typedef __SLONGWORD_TYPE __t_scalar_t;
++typedef __ULONGWORD_TYPE __t_uscalar_t;
++
++
++#endif /* bits/xtitypes.h */
+diff -Naur glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/bits/atomic.h glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/bits/atomic.h
+--- glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/bits/atomic.h	1970-01-01 02:00:00.000000000 +0200
++++ glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/bits/atomic.h	2009-05-16 11:36:20.000000000 +0300
+@@ -0,0 +1,122 @@
++/* Copyright (C) 2002, 2003, 2004, 2005 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, write to the Free
++   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
++   02111-1307 USA.  */
++
++#include <stdint.h>
++#include <sysdep.h>
++
++
++typedef int8_t atomic8_t;
++typedef uint8_t uatomic8_t;
++typedef int_fast8_t atomic_fast8_t;
++typedef uint_fast8_t uatomic_fast8_t;
++
++typedef int32_t atomic32_t;
++typedef uint32_t uatomic32_t;
++typedef int_fast32_t atomic_fast32_t;
++typedef uint_fast32_t uatomic_fast32_t;
++
++typedef intptr_t atomicptr_t;
++typedef uintptr_t uatomicptr_t;
++typedef intmax_t atomic_max_t;
++typedef uintmax_t uatomic_max_t;
++
++void __arm_link_error (void);
++
++#ifdef __thumb2__
++#define atomic_full_barrier() \
++     __asm__ __volatile__						      \
++	     ("movw\tip, #0x0fa0\n\t"					      \
++	      "movt\tip, #0xffff\n\t"					      \
++	      "blx\tip"							      \
++	      : : : "ip", "lr", "cc", "memory");
++#else
++#define atomic_full_barrier() \
++     __asm__ __volatile__						      \
++	     ("mov\tip, #0xffff0fff\n\t"				      \
++	      "mov\tlr, pc\n\t"						      \
++	      "add\tpc, ip, #(0xffff0fa0 - 0xffff0fff)"			      \
++	      : : : "ip", "lr", "cc", "memory");
++#endif
++
++/* Atomic compare and exchange.  This sequence relies on the kernel to
++   provide a compare and exchange operation which is atomic on the
++   current architecture, either via cleverness on pre-ARMv6 or via
++   ldrex / strex on ARMv6.  */
++
++#define __arch_compare_and_exchange_val_8_acq(mem, newval, oldval) \
++  ({ __arm_link_error (); oldval; })
++
++#define __arch_compare_and_exchange_val_16_acq(mem, newval, oldval) \
++  ({ __arm_link_error (); oldval; })
++
++/* It doesn't matter what register is used for a_oldval2, but we must
++   specify one to work around GCC PR rtl-optimization/21223.  Otherwise
++   it may cause a_oldval or a_tmp to be moved to a different register.  */
++
++#ifdef __thumb2__
++/* Thumb-2 has ldrex/strex.  However it does not have barrier instructions,
++   so we still need to use the kernel helper.  */
++#define __arch_compare_and_exchange_val_32_acq(mem, newval, oldval) \
++  ({ register __typeof (oldval) a_oldval asm ("r0");			      \
++     register __typeof (oldval) a_newval asm ("r1") = (newval);		      \
++     register __typeof (mem) a_ptr asm ("r2") = (mem);			      \
++     register __typeof (oldval) a_tmp asm ("r3");			      \
++     register __typeof (oldval) a_oldval2 asm ("r4") = (oldval);	      \
++     __asm__ __volatile__						      \
++	     ("0:\tldr\t%[tmp],[%[ptr]]\n\t"				      \
++	      "cmp\t%[tmp], %[old2]\n\t"				      \
++	      "bne\t1f\n\t"						      \
++	      "mov\t%[old], %[old2]\n\t"				      \
++	      "movw\t%[tmp], #0x0fc0\n\t"				      \
++	      "movt\t%[tmp], #0xffff\n\t"				      \
++	      "blx\t%[tmp]\n\t"						      \
++	      "bcc\t0b\n\t"						      \
++	      "mov\t%[tmp], %[old2]\n\t"				      \
++	      "1:"							      \
++	      : [old] "=&r" (a_oldval), [tmp] "=&r" (a_tmp)		      \
++	      : [new] "r" (a_newval), [ptr] "r" (a_ptr),		      \
++		[old2] "r" (a_oldval2)					      \
++	      : "ip", "lr", "cc", "memory");				      \
++     a_tmp; })
++#else
++#define __arch_compare_and_exchange_val_32_acq(mem, newval, oldval) \
++  ({ register __typeof (oldval) a_oldval asm ("r0");			      \
++     register __typeof (oldval) a_newval asm ("r1") = (newval);		      \
++     register __typeof (mem) a_ptr asm ("r2") = (mem);			      \
++     register __typeof (oldval) a_tmp asm ("r3");			      \
++     register __typeof (oldval) a_oldval2 asm ("r4") = (oldval);	      \
++     __asm__ __volatile__						      \
++	     ("0:\tldr\t%[tmp],[%[ptr]]\n\t"				      \
++	      "cmp\t%[tmp], %[old2]\n\t"				      \
++	      "bne\t1f\n\t"						      \
++	      "mov\t%[old], %[old2]\n\t"				      \
++	      "mov\t%[tmp], #0xffff0fff\n\t"				      \
++	      "mov\tlr, pc\n\t"						      \
++	      "add\tpc, %[tmp], #(0xffff0fc0 - 0xffff0fff)\n\t"		      \
++	      "bcc\t0b\n\t"						      \
++	      "mov\t%[tmp], %[old2]\n\t"				      \
++	      "1:"							      \
++	      : [old] "=&r" (a_oldval), [tmp] "=&r" (a_tmp)		      \
++	      : [new] "r" (a_newval), [ptr] "r" (a_ptr),		      \
++		[old2] "r" (a_oldval2)					      \
++	      : "ip", "lr", "cc", "memory");				      \
++     a_tmp; })
++#endif
++
++#define __arch_compare_and_exchange_val_64_acq(mem, newval, oldval) \
++  ({ __arm_link_error (); oldval; })
+diff -Naur glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/bits/pthreadtypes.h glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/bits/pthreadtypes.h
+--- glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/bits/pthreadtypes.h	1970-01-01 02:00:00.000000000 +0200
++++ glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/bits/pthreadtypes.h	2009-05-16 11:36:20.000000000 +0300
+@@ -0,0 +1,181 @@
++/* Copyright (C) 2002, 2003, 2004, 2005, 2006 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, write to the Free
++   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
++   02111-1307 USA.  */
++
++#ifndef _BITS_PTHREADTYPES_H
++#define _BITS_PTHREADTYPES_H	1
++
++#include <endian.h>
++
++#define __SIZEOF_PTHREAD_ATTR_T 36
++#define __SIZEOF_PTHREAD_MUTEX_T 24
++#define __SIZEOF_PTHREAD_MUTEXATTR_T 4
++#define __SIZEOF_PTHREAD_COND_T 48
++#define __SIZEOF_PTHREAD_COND_COMPAT_T 12
++#define __SIZEOF_PTHREAD_CONDATTR_T 4
++#define __SIZEOF_PTHREAD_RWLOCK_T 32
++#define __SIZEOF_PTHREAD_RWLOCKATTR_T 8
++#define __SIZEOF_PTHREAD_BARRIER_T 20
++#define __SIZEOF_PTHREAD_BARRIERATTR_T 4
++
++
++/* Thread identifiers.  The structure of the attribute type is not
++   exposed on purpose.  */
++typedef unsigned long int pthread_t;
++
++
++typedef union
++{
++  char __size[__SIZEOF_PTHREAD_ATTR_T];
++  long int __align;
++} pthread_attr_t;
++
++
++typedef struct __pthread_internal_slist
++{
++  struct __pthread_internal_slist *__next;
++} __pthread_slist_t;
++
++
++/* Data structures for mutex handling.  The structure of the attribute
++   type is not exposed on purpose.  */
++typedef union
++{
++  struct __pthread_mutex_s
++  {
++    int __lock;
++    unsigned int __count;
++    int __owner;
++    /* KIND must stay at this position in the structure to maintain
++       binary compatibility.  */
++    int __kind;
++    unsigned int __nusers;
++    __extension__ union
++    {
++      int __spins;
++      __pthread_slist_t __list;
++    };
++  } __data;
++  char __size[__SIZEOF_PTHREAD_MUTEX_T];
++  long int __align;
++} pthread_mutex_t;
++
++typedef union
++{
++  char __size[__SIZEOF_PTHREAD_MUTEXATTR_T];
++  long int __align;
++} pthread_mutexattr_t;
++
++
++/* Data structure for conditional variable handling.  The structure of
++   the attribute type is not exposed on purpose.  */
++typedef union
++{
++  struct
++  {
++    int __lock;
++    unsigned int __futex;
++    __extension__ unsigned long long int __total_seq;
++    __extension__ unsigned long long int __wakeup_seq;
++    __extension__ unsigned long long int __woken_seq;
++    void *__mutex;
++    unsigned int __nwaiters;
++    unsigned int __broadcast_seq;
++  } __data;
++  char __size[__SIZEOF_PTHREAD_COND_T];
++  __extension__ long long int __align;
++} pthread_cond_t;
++
++typedef union
++{
++  char __size[__SIZEOF_PTHREAD_CONDATTR_T];
++  long int __align;
++} pthread_condattr_t;
++
++
++/* Keys for thread-specific data */
++typedef unsigned int pthread_key_t;
++
++
++/* Once-only execution */
++typedef int pthread_once_t;
++
++
++#if defined __USE_UNIX98 || defined __USE_XOPEN2K
++/* Data structure for read-write lock variable handling.  The
++   structure of the attribute type is not exposed on purpose.  */
++typedef union
++{
++  struct
++  {
++    int __lock;
++    unsigned int __nr_readers;
++    unsigned int __readers_wakeup;
++    unsigned int __writer_wakeup;
++    unsigned int __nr_readers_queued;
++    unsigned int __nr_writers_queued;
++#if __BYTE_ORDER == __BIG_ENDIAN
++    unsigned char __pad1;
++    unsigned char __pad2;
++    unsigned char __shared;
++    /* FLAGS must stay at this position in the structure to maintain
++       binary compatibility.  */
++    unsigned char __flags;
++#else
++    /* FLAGS must stay at this position in the structure to maintain
++       binary compatibility.  */
++    unsigned char __flags;
++    unsigned char __shared;
++    unsigned char __pad1;
++    unsigned char __pad2;
++#endif
++    int __writer;
++  } __data;
++  char __size[__SIZEOF_PTHREAD_RWLOCK_T];
++  long int __align;
++} pthread_rwlock_t;
++
++typedef union
++{
++  char __size[__SIZEOF_PTHREAD_RWLOCKATTR_T];
++  long int __align;
++} pthread_rwlockattr_t;
++#endif
++
++
++#ifdef __USE_XOPEN2K
++/* POSIX spinlock data type.  */
++typedef volatile int pthread_spinlock_t;
++
++
++/* POSIX barriers data type.  The structure of the type is
++   deliberately not exposed.  */
++typedef union
++{
++  char __size[__SIZEOF_PTHREAD_BARRIER_T];
++  long int __align;
++} pthread_barrier_t;
++
++typedef union
++{
++  char __size[__SIZEOF_PTHREAD_BARRIERATTR_T];
++  int __align;
++} pthread_barrierattr_t;
++#endif
++
++
++#endif	/* bits/pthreadtypes.h */
+diff -Naur glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/bits/semaphore.h glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/bits/semaphore.h
+--- glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/bits/semaphore.h	1970-01-01 02:00:00.000000000 +0200
++++ glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/bits/semaphore.h	2009-05-16 11:36:20.000000000 +0300
+@@ -0,0 +1,35 @@
++/* Copyright (C) 2002, 2005, 2007 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, write to the Free
++   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
++   02111-1307 USA.  */
++
++#ifndef _SEMAPHORE_H
++# error "Never use <bits/semaphore.h> directly; include <semaphore.h> instead."
++#endif
++
++
++#define __SIZEOF_SEM_T	16
++
++
++/* Value returned if `sem_open' failed.  */
++#define SEM_FAILED      ((sem_t *) 0)
++
++
++typedef union
++{
++  char __size[__SIZEOF_SEM_T];
++  long int __align;
++} sem_t;
+diff -Naur glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/clone.S glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/clone.S
+--- glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/clone.S	1970-01-01 02:00:00.000000000 +0200
++++ glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/clone.S	2009-05-16 11:36:20.000000000 +0300
+@@ -0,0 +1,3 @@
++#define RESET_PID
++#include <tcb-offsets.h>
++#include "../clone.S"
+diff -Naur glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/createthread.c glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/createthread.c
+--- glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/createthread.c	1970-01-01 02:00:00.000000000 +0200
++++ glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/createthread.c	2009-05-16 11:36:20.000000000 +0300
+@@ -0,0 +1,23 @@
++/* Copyright (C) 2005 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, write to the Free
++   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
++   02111-1307 USA.  */
++
++/* Value passed to 'clone' for initialization of the thread register.  */
++#define TLS_VALUE (pd + 1)
++
++/* Get the real implementation.	 */
++#include <nptl/sysdeps/pthread/createthread.c>
+diff -Naur glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/fork.c glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/fork.c
+--- glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/fork.c	2010-03-08 16:00:05.873080103 +0200
++++ glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/fork.c	2009-05-16 11:36:20.000000000 +0300
+@@ -1 +1,31 @@
+-#include <linuxthreads/sysdeps/unix/sysv/linux/fork.c>
++/* Copyright (C) 2005 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++   Contributed by Phil Blundell <pb@nexus.co.uk>, 2005
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, write to the Free
++   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
++   02111-1307 USA.  */
++
++#include <sched.h>
++#include <signal.h>
++#include <sysdep.h>
++#include <tls.h>
++
++
++#define ARCH_FORK()							\
++  INLINE_SYSCALL (clone, 5,						\
++		  CLONE_CHILD_SETTID | CLONE_CHILD_CLEARTID | SIGCHLD,	\
++		  NULL, NULL, NULL, &THREAD_SELF->tid)
++
++#include <nptl/sysdeps/unix/sysv/linux/fork.c>
+diff -Naur glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/lowlevellock.c glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/lowlevellock.c
+--- glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/lowlevellock.c	1970-01-01 02:00:00.000000000 +0200
++++ glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/lowlevellock.c	2009-05-16 11:36:20.000000000 +0300
+@@ -0,0 +1,133 @@
++/* low level locking for pthread library.  Generic futex-using version.
++   Copyright (C) 2003, 2005, 2007 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, write to the Free
++   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
++   02111-1307 USA.  */
++
++#include <errno.h>
++#include <sysdep.h>
++#include <lowlevellock.h>
++#include <sys/time.h>
++
++void
++__lll_lock_wait_private (int *futex)
++{
++  do
++    {
++      int oldval = atomic_compare_and_exchange_val_acq (futex, 2, 1);
++      if (oldval != 0)
++	lll_futex_wait (futex, 2, LLL_PRIVATE);
++    }
++  while (atomic_compare_and_exchange_bool_acq (futex, 2, 0) != 0);
++}
++
++
++/* These functions don't get included in libc.so  */
++#ifdef IS_IN_libpthread
++void
++__lll_lock_wait (int *futex, int private)
++{
++  do
++    {
++      int oldval = atomic_compare_and_exchange_val_acq (futex, 2, 1);
++      if (oldval != 0)
++	lll_futex_wait (futex, 2, private);
++    }
++  while (atomic_compare_and_exchange_bool_acq (futex, 2, 0) != 0);
++}
++
++
++int
++__lll_timedlock_wait (int *futex, const struct timespec *abstime, int private)
++{
++  struct timespec rt;
++
++  /* Reject invalid timeouts.  */
++  if (abstime->tv_nsec < 0 || abstime->tv_nsec >= 1000000000)
++    return EINVAL;
++
++  /* Upgrade the lock.  */
++  if (atomic_exchange_acq (futex, 2) == 0)
++    return 0;
++
++  do
++    {
++      struct timeval tv;
++
++      /* Get the current time.  */
++      (void) __gettimeofday (&tv, NULL);
++
++      /* Compute relative timeout.  */
++      rt.tv_sec = abstime->tv_sec - tv.tv_sec;
++      rt.tv_nsec = abstime->tv_nsec - tv.tv_usec * 1000;
++      if (rt.tv_nsec < 0)
++	{
++	  rt.tv_nsec += 1000000000;
++	  --rt.tv_sec;
++	}
++
++      /* Already timed out?  */
++      if (rt.tv_sec < 0)
++	return ETIMEDOUT;
++
++      // XYZ: Lost the lock to check whether it was private.
++      lll_futex_timed_wait (futex, 2, &rt, private);
++    }
++  while (atomic_compare_and_exchange_bool_acq (futex, 2, 0) != 0);
++
++  return 0;
++}
++
++
++int
++__lll_timedwait_tid (int *tidp, const struct timespec *abstime)
++{
++  int tid;
++
++  if (abstime->tv_nsec < 0 || abstime->tv_nsec >= 1000000000)
++    return EINVAL;
++
++  /* Repeat until thread terminated.  */
++  while ((tid = *tidp) != 0)
++    {
++      struct timeval tv;
++      struct timespec rt;
++
++      /* Get the current time.  */
++      (void) __gettimeofday (&tv, NULL);
++
++      /* Compute relative timeout.  */
++      rt.tv_sec = abstime->tv_sec - tv.tv_sec;
++      rt.tv_nsec = abstime->tv_nsec - tv.tv_usec * 1000;
++      if (rt.tv_nsec < 0)
++	{
++	  rt.tv_nsec += 1000000000;
++	  --rt.tv_sec;
++	}
++
++      /* Already timed out?  */
++      if (rt.tv_sec < 0)
++	return ETIMEDOUT;
++
++      /* Wait until thread terminates.  */
++      // XYZ: Lost the lock to check whether it was private.
++      if (lll_futex_timed_wait (tidp, tid, &rt, LLL_SHARED) == -ETIMEDOUT)
++	return ETIMEDOUT;
++    }
++
++  return 0;
++}
++#endif
+diff -Naur glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/lowlevellock.h glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/lowlevellock.h
+--- glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/lowlevellock.h	1970-01-01 02:00:00.000000000 +0200
++++ glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/lowlevellock.h	2009-05-16 11:36:20.000000000 +0300
+@@ -0,0 +1,282 @@
++/* Copyright (C) 2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, write to the Free
++   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
++   02111-1307 USA.  */
++
++#ifndef _LOWLEVELLOCK_H
++#define _LOWLEVELLOCK_H	1
++
++#include <time.h>
++#include <sys/param.h>
++#include <bits/pthreadtypes.h>
++#include <atomic.h>
++#include <sysdep.h>
++#include <kernel-features.h>
++
++#define FUTEX_WAIT		0
++#define FUTEX_WAKE		1
++#define FUTEX_REQUEUE		3
++#define FUTEX_CMP_REQUEUE	4
++#define FUTEX_WAKE_OP		5
++#define FUTEX_OP_CLEAR_WAKE_IF_GT_ONE	((4 << 24) | 1)
++#define FUTEX_LOCK_PI		6
++#define FUTEX_UNLOCK_PI		7
++#define FUTEX_TRYLOCK_PI	8
++#define FUTEX_WAIT_BITSET	9
++#define FUTEX_WAKE_BITSET	10
++#define FUTEX_PRIVATE_FLAG	128
++#define FUTEX_CLOCK_REALTIME	256
++
++#define FUTEX_BITSET_MATCH_ANY	0xffffffff
++
++/* Values for 'private' parameter of locking macros.  Yes, the
++   definition seems to be backwards.  But it is not.  The bit will be
++   reversed before passing to the system call.  */
++#define LLL_PRIVATE	0
++#define LLL_SHARED	FUTEX_PRIVATE_FLAG
++
++
++#if !defined NOT_IN_libc || defined IS_IN_rtld
++/* In libc.so or ld.so all futexes are private.  */
++# ifdef __ASSUME_PRIVATE_FUTEX
++#  define __lll_private_flag(fl, private) \
++  ((fl) | FUTEX_PRIVATE_FLAG)
++# else
++#  define __lll_private_flag(fl, private) \
++  ((fl) | THREAD_GETMEM (THREAD_SELF, header.private_futex))
++# endif
++#else
++# ifdef __ASSUME_PRIVATE_FUTEX
++#  define __lll_private_flag(fl, private) \
++  (((fl) | FUTEX_PRIVATE_FLAG) ^ (private))
++# else
++#  define __lll_private_flag(fl, private) \
++  (__builtin_constant_p (private)					      \
++   ? ((private) == 0							      \
++      ? ((fl) | THREAD_GETMEM (THREAD_SELF, header.private_futex))	      \
++      : (fl))								      \
++   : ((fl) | (((private) ^ FUTEX_PRIVATE_FLAG)				      \
++	      & THREAD_GETMEM (THREAD_SELF, header.private_futex))))
++# endif	      
++#endif
++
++
++#define lll_futex_wait(futexp, val, private) \
++  lll_futex_timed_wait(futexp, val, NULL, private)
++
++#define lll_futex_timed_wait(futexp, val, timespec, private) \
++  ({									      \
++    INTERNAL_SYSCALL_DECL (__err);					      \
++    long int __ret;							      \
++    __ret = INTERNAL_SYSCALL (futex, __err, 4, (futexp),		      \
++			      __lll_private_flag (FUTEX_WAIT, private),	      \
++			      (val), (timespec));			      \
++    __ret;								      \
++  })
++
++#define lll_futex_wake(futexp, nr, private) \
++  ({									      \
++    INTERNAL_SYSCALL_DECL (__err);					      \
++    long int __ret;							      \
++    __ret = INTERNAL_SYSCALL (futex, __err, 4, (futexp),		      \
++			      __lll_private_flag (FUTEX_WAKE, private),	      \
++			      (nr), 0);					      \
++    __ret;								      \
++  })
++
++#define lll_robust_dead(futexv, private) \
++  do									      \
++    {									      \
++      int *__futexp = &(futexv);					      \
++      atomic_or (__futexp, FUTEX_OWNER_DIED);				      \
++      lll_futex_wake (__futexp, 1, private);				      \
++    }									      \
++  while (0)
++
++/* Returns non-zero if error happened, zero if success.  */
++#define lll_futex_requeue(futexp, nr_wake, nr_move, mutex, val, private) \
++  ({									      \
++    INTERNAL_SYSCALL_DECL (__err);					      \
++    long int __ret;							      \
++    __ret = INTERNAL_SYSCALL (futex, __err, 6, (futexp),		      \
++			      __lll_private_flag (FUTEX_CMP_REQUEUE, private),\
++			      (nr_wake), (nr_move), (mutex), (val));	      \
++    INTERNAL_SYSCALL_ERROR_P (__ret, __err);				      \
++  })
++
++
++/* Returns non-zero if error happened, zero if success.  */
++#define lll_futex_wake_unlock(futexp, nr_wake, nr_wake2, futexp2, private) \
++  ({									      \
++    INTERNAL_SYSCALL_DECL (__err);					      \
++    long int __ret;							      \
++    __ret = INTERNAL_SYSCALL (futex, __err, 6, (futexp),		      \
++			      __lll_private_flag (FUTEX_WAKE_OP, private),    \
++			      (nr_wake), (nr_wake2), (futexp2),		      \
++			      FUTEX_OP_CLEAR_WAKE_IF_GT_ONE);		      \
++    INTERNAL_SYSCALL_ERROR_P (__ret, __err);				      \
++  })
++
++
++#define lll_trylock(lock)	\
++  atomic_compare_and_exchange_val_acq(&(lock), 1, 0)
++
++#define lll_cond_trylock(lock)	\
++  atomic_compare_and_exchange_val_acq(&(lock), 2, 0)
++
++#define __lll_robust_trylock(futex, id) \
++  (atomic_compare_and_exchange_val_acq (futex, id, 0) != 0)
++#define lll_robust_trylock(lock, id) \
++  __lll_robust_trylock (&(lock), id)
++
++extern void __lll_lock_wait_private (int *futex) attribute_hidden;
++extern void __lll_lock_wait (int *futex, int private) attribute_hidden;
++extern int __lll_robust_lock_wait (int *futex, int private) attribute_hidden;
++
++#define __lll_lock(futex, private)					      \
++  ((void) ({								      \
++    int *__futex = (futex);						      \
++    if (__builtin_expect (atomic_compare_and_exchange_val_acq (__futex,       \
++								1, 0), 0))    \
++      {									      \
++	if (__builtin_constant_p (private) && (private) == LLL_PRIVATE)	      \
++	  __lll_lock_wait_private (__futex);				      \
++	else								      \
++	  __lll_lock_wait (__futex, private);				      \
++      }									      \
++  }))
++#define lll_lock(futex, private) __lll_lock (&(futex), private)
++
++
++#define __lll_robust_lock(futex, id, private)				      \
++  ({									      \
++    int *__futex = (futex);						      \
++    int __val = 0;							      \
++									      \
++    if (__builtin_expect (atomic_compare_and_exchange_bool_acq (__futex, id,  \
++								0), 0))	      \
++      __val = __lll_robust_lock_wait (__futex, private);		      \
++    __val;								      \
++  })
++#define lll_robust_lock(futex, id, private) \
++  __lll_robust_lock (&(futex), id, private)
++
++
++#define __lll_cond_lock(futex, private)					      \
++  ((void) ({								      \
++    int *__futex = (futex);						      \
++    if (__builtin_expect (atomic_exchange_acq (__futex, 2), 0))		      \
++      __lll_lock_wait (__futex, private);				      \
++  }))
++#define lll_cond_lock(futex, private) __lll_cond_lock (&(futex), private)
++
++
++#define lll_robust_cond_lock(futex, id, private) \
++  __lll_robust_lock (&(futex), (id) | FUTEX_WAITERS, private)
++
++
++extern int __lll_timedlock_wait (int *futex, const struct timespec *,
++				 int private) attribute_hidden;
++extern int __lll_robust_timedlock_wait (int *futex, const struct timespec *,
++					int private) attribute_hidden;
++
++#define __lll_timedlock(futex, abstime, private)			      \
++  ({									      \
++     int *__futex = (futex);						      \
++     int __val = 0;							      \
++									      \
++     if (__builtin_expect (atomic_exchange_acq (__futex, 1), 0))	      \
++       __val = __lll_timedlock_wait (__futex, abstime, private);	      \
++     __val;								      \
++  })
++#define lll_timedlock(futex, abstime, private) \
++  __lll_timedlock (&(futex), abstime, private)
++
++
++#define __lll_robust_timedlock(futex, abstime, id, private)		      \
++  ({									      \
++    int *__futex = (futex);						      \
++    int __val = 0;							      \
++									      \
++    if (__builtin_expect (atomic_compare_and_exchange_bool_acq (__futex, id,  \
++								0), 0))	      \
++      __val = __lll_robust_timedlock_wait (__futex, abstime, private);	      \
++    __val;								      \
++  })
++#define lll_robust_timedlock(futex, abstime, id, private) \
++  __lll_robust_timedlock (&(futex), abstime, id, private)
++
++
++#define __lll_unlock(futex, private) \
++  (void)							\
++    ({ int *__futex = (futex);					\
++       int __oldval = atomic_exchange_rel (__futex, 0);		\
++       if (__builtin_expect (__oldval > 1, 0))			\
++	 lll_futex_wake (__futex, 1, private);			\
++    })
++#define lll_unlock(futex, private) __lll_unlock(&(futex), private)
++
++
++#define __lll_robust_unlock(futex, private) \
++  (void)							\
++    ({ int *__futex = (futex);					\
++       int __oldval = atomic_exchange_rel (__futex, 0);		\
++       if (__builtin_expect (__oldval & FUTEX_WAITERS, 0))	\
++	 lll_futex_wake (__futex, 1, private);			\
++    })
++#define lll_robust_unlock(futex, private) \
++  __lll_robust_unlock(&(futex), private)
++
++
++#define lll_islocked(futex) \
++  (futex != 0)
++
++
++/* Our internal lock implementation is identical to the binary-compatible
++   mutex implementation. */
++
++/* Initializers for lock.  */
++#define LLL_LOCK_INITIALIZER		(0)
++#define LLL_LOCK_INITIALIZER_LOCKED	(1)
++
++/* The states of a lock are:
++    0  -  untaken
++    1  -  taken by one user
++   >1  -  taken by more users */
++
++/* The kernel notifies a process which uses CLONE_CLEARTID via futex
++   wakeup when the clone terminates.  The memory location contains the
++   thread ID while the clone is running and is reset to zero
++   afterwards.	*/
++#define lll_wait_tid(tid) \
++  do {					\
++    __typeof (tid) __tid;		\
++    while ((__tid = (tid)) != 0)	\
++      lll_futex_wait (&(tid), __tid, LLL_SHARED);\
++  } while (0)
++
++extern int __lll_timedwait_tid (int *, const struct timespec *)
++     attribute_hidden;
++
++#define lll_timedwait_tid(tid, abstime) \
++  ({							\
++    int __res = 0;					\
++    if ((tid) != 0)					\
++      __res = __lll_timedwait_tid (&(tid), (abstime));	\
++    __res;						\
++  })
++
++#endif	/* lowlevellock.h */
+diff -Naur glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/Makefile glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/Makefile
+--- glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/Makefile	1970-01-01 02:00:00.000000000 +0200
++++ glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/Makefile	2009-05-16 11:36:20.000000000 +0300
+@@ -0,0 +1,8 @@
++ifeq ($(subdir),nptl)
++ifneq ($(arm-using-eabi),yes)
++# These tests rely on PTHREAD_KEYS_MAX.  The SJLJ exception machinery
++# in libgcc registers one key, however, so only PTHREAD_KEYS_MAX-1
++# keys are available.  This works fine for EABI targets.
++tests := $(filter-out tst-key1 tst-key4,$(tests))
++endif
++endif
+diff -Naur glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/pthread_once.c glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/pthread_once.c
+--- glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/pthread_once.c	1970-01-01 02:00:00.000000000 +0200
++++ glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/pthread_once.c	2009-05-16 11:36:20.000000000 +0300
+@@ -0,0 +1,99 @@
++/* Copyright (C) 2004, 2005 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, write to the Free
++   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
++   02111-1307 USA.  */
++
++#include "pthreadP.h"
++#include <lowlevellock.h>
++
++unsigned long int __fork_generation attribute_hidden;
++
++static void
++clear_once_control (void *arg)
++{
++  pthread_once_t *once_control = (pthread_once_t *) arg;
++
++  *once_control = 0;
++  lll_futex_wake (once_control, INT_MAX, LLL_PRIVATE);
++}
++
++int
++__pthread_once (pthread_once_t *once_control, void (*init_routine) (void))
++{
++  for (;;)
++    {
++      int oldval;
++      int newval;
++
++      /* Pseudo code:
++	 newval = __fork_generation | 1;
++	 oldval = *once_control;
++	 if ((oldval & 2) == 0)
++	   *once_control = newval;
++	 Do this atomically.
++      */
++      do
++	{
++	  newval = __fork_generation | 1;
++	  oldval = *once_control;
++	  if (oldval & 2)
++	    break;
++	} while (atomic_compare_and_exchange_val_acq (once_control, newval, oldval) != oldval);
++
++      /* Check if the initializer has already been done.  */
++      if ((oldval & 2) != 0)
++	return 0;
++
++      /* Check if another thread already runs the initializer.	*/
++      if ((oldval & 1) == 0)
++	break;
++
++      /* Check whether the initializer execution was interrupted by a fork.  */
++      if (oldval != newval)
++	break;
++
++      /* Same generation, some other thread was faster. Wait.  */
++      lll_futex_wait (once_control, oldval, LLL_PRIVATE);
++    }
++
++  /* This thread is the first here.  Do the initialization.
++     Register a cleanup handler so that in case the thread gets
++     interrupted the initialization can be restarted.  */
++  pthread_cleanup_push (clear_once_control, once_control);
++
++  init_routine ();
++
++  pthread_cleanup_pop (0);
++
++  /* Say that the initialisation is done.  */
++  *once_control = __fork_generation | 2;
++
++  /* Wake up all other threads.  */
++  lll_futex_wake (once_control, INT_MAX, LLL_PRIVATE);
++
++  return 0;
++}
++weak_alias (__pthread_once, pthread_once)
++strong_alias (__pthread_once, __pthread_once_internal)
++
++#if defined(__USING_SJLJ_EXCEPTIONS__) && !defined(__PIC__)
++/* When statically linked, if pthread_create is used, this file
++   will be brought in.  The exception handling code in GCC assumes
++   that if pthread_create is available, so are these.  */
++const void *include_pthread_getspecific attribute_hidden = pthread_getspecific;
++const void *include_pthread_setspecific attribute_hidden = pthread_setspecific;
++const void *include_pthread_key_create attribute_hidden = pthread_key_create;
++#endif
+diff -Naur glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/pt-vfork.S glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/pt-vfork.S
+--- glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/pt-vfork.S	1970-01-01 02:00:00.000000000 +0200
++++ glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/pt-vfork.S	2009-05-16 11:36:20.000000000 +0300
+@@ -0,0 +1,38 @@
++/* Copyright (C) 2005 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, write to the Free
++   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
++   02111-1307 USA.  */
++
++#include <tcb-offsets.h>
++
++/* Save the PID value.  */
++#define SAVE_PID \
++	str	lr, [sp, #-4]!;		/* Save LR.  */			\
++	mov	r0, #0xffff0fff;	/* Point to the high page.  */	\
++	mov	lr, pc;			/* Save our return address.  */	\
++	sub	pc, r0, #31;		/* Jump to the TLS entry.  */	\
++	ldr	lr, [sp], #4;		/* Restore LR.  */		\
++	mov	r2, r0;			/* Save the TLS addr in r2.  */	\
++	ldr	r3, [r2, #PID_OFFSET];	/* Load the saved PID.  */	\
++	rsb	r0, r3, #0;		/* Negate it.  */		\
++	str	r0, [r2, #PID_OFFSET]	/* Store the temporary PID.  */
++
++/* Restore the old PID value in the parent.  */
++#define RESTORE_PID \
++	cmp	r0, #0;			/* If we are the parent... */	\
++	strne	r3, [r2, #PID_OFFSET]	/* ... restore the saved PID.  */
++
++#include "../vfork.S"
+diff -Naur glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/sysdep-cancel.h glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/sysdep-cancel.h
+--- glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/sysdep-cancel.h	2010-03-08 16:00:05.873080103 +0200
++++ glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/sysdep-cancel.h	2009-05-16 11:36:20.000000000 +0300
+@@ -1,6 +1,5 @@
+-/* Copyright (C) 2003, 2005 Free Software Foundation, Inc.
++/* Copyright (C) 2003, 2004, 2005 Free Software Foundation, Inc.
+    This file is part of the GNU C Library.
+-   Contributed by Phil Blundell <pb@nexus.co.uk>, 2003.
+ 
+    The GNU C Library is free software; you can redistribute it and/or
+    modify it under the terms of the GNU Lesser General Public
+@@ -18,43 +17,33 @@
+    02111-1307 USA.  */
+ 
+ #include <sysdep.h>
++#include <tls.h>
+ #ifndef __ASSEMBLER__
+-# include <linuxthreads/internals.h>
++# include <nptl/pthreadP.h>
+ #endif
+ 
+-#if !defined NOT_IN_libc || defined IS_IN_libpthread
+-
+-/* We push lr onto the stack, so we have to use ldmib instead of ldmia
+-   to find the saved arguments.  */
+-# ifdef PIC
+-#  undef DOARGS_5
+-#  undef DOARGS_6
+-#  undef DOARGS_7
+-#  define DOARGS_5 str r4, [sp, $-4]!; ldr r4, [sp, $8];
+-#  define DOARGS_6 mov ip, sp; stmfd sp!, {r4, r5}; ldmib ip, {r4, r5};
+-#  define DOARGS_7 mov ip, sp; stmfd sp!, {r4, r5, r6}; ldmib ip, {r4, r5, r6};
+-# endif
+-
+-# undef PSEUDO_RET
+-# define PSEUDO_RET						        \
+-    ldrcc pc, [sp], $4;						        \
+-    ldr	lr, [sp], $4;							\
+-    b PLTJMP(SYSCALL_ERROR)
++#if !defined NOT_IN_libc || defined IS_IN_libpthread || defined IS_IN_librt
+ 
+ # undef PSEUDO
+ # define PSEUDO(name, syscall_name, args)				\
+   .section ".text";							\
+     PSEUDO_PROLOGUE;							\
++  .type __##syscall_name##_nocancel,%function;				\
++  .globl __##syscall_name##_nocancel;					\
++  __##syscall_name##_nocancel:						\
++    DO_CALL (syscall_name, args);					\
++    PSEUDO_RET;								\
++  .size __##syscall_name##_nocancel,.-__##syscall_name##_nocancel;	\
+   ENTRY (name);								\
+     SINGLE_THREAD_P;							\
++    DOARGS_##args;							\
+     bne .Lpseudo_cancel;						\
+-    DO_CALL (syscall_name, args);					\
++    DO_CALL (syscall_name, 0);						\
++    UNDOARGS_##args;							\
+     cmn r0, $4096;							\
+-    RETINSTR(cc, lr);							\
+-    b PLTJMP(SYSCALL_ERROR);						\
++    PSEUDO_RET;								\
+   .Lpseudo_cancel:							\
+-    str lr, [sp, $-4]!;							\
+-    DOCARGS_##args;	/* save syscall args around CENABLE.  */	\
++    DOCARGS_##args;	/* save syscall args etc. around CENABLE.  */	\
+     CENABLE;								\
+     mov ip, r0;		/* put mask in safe place.  */			\
+     UNDOCARGS_##args;	/* restore syscall args.  */			\
+@@ -62,54 +51,50 @@
+     str r0, [sp, $-4]!; /* save syscall return value.  */		\
+     mov r0, ip;		/* get mask back.  */				\
+     CDISABLE;								\
+-    ldr r0, [sp], $4;	/* retrieve return value.  */			\
+-    UNDOC2ARGS_##args;	/* fix register damage.  */			\
++    ldmfd sp!, {r0, lr}; /* retrieve return value and address.  */	\
++    UNDOARGS_##args;							\
+     cmn r0, $4096;
+ 
+-# define DOCARGS_0
++# define DOCARGS_0	str lr, [sp, #-4]!;
+ # define UNDOCARGS_0
+-# define UNDOC2ARGS_0
+ 
+-# define DOCARGS_1	str r0, [sp, #-4]!;
++# define DOCARGS_1	stmfd sp!, {r0, lr};
+ # define UNDOCARGS_1	ldr r0, [sp], #4;
+-# define UNDOC2ARGS_1
+ 
+-# define DOCARGS_2	str r1, [sp, #-4]!; str r0, [sp, #-4]!;
+-# define UNDOCARGS_2	ldr r0, [sp], #4; ldr r1, [sp], #4;
+-# define UNDOC2ARGS_2
+-
+-# define DOCARGS_3	str r2, [sp, #-4]!; str r1, [sp, #-4]!; str r0, [sp, #-4]!;
+-# define UNDOCARGS_3	ldr r0, [sp], #4; ldr r1, [sp], #4; ldr r2, [sp], #4
+-# define UNDOC2ARGS_3
+-
+-# define DOCARGS_4	stmfd sp!, {r0-r3}
+-# define UNDOCARGS_4	ldmfd sp!, {r0-r3}
+-# define UNDOC2ARGS_4
+-
+-# define DOCARGS_5	stmfd sp!, {r0-r3}
+-# define UNDOCARGS_5	ldmfd sp, {r0-r3}; str r4, [sp, #-4]!; ldr r4, [sp, #24]
+-# define UNDOC2ARGS_5   ldr r4, [sp], #20
++# define DOCARGS_2	stmfd sp!, {r0, r1, lr};
++# define UNDOCARGS_2	ldmfd sp!, {r0, r1};
++
++# define DOCARGS_3	stmfd sp!, {r0, r1, r2, lr};
++# define UNDOCARGS_3	ldmfd sp!, {r0, r1, r2};
++
++# define DOCARGS_4	stmfd sp!, {r0, r1, r2, r3, lr};
++# define UNDOCARGS_4	ldmfd sp!, {r0, r1, r2, r3};
++
++# define DOCARGS_5	DOCARGS_4
++# define UNDOCARGS_5	UNDOCARGS_4
++
++# define DOCARGS_6	DOCARGS_5
++# define UNDOCARGS_6	UNDOCARGS_5
+ 
+ # ifdef IS_IN_libpthread
+ #  define CENABLE	bl PLTJMP(__pthread_enable_asynccancel)
+ #  define CDISABLE	bl PLTJMP(__pthread_disable_asynccancel)
+ #  define __local_multiple_threads __pthread_multiple_threads
+-# else
++# elif !defined NOT_IN_libc
+ #  define CENABLE	bl PLTJMP(__libc_enable_asynccancel)
+ #  define CDISABLE	bl PLTJMP(__libc_disable_asynccancel)
+ #  define __local_multiple_threads __libc_multiple_threads
++# elif defined IS_IN_librt
++#  define CENABLE	bl PLTJMP(__librt_enable_asynccancel)
++#  define CDISABLE	bl PLTJMP(__librt_disable_asynccancel)
++# else
++#  error Unsupported library
+ # endif
+ 
+-# ifndef __ASSEMBLER__
++# if defined IS_IN_libpthread || !defined NOT_IN_libc
++#  ifndef __ASSEMBLER__
+ extern int __local_multiple_threads attribute_hidden;
+-#  define SINGLE_THREAD_P __builtin_expect (__local_multiple_threads == 0, 1)
+-# else
+-#  if !defined PIC
+-#   define SINGLE_THREAD_P						\
+-  ldr ip, =__local_multiple_threads;					\
+-  ldr ip, [ip];								\
+-  teq ip, #0;
+-#   define PSEUDO_PROLOGUE
++#   define SINGLE_THREAD_P __builtin_expect (__local_multiple_threads == 0, 1)
+ #  else
+ #   define SINGLE_THREAD_P						\
+   ldr ip, 1b;								\
+@@ -119,11 +104,34 @@
+ #   define PSEUDO_PROLOGUE						\
+   1:  .word __local_multiple_threads - 2f - 8;
+ #  endif
++# else
++/*  There is no __local_multiple_threads for librt, so use the TCB.  */
++#  ifndef __ASSEMBLER__
++#   define SINGLE_THREAD_P						\
++  __builtin_expect (THREAD_GETMEM (THREAD_SELF,				\
++				   header.multiple_threads) == 0, 1)
++#  else
++#   define PSEUDO_PROLOGUE
++#   define SINGLE_THREAD_P						\
++  stmfd	sp!, {r0, lr};							\
++  bl	__aeabi_read_tp;						\
++  ldr	ip, [r0, #MULTIPLE_THREADS_OFFSET];				\
++  ldmfd	sp!, {r0, lr};							\
++  teq	ip, #0
++#   define SINGLE_THREAD_P_PIC(x) SINGLE_THREAD_P
++#  endif
+ # endif
+ 
+ #elif !defined __ASSEMBLER__
+ 
+-/* This code should never be used but we define it anyhow.  */
+-# define SINGLE_THREAD_P (1)
++/* For rtld, et cetera.  */
++# define SINGLE_THREAD_P 1
++# define NO_CANCELLATION 1
+ 
+ #endif
++
++#ifndef __ASSEMBLER__
++# define RTLD_SINGLE_THREAD_P \
++  __builtin_expect (THREAD_GETMEM (THREAD_SELF, \
++				   header.multiple_threads) == 0, 1)
++#endif
+diff -Naur glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/unwind-forcedunwind.c glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/unwind-forcedunwind.c
+--- glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/unwind-forcedunwind.c	1970-01-01 02:00:00.000000000 +0200
++++ glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/unwind-forcedunwind.c	2009-05-16 11:36:20.000000000 +0300
+@@ -0,0 +1,146 @@
++/* Copyright (C) 2003, 2009 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++   Contributed by Jakub Jelinek <jakub@redhat.com>.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public License as
++   published by the Free Software Foundation; either version 2.1 of the
++   License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; see the file COPYING.LIB.  If not,
++   write to the Free Software Foundation, Inc., 59 Temple Place - Suite 330,
++   Boston, MA 02111-1307, USA.  */
++
++#include <dlfcn.h>
++#include <stdio.h>
++#include <unwind.h>
++#include <pthreadP.h>
++
++static void *libgcc_s_handle;
++static void (*libgcc_s_resume) (struct _Unwind_Exception *exc);
++static _Unwind_Reason_Code (*libgcc_s_personality)
++  (int, _Unwind_Action, _Unwind_Exception_Class, struct _Unwind_Exception *,
++   struct _Unwind_Context *);
++static _Unwind_Reason_Code (*libgcc_s_forcedunwind)
++  (struct _Unwind_Exception *, _Unwind_Stop_Fn, void *);
++static _Unwind_Word (*libgcc_s_getcfa) (struct _Unwind_Context *);
++static void (*libgcc_s_sjlj_register) (struct SjLj_Function_Context *);
++static void (*libgcc_s_sjlj_unregister) (struct SjLj_Function_Context *);
++
++void
++__attribute_noinline__
++pthread_cancel_init (void)
++{
++  void *resume, *personality, *forcedunwind, *getcfa;
++  void *handle;
++  void *sjlj_register, *sjlj_unregister;
++
++  if (__builtin_expect (libgcc_s_handle != NULL, 1))
++    {
++      /* Force gcc to reload all values.  */
++      asm volatile ("" ::: "memory");
++      return;
++    }
++
++  handle = __libc_dlopen ("libgcc_s.so.1");
++
++  if (handle == NULL
++      || (sjlj_register = __libc_dlsym (handle, "_Unwind_SjLj_Register")) == NULL
++      || (sjlj_unregister = __libc_dlsym (handle, "_Unwind_SjLj_Unregister")) == NULL
++      || (resume = __libc_dlsym (handle, "_Unwind_SjLj_Resume")) == NULL
++      || (personality = __libc_dlsym (handle, "__gcc_personality_sj0")) == NULL
++      || (forcedunwind = __libc_dlsym (handle, "_Unwind_SjLj_ForcedUnwind"))
++	 == NULL
++      || (getcfa = __libc_dlsym (handle, "_Unwind_GetCFA")) == NULL
++      )
++    __libc_fatal ("libgcc_s.so.1 must be installed for pthread_cancel to work\n");
++
++  libgcc_s_resume = resume;
++  libgcc_s_personality = personality;
++  libgcc_s_forcedunwind = forcedunwind;
++  libgcc_s_sjlj_register = sjlj_register;
++  libgcc_s_sjlj_unregister = sjlj_unregister;
++  libgcc_s_getcfa = getcfa;
++  /* Make sure libgcc_s_getcfa is written last.  Otherwise,
++     pthread_cancel_init might return early even when the pointer the
++     caller is interested in is not initialized yet.  */
++  atomic_write_barrier ();
++  libgcc_s_handle = handle;
++}
++
++void
++__libc_freeres_fn_section
++__unwind_freeres (void)
++{
++  void *handle = libgcc_s_handle;
++  if (handle != NULL)
++    {
++      libgcc_s_handle = NULL;
++      __libc_dlclose (handle);
++    }
++}
++
++void
++_Unwind_Resume (struct _Unwind_Exception *exc)
++{
++  if (__builtin_expect (libgcc_s_resume == NULL, 0))
++    pthread_cancel_init ();
++
++  libgcc_s_resume (exc);
++}
++
++_Unwind_Reason_Code
++__gcc_personality_v0 (int version, _Unwind_Action actions,
++		      _Unwind_Exception_Class exception_class,
++                      struct _Unwind_Exception *ue_header,
++                      struct _Unwind_Context *context)
++{
++  if (__builtin_expect (libgcc_s_personality == NULL, 0))
++    pthread_cancel_init ();
++
++  return libgcc_s_personality (version, actions, exception_class,
++			       ue_header, context);
++}
++
++_Unwind_Reason_Code
++_Unwind_ForcedUnwind (struct _Unwind_Exception *exc, _Unwind_Stop_Fn stop,
++		      void *stop_argument)
++{
++  if (__builtin_expect (libgcc_s_forcedunwind == NULL, 0))
++    pthread_cancel_init ();
++
++  return libgcc_s_forcedunwind (exc, stop, stop_argument);
++}
++
++_Unwind_Word
++_Unwind_GetCFA (struct _Unwind_Context *context)
++{
++  if (__builtin_expect (libgcc_s_getcfa == NULL, 0))
++    pthread_cancel_init ();
++
++  return libgcc_s_getcfa (context);
++}
++
++void
++_Unwind_SjLj_Register (struct SjLj_Function_Context *fc)
++{
++  if (__builtin_expect (libgcc_s_sjlj_register == NULL, 0))
++    pthread_cancel_init ();
++
++  libgcc_s_sjlj_register (fc);
++}
++
++void
++_Unwind_SjLj_Unregister (struct SjLj_Function_Context *fc)
++{
++  if (__builtin_expect (libgcc_s_sjlj_unregister == NULL, 0))
++    pthread_cancel_init ();
++
++  libgcc_s_sjlj_unregister (fc);
++}
+diff -Naur glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/unwind.h glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/unwind.h
+--- glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/unwind.h	1970-01-01 02:00:00.000000000 +0200
++++ glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/unwind.h	2009-05-16 11:36:20.000000000 +0300
+@@ -0,0 +1,31 @@
++/* Exception handling and frame unwind runtime interface routines.
++   Copyright (C) 2005 Free Software Foundation, Inc.
++
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, write to the Free
++   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
++   02111-1307 USA.  */
++
++#ifndef _ARM_UNWIND_H
++#define _ARM_UNWIND_H	1
++
++#include <sysdeps/generic/unwind.h>
++
++/* Call the SjLj versions of these functions.  */
++#define _Unwind_ForcedUnwind _Unwind_SjLj_ForcedUnwind
++#define _Unwind_Resume _Unwind_SjLj_Resume
++#define __gcc_personality_v0 __gcc_personality_sj0
++
++#endif	/* unwind.h */
+diff -Naur glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/unwind-resume.c glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/unwind-resume.c
+--- glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/unwind-resume.c	1970-01-01 02:00:00.000000000 +0200
++++ glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/unwind-resume.c	2009-05-16 11:36:20.000000000 +0300
+@@ -0,0 +1,87 @@
++/* Copyright (C) 2003 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++   Contributed by Jakub Jelinek <jakub@redhat.com>.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public License as
++   published by the Free Software Foundation; either version 2.1 of the
++   License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; see the file COPYING.LIB.  If not,
++   write to the Free Software Foundation, Inc., 59 Temple Place - Suite 330,
++   Boston, MA 02111-1307, USA.  */
++
++#include <dlfcn.h>
++#include <stdio.h>
++#include <unwind.h>
++
++static void (*libgcc_s_resume) (struct _Unwind_Exception *exc);
++static _Unwind_Reason_Code (*libgcc_s_personality)
++  (int, _Unwind_Action, _Unwind_Exception_Class, struct _Unwind_Exception *,
++   struct _Unwind_Context *);
++static void (*libgcc_s_sjlj_register) (struct SjLj_Function_Context *);
++static void (*libgcc_s_sjlj_unregister) (struct SjLj_Function_Context *);
++
++static void
++init (void)
++{
++  void *resume, *personality;
++  void *handle;
++  void *sjlj_register, *sjlj_unregister;
++
++  handle = __libc_dlopen ("libgcc_s.so.1");
++
++  if (handle == NULL
++      || (sjlj_register = __libc_dlsym (handle, "_Unwind_SjLj_Register")) == NULL
++      || (sjlj_unregister = __libc_dlsym (handle, "_Unwind_SjLj_Unregister")) == NULL
++      || (resume = __libc_dlsym (handle, "_Unwind_SjLj_Resume")) == NULL
++      || (personality = __libc_dlsym (handle, "__gcc_personality_sj0")) == NULL)
++    __libc_fatal ("libgcc_s.so.1 must be installed for pthread_cancel to work\n");
++
++  libgcc_s_resume = resume;
++  libgcc_s_personality = personality;
++  libgcc_s_sjlj_register = sjlj_register;
++  libgcc_s_sjlj_unregister = sjlj_unregister;
++}
++
++void
++_Unwind_Resume (struct _Unwind_Exception *exc)
++{
++  if (__builtin_expect (libgcc_s_resume == NULL, 0))
++    init ();
++  libgcc_s_resume (exc);
++}
++
++_Unwind_Reason_Code
++__gcc_personality_v0 (int version, _Unwind_Action actions,
++		      _Unwind_Exception_Class exception_class,
++                      struct _Unwind_Exception *ue_header,
++                      struct _Unwind_Context *context)
++{
++  if (__builtin_expect (libgcc_s_personality == NULL, 0))
++    init ();
++  return libgcc_s_personality (version, actions, exception_class,
++			       ue_header, context);
++}
++
++void
++_Unwind_SjLj_Register (struct SjLj_Function_Context *fc)
++{
++  if (__builtin_expect (libgcc_s_sjlj_register == NULL, 0))
++    init ();
++  libgcc_s_sjlj_register (fc);
++}
++
++void
++_Unwind_SjLj_Unregister (struct SjLj_Function_Context *fc)
++{
++  if (__builtin_expect (libgcc_s_sjlj_unregister == NULL, 0))
++    init ();
++  libgcc_s_sjlj_unregister (fc);
++}
+diff -Naur glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/Versions glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/Versions
+--- glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/Versions	1970-01-01 02:00:00.000000000 +0200
++++ glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/Versions	2009-05-16 11:36:20.000000000 +0300
+@@ -0,0 +1,8 @@
++libc {
++  GLIBC_PRIVATE {
++    # A copy of sigaction lives in NPTL, and needs these.
++    __default_sa_restorer; __default_rt_sa_restorer;
++    __default_sa_restorer_v1; __default_rt_sa_restorer_v1;
++    __default_sa_restorer_v2; __default_rt_sa_restorer_v2;
++  }
++}
+diff -Naur glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/vfork.S glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/vfork.S
+--- glibc-2.10.1.orig/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/vfork.S	2010-03-08 16:00:05.873080103 +0200
++++ glibc-2.10.1/ports/sysdeps/unix/sysv/linux/arm/linuxthreads/vfork.S	2009-05-16 11:36:20.000000000 +0300
+@@ -1,6 +1,5 @@
+-/* Copyright (C) 1999, 2002, 2003, 2005 Free Software Foundation, Inc.
++/* Copyright (C) 2005 Free Software Foundation, Inc.
+    This file is part of the GNU C Library.
+-   Contributed by Philip Blundell <philb@gnu.org>.
+ 
+    The GNU C Library is free software; you can redistribute it and/or
+    modify it under the terms of the GNU Lesser General Public
+@@ -17,62 +16,24 @@
+    Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
+    02111-1307 USA.  */
+ 
+-#include <sysdep-cancel.h>
+-#define _ERRNO_H	1
+-#include <bits/errno.h>
+-#include <kernel-features.h>
+-
+-/* Clone the calling process, but without copying the whole address space.
+-   The calling process is suspended until the new process exits or is
+-   replaced by a call to `execve'.  Return -1 for errors, 0 to the new process,
+-   and the process ID of the new process to the old process.  */
+-
+-ENTRY (__vfork)
+-
+-#ifdef __NR_vfork
+-
+-#ifdef SHARED
+-	ldr	ip, 1f
+-	ldr	r0, 2f
+-3:	add	ip, pc, ip
+-	ldr	r0, [ip, r0]
+-#else
+-	ldr	r0, 1f
+-#endif
+-	movs	r0, r0
+-	bne	HIDDEN_JUMPTARGET (__fork)
+-		
+-	DO_CALL (vfork, 0)
+-	cmn	a1, #4096
+-	RETINSTR(cc, lr)
+-
+-#ifndef __ASSUME_VFORK_SYSCALL
+-	/* Check if vfork syscall is known at all.  */
+-	cmn	a1, #ENOSYS
+-	bne	PLTJMP(C_SYMBOL_NAME(__syscall_error))
+-#endif
+-
+-#endif
+-
+-#ifndef __ASSUME_VFORK_SYSCALL
+-	/* If we don't have vfork, fork is close enough.  */
+-	DO_CALL (fork, 0)
+-	cmn	a1, #4096
+-	RETINSTR(cc, lr)
+-#elif !defined __NR_vfork
+-# error "__NR_vfork not available and __ASSUME_VFORK_SYSCALL defined"
+-#endif
+-    	b	PLTJMP(C_SYMBOL_NAME(__syscall_error))
+-
+-#ifdef SHARED
+-1:	.word	_GLOBAL_OFFSET_TABLE_ - 3b - 8
+-2:	.word	__libc_pthread_functions(GOTOFF)
+-#else
+-	.weak	pthread_create
+-1:	.word	pthread_create
+-#endif
++#include <tcb-offsets.h>
+ 
+-PSEUDO_END (__vfork)
+-libc_hidden_def (__vfork)
++/* Save the PID value.  */
++#define SAVE_PID \
++	str	lr, [sp, #-4]!;		/* Save LR.  */			\
++	mov	r0, #0xffff0fff;	/* Point to the high page.  */	\
++	mov	lr, pc;			/* Save our return address.  */	\
++	sub	pc, r0, #31;		/* Jump to the TLS entry.  */	\
++	ldr	lr, [sp], #4;		/* Restore LR.  */		\
++	mov	r2, r0;			/* Save the TLS addr in r2.  */	\
++	ldr	r3, [r2, #PID_OFFSET];	/* Load the saved PID.  */	\
++	rsbs	r0, r3, #0;		/* Negate it.  */		\
++	moveq	r0, #0x80000000;	/* Use 0x80000000 if it was 0.  */ \
++	str	r0, [r2, #PID_OFFSET]	/* Store the temporary PID.  */
++
++/* Restore the old PID value in the parent.  */
++#define RESTORE_PID \
++	cmp	r0, #0;		/* If we are the parent... */		\
++	strne	r3, [r2, #PID_OFFSET]	/* ... restore the saved PID.  */
+ 
+-weak_alias (__vfork, vfork)
++#include "../vfork.S"

@@ -1,0 +1,66 @@
+Index: view.cpp
+===================================================================
+--- plasma/view.cpp	(revision 976441)
++++ plasma/view.cpp	(revision 976442)
+@@ -231,8 +231,10 @@
+     int screen = -1;
+     int desktop = -1;
+     if (oldContainment) {
+-        screen = d->containment->screen();
+-        desktop = d->containment->desktop();
++        if (oldContainment != containment) {
++            screen = d->containment->screen();
++            desktop = d->containment->desktop();
++        }
+     } else {
+         setScene(containment->scene());
+     }
+@@ -245,10 +247,10 @@
+     int otherScreen = containment->screen();
+     int otherDesktop = containment->desktop();
+ 
+-
+     if (screen > -1) {
+         d->lastScreen = screen;
+         d->lastDesktop = desktop;
++        //kDebug() << "set screen from setContainment due to old containment";
+         oldContainment->setScreen(-1, -1);
+         containment->setScreen(-1, -1);
+         containment->setScreen(screen, desktop);
+@@ -257,8 +259,9 @@
+         d->lastDesktop = otherDesktop;
+     }
+ 
+-    if (oldContainment && otherScreen > -1) {
++    if (oldContainment && oldContainment != d->containment && otherScreen > -1) {
+         // assign the old containment the old screen/desktop
++        //kDebug() << "set screen from setContainment" << screen << otherScreen << desktop << otherDesktop;
+         oldContainment->setScreen(otherScreen, otherDesktop);
+     }
+ 
+Index: containment.cpp
+===================================================================
+--- plasma/containment.cpp	(revision 976440)
++++ plasma/containment.cpp	(revision 976441)
+@@ -883,15 +885,19 @@
+ 
+     updateConstraints(Plasma::ScreenConstraint);
+ 
+-    if (oldScreen != newScreen) {
+-        emit screenChanged(oldScreen, newScreen, this);
++    if (oldScreen != newScreen || oldDesktop != newDesktop) {
++        if (oldScreen != newScreen) {
++            emit screenChanged(oldScreen, newScreen, this);
++        }
+ 
+         KConfigGroup c = config();
+         c.writeEntry("screen", d->screen);
++        c.writeEntry("desktop", d->desktop);
+         emit configNeedsSaving();
+     }
+ 
+     if (swapScreensWith) {
++        //kDebug() << "setScreen due to swap, part 2";
+         swapScreensWith->setScreen(oldScreen, oldDesktop);
+     }
+ 

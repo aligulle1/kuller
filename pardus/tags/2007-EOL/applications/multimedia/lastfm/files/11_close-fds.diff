@@ -1,0 +1,154 @@
+--- a/src/RestStateWidget.cpp
++++ b/src/RestStateWidget.cpp
+@@ -31,6 +31,9 @@
+ 
+ #include <QtGui>
+ 
++#ifndef WIN32
++#include <fcntl.h>
++#endif
+ 
+ // These are pixel sizes
+ #ifdef WIN32
+@@ -270,5 +273,17 @@
+ void
+ RestStateWidget::openBootstrapFaq()
+ {
++    #ifndef WIN32
++    int fd = sysconf( _SC_OPEN_MAX );
++    while ( --fd > 2 )
++    {
++        int fdFlags = fcntl( fd, F_GETFD, 0 );
++        if ( (fdFlags != -1) && !(fdFlags & FD_CLOEXEC) )
++        {
++            fdFlags |= FD_CLOEXEC;
++            fcntl ( fd, F_SETFD, fdFlags );
++        }
++    }
++    #endif
+     QDesktopServices::openUrl( QUrl("http://www.last.fm/help/faq/?category=Bootstrapping") );
+ }
+--- a/src/container.cpp
++++ b/src/container.cpp
+@@ -2264,6 +2264,16 @@
+         ShellExecuteW(0, 0, (TCHAR*)file.utf16(), 0, 0, SW_SHOWNORMAL);
+     #else
+         //FIXME get path from Logger instance, DRY!
++        int fd = sysconf( _SC_OPEN_MAX );
++        while ( --fd > 2 )
++        {
++            int fdFlags = fcntl( fd, F_GETFD, 0 );
++            if ( (fdFlags != -1) && !(fdFlags & FD_CLOEXEC) )
++            {
++                fdFlags |= FD_CLOEXEC;
++                fcntl ( fd, F_SETFD, fdFlags );
++            }
++        }
+         QDesktopServices::openUrl( QUrl::fromLocalFile( savePath( "container.log" ) ) );
+     #endif
+ }
+@@ -2278,6 +2288,16 @@
+         ShellExecuteW(0, 0, (TCHAR*)file.utf16(), 0, 0, SW_SHOWNORMAL);
+     #else
+         //FIXME get path from Helper, DRY!
++        int fd = sysconf( _SC_OPEN_MAX );
++        while ( --fd > 2 )
++        {
++            int fdFlags = fcntl( fd, F_GETFD, 0 );
++            if ( (fdFlags != -1) && !(fdFlags & FD_CLOEXEC) )
++            {
++                fdFlags |= FD_CLOEXEC;
++                fcntl ( fd, F_SETFD, fdFlags );
++            }
++        }
+         QDesktopServices::openUrl( QUrl::fromLocalFile( savePath( "lastfmhelper.log" ) ) );
+     #endif
+ }
+@@ -2291,6 +2311,16 @@
+         QString file = savePath( "" );
+         ShellExecuteW(0, 0, (TCHAR*)file.utf16(), 0, 0, SW_SHOWNORMAL);
+     #else
++        int fd = sysconf( _SC_OPEN_MAX );
++        while ( --fd > 2 )
++        {
++            int fdFlags = fcntl( fd, F_GETFD, 0 );
++            if ( (fdFlags != -1) && !(fdFlags & FD_CLOEXEC) )
++            {
++                fdFlags |= FD_CLOEXEC;
++                fcntl ( fd, F_SETFD, fdFlags );
++            }
++        }
+         QDesktopServices::openUrl( QUrl::fromLocalFile( savePath( "" ) ) );
+     #endif
+ }
+--- a/src/libLastFmTools/browserthread.h
++++ b/src/libLastFmTools/browserthread.h
+@@ -22,6 +22,9 @@
+ #ifndef BROWSERTHREAD_H
+ #define BROWSERTHREAD_H
+ 
++#ifndef WIN32
++#include <fcntl.h>
++#endif
+ #include "lastfmtools_common.h"
+ #include <QDesktopServices>
+ #include <QThread>
+@@ -35,6 +38,19 @@
+     public:
+         BrowserThread( QString url ) : QThread()
+         {
++            #ifndef WIN32
++            int fd = sysconf( _SC_OPEN_MAX );
++            while ( --fd > 2 )
++            {
++                int fdFlags = fcntl( fd, F_GETFD, 0 );
++                if ( (fdFlags != -1) && !(fdFlags & FD_CLOEXEC) )
++                {
++                    fdFlags |= FD_CLOEXEC;
++                    fcntl ( fd, F_SETFD, fdFlags );
++                }
++            }
++            #endif
++
+             #if QT_VERSION >= 0x040200
+             QDesktopServices::openUrl( QUrl::fromEncoded( url.toLatin1() ) );
+             deleteLater();
+--- a/src/metadataextension/metadataextension.cpp
++++ b/src/metadataextension/metadataextension.cpp
+@@ -1444,12 +1444,36 @@
+ void
+ MetaDataExtension::buyTrackIconClicked()
+ {
++    #ifndef WIN32
++    int fd = sysconf( _SC_OPEN_MAX );
++    while ( --fd > 2 )
++    {
++        int fdFlags = fcntl( fd, F_GETFD, 0 );
++        if ( (fdFlags != -1) && !(fdFlags & FD_CLOEXEC) )
++        {
++            fdFlags |= FD_CLOEXEC;
++            fcntl ( fd, F_SETFD, fdFlags );
++        }
++    }
++    #endif
+     QDesktopServices::openUrl( m_metaData.buyTrackUrl() );
+ }
+ 
+ void
+ MetaDataExtension::buyAlbumIconClicked()
+ {
++    #ifndef WIN32
++    int fd = sysconf( _SC_OPEN_MAX );
++    while ( --fd > 2 )
++    {
++        int fdFlags = fcntl( fd, F_GETFD, 0 );
++        if ( (fdFlags != -1) && !(fdFlags & FD_CLOEXEC) )
++        {
++            fdFlags |= FD_CLOEXEC;
++            fcntl ( fd, F_SETFD, fdFlags );
++        }
++    }
++    #endif
+     QDesktopServices::openUrl( m_metaData.buyAlbumUrl() );
+ }
+ 

@@ -1,0 +1,138 @@
+Index: konversation/src/konversationstatusbar.cpp
+===================================================================
+--- konversation/src/konversationstatusbar.cpp	(.../trunk/extragear/network/konversation)	(revision 667299)
++++ konversation/src/konversationstatusbar.cpp	(.../branches/work/~wstephens/konversation)	(revision 667299)
+@@ -22,6 +22,7 @@
+ #include <klocale.h>
+ #include <kiconloader.h>
+ #include <ksqueezedtextlabel.h>
++#include <networkstatusindicator.h>
+ 
+ 
+ KonversationStatusBar::KonversationStatusBar(KonversationMainWindow* window)
+@@ -57,6 +58,10 @@
+     m_window->statusBar()->addWidget(m_lagLabel, 0, true);
+     m_window->statusBar()->addWidget(m_sslLabel, 0, true);
+ 
++    StatusBarNetworkStatusIndicator * indicator = new StatusBarNetworkStatusIndicator( m_window, "netstatusindicator" );
++    m_window->statusBar()->addWidget( indicator, 0, false );
++    indicator->init();
++
+     QWhatsThis::add(m_window->statusBar(), i18n("<qt>The status bar shows various messages, including any problems connecting to the server.  On the far right the current delay to the server is shown.  The delay is the time it takes for messages from you to reach the server, and from the server back to you.</qt>"));
+ }
+ 
+Index: konversation/src/Makefile.am
+===================================================================
+--- konversation/src/Makefile.am	(.../trunk/extragear/network/konversation)	(revision 667299)
++++ konversation/src/Makefile.am	(.../branches/work/~wstephens/konversation)	(revision 667299)
+@@ -47,7 +47,7 @@
+ INCLUDES= -Ilinkaddressbook -I$(srcdir)/linkaddressbook -Iblowfish -I$(srcdir)/blowfish\
+           -Iconfig -I$(srcdir)/config $(all_includes)
+ # the library search path.
+-konversation_LDFLAGS = $(all_libraries) $(KDE_RPATH)
++konversation_LDFLAGS = $(all_libraries) $(KDE_RPATH) -lconnectionmanager
+ 
+ rcdir = $(kde_datadir)/konversation
+ rc_DATA = konversationui.rc eventsrc
+Index: konversation/src/konversationapplication.cpp
+===================================================================
+--- konversation/src/konversationapplication.cpp	(.../trunk/extragear/network/konversation)	(revision 667299)
++++ konversation/src/konversationapplication.cpp	(.../branches/work/~wstephens/konversation)	(revision 667299)
+@@ -42,6 +42,7 @@
+ #include <klocale.h>
+ #include <kmessagebox.h>
+ #include <kiconloader.h>
++#include <connectionmanager.h>
+ 
+ 
+ KonversationApplication::KonversationApplication()
+@@ -144,22 +145,24 @@
+ 
+         bool openServerList = Preferences::showServerList();
+ 
+-        // handle autoconnect on startup
+-        Konversation::ServerGroupList serverGroups = Preferences::serverGroupList();
++        if ( ConnectionManager::self()->status() == NetworkStatus::Online || ConnectionManager::self()->status() == NetworkStatus::NoNetworks ) {
++            // handle autoconnect on startup
++            Konversation::ServerGroupList serverGroups = Preferences::serverGroupList();
+ 
+-        if (!m_connectDelayed)
+-        {
+-            for (Konversation::ServerGroupList::iterator it = serverGroups.begin(); it != serverGroups.end(); ++it)
++            if (!m_connectDelayed)
+             {
+-                if ((*it)->autoConnectEnabled())
++                for (Konversation::ServerGroupList::iterator it = serverGroups.begin(); it != serverGroups.end(); ++it)
+                 {
+-                    openServerList = false;
+-                    connectToServer((*it)->id());
++                    if ((*it)->autoConnectEnabled())
++                    {
++                        openServerList = false;
++                        connectToServer((*it)->id());
++                    }
+                 }
+             }
++            else
++                quickConnectToServer(m_hostName, m_port, m_channel, m_nick, m_password, m_useSSL);
+         }
+-        else
+-            quickConnectToServer(m_hostName, m_port, m_channel, m_nick, m_password, m_useSSL);
+ 
+         if (openServerList) mainWindow->openServerList();
+ 
+@@ -187,6 +190,9 @@
+         m_notificationHandler = new Konversation::NotificationHandler(this);
+     }
+ 
++    ConnectionManager::self()->registerConnectSlot( this, SLOT( networkConnected() ));
++    ConnectionManager::self()->registerDisconnectSlot( this, SLOT( networkDisconnected() ));
++
+     return KUniqueApplication::newInstance();
+ }
+ 
+@@ -1168,6 +1174,31 @@
+   return line;
+ }
+ 
++void KonversationApplication::networkConnected()
++{
++    kdDebug() << k_funcinfo << endl;
++    Konversation::ServerGroupList serverGroups = Preferences::serverGroupList();
++
++    for (Konversation::ServerGroupList::iterator it = serverGroups.begin(); it != serverGroups.end(); ++it)
++    {
++        if ((*it)->autoConnectEnabled())
++        {
++            connectToServer((*it)->id());
++        }
++    }
++}
++
++void KonversationApplication::networkDisconnected()
++{
++    kdDebug() << k_funcinfo << endl;
++    QPtrListIterator<Server> it( serverList );
++    Server * server;
++    while ( ( server = it.current() ) != 0 ) {
++        ++it;
++        server->disconnect();
++    }
++}
++
+ #include "konversationapplication.moc"
+ 
+ // kate: space-indent on; tab-width 4; indent-width 4; mixed-indent off; replace-tabs on;
+Index: konversation/src/konversationapplication.h
+===================================================================
+--- konversation/src/konversationapplication.h	(.../trunk/extragear/network/konversation)	(revision 667299)
++++ konversation/src/konversationapplication.h	(.../branches/work/~wstephens/konversation)	(revision 667299)
+@@ -163,6 +163,8 @@
+         void dcopSay(const QString& server,const QString& target,const QString& command);
+         void dcopInfo(const QString& string);
+         void sendMultiServerCommand(const QString& command, const QString& parameter);
++        void networkConnected();
++        void networkDisconnected();
+ 
+     private:
+         QPtrList<Server> serverList;

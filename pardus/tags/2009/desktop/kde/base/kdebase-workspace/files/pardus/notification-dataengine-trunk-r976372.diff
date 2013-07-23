@@ -1,0 +1,242 @@
+diff -Naur notifications-orig/notificationaction.cpp notifications/notificationaction.cpp
+--- notifications-orig/notificationaction.cpp	2008-12-04 10:34:58.000000000 +0200
++++ plasma/dataengines/notifications/notificationaction.cpp	2009-06-07 19:30:09.900069947 +0300
+@@ -23,8 +23,8 @@
+ 
+ void NotificationAction::start()
+ {
+-    kDebug() << "Trying to perform the action " << operationName() << " on " << destination();
+-    kDebug() << "actionId: " << parameters()["actionId"].toString();
++    //kDebug() << "Trying to perform the action " << operationName() << " on " << destination();
++    //kDebug() << "actionId: " << parameters()["actionId"].toString();
+ 
+     if (!m_engine) {
+         setErrorText(i18n("The notification dataEngine is not set."));
+@@ -33,18 +33,22 @@
+         return;
+     }
+ 
+-    if (operationName() == "invokeAction") {
+-        const QStringList dest = destination().split(" ");
++    const QStringList dest = destination().split(" ");
++
++    if (dest.count() >  1 && !dest[1].toInt()) {
++        setErrorText(i18n("Invalid destination: %1", destination()));
++        setError(-2);
++        emitResult();
++        return;
++    }
+ 
+-        if (dest.count() >  1 && !dest[1].toInt()) {
+-            setErrorText(i18n("Invalid destination: ", destination()));
+-            setError(-2);
+-            emitResult();
+-            return;
+-        }
++    uint id = dest[1].toUInt();
+ 
+-        kDebug() << "firing";
+-        emit m_engine->ActionInvoked(dest[1].toUInt(), parameters()["actionId"].toString());
++    if (operationName() == "invokeAction") {
++        //kDebug() << "invoking action on " << id;
++        emit m_engine->ActionInvoked(id, parameters()["actionId"].toString());
++    } else if (operationName() == "userClosed") {
++        m_engine->CloseNotification(id);
+     }
+ 
+     emitResult();
+diff -Naur notifications-orig/notificationsengine.cpp notifications/notificationsengine.cpp
+--- notifications-orig/notificationsengine.cpp	2009-01-17 13:00:24.000000000 +0200
++++ plasma/dataengines/notifications/notificationsengine.cpp	2009-06-07 19:30:09.900069947 +0300
+@@ -21,8 +21,11 @@
+ #include "notificationservice.h"
+ #include "visualnotificationsadaptor.h"
+ 
++#include <Plasma/DataContainer>
+ #include <Plasma/Service>
+ 
++#include <QImage>
++
+ NotificationsEngine::NotificationsEngine( QObject* parent, const QVariantList& args )
+     : Plasma::DataEngine( parent, args ), m_nextId( 1 )
+ {
+@@ -52,43 +55,68 @@
+                                  const QStringList &actions, const QVariantMap &hints, int timeout)
+ {
+     uint id = 0;
+-    if (replaces_id == 0) {
+-        // new notification
+-
+-        id = m_nextId++;
++    id = replaces_id ? replaces_id : m_nextId++;
+ 
+-        // TODO implement hints support
+-        Q_UNUSED(hints)
++    QString appname_str = app_name;
++    if (appname_str.isEmpty()) {
++        appname_str = i18n("Unknown Application");
++    }
+ 
+-        QString appname_str = app_name;
+-        if (appname_str.isEmpty()) {
+-            appname_str = i18n("unknown app");
++    QString source = QString("notification %1").arg(id);
++    if (replaces_id) {
++        Plasma::DataContainer *container = containerForSource(source);
++        if (container && container->data()["expireTimeout"].toInt() != timeout) {
++            int timerId = m_sourceTimers.value(source);
++            killTimer(timerId);
++            m_sourceTimers.remove(source);
++            m_timeouts.remove(timerId);
+         }
++    }
++
++    Plasma::DataEngine::Data notificationData;
++    notificationData.insert("id", QString::number(id));
++    notificationData.insert("appName", appname_str);
++    notificationData.insert("appIcon", app_icon);
++    notificationData.insert("eventId", event_id);
++    notificationData.insert("summary", summary);
++    notificationData.insert("body", body);
++    notificationData.insert("actions", actions);
++    notificationData.insert("expireTimeout", timeout);
++
++    QImage image;
++    if (hints.contains("image_data")) {
++        image.loadFromData(hints["image_data"].toByteArray());
++    }
++    notificationData.insert("image", image);
+ 
+-        Plasma::DataEngine::Data notificationData;
+-        notificationData.insert("id", QString::number(id ));
+-        notificationData.insert("appName", appname_str );
+-        notificationData.insert("appIcon", app_icon );
+-        notificationData.insert("eventId", event_id );
+-        notificationData.insert("summary", summary );
+-        notificationData.insert("body", body );
+-        notificationData.insert("actions", actions );
+-        notificationData.insert("expireTimeout", timeout );
+-
+-        setData(QString("notification %1").arg(id), notificationData );
+-    } else {
+-        id = replaces_id;
+-        // TODO: update existing source
+-        kDebug() << "notice: updating notifications isn't implemented yet";
++    setData(source, notificationData );
++
++    if (timeout) {
++        int timerId = startTimer(timeout);
++        m_sourceTimers.insert(source, timerId);
++        m_timeouts.insert(timerId, source);
+     }
+ 
+     return id;
+ }
+ 
++void NotificationsEngine::timerEvent(QTimerEvent *event)
++{
++    QString source = m_timeouts.value(event->timerId());
++    if (!source.isEmpty()) {
++        m_sourceTimers.remove(source);
++        m_timeouts.remove(event->timerId());
++        removeSource(source);
++        return;
++    }
++
++    Plasma::DataEngine::timerEvent(event);
++}
++
+ void NotificationsEngine::CloseNotification(uint id)
+ {
+     removeSource(QString("notification %1").arg(id));
+-    emit NotificationClosed(id,0);
++    emit NotificationClosed(id, 0);
+ }
+ 
+ Plasma::Service* NotificationsEngine::serviceForSource(const QString& source)
+diff -Naur notifications-orig/notificationsengine.h notifications/notificationsengine.h
+--- notifications-orig/notificationsengine.h	2009-01-17 13:00:24.000000000 +0200
++++ plasma/dataengines/notifications/notificationsengine.h	2009-06-07 19:30:09.900069947 +0300
+@@ -54,12 +54,17 @@
+     void NotificationClosed( uint id, uint reason );
+     void ActionInvoked( uint id, const QString& actionKey );
+ 
++protected:
++    void timerEvent(QTimerEvent *event);
++
+ private:
+     /**
+      * Holds the id that will be assigned to the next notification source
+      * that will be created
+      */
+     uint m_nextId;
++    QHash<int, QString> m_timeouts; // timerIDs -> sources
++    QHash<QString, int> m_sourceTimers; // sources -> timerIDs
+ 
+     friend class NotificationAction;
+ };
+diff -Naur notifications-orig/notifications.operations notifications/notifications.operations
+--- notifications-orig/notifications.operations	2008-10-23 02:03:40.000000000 +0300
++++ plasma/dataengines/notifications/notifications.operations	2009-06-07 19:30:09.900069947 +0300
+@@ -7,4 +7,6 @@
+       <label>The id of the action to be invoked.</label>
+     </entry>
+   </group>
++  <group name="userClosed">
++  </group>
+ </kcfg>
+diff -Naur notifications-orig/plasma-dataengine-notifications.desktop notifications/plasma-dataengine-notifications.desktop
+--- notifications-orig/plasma-dataengine-notifications.desktop	2009-03-26 17:42:26.000000000 +0300
++++ plasma/dataengines/notifications/plasma-dataengine-notifications.desktop	2009-06-07 19:30:09.891083869 +0300
+@@ -5,6 +5,7 @@
+ Name[bn]=অ্যাপলিকেশন বিজ্ঞপ্তি
+ Name[bn_IN]=অ্যাপ্লিকেশনের সূচনাবার্তা
+ Name[ca]=Notificacions de les aplicacions
++Name[ca@valencia]=Notificacions de les aplicacions
+ Name[cs]=Oznamování aplikací
+ Name[csb]=Dôwanié wiédzë ò aplikacëjach
+ Name[da]=Programbekendtgørelser
+@@ -22,7 +23,6 @@
+ Name[he]=הודעות מערכת
+ Name[hi]=अनुप्रयोग सूचनाएँ
+ Name[hne]=अनुपरयोग सूचना
+-Name[hu]=Értesítő üzenetek
+ Name[is]=Tilkynningar forrita
+ Name[it]=Applicaizione notifiche
+ Name[ja]=アプリケーションの通知
+@@ -45,6 +45,7 @@
+ Name[pt_BR]=Notificações do aplicativo
+ Name[ro]=Notificări aplicații
+ Name[ru]=Уведомления приложений
++Name[si]=යෙදුම් දැනුම් දීම්
+ Name[sk]=Notifikácie aplikácií
+ Name[sl]=Obvestila programov
+ Name[sr]=обавештења програма
+@@ -58,6 +59,27 @@
+ Name[x-test]=xxApplication Notificationsxx
+ Name[zh_CN]=应用程序通知
+ Name[zh_TW]=應用程式通知
++Comment=Passive visual notifications for the user.
++Comment[ca]=Notificacions visuals pasives per a l'usuari.
++Comment[ca@valencia]=Notificacions visuals pasives per a l'usuari.
++Comment[da]=Passive visuelle bekendtgørelser til brugeren.
++Comment[de]=Passive sichtbare Benachrichtigungen für den Anwender.
++Comment[et]=Passiivsed visuaalsed märguanded kasutajale.
++Comment[is]=Hlutlausar sjónrænar tilkynningar til notandans.
++Comment[km]=ការ​ជូនដំណឹង​ដែល​មើល​សម្រាប់​អ្នកប្រើ ។
++Comment[ko]=사용자에게 보이는 수동적인 알림입니다.
++Comment[lv]=Pasīvi vizuālie paziņojumi lietotājam.
++Comment[ml]=ഉപയോക്താവിനുള്ള വഴങ്ങുന്ന ദൃശ്യ സൂചനകള്‍
++Comment[nb]=Passive visuelle varslinger for brukeren.
++Comment[nds]=Passiev sichtbor Bescheden för den Bruker
++Comment[pt]=Notificações passivas visuais para o utilizador.
++Comment[pt_BR]=Notificações visuais passivas para o usuário.
++Comment[sl]=Pasivna vidna obvestila za uporabnika.
++Comment[sv]=Passiva visuella underrättelser för användaren.
++Comment[tr]=Kullanıcı için pasif görsel bildirimler.
++Comment[uk]=Пасивні візуальні сповіщення для користувача.
++Comment[zh_CN]=为用户提供被动出现的视觉通知。
++Comment[zh_TW]=給使用者的被動視覺通知。
+ X-KDE-ServiceTypes=Plasma/DataEngine
+ Type=Service
+ Icon=notifier

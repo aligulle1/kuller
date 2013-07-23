@@ -1,0 +1,39 @@
+diff -Nur alienarena-7.32-old/Makefile alienarena-7.32/Makefile
+--- alienarena-7.32-old/Makefile	2009-10-22 14:02:00.216821339 +0300
++++ alienarena-7.32/Makefile	2009-10-22 14:05:50.958571410 +0300
+@@ -119,7 +119,7 @@
+ VORBISLDFLAGS=$(shell pkg-config --libs vorbisfile)
+ 
+ CURLCFLAGS=$(shell curl-config --cflags)
+-CURLLDFLAGS=$(shell curl-config --libs)
++CURLLDFLAGS=-lcurl
+ 
+ JPEGLDFLAGS=-ljpeg
+ 
+@@ -266,7 +266,7 @@
+ 
+ 
+ $(BUILDDIR)/crx : $(CODERED_OBJS) $(SOUND_OPENAL_OBJS) $(REF_GL_OBJS) $(REF_GL_GLX_OBJS)
+-	$(CC) $(CFLAGS) -o $@ $(CODERED_OBJS) $(LDFLAGS) $(REF_GL_OBJS) $(REF_GL_GLX_OBJS) $(GLXLDFLAGS) $(OPENALLDFLAGS) $(VORBISLDFLAGS) $(CURLLDFLAGS) $(JPEGLDFLAGS)
++	$(CC) $(CFLAGS) $(LDFLAGS) $(CODERED_OBJS) $(REF_GL_OBJS) $(REF_GL_GLX_OBJS) $(GLXLDFLAGS) $(OPENALLDFLAGS) $(VORBISLDFLAGS) $(CURLLDFLAGS) $(JPEGLDFLAGS) -o $@
+ 
+ $(BUILDDIR)/client/cl_ents.o :    $(CLIENT_DIR)/cl_ents.c
+ 	$(DO_CC)
+@@ -615,7 +615,7 @@
+ 
+ 
+ $(BUILDDIR)/game.$(SHLIBEXT) : $(GAME_OBJS)
+-	$(CC) $(CFLAGS) $(SHLIBLDFLAGS) -o $@ $(GAME_OBJS)
++	$(CC) $(CFLAGS) $(LDFLAGS) $(SHLIBLDFLAGS) $(GAME_OBJS) -o $@
+ 
+ 
+ $(BUILDDIR)/game/acebot_ai.o :        $(GAME_DIR)/acesrc/acebot_ai.c
+@@ -775,7 +775,7 @@
+ 	$(BUILDDIR)/arena/p_weapon.o
+ 
+ $(BUILDDIR)/arena/game.$(SHLIBEXT) : $(ARENA_OBJS)
+-	$(CC) $(CFLAGS) $(SHLIBLDFLAGS) -o $@ $(ARENA_OBJS)
++	$(CC) $(CFLAGS) $(LDFLAGS) $(SHLIBLDFLAGS) $(ARENA_OBJS) -o $@
+ 
+ 
+ $(BUILDDIR)/arena/acebot_ai.o :        $(ARENA_DIR)/acesrc/acebot_ai.c

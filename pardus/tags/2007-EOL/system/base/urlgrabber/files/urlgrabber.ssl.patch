@@ -1,0 +1,31 @@
+diff -ur urlgrabber-3.1.0.orig/urlgrabber/keepalive.py urlgrabber-3.1.0/urlgrabber/keepalive.py
+--- urlgrabber-3.1.0.orig/urlgrabber/keepalive.py	2006-09-22 03:58:05.000000000 +0300
++++ urlgrabber-3.1.0/urlgrabber/keepalive.py	2007-12-21 00:22:19.000000000 +0200
+@@ -347,7 +347,7 @@
+         return self.do_open(req)
+ 
+     def _get_connection(self, host):
+-        return self._ssl_factory.get_https_connection(host)
++        return self._ssl_factory.create_https_connection(host, HTTPResponse)
+ 
+ class HTTPResponse(httplib.HTTPResponse):
+     # we need to subclass HTTPResponse in order to
+diff -ur urlgrabber-3.1.0.orig/urlgrabber/sslfactory.py urlgrabber-3.1.0/urlgrabber/sslfactory.py
+--- urlgrabber-3.1.0.orig/urlgrabber/sslfactory.py	2006-09-22 03:58:05.000000000 +0300
++++ urlgrabber-3.1.0/urlgrabber/sslfactory.py	2007-12-21 00:22:19.000000000 +0200
+@@ -79,7 +79,14 @@
+ def get_factory(ssl_ca_cert = None, ssl_context = None):
+     """ Return an SSLFactory, based on if M2Crypto is available. """
+     if have_m2crypto:
+-        return M2SSLFactory(ssl_ca_cert, ssl_context)
++
++        if ssl_ca_cert or ssl_context:
++            return M2SSLFactory(ssl_ca_cert, ssl_context)
++        else:
++            if DEBUG:
++                DEBUG.warning("M2Crypto is available, but SSL arguments didn't supply. "
++                        "Using Python SSL.")
++            return SSLFactory()
+     else:
+         # Log here if someone provides the args but we don't use them.
+         if ssl_ca_cert or ssl_context:

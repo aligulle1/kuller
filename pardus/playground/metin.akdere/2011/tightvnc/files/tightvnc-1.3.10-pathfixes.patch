@@ -1,0 +1,57 @@
+Index: vnc_unixsrc/vncserver
+===================================================================
+--- vnc_unixsrc.orig/vncserver
++++ vnc_unixsrc/vncserver
+@@ -32,9 +32,9 @@
+ $geometry = "1024x768";
+ $depth = 24;
+ $desktopName = "X";
+-$vncClasses = "/usr/local/vnc/classes";
++$vncClasses = "/usr/share/vnc/classes";
+ $vncUserDir = "$ENV{HOME}/.vnc";
+-$fontPath = "unix/:7100";
++$fontPath = "/usr/share/fonts/misc";
+ $authType = "-rfbauth $vncUserDir/passwd";
+ 
+ # Read configuration from the system-wide and user files if present.
+@@ -80,7 +80,7 @@ chop($host = `uname -n`);
+ 
+ # Uncomment this line if you want default geometry, depth and pixelformat
+ # to match the current X display:
+-# &GetXDisplayDefaults();
++&GetXDisplayDefaults();
+ 
+ if ($opt{'-geometry'}) {
+     $geometry = $opt{'-geometry'};
+@@ -148,12 +148,7 @@ unlink($desktopLog);
+ # PID and part of the encrypted form of the password.  Ideally we'd use
+ # /dev/urandom, but that's only available on Linux.
+ 
+-srand(time+$$+unpack("L",`cat $vncUserDir/passwd`));
+-$cookie = "";
+-for (1..16) {
+-    $cookie .= sprintf("%02x", int(rand(256)));
+-}
+-
++$cookie = `mcookie`;
+ system("xauth -f $xauthorityFile add $host:$displayNumber . $cookie");
+ system("xauth -f $xauthorityFile add $host/unix:$displayNumber . $cookie"); 
+ 
+@@ -227,6 +222,8 @@ if (-e "/tmp/.X11-unix/X$displayNumber")
+ }
+ $ENV{VNCDESKTOP}= $desktopName;
+ 
++delete @ENV{qw(SESSION_MANAGER)};
++
+ system("$xstartup >> " . &quotedString($desktopLog) . " 2>&1 &");
+ 
+ exit;
+@@ -274,7 +271,7 @@ sub CheckGeometryAndDepth
+ 
+ sub GetDisplayNumber
+ {
+-    foreach $n (1..99) {
++    for ($n = 1; $n < 100; $n++){
+ 	if (&CheckDisplayNumber($n)) {
+ 	    return $n+0; # Bruce Mah's workaround for bug in perl 5.005_02
+ 	}

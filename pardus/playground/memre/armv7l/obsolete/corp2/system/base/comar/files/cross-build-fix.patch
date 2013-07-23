@@ -1,0 +1,35 @@
+Index: comar-3.0.0/CMakeLists.txt
+===================================================================
+--- comar-3.0.0.orig/CMakeLists.txt
++++ comar-3.0.0/CMakeLists.txt
+@@ -8,13 +8,16 @@ CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
+ SET (APP_NAME "comar")
+ SET (APP_SUFFIX "3")
+ 
++# This is neccessary for cross-build
++SET (SYSROOT "/")
++
+ # Uncomment this for production releases.
+ SET (VERSION_SUFFIX "")
+ #SET (FLAGS "-g -O0 -Werror -Wcast-align -Wno-uninitialized -Wall -fstrict-aliasing")
+ 
+ # Uncomment this for gprof profiling
+ # SET (FLAGS "-g -O0 -Werror -Wcast-align -Wno-uninitialized -Wall -fstrict-aliasing -fprofile-arcs -ftest-coverage")
+-#SET (CMAKE_C_FLAGS "${FLAGS}")
++SET (CMAKE_C_FLAGS "${CFLAGS}")
+ # Uncomment this for sparse building
+ # SET (CMAKE_C_COMPILER cgcc)
+ 
+@@ -49,9 +52,9 @@ SET (LIBS python2.6
+ 
+ # Include standard headers
+ INCLUDE_DIRECTORIES (include/
+-                     /usr/include/python2.6
+-                     /usr/include/dbus-1.0
+-                     /usr/lib/dbus-1.0/include)
++                     ${SYSROOT}/usr/include/python2.6
++                     ${SYSROOT}/usr/include/dbus-1.0
++                     ${SYSROOT}/usr/lib/dbus-1.0/include)
+ 
+ # Compile comar from specified sources
+ ADD_EXECUTABLE (comar ${SOURCES})

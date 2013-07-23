@@ -1,0 +1,63 @@
+From 0cbaa7b13af14957619e245110f92f434073868a Mon Sep 17 00:00:00 2001
+From: Colin Guthrie <cguthrie@mandriva.org>
+Date: Mon, 23 Feb 2009 23:40:33 +0000
+Subject: [PATCH] Hack to hide all devices when using pulseaudio.
+
+In an ideal world, we would completely hand off control and routing of devices to pulseaudio and simply
+give the config information from phonon over to pulseaudio. This is not currently possible so
+in the interests of sanity, we simply hide all devices until more complete pulseaudio support is available.
+---
+ phonon/kded-module/phononserver.cpp |   16 ++++++++++++++++
+ phonon/kded-module/phononserver.h   |    2 ++
+ 2 files changed, 18 insertions(+), 0 deletions(-)
+
+diff --git a/phonon/kded-module/phononserver.cpp b/phonon/kded-module/phononserver.cpp
+index b76e08c..84ece88 100644
+--- a/phonon/kded-module/phononserver.cpp
++++ b/phonon/kded-module/phononserver.cpp
+@@ -66,6 +66,16 @@ PhononServer::PhononServer(QObject *parent, const QList<QVariant> &)
+     : KDEDModule(parent),
+     m_config(KSharedConfig::openConfig("phonondevicesrc", KConfig::SimpleConfig))
+ {
++    /*
++     * This is a pretty ugly hack but it will do for now.
++     * If the user is using pulseaudio, we do not want to show them any preferences here.
++     * In an ideal world the GUI in the KCM would actually edit and effect the underlying
++     * pulseaudio layer, but we're not there yet, so the best option is to simply hide all
++     * the actual devices until we can write better integration
++     */
++    QSettings pulseconf("/etc/conf.d/pulseaudio", QSettings::NativeFormat);
++    m_using_pulse = (pulseconf.value( "PULSE_SERVER_TYPE", "None" ) == "personal");
++
+     findDevices();
+     connect(Solid::DeviceNotifier::instance(), SIGNAL(deviceAdded(const QString &)), SLOT(deviceAdded(const QString &)));
+     connect(Solid::DeviceNotifier::instance(), SIGNAL(deviceRemoved(const QString &)), SLOT(deviceRemoved(const QString &)));
+@@ -458,6 +468,12 @@ static void pulseContextStateCallback(pa_context *context, void *userdata)
+ 
+ void PhononServer::findDevices()
+ {
++    /*
++     * This is a pretty ugly hack but it will do for now. See constructor.
++     */
++    if (m_using_pulse)
++        return;
++
+     QHash<PS::AudioDeviceKey, PS::AudioDevice> playbackDevices;
+     QHash<PS::AudioDeviceKey, PS::AudioDevice> captureDevices;
+     bool haveAlsaDevices = false;
+diff --git a/phonon/kded-module/phononserver.h b/phonon/kded-module/phononserver.h
+index 2583863..e35b78e 100644
+--- a/phonon/kded-module/phononserver.h
++++ b/phonon/kded-module/phononserver.h
+@@ -75,6 +75,8 @@ class PhononServer : public KDEDModule
+         QList<PS::AudioDevice> m_audioCaptureDevices;
+ 
+         QStringList m_udisOfAudioDevices;
++
++        bool m_using_pulse;
+ };
+ 
+ #endif // PHONONSERVER_H
+-- 
+1.6.1.3
+

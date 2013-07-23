@@ -1,0 +1,18 @@
+Index: bugzilla-4.0/Bugzilla/Attachment.pm
+===================================================================
+--- bugzilla-4.0.orig/Bugzilla/Attachment.pm
++++ bugzilla-4.0/Bugzilla/Attachment.pm
+@@ -1009,6 +1009,13 @@ sub get_content_type {
+         if ($content_type eq 'image/x-png') {
+             $content_type = 'image/png';
+         }
++
++        # Set the contenttype to text/plain if the autodetection resulted
++        # in application/octet-stream
++        if ( $content_type eq 'application/octet-stream') {
++            $content_type = 'text/plain';
++        }
++
+     }
+     elsif ($cgi->param('contenttypemethod') eq 'list') {
+         # The user selected a content type from the list, so use their

@@ -1,0 +1,49 @@
+From: Chris Mason <mason@suse.com>
+Subject: increase defaults for shmmall, shmmax, msgmax and msgmnb
+References: 146656
+
+The defaults are too small for most users.
+
+Acked-by: Jeff Mahoney <jeffm@suse.com>
+
+Index: linux-2.6.18/include/linux/msg.h
+===================================================================
+--- linux-2.6.18.orig/include/linux/msg.h
++++ linux-2.6.18/include/linux/msg.h
+@@ -50,8 +50,8 @@ struct msginfo {
+ };
+ 
+ #define MSGMNI    16   /* <= IPCMNI */     /* max # of msg queue identifiers */
+-#define MSGMAX  8192   /* <= INT_MAX */   /* max size of message (bytes) */
+-#define MSGMNB 16384   /* <= INT_MAX */   /* default max size of a message queue */
++#define MSGMAX  65536   /* <= INT_MAX */   /* max size of message (bytes) */
++#define MSGMNB 65536   /* <= INT_MAX */   /* default max size of a message queue */
+ 
+ /* unused */
+ #define MSGPOOL (MSGMNI*MSGMNB/1024)  /* size in kilobytes of message pool */
+Index: linux-2.6.18/include/linux/sem.h
+===================================================================
+--- linux-2.6.18.orig/include/linux/sem.h
++++ linux-2.6.18/include/linux/sem.h
+@@ -63,7 +63,7 @@ struct  seminfo {
+ 	int semaem;
+ };
+ 
+-#define SEMMNI  128             /* <= IPCMNI  max # of semaphore identifiers */
++#define SEMMNI  1024            /* <= IPCMNI  max # of semaphore identifiers */
+ #define SEMMSL  250             /* <= 8 000 max num of semaphores per id */
+ #define SEMMNS  (SEMMNI*SEMMSL) /* <= INT_MAX max # of semaphores in system */
+ #define SEMOPM  32	        /* <= 1 000 max num of ops per semop call */
+Index: linux-2.6.18/include/linux/shm.h
+===================================================================
+--- linux-2.6.18.orig/include/linux/shm.h
++++ linux-2.6.18/include/linux/shm.h
+@@ -10,7 +10,7 @@
+  * be increased by sysctl
+  */
+ 
+-#define SHMMAX 0x2000000		 /* max shared seg size (bytes) */
++#define SHMMAX ULONG_MAX		 /* max shared seg size (bytes) */
+ #define SHMMIN 1			 /* min shared seg size (bytes) */
+ #define SHMMNI 4096			 /* max num of segs system wide */
+ #define SHMALL (SHMMAX/PAGE_SIZE*(SHMMNI/16)) /* max shm system wide (pages) */

@@ -1,0 +1,94 @@
+Index: services/strigi/indexscheduler.cpp
+===================================================================
+--- services/strigi/indexscheduler.cpp	(revision 966595)
++++ nepomuk/services/strigi/indexscheduler.cpp	(revision 966596)
+@@ -107,7 +107,7 @@
+     m_analyzerConfig = new StoppableConfiguration;
+ 
+     connect( StrigiServiceConfig::self(), SIGNAL( configChanged() ),
+-             this, SLOT( readConfig() ) );
++             this, SLOT( slotConfigChanged() ) );
+ }
+ 
+ 
+@@ -158,6 +158,14 @@
+ }
+ 
+ 
++void Nepomuk::IndexScheduler::restart()
++{
++    stop();
++    wait();
++    start();
++}
++
++
+ bool Nepomuk::IndexScheduler::isSuspended() const
+ {
+     return isRunning() && m_suspended;
+@@ -205,7 +213,6 @@
+     setIndexingStarted( true );
+ 
+     // do the actual indexing
+-    m_dirsToUpdate.clear();
+     foreach( const QString& f, StrigiServiceConfig::self()->folders() )
+         m_dirsToUpdate << qMakePair( f, UpdateRecursive|AutoUpdateFolder );
+ 
+@@ -416,6 +423,14 @@
+ }
+ 
+ 
++void Nepomuk::IndexScheduler::slotConfigChanged()
++{
++    readConfig();
++    if ( isRunning() )
++        restart();
++}
++
++
+ namespace {
+     class QDataStreamStrigiBufferedStream : public Strigi::BufferedStream<char>
+     {
+Index: services/strigi/indexscheduler.h
+===================================================================
+--- services/strigi/indexscheduler.h	(revision 966595)
++++ nepomuk/services/strigi/indexscheduler.h	(revision 966596)
+@@ -68,6 +68,7 @@
+         void suspend();
+         void resume();
+         void stop();
++        void restart();
+ 
+         void setSuspended( bool );
+ 
+@@ -102,6 +103,7 @@
+ 
+     private Q_SLOTS:
+         void readConfig();
++        void slotConfigChanged();
+ 
+     private:
+         void run();
+@@ -115,7 +117,7 @@
+          * from the store
+          */
+         void deleteEntries( const std::vector<std::string>& entries );
+-        
++
+         // emits indexingStarted or indexingStopped based on parameter. Makes sure
+         // no signal is emitted twice
+         void setIndexingStarted( bool started );
+Index: services/strigi/strigiservice.cpp
+===================================================================
+--- services/strigi/strigiservice.cpp	(revision 966595)
++++ nepomuk/services/strigi/strigiservice.cpp	(revision 966596)
+@@ -36,7 +36,8 @@
+ 
+ 
+ Nepomuk::StrigiService::StrigiService( QObject* parent, const QList<QVariant>& )
+-    : Service( parent, true )
++    : Service( parent, true ),
++      m_indexManager( 0 )
+ {
+     // only so ResourceManager won't open yet another connection to the nepomuk server
+     ResourceManager::instance()->setOverrideMainModel( mainModel() );

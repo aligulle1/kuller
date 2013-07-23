@@ -1,0 +1,43 @@
+--- src/LYMain.c.pix	2006-09-19 02:28:28.000000000 +0200
++++ src/LYMain.c	2006-11-16 17:24:53.000000000 +0100
+@@ -969,6 +969,7 @@
+     struct stat dir_info;
+     char filename[LY_MAXPATH];
+     BOOL LYGetStdinArgs = FALSE;
++    struct stat st;
+ 
+ #ifdef _WINDOWS
+     WSADATA WSAData;
+@@ -1207,6 +1208,21 @@
+ #endif
+ 	tildeExpand(&lynx_temp_space, TRUE);
+ 
++
++    if (stat(lynx_temp_space, &st) < 0) {
++	    if (errno = ENOENT) {
++		    printf("Creating dir %s\n", lynx_temp_space);
++		    mkdir(lynx_temp_space, 0700);
++	    }
++    }
++
++    if (stat(lynx_temp_space, &st) < 0) {
++	    if (errno = ENOENT) {
++		    printf("Can't create %s, let's try /tmp/\n", lynx_temp_space);
++		    lynx_temp_space = "/tmp/";
++	    }
++    }
++    
+     if ((cp = strstr(lynx_temp_space, "$USER")) != NULL) {
+ 	char *cp1;
+ 
+--- userdefs.h.pix	2006-11-16 17:23:50.000000000 +0100
++++ userdefs.h	2006-11-16 17:23:50.000000000 +0100
+@@ -345,7 +345,7 @@
+  * the "TMPDIR" (unix), or "TEMP" or "TMP" (Windows,DOS,OS/2)
+  * variable.
+  */
+-#define TEMP_SPACE "/tmp/"
++#define TEMP_SPACE "~/tmp/"
+ 
+ /********************************
+  * Comment this line out to disable code that implements command logging

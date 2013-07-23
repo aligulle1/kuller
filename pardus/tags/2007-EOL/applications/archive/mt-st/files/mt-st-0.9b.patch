@@ -1,0 +1,35 @@
+--- Makefile.org	2007-12-04 13:48:36.000000000 +0200
++++ Makefile	2007-12-04 13:49:57.000000000 +0200
+@@ -1,7 +1,7 @@
+-CFLAGS=  -Wall -O2
+-SBINDIR= /sbin
+-BINDIR=  /bin
+-MANDIR= /usr/share/man
++PREFIX	= $(DESTDIR)/usr
++SBINDIR	= $(PREFIX)/sbin
++BINDIR	= $(PREFIX)/bin
++MANDIR	= $(PREFIX)/share/man
+ 
+ all:	mt stinit
+ 
+@@ -12,14 +12,12 @@
+ 	$(CC) $(CFLAGS) -o stinit stinit.c
+ 
+ install: mt stinit
+-	install -s mt $(BINDIR)
+-	install -c -m 444 mt.1 $(MANDIR)/man1
+-	(if [ -f $(MANDIR)/man1/mt.1.gz ] ; then \
+-	  rm -f $(MANDIR)/man1/mt.1.gz; gzip $(MANDIR)/man1/mt.1; fi)
+-	install -s stinit $(SBINDIR)
+-	install -c -m 444 stinit.8 $(MANDIR)/man8
+-	(if [ -f $(MANDIR)/man8/stinit.8.gz ] ; then \
+-	  rm -f $(MANDIR)/man8/stinit.8.gz; gzip $(MANDIR)/man8/stinit.8; fi)
++	mkdir -p $(BINDIR) $(SBINDIR) $(MANDIR) $(MANDIR)/man1 $(MANDIR)/man8
++	install mt $(BINDIR)/mtst
++	install -c -m 644 mt.1 $(MANDIR)/man1/mtst.1
++	install stinit $(SBINDIR)
++	install -c -m 644 stinit.8 $(MANDIR)/man8
++ 
+ 
+ dist:	clean
+ 	(mydir=`basename \`pwd\``;\

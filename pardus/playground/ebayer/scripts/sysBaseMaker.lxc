@@ -1,0 +1,81 @@
+#!/bin/bash
+
+for option in $*; do
+    case $option in
+        --chrootDIR=*)
+            CHROOTDIR="`echo $option | awk -F= '{print $2;}'`"
+            ;;
+        --repoURL=*)
+            REPOURL="`echo $option | awk -F= '{print $2;}'`"
+            ;;
+        --test-packages=*)
+            TEST="`echo $option | awk -F= '{print $2;}'`"
+    esac
+done
+
+
+if [ "$CHROOTDIR" == "" ]; then
+    echo "Use with $0 --chrootDIR=/path/to/system/chroot"
+    exit
+fi
+
+if [ "$REPOURL" == "" ]; then
+    echo "Use with $0 --repoURL=http://packages.pardus.org.tr/pardus-2009/pisi-index.xml.bz2"
+    exit
+fi
+
+REPO="`echo $REPOURL | awk -F/ '{print $4;}'`"
+
+if [ ! -e $CHROOTDIR ]
+then
+    mkdir $CHROOTDIR || exit 1
+fi
+
+pisi ar $REPO $REPOURL -y -D $CHROOTDIR --ignore-check
+pisi it -c system.base -D $CHROOTDIR --ignore-comar -d -y
+pisi it -c system.devel -D $CHROOTDIR --ignore-comar -d -y
+pisi it vim -D $CHROOTDIR --ignore-comar -d -y
+pisi it screen -D $CHROOTDIR --ignore-comar -d -y
+pisi it rsync -D $CHROOTDIR --ignore-comar -d -y
+pisi it sudo -D $CHROOTDIR --ignore-comar -d -y
+
+cp $CHROOTDIR/usr/share/baselayout/hosts $CHROOTDIR/etc/hosts
+cp $CHROOTDIR/usr/share/baselayout/ld.so.conf $CHROOTDIR/etc/
+cp /etc/passwd $CHROOTDIR/etc/
+cp /etc/shadow $CHROOTDIR/etc/
+chmod 0600 $CHROOTDIR/etc/shadow
+#cp $CHROOTDIR/usr/share/baselayout/group $CHROOTDIR/etc/
+cp /etc/group $CHROOTDIR/etc/
+touch $CHROOTDIR/var/log/lastlog
+touch $CHROOTDIR/var/run/utmp
+chgrp utmp $CHROOTDIR/var/run/utmp
+touch $CHROOTDIR/var/run/wtmp
+chgrp utmp $CHROOTDIR/var/run/wtmp
+
+DEV=${CHROOTDIR}/dev
+mv ${DEV} ${DEV}.old
+mkdir -p ${DEV}
+mknod -m 666 ${DEV}/null c 1 3
+mknod -m 666 ${DEV}/zero c 1 5
+mknod -m 666 ${DEV}/random c 1 8
+mknod -m 666 ${DEV}/urandom c 1 9
+mkdir -m 755 ${DEV}/pts
+mkdir -m 1777 ${DEV}/shm
+mknod -m 666 ${DEV}/tty c 5 0
+mknod -m 600 ${DEV}/console c 5 1
+mknod -m 666 ${DEV}/tty0 c 4 0
+mknod -m 666 ${DEV}/full c 1 7
+mknod -m 600 ${DEV}/initctl p
+mknod -m 666 ${DEV}/ptmx c 5 2
+ln -s /proc/self/fd ${DEV}/fd
+ln -s /proc/kcore ${DEV}/core
+mkdir -m 755 ${DEV}/mapper
+mknod -m 600 ${DEV}/mapper/control c 10 60
+mkdir -m 755 ${DEV}/net
+mknod -m 666 ${DEV}/net/tun c 10 200
+
+chroot $CHROOTDIR service dbus start
+chroot $CHROOTDIR pisi configure-pending
+#chroot $CHROOTDIR pisi rm --ignore-dependency --ignore-safety --purge udev
+chroot $CHROOTDIR service openssh on
+chroot $CHROOTDIR service dbus stop

@@ -1,0 +1,28 @@
+diff -up ecryptfs-utils-87/src/utils/ecryptfs-setup-private.autoload ecryptfs-utils-87/src/utils/ecryptfs-setup-private
+--- ecryptfs-utils-87/src/utils/ecryptfs-setup-private.autoload	2011-05-26 15:03:03.716014960 +0200
++++ ecryptfs-utils-87/src/utils/ecryptfs-setup-private	2011-05-26 15:03:03.676014684 +0200
+@@ -101,6 +101,7 @@ random_passphrase () {
+ }
+ 
+ filename_encryption_available() {
++	[ ! -e /sys/fs/ecryptfs/version ] && ! lsmod | grep -q ecryptfs && /sbin/mount.ecryptfs_private --loadmodule
+ 	version=$(cat /sys/fs/ecryptfs/version 2>/dev/null)
+ 	[ -z "$version" ] && error "$(gettext 'Cannot get ecryptfs version, ecryptfs kernel module not loaded?')"
+ 	[ $(($version & 0x100)) -eq 0 ] && return 1
+diff -up ecryptfs-utils-87/src/utils/mount.ecryptfs_private.c.autoload ecryptfs-utils-87/src/utils/mount.ecryptfs_private.c
+--- ecryptfs-utils-87/src/utils/mount.ecryptfs_private.c.autoload	2011-05-26 13:35:41.364468265 +0200
++++ ecryptfs-utils-87/src/utils/mount.ecryptfs_private.c	2011-05-26 13:39:34.887345368 +0200
+@@ -387,6 +387,13 @@ int main(int argc, char *argv[]) {
+ 	char *sig, *sig_fnek;
+ 	FILE *fh_counter = NULL;
+ 
++	if (argc == 2 && !strcmp(argv[1],"--loadmodule"))
++	{
++	  execl("/sbin/modprobe","modprobe","ecryptfs",NULL);
++	  perror("Unable to load ecryptfs module");
++	  return -1;
++	}
++	
+ 	uid = getuid();
+ 	/* Non-privileged effective uid is sufficient for all but the code
+  	 * that mounts, unmounts, and updates /etc/mtab.

@@ -1,0 +1,206 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>perl</Name>
+        <Homepage>http://www.perl.org/</Homepage>
+        <Packager>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Packager>
+        <License>Artistic</License>
+        <License>GPL-2</License>
+        <IsA>app:console</IsA>
+        <Summary>Larry Wall's Practical Extraction and Reporting Language</Summary>
+        <Summary xml:lang="tr">Perl dili</Summary>
+        <Description>Perl is a stable, cross platform programming language.</Description>
+        <Description xml:lang="tr">Perl kararlı, platform bağımsız programlama dilidir.</Description>
+        <Archive sha1sum="4aab490040727ca4419098720eca2ba4367df539" type="tarbz2">ftp://ftp.ulak.net.tr/pub/CPAN/src/perl-5.8.8.tar.bz2</Archive>
+        <BuildDependencies>
+            <Dependency>groff</Dependency>
+            <Dependency>db4</Dependency>
+            <Dependency versionFrom="1.8.3">gdbm</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <Patch>perl-5.8.5-prelink-lpthread.patch</Patch>
+            <Patch>perl-5.8.5-perldoc-emptydirs.patch</Patch>
+            <Patch>perl-5.8.5-picdl.patch</Patch>
+            <Patch level="1">perl-5.8.5-noksh.patch</Patch>
+            <Patch>perl-5.8.5-reorder-INC.patch</Patch>
+            <Patch>libperl-5.8.5-create-libperl-soname.patch</Patch>
+
+            <!-- Fedora patches -->
+            <Patch level="1">perl-5.8.8-incpush.patch</Patch>
+            <Patch level="1">perl-5.8.8-perlbug-tag.patch</Patch>
+            <Patch level="1">perl-5.8.8-dashI.patch</Patch>
+            <Patch level="1">perl-5.8.0-sharedlinker.patch</Patch>
+            <Patch level="1">perl-5.8.8-links.patch</Patch>
+            <Patch level="1">perl-5.8.8-rpath-make.patch</Patch>
+            <Patch level="1">perl-5.8.7-no-debugging.patch</Patch>
+            <Patch level="1">perl-5.8.1-fpic.patch</Patch>
+            <Patch level="1">perl-5.8.0-nptlhint.patch</Patch>
+            <Patch level="1">perl-5.8.6-libresolv.patch</Patch>
+            <Patch level="1">perl-5.8.7-25084.patch</Patch>
+            <Patch level="1">perl-5.8.8-CAN-2004-0976.patch</Patch>
+            <Patch level="1">perl-5.8.8-USE_MM_LD_RUN_PATH.patch</Patch>
+            <Patch level="1">perl-5.8.8-bz178343.patch</Patch>
+            <Patch level="1">perl-5.8.8-debian_fix_net_nntp.patch</Patch>
+            <Patch level="1">perl-5.8.8-up27133_up27169.patch</Patch>
+            <Patch level="1">perl-5.8.8-up27284.patch</Patch>
+            <Patch level="1">perl-5.8.8-bz183553_ubz38657.patch</Patch>
+
+            <!-- Already upstream -->
+            <Patch level="1">upstream/perl-5.8.8-U27116.patch</Patch>
+            <Patch level="1">upstream/perl-5.8.8-U27391.patch</Patch>
+            <Patch level="1">upstream/perl-5.8.8-U27426.patch</Patch>
+            <Patch level="1">upstream/perl-5.8.8-U27509.patch</Patch>
+            <Patch level="1">upstream/perl-5.8.8-U27512.patch</Patch>
+            <Patch level="1">upstream/perl-5.8.8-U27604.patch</Patch>
+            <Patch level="1">upstream/perl-5.8.8-U27605.patch</Patch>
+            <Patch level="1">upstream/perl-5.8.8-U27914.patch</Patch>
+            <Patch level="1">upstream/perl-5.8.8-U27329.patch</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>perl-doc</Name>
+            <PartOf>programming.languages.perl</PartOf>
+            <Files>
+                <Path fileType="doc">/usr/share/doc/</Path>
+                <Path fileType="man">/usr/share/man/</Path>
+            </Files>
+    </Package>
+
+    <Package>
+        <Name>perl</Name>
+        <RuntimeDependencies>
+            <Dependency versionFrom="5.8.7">libperl</Dependency>
+            <Dependency>db4</Dependency>
+            <Dependency versionFrom="1.8.3">gdbm</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="executable">/usr/bin/</Path>
+            <Path fileType="library">/usr/lib/perl5/</Path>
+            <Path fileType="executable">/var/lib/pisi/scripts</Path>
+        </Files>
+        <AdditionalFiles>
+            <AdditionalFile owner="root" permission="0755" target="/var/lib/pisi/scripts/perl.postinstall">perl.postinstall</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/usr/lib/perl5/vendor_perl/5.8.8/Turkish.pm">Turkish.pm</AdditionalFile>
+        </AdditionalFiles>
+        <Provides>
+            <COMAR script="package.py">System.Package</COMAR>
+        </Provides>
+    </Package>
+
+    <Package>
+        <Name>libperl</Name>
+        <RuntimeDependencies>
+            <Dependency>db4</Dependency>
+            <Dependency versionFrom="1.8.0">gdbm</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="library">/usr/lib/libperl.*</Path>
+        </Files>
+    </Package>
+
+    <History>
+        <Update release="14">
+            <Date>2007-05-11</Date>
+            <Version>5.8.8</Version>
+            <Comment>Fix Turkish.pm</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="13">
+            <Date>2006-11-25</Date>
+            <Version>5.8.8</Version>
+            <Comment>Fix #59</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="12">
+            <Date>2006-07-01</Date>
+            <Version>5.8.8</Version>
+            <Comment>perldoc doesnt belong to system.base</Comment>
+            <Name>Gürer Özen</Name>
+            <Email>gurer@pardus.org.tr</Email>
+        </Update>
+        <Update release="11">
+            <Date>2006-06-29</Date>
+            <Version>5.8.8</Version>
+            <Comment>Remove duplicate man pages</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="10">
+            <Date>2006-06-12</Date>
+            <Version>5.8.8</Version>
+            <Comment>Fix upstream bugs</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="9" type="security">
+            <Date>2006-04-28</Date>
+            <Version>5.8.8</Version>
+            <Comment>Merge libperl and perl packages, provide suid perl, add some patches</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="8">
+            <Date>2006-02-01</Date>
+            <Version>5.8.8</Version>
+            <Comment>New stable release</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="7">
+            <Date>2005-12-20</Date>
+            <Version>5.8.7</Version>
+            <Comment>Unnecessary .ph file generation at the postInstall removed.</Comment>
+            <Name>Gürer Özen</Name>
+            <Email>gurer@pardus.org.tr</Email>
+        </Update>
+        <Update release="6" type="security">
+            <Date>2005-12-13</Date>
+            <Version>5.8.7</Version>
+            <Comment>Revise fix for CVE-2005-3962 and combine it with a fix for CVE-2005-3912</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="5" type="security">
+            <Date>2005-12-02</Date>
+            <Version>5.8.7</Version>
+            <Comment>Fix CVE-2005-3962</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="4">
+            <Date>2005-10-30</Date>
+            <Version>5.8.7</Version>
+            <Comment>typo fix</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="3" type="security">
+            <Date>2005-10-27</Date>
+            <Version>5.8.7</Version>
+            <Comment>Update to version 5.8.7 and fix CAN-2005-0448</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="2">
+            <Date>2005-10-12</Date>
+            <Version>5.8.5</Version>
+            <Comment>dosed functions in action.py fixed.</Comment>
+            <Name>A. Murat Eren</Name>
+            <Email>meren@pardus.org.tr</Email>
+        </Update>
+        <Update release="1">
+            <Date>2005-08-17</Date>
+            <Version>5.8.5</Version>
+            <Comment>First release.</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+    </History>
+</PISI>

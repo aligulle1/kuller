@@ -1,0 +1,15 @@
+diff -p -up mc-4.7.2/src/file.c.refresh mc-4.7.2/src/file.c
+--- mc-4.7.2/src/file.c.refresh	2010-05-05 15:30:03.000000000 -0300
++++ mc-4.7.2/src/file.c	2010-05-06 14:39:00.000000000 -0300
+@@ -767,7 +767,10 @@ copy_file_file (FileOpTotalContext * tct
+                 file_progress_show (ctx, n_read_total + ctx->do_reget, file_size, stalled_msg,
+                                     force_update);
+             }
+-            mc_refresh ();
++            if (winch_flag)
++                change_screen_size ();
++            else
++                mc_refresh();
+ 
+             return_status = check_progress_buttons (ctx);
+ 

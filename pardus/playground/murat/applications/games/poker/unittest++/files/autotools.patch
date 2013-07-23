@@ -1,0 +1,463 @@
+diff -Nuar UnitTest++.orig/AUTHORS UnitTest++/AUTHORS
+--- UnitTest++.orig/AUTHORS	1970-01-01 02:00:00.000000000 +0200
++++ UnitTest++/AUTHORS	2008-06-29 00:02:41.000000000 +0300
+@@ -0,0 +1,14 @@
++Authors:
++Noel Llopis (llopis@convexhull.com) 
++Charles Nicholson (cn@cnicholson.net)
++
++Contributors:
++Jim Tilander (jim.tilander@gmail.com)
++Kim Grasman (kim@mvps.org)
++Jonathan Jansson (lilliemarck@users.sourceforge.net)
++Dirck Blaskey (listtarget2@danbala.com)
++Rory Driscoll (rorydriscoll@gmail.com)
++Dan Lind (podcat@gmail.com)
++Matt Kimmel (mattkimmel@gmail.com) -- Submitted with permission from Blue Fang Games
++Anthony Moralez (anthony.moralez@gmail.com)
++Jeff Dixon <bodisafa@helixe.com>
+diff -Nuar UnitTest++.orig/ChangeLog UnitTest++/ChangeLog
+--- UnitTest++.orig/ChangeLog	1970-01-01 02:00:00.000000000 +0200
++++ UnitTest++/ChangeLog	2008-06-29 00:02:41.000000000 +0300
+@@ -0,0 +1,21 @@
++2006-12-06  Johan Euphrosine (proppy)  <proppy@aminche.com>
++
++	* Release 1.2.1
++
++2006-10-30  Johan Euphrosine (proppy)  <proppy@aminche.com>
++
++	* Release 1.2.0
++
++2006-10-30  Loic Dachary  <loic@dachary.org>
++
++	* Release 1.1.1
++
++Thu Oct 11 2006  Cedric Pinson  <cpinson@freesheep.org>
++
++	* Change macro m4
++
++	* Release 1.1.0
++
++Wed Mar 29 2006  Johan Euphrosine (proppy)  <proppy@aminche.com>
++
++	* Release 1.0.0
+diff -Nuar UnitTest++.orig/config/ccache.m4 UnitTest++/config/ccache.m4
+--- UnitTest++.orig/config/ccache.m4	1970-01-01 02:00:00.000000000 +0200
++++ UnitTest++/config/ccache.m4	2008-06-29 00:02:41.000000000 +0300
+@@ -0,0 +1,18 @@
++# AM_PATH_CCACHE
++#
++# Use ccache (http://ccache.samba.org) to boost compilation.
++
++AC_DEFUN(AM_PATH_CCACHE,
++[
++AC_ARG_WITH( ccache,
++    [  --with-ccache           use ccache for compiling (default=auto)],
++    [ using_ccache=$with_ccache ]
++)
++
++AC_PATH_PROG(CCACHE, ccache)
++if test "$CCACHE" -a "$using_ccache" != "no"
++then
++    CC="ccache $CC"
++    CXX="ccache $CXX"
++fi
++])
+diff -Nuar UnitTest++.orig/configure.ac UnitTest++/configure.ac
+--- UnitTest++.orig/configure.ac	1970-01-01 02:00:00.000000000 +0200
++++ UnitTest++/configure.ac	2008-06-29 00:12:41.000000000 +0300
+@@ -0,0 +1,73 @@
++# 
++# Copyright (c) 2006 Noel Llopis and Charles Nicholson
++# 
++# Permission is hereby granted, free of charge, to any person obtaining
++# a copy of this software and associated documentation files (the
++# "Software"), to deal in the Software without restriction, including
++# without limitation the rights to use, copy, modify, merge, publish,
++# distribute, sublicense, and/or sell copies of the Software, and to
++# permit persons to whom the Software is furnished to do so, subject to
++# the following conditions:
++# 
++# The above copyright notice and this permission notice shall be included
++# in all copies or substantial portions of the Software.
++# 
++# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
++# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
++# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
++# CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
++# TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
++# SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
++# 
++# Authors:
++#  Johan Euphrosine <proppy@aminche.com>
++# 
++
++# 
++# Process this file with autoconf to produce a configure script.
++# 
++AC_PREREQ(2.54)
++AC_INIT(unittest++, 1.3, proppy@aminche.com, unittest++)
++AC_CANONICAL_TARGET
++AM_INIT_AUTOMAKE()
++AM_CONFIG_HEADER([config.h])
++
++# Checks for programs.
++AC_PROG_MAKE_SET
++AC_GNU_SOURCE
++AC_LANG(C++)
++AC_PROG_CPP
++AC_PROG_CXX
++AM_PATH_CCACHE
++AC_PROG_LIBTOOL
++
++
++AC_EXEEXT
++AC_OBJEXT
++
++AC_ISC_POSIX
++AC_HEADER_STDC
++AC_C_INLINE
++
++#
++# G++ specific debug and optimization flags
++#
++AC_ARG_ENABLE(debug,
++    [  --enable-debug          build in debug mode (the default is to build in optimized mode)],
++    [enable_debug=yes])
++
++if test "$GXX" = "yes" -a "$ac_test_CXXFLAGS" != set ; then
++  if test "$enable_debug" = "yes" ; then
++    CXXFLAGS="-pipe -g -Wall -Wpointer-arith -ansi -pedantic"
++  else
++    CXXFLAGS="-pipe -O3 -Wall -Wpointer-arith -ansi -pedantic"
++  fi
++fi
++
++CPPFLAGS="$CPPFLAGS "' -I${top_srcdir}/src -I${top_srcdir}/src/Posix'
++
++AC_CONFIG_FILES([Makefile
++		 unittest++.pc
++	 ])
++AC_OUTPUT
+diff -Nuar UnitTest++.orig/Makefile UnitTest++/Makefile
+--- UnitTest++.orig/Makefile	2007-04-24 07:46:55.000000000 +0300
++++ UnitTest++/Makefile	1970-01-01 02:00:00.000000000 +0200
+@@ -1,93 +0,0 @@
+-CC = g++
+-CCFLAGS = -g -ansi -Wall -W -ansi # -pedantic
+-SED = sed
+-MV = mv
+-RM = rm
+-
+-.SUFFIXES: .o .cpp
+-
+-lib = libUnitTest++.a
+-test = TestUnitTest++
+-
+-src = src/AssertException.cpp \
+-	src/Test.cpp \
+-	src/Checks.cpp \
+-	src/TestRunner.cpp \
+-	src/TestResults.cpp \
+-	src/TestReporter.cpp \
+-	src/TestReporterStdout.cpp \
+-	src/ReportAssert.cpp \
+-	src/TestList.cpp \
+-	src/TimeConstraint.cpp \
+-	src/TestDetails.cpp \
+-	src/MemoryOutStream.cpp \
+-	src/DeferredTestReporter.cpp \
+-	src/DeferredTestResult.cpp \
+-	src/XmlTestReporter.cpp
+-	
+-ifeq ($(MSYSTEM), MINGW32)
+-  src += src/Win32/TimeHelpers.cpp
+-else
+-  src += src/Posix/SignalTranslator.cpp \
+-	src/Posix/TimeHelpers.cpp
+-endif
+-
+-test_src = src/tests/Main.cpp \
+-	src/tests/TestAssertHandler.cpp \
+-	src/tests/TestChecks.cpp \
+-	src/tests/TestUnitTest++.cpp \
+-	src/tests/TestTest.cpp \
+-	src/tests/TestTestResults.cpp \
+-	src/tests/TestTestRunner.cpp \
+-	src/tests/TestCheckMacros.cpp \
+-	src/tests/TestTestList.cpp \
+-	src/tests/TestTestMacros.cpp \
+-	src/tests/TestTimeConstraint.cpp \
+-	src/tests/TestTimeConstraintMacro.cpp \
+-	src/tests/TestMemoryOutStream.cpp \
+-	src/tests/TestDeferredTestReporter.cpp \
+-	src/tests/TestXmlTestReporter.cpp
+-
+-objects = $(patsubst %.cpp, %.o, $(src))
+-test_objects = $(patsubst %.cpp, %.o, $(test_src))
+-dependencies = $(subst .o,.d,$(objects))
+-test_dependencies = $(subst .o,.d,$(test_objects))
+-
+-define make-depend
+-  $(CC) $(CCFLAGS) -M $1 | \
+-  $(SED) -e 's,\($(notdir $2)\) *:,$(dir $2)\1: ,' > $3.tmp
+-  $(SED) -e 's/#.*//' \
+-      -e 's/^[^:]*: *//' \
+-      -e 's/ *\\$$//' \
+-      -e '/^$$/ d' \
+-      -e 's/$$/ :/' $3.tmp >> $3.tmp
+-  $(MV) $3.tmp $3
+-endef
+-
+-
+-all: $(test)
+-
+-
+-$(lib): $(objects) 
+-	@echo Creating $(lib) library...
+-	@ar cr $(lib) $(objects)
+-    
+-$(test): $(lib) $(test_objects)
+-	@echo Linking $(test)...
+-	@$(CC) -o $(test) $(test_objects) $(lib)
+-	@echo Running unit tests...
+-	@./$(test)
+-
+-clean:
+-	-@$(RM) $(objects) $(test_objects) $(dependencies) $(test_dependencies) $(test) $(lib) 2> /dev/null
+-
+-%.o : %.cpp
+-	@echo $<
+-	@$(call make-depend,$<,$@,$(subst .o,.d,$@))
+-	@$(CC) $(CCFLAGS) -c $< -o $(patsubst %.cpp, %.o, $<)
+-
+-
+-ifneq "$(MAKECMDGOALS)" "clean"
+--include $(dependencies)
+--include $(test_dependencies)
+-endif
+diff -Nuar UnitTest++.orig/Makefile.am UnitTest++/Makefile.am
+--- UnitTest++.orig/Makefile.am	1970-01-01 02:00:00.000000000 +0200
++++ UnitTest++/Makefile.am	2008-06-29 00:02:50.000000000 +0300
+@@ -0,0 +1,147 @@
++# 
++# Copyright (c) 2006 Noel Llopis and Charles Nicholson
++# 
++# Permission is hereby granted, free of charge, to any person obtaining
++# a copy of this software and associated documentation files (the
++# "Software"), to deal in the Software without restriction, including
++# without limitation the rights to use, copy, modify, merge, publish,
++# distribute, sublicense, and/or sell copies of the Software, and to
++# permit persons to whom the Software is furnished to do so, subject to
++# the following conditions:
++# 
++# The above copyright notice and this permission notice shall be included
++# in all copies or substantial portions of the Software.
++# 
++# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
++# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
++# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
++# CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
++# TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
++# SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
++# 
++# Authors:
++#  Johan Euphrosine <proppy@aminche.com>
++# 
++
++EXTRA_DIST = \
++	unittest++.pc.in \
++	unittest++.m4 \
++	config/ccache.m4 \
++	TestUnitTest++.vsnet2003.vcproj \
++	TestUnitTest++.vsnet2005.vcproj \
++	UnitTest++.vsnet2003.sln \
++	UnitTest++.vsnet2005.sln \
++	UnitTest++.vsnet2003.vcproj \
++	UnitTest++.vsnet2005.vcproj \
++	docs/UnitTest++.html \
++	gentoo/dev-cpp/unittest++/unittest++-1.1.0-r1.ebuild
++
++MAINTAINERCLEANFILES = \
++	INSTALL \
++	Makefile.in \
++	aclocal.m4 \
++	config.guess \
++	config.h.in \
++	config.sub \
++	configure \
++	depcomp \
++	install-sh \
++	ltmain.sh \
++	missing \
++	mkinstalldirs
++
++DISTCLEANFILES = \
++	config.log \
++	config.status
++
++
++pkgconfigdir = ${libdir}/pkgconfig
++pkgconfig_DATA = unittest++.pc
++
++aclocaldir = ${datadir}/aclocal
++dist_aclocal_DATA = unittest++.m4
++
++ACLOCAL_AMFLAGS = -I config
++
++lib_LTLIBRARIES = libunittest++.la
++
++libunittest___la_SOURCES = \
++src/AssertException.cpp \
++src/Test.cpp \
++src/Checks.cpp \
++src/TestRunner.cpp \
++src/TestResults.cpp \
++src/TestReporter.cpp \
++src/TestReporterStdout.cpp \
++src/ReportAssert.cpp \
++src/TestList.cpp \
++src/TimeConstraint.cpp \
++src/TestDetails.cpp \
++src/MemoryOutStream.cpp \
++src/DeferredTestReporter.cpp \
++src/DeferredTestResult.cpp \
++src/XmlTestReporter.cpp \
++src/Posix/SignalTranslator.cpp \
++src/Posix/TimeHelpers.cpp
++
++libunittest___la_LDFLAGS = -version-info 0:0:0
++
++unittest__includedir = $(includedir)/unittest++
++unittest__include_HEADERS = \
++src/Checks.h \
++src/DeferredTestResult.h \
++src/TestDetails.h \
++src/XmlTestReporter.h \
++src/AssertException.h \
++src/TestMacros.h \
++src/tests/RecordingReporter.h \
++src/Config.h \
++src/TestResults.h \
++src/TestReporterStdout.h \
++src/Test.h \
++src/MemoryOutStream.h \
++src/TestRunner.h \
++src/DeferredTestReporter.h \
++src/ReportAssert.h \
++src/UnitTest++.h \
++src/TestSuite.h \
++src/TestList.h \
++src/TimeHelpers.h \
++src/TestReporter.h \
++src/CheckMacros.h \
++src/TimeConstraint.h
++
++posixdir = $(includedir)/unittest++/Posix
++posix_HEADERS = \
++src/Posix/TimeHelpers.h \
++src/Posix/SignalTranslator.h
++
++EXTRA_DIST += \
++src/Win32/TimeHelpers.cpp \
++src/Win32/TimeHelpers.h
++
++TESTS = ./testunittest++
++
++check_PROGRAMS = testunittest++
++
++testunittest___SOURCES = \
++src/tests/Main.cpp \
++src/tests/TestAssertHandler.cpp \
++src/tests/TestChecks.cpp \
++src/tests/TestUnitTest++.cpp \
++src/tests/TestTest.cpp \
++src/tests/TestTestResults.cpp \
++src/tests/TestTestRunner.cpp \
++src/tests/TestCheckMacros.cpp \
++src/tests/TestTestList.cpp \
++src/tests/TestTestMacros.cpp \
++src/tests/TestTimeConstraint.cpp \
++src/tests/TestTimeConstraintMacro.cpp \
++src/tests/TestMemoryOutStream.cpp \
++src/tests/TestDeferredTestReporter.cpp \
++src/tests/TestXmlTestReporter.cpp \
++src/tests/TestTestSuite.cpp
++
++testunittest___LDADD = \
++	$(top_builddir)/libunittest++.la
+diff -Nuar UnitTest++.orig/NEWS UnitTest++/NEWS
+--- UnitTest++.orig/NEWS	1970-01-01 02:00:00.000000000 +0200
++++ UnitTest++/NEWS	2008-06-29 00:02:50.000000000 +0300
+@@ -0,0 +1,33 @@
++Release 1.2.1
++
++- Packaging fixes
++
++Release 1.2.0
++
++- First pass at documentation. 
++- More detailed error crash catching in fixtures. 
++- Standard streams used for printing objects under check. 
++- This should allow the use of standard class types such as std::string or other custom classes with stream operators to ostream. 
++- Standard streams can be optionally compiled off by defining UNITTEST_USE_CUSTOM_STREAMS in Config.h 
++- Added named test suites 
++- Added CHECK_ARRAY2D_CLOSE 
++- Posix library name is libUnitTest++.a now 
++- Floating point numbers are postfixed with f in the failure reports
++
++Release 1.1.1
++
++- Bug fixes
++
++Release 1.1.0
++
++- CHECK macros do not have side effects even if one of the parameters changes state
++- Removed CHECK_ARRAY_EQUAL (too similar to CHECK_ARRAY_CLOSE)
++- Added local and global time constraints
++- Removed dependencies on strstream
++- Improved Posix signal to exception translator
++- Failing tests are added to Visual Studio's error list
++- Fixed Visual Studio projects to work with spaces in directories
++
++Release 1.0.0
++
++- Initial release
+diff -Nuar UnitTest++.orig/unittest++.m4 UnitTest++/unittest++.m4
+--- UnitTest++.orig/unittest++.m4	1970-01-01 02:00:00.000000000 +0200
++++ UnitTest++/unittest++.m4	2008-06-29 00:02:50.000000000 +0300
+@@ -0,0 +1,14 @@
++# AM_USE_UNITTESTCPP
++
++AC_DEFUN([AM_USE_UNITTESTCPP],
++[
++have_unittestcpp="no"
++PKG_CHECK_MODULES(UNITTESTCPP, unittest++ >= 0.1, [have_unittestcpp="yes"] ,)
++
++if test "$have_unittestcpp" = "yes" ; then
++  CPPFLAGS="$CPPFLAGS $UNITTESTCPP_CFLAGS" 
++  LIBS="$LIBS $UNITTESTCPP_LIBS"
++  AC_DEFINE(USE_UNITTESTCPP, 1, [activate unittest++])
++fi
++
++])
+diff -Nuar UnitTest++.orig/unittest++.pc.in UnitTest++/unittest++.pc.in
+--- UnitTest++.orig/unittest++.pc.in	1970-01-01 02:00:00.000000000 +0200
++++ UnitTest++/unittest++.pc.in	2008-06-29 00:02:50.000000000 +0300
+@@ -0,0 +1,14 @@
++# pkg-config source file
++
++prefix=@prefix@
++exec_prefix=@exec_prefix@
++libdir=@libdir@
++includedir=@includedir@
++
++Name: unittest++
++Description: unittest++ is a unit testing framework for C++
++Version: @PACKAGE_VERSION@
++Requires:
++Conflicts:
++Libs: -L${libdir} -lunittest++
++Cflags: -I${includedir}/unittest++

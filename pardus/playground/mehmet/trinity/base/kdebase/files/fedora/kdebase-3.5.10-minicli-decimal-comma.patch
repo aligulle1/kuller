@@ -1,0 +1,18 @@
+Index: kdebase/kdesktop/minicli.cpp
+===================================================================
+--- kdebase.orig/kdesktop/minicli.cpp
++++ kdebase/kdesktop/minicli.cpp
+@@ -995,9 +995,12 @@ void Minicli::slotPriority(int priority)
+   updateAuthLabel();
+ }
+ 
+-TQString Minicli::calculate(const TQString &exp)
++TQString Minicli::calculate(const TQString &input)
+ {
+    TQString result, cmd;
++   TQString exp = input;
++   //replace commas with dots so european decimals can be calculated
++   exp.replace(TQChar(','), ".");
+    const TQString bc = KStandardDirs::findExe("bc");
+    if ( !bc.isEmpty() )
+       cmd = TQString("echo %1 | %2").arg(KProcess::quote(TQString("scale=8; ")+exp), KProcess::quote(bc));

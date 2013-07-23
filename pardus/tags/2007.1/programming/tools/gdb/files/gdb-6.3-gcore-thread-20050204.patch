@@ -1,0 +1,25 @@
+2005-02-07  Jeff Johnston  <jjohnstn@redhat.com>
+
+        * linux-nat.c (linux_nat_xfer_memory): Don't use
+        linux_proc_xfer_memory for ia64.
+
+Index: gdb-6.5/gdb/linux-nat.c
+===================================================================
+--- gdb-6.5.orig/gdb/linux-nat.c	2006-07-07 00:57:56.000000000 -0300
++++ gdb-6.5/gdb/linux-nat.c	2006-07-07 02:24:51.000000000 -0300
+@@ -3152,10 +3152,15 @@ linux_xfer_partial (struct target_ops *o
+     return procfs_xfer_auxv (ops, object, annex, readbuf, writebuf,
+ 			     offset, len);
+ 
++#ifndef NATIVE_XFER_UNWIND_TABLE
++  /* FIXME: For ia64, we cannot currently use linux_proc_xfer_memory
++            for accessing thread storage.  Revert when Bugzilla 147436
++	    is fixed.  */
+   xfer = linux_proc_xfer_partial (ops, object, annex, readbuf, writebuf,
+ 				  offset, len);
+   if (xfer != 0)
+     return xfer;
++#endif
+ 
+   return super_xfer_partial (ops, object, annex, readbuf, writebuf,
+ 			     offset, len);

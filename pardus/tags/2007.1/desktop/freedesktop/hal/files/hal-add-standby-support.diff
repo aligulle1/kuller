@@ -1,0 +1,293 @@
+Index: doc/spec/hal-spec-properties.xml
+===================================================================
+RCS file: /cvs/hal/hal/doc/spec/hal-spec-properties.xml,v
+retrieving revision 1.7
+diff -u -3 -p -u -r1.7 hal-spec-properties.xml
+--- doc/spec/hal-spec-properties.xml	31 May 2006 17:31:32 -0000	1.7
++++ doc/spec/hal-spec-properties.xml	20 Jul 2006 17:16:50 -0000
+@@ -5190,7 +5190,7 @@
+               <entry></entry>
+               <entry>Yes</entry>
+               <entry>
+-                If suspend support is compiled into the kernel.
++                If suspend (S3) support is compiled into the kernel.
+                 NB. This may not mean the machine is able to suspend
+                 successfully.
+               </entry>
+@@ -5202,19 +5202,31 @@
+               <entry></entry>
+               <entry>Yes</entry>
+               <entry>
+-                If hibernation support is compiled into the kernel.
++                If hibernation (S4) support is compiled into the kernel.
+                 NB. This may not mean the machine is able to hibernate
+                 successfully.
+               </entry>
+             </row>
+             <row>
+               <entry>
++                <literal>power_management.can_standby</literal> (bool)
++              </entry>
++              <entry></entry>
++              <entry>Yes</entry>
++              <entry>
++                If standby (S1) support is compiled into the kernel.
++                NB. This may not mean the machine is able to standby
++                successfully.
++              </entry>
++            </row>
++            <row>
++              <entry>
+                 <literal>power_management.can_suspend_to_ram</literal> (bool)
+               </entry>
+               <entry></entry>
+               <entry>No</entry>
+               <entry>
+-                If suspend support is compiled into the kernel.
++                If suspend (S3) support is compiled into the kernel.
+                 NB. This may not mean the machine is able to suspend
+                 successfully.
+                 WARNING: This key is depreciated and power_management.can_suspend
+@@ -5228,7 +5240,7 @@
+               <entry></entry>
+               <entry>No</entry>
+               <entry>
+-                If hibernation support is compiled into the kernel.
++                If hibernation (S4) support is compiled into the kernel.
+                 NB. This may not mean the machine is able to hibernate
+                 successfully.
+                 WARNING: This key is depreciated and power_management.can_hibernate
+Index: fdi/policy/10osvendor/10-power-mgmt-policy.fdi
+===================================================================
+RCS file: /cvs/hal/hal/fdi/policy/10osvendor/10-power-mgmt-policy.fdi,v
+retrieving revision 1.5
+diff -u -3 -p -u -r1.5 10-power-mgmt-policy.fdi
+--- fdi/policy/10osvendor/10-power-mgmt-policy.fdi	6 Jun 2006 23:56:09 -0000	1.5
++++ fdi/policy/10osvendor/10-power-mgmt-policy.fdi	20 Jul 2006 17:16:50 -0000
+@@ -36,6 +36,11 @@
+       <append key="org.freedesktop.Hal.Device.SystemPowerManagement.method_argnames" type="strlist"></append>
+       <append key="org.freedesktop.Hal.Device.SystemPowerManagement.method_execpaths" type="strlist">hal-system-power-hibernate</append>
+ 
++      <append key="org.freedesktop.Hal.Device.SystemPowerManagement.method_names" type="strlist">Standby</append>
++      <append key="org.freedesktop.Hal.Device.SystemPowerManagement.method_signatures" type="strlist"></append>
++      <append key="org.freedesktop.Hal.Device.SystemPowerManagement.method_argnames" type="strlist"></append>
++      <append key="org.freedesktop.Hal.Device.SystemPowerManagement.method_execpaths" type="strlist">hal-system-power-standby</append>
++      
+       <append key="org.freedesktop.Hal.Device.SystemPowerManagement.method_names" type="strlist">Shutdown</append>
+       <append key="org.freedesktop.Hal.Device.SystemPowerManagement.method_signatures" type="strlist"></append>
+       <append key="org.freedesktop.Hal.Device.SystemPowerManagement.method_argnames" type="strlist"></append>
+Index: hald/linux/osspec.c
+===================================================================
+RCS file: /cvs/hal/hal/hald/linux/osspec.c,v
+retrieving revision 1.48
+diff -u -3 -p -u -r1.48 osspec.c
+--- hald/linux/osspec.c	21 May 2006 00:58:24 -0000	1.48
++++ hald/linux/osspec.c	20 Jul 2006 17:16:50 -0000
+@@ -449,10 +449,12 @@ out:
+ }
+ 
+ static void
+-set_suspend_hibernate_keys (HalDevice *d)
++set_power_state_keys (HalDevice *d)
+ {
+-	int can_suspend;
+-	int can_hibernate;
++	gboolean can_suspend;
++	gboolean can_hibernate;
++	gboolean can_standby;
++	
+ 	ssize_t read;
+ 	size_t len;
+ 	char *poweroptions;
+@@ -460,6 +462,7 @@ set_suspend_hibernate_keys (HalDevice *d
+ 
+ 	can_suspend = FALSE;
+ 	can_hibernate = FALSE;
++	can_standby = FALSE;
+ 
+ 	/* try to find 'mem' and 'disk' in /sys/power/state */
+ 	fp = fopen ("/sys/power/state", "r");
+@@ -479,6 +482,8 @@ set_suspend_hibernate_keys (HalDevice *d
+ 		can_suspend = TRUE;
+ 	if (strstr (poweroptions, "disk"))
+ 		can_hibernate = TRUE;
++	if (strstr (poweroptions, "standby"))
++		can_standby = TRUE;
+ 	free (poweroptions);
+ 
+ 	/* check for the presence of suspend2 */
+@@ -489,6 +494,7 @@ set_suspend_hibernate_keys (HalDevice *d
+ out:
+ 	hal_device_property_set_bool (d, "power_management.can_suspend", can_suspend);
+ 	hal_device_property_set_bool (d, "power_management.can_hibernate", can_hibernate);
++	hal_device_property_set_bool (d, "power_management.can_standby", can_standby);
+ 
+ 	/* WARNING: These keys are depreciated and power_management.can_suspend
+ 	 * and power_management.can_hibernate should be used instead.
+@@ -546,7 +552,7 @@ osspec_probe (void)
+ 	 *	 or hibernate successfully, only that the machine has
+ 	 *	 support compiled into the kernel.
+ 	 */
+-	set_suspend_hibernate_keys (root);
++	set_power_state_keys (root);
+ 
+ 	/* TODO: add prober for PowerMac's */
+ 	if (should_decode_dmi) {
+Index: privileges/Makefile.am
+===================================================================
+RCS file: /cvs/hal/hal/privileges/Makefile.am,v
+retrieving revision 1.1
+diff -u -3 -p -u -r1.1 Makefile.am
+--- privileges/Makefile.am	5 Jun 2006 23:56:00 -0000	1.1
++++ privileges/Makefile.am	20 Jul 2006 17:16:50 -0000
+@@ -7,6 +7,7 @@ dist_polkit_privilege_DATA =            
+ 	hal-storage-removable-mount.privilege             \
+ 	hal-storage-removable-mount-all-options.privilege \
+ 	hal-power-suspend.privilege                       \
++	hal-power-standby.privilege                       \
+ 	hal-power-hibernate.privilege                     \
+ 	hal-power-poweroff.privilege                      \
+ 	hal-power-reboot.privilege
+Index: privileges/hal-power-standby.privilege
+===================================================================
+RCS file: privileges/hal-power-standby.privilege
+diff -N privileges/hal-power-standby.privilege
+--- /dev/null	1 Jan 1970 00:00:00 -0000
++++ privileges/hal-power-standby.privilege	20 Jul 2006 17:16:50 -0000
+@@ -0,0 +1,12 @@
++
++# This privilege specifies who is allowed to suspend the system.
++
++[Privilege]
++RequiredPrivileges=desktop-console
++SufficientPrivileges=
++Allow=uid:__all__
++Deny=
++CanObtain=True
++CanGrant=True
++ObtainRequireRoot=False
++
+Index: tools/Makefile.am
+===================================================================
+RCS file: /cvs/hal/hal/tools/Makefile.am,v
+retrieving revision 1.41
+diff -u -3 -p -u -r1.41 Makefile.am
+--- tools/Makefile.am	6 Jun 2006 03:17:27 -0000	1.41
++++ tools/Makefile.am	20 Jul 2006 17:16:50 -0000
+@@ -68,6 +68,7 @@ script_SCRIPTS =				\
+ 	hal-system-power-suspend		\
+ 	hal-system-power-hibernate		\
+ 	hal-system-power-shutdown		\
++	hal-system-power-standby		\
+ 	hal-system-power-reboot			\
+ 	hal-system-lcd-get-brightness		\
+ 	hal-system-lcd-set-brightness		\
+Index: tools/hal-system-power-standby
+===================================================================
+RCS file: tools/hal-system-power-standby
+diff -N tools/hal-system-power-standby
+--- /dev/null	1 Jan 1970 00:00:00 -0000
++++ tools/hal-system-power-standby	20 Jul 2006 17:16:50 -0000
+@@ -0,0 +1,22 @@
++#!/bin/sh
++
++PRIVILEGE=hal-power-standby
++if [ "$HAL_METHOD_INVOKED_BY_UID" != "0" ] ; then
++    RESULT=$(polkit-is-privileged --privilege $PRIVILEGE \
++                                  --user $HAL_METHOD_INVOKED_BY_UID \
++	                          --system-bus-unique-name $HAL_METHOD_INVOKED_BY_SYSTEMBUS_CONNECTION_NAME 2>&1)
++    IS_PRIVILEGED=$?
++    if [ "$IS_PRIVILEGED" != "0" ] ; then
++	echo org.freedesktop.Hal.Device.PermissionDeniedByPolicy >&2
++	echo $PRIVILEGE refused uid $HAL_METHOD_INVOKED_BY_UID >&2
++	exit 1
++    fi
++fi
++
++if [ -n "$HALD_UNAME_S" -a -x ./$HALD_UNAME_S/hal-system-power-standby-$HALD_UNAME_S ]; then
++    exec ./$HALD_UNAME_S/hal-system-power-standby-$HALD_UNAME_S $@
++else
++    echo "org.freedesktop.Hal.Device.UnknownError" >&2
++    echo "No back-end for your operating system" >&2
++    exit 1
++fi
+Index: tools/linux/Makefile.am
+===================================================================
+RCS file: /cvs/hal/hal/tools/linux/Makefile.am,v
+retrieving revision 1.22
+diff -u -3 -p -u -r1.22 Makefile.am
+--- tools/linux/Makefile.am	6 Jun 2006 01:52:07 -0000	1.22
++++ tools/linux/Makefile.am	20 Jul 2006 17:16:50 -0000
+@@ -12,6 +12,7 @@ script_SCRIPTS =					\
+ 	hal-system-power-suspend-linux			\
+ 	hal-system-power-hibernate-linux		\
+ 	hal-system-power-shutdown-linux			\
++	hal-system-power-standby-linux			\
+ 	hal-system-power-reboot-linux			\
+ 	hal-system-lcd-get-brightness-linux		\
+ 	hal-system-lcd-set-brightness-linux		\
+Index: tools/linux/hal-system-power-standby-linux
+===================================================================
+RCS file: tools/linux/hal-system-power-standby-linux
+diff -N tools/linux/hal-system-power-standby-linux
+--- /dev/null	1 Jan 1970 00:00:00 -0000
++++ tools/linux/hal-system-power-standby-linux	20 Jul 2006 17:16:50 -0000
+@@ -0,0 +1,58 @@
++#!/bin/sh
++
++POWERSAVED_STANDBY="dbus-send --system --dest=com.novell.powersave \
++                    --print-reply /com/novell/powersave \
++                    com.novell.powersave.action.Standby"
++
++unsupported() {
++	echo org.freedesktop.Hal.Device.SystemPowerManagement.NotSupported >&2
++	echo No Standby method found >&2
++	exit 1
++}
++
++#SuSE and ALTLinux only support powersave
++if [ -f "/etc/altlinux-release" ] || [ -f "/etc/SuSE-release" ] ; then
++	if [ -x /usr/bin/powersave ] ; then
++	        $POWERSAVED_STANDBY
++		RET=$?
++	else
++		# TODO: add support
++		unsupported
++	fi
++
++#FreeBSD uses zzz to suspend for both ACPI and APM
++elif [ "x`uname -s`" = "xFreeBSD" ] ; then
++	if [ -x /usr/sbin/acpiconf ] ; then
++		/usr/sbin/acpiconf -s 1
++		RET=$?
++	else
++		unsupported
++	fi
++
++#Other distros just need to have *any* tools installed
++else
++	if [ -x "/usr/bin/powersave" ] ; then
++	    $POWERSAVED_STANDBY
++	    RET=$?
++	elif [ -w "/sys/power/state" ] ; then
++	    # Use the raw kernel sysfs interface
++	    echo "standby" > /sys/power/state
++	    RET=$?
++	else
++	    # TODO: add other scripts support
++	    unsupported
++	    fi
++	fi
++
++#Refresh devices as a resume can do funny things
++for type in button battery ac_adapter
++do
++	devices=`hal-find-by-capability --capability $type`
++	for device in $devices
++	do
++		dbus-send --system --print-reply --dest=org.freedesktop.Hal \
++			  $device org.freedesktop.Hal.Device.Rescan
++	done
++done
++
++exit $RET

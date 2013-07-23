@@ -1,0 +1,52 @@
+diff -ur gmailfs-0.7.2.orig/gmailfs.py gmailfs-0.7.2/gmailfs.py
+--- gmailfs-0.7.2.orig/gmailfs.py	2006-02-06 23:40:51.000000000 +0200
++++ gmailfs-0.7.2/gmailfs.py	2006-03-05 23:49:20.000000000 +0200
+@@ -19,6 +19,7 @@
+ 
+ from fuse import Fuse
+ import os
++import base64
+ from errno import *
+ from stat import *
+ from os.path import abspath, expanduser
+@@ -162,12 +163,21 @@
+ # old filesystems were stored with 7bit encodings
+ # but new ones are all quoted printable
+ def fixQuotedPrintable(body):
+-    fixed = body
++    fixed = fixBase64(body)
+     if re.search("Content-Transfer-Encoding: quoted",body):
+         fixed = quopri.decodestring(body)
+     # Map unicode     
+     return fixed.replace('\u003d','=')
+ 
++def fixBase64(body):
++    if re.search("Content-Transfer-Encoding: base64", body):
++        fixed = body.split("\r\n")
++        fixed = "%s%s" % (fixed[fixed.__len__() -2], fixed[fixed.__len__() -1])
++        fixed = base64.decodestring(fixed)
++        return fixed.replace('\u003d','=')
++    else:
++        return body
++ 
+ def _getMessagesByQuery(ga,queryString):
+     tries = 0
+     while tries<NumberQueryRetries:
+@@ -311,7 +321,7 @@
+         try:
+             subject = self.inode_msg.subject.replace('\u003d','=')
+             body = self.inode_msg.source
+-	    body = fixQuotedPrintable(body)
++            body = fixQuotedPrintable(body)
+             log.debug("setting inode from subject:"+subject)
+             log.debug("and body:"+body)
+             m = re.match(VersionTag+'=(.*) '+InodeTag+'=(.*) '+DevTag+'=(.*) '+NumberLinksTag+'=(.*) '+FsNameTag+'='+MagicStartDelim+'(.*)'+
+@@ -330,7 +340,7 @@
+ 			  MtimeTag+quotedEquals+' ?'+
+                           CtimeTag+quotedEquals+' ?'+
+ 			  BlockSizeTag+quotedEquals, re.DOTALL),body)
+-	    self.mode = int(m.group(1))
++            self.mode = int(m.group(1))
+             self.uid = int(m.group(2))
+             self.gid = int(m.group(3))
+             self.size = int(m.group(4))

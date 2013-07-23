@@ -1,0 +1,130 @@
+--- systemv/hal_lpadmin.orig	2008-07-29 14:34:07.000000000 +0300
++++ systemv/hal_lpadmin	2008-07-29 14:34:05.000000000 +0300
+@@ -1,7 +1,8 @@
+-#!/bin/env python
++#!/usr/bin/env python
+ import dbus, sys, os, time, signal, re
+ import traceback
+ import cups, cupshelpers
++import comar.service
+ from syslog import *
+ 
+ def get_hplip_uris_for_usb (fax=False, checkuri=None):
+@@ -43,6 +44,40 @@
+         self.get_properties()
+         self.uris = None
+         self.hp_fax_uris = None
++
++        # Check for CUPS status
++        # If set to 'on' just wait a little while,
++        # if not, start it manually
++
++        bus = dbus.SystemBus()
++
++        try:
++            obj = bus.get_object("tr.org.pardus.comar", "/package/cups", introspect=False)
++            state = obj.info(dbus_interface="tr.org.pardus.comar.System.Service")
++            state = str(state[2])
++            syslog (LOG_INFO, "Checking CUPS state: %s" % state)
++
++        except dbus.DBusException, e:
++            syslog (LOG_DEBUG, "D-Bus method call failed: %s" % e)
++
++        # will autostart
++        if state == 'stopped':
++            syslog (LOG_INFO, "Waiting for CUPS to start...")
++            comar.service.waitBus("/var/run/cups/cups.sock")
++        elif state == 'off':
++            # start it manually
++            syslog (LOG_INFO, "Starting CUPS manually using comar..")
++            try:
++                obj = bus.get_object("tr.org.pardus.comar", "/package/cups", introspect=False)
++                obj.start(dbus_interface="tr.org.pardus.comar.System.Service")
++
++            except dbus.DBusException, e:
++                syslog (LOG_DEBUG, "D-Bus method call failed: %s" % e)
++        else:
++            pass
++
++        bus.close()
++
+         try:
+             self.cups_connection = cups.Connection()
+         except RuntimeError, e:
+@@ -102,13 +137,13 @@
+                     model = model[len (make):]
+                     model = model.lstrip ()
+                 model = model.rstrip ()
+-                
++
+                 uri = "usb://%s/%s" % (make, model)
+                 uri = uri.replace (" ", "%20")
+                 if serial:
+                     uri += "?serial=%s" % serial
+                 uris.insert (0, uri)
+-                
++
+             if (not removed and
+                 (vendor == "hewlett-packard" or vendor == "hp")):
+                 # Perhaps HPLIP can drive this device.  If so, we
+@@ -185,7 +220,7 @@
+                                 faxuris.append (faxuri)
+                 except:
+                     pass
+-        
++
+         if faxurisfound == 1:
+             self.hp_fax_uris = faxuris
+             return faxuris
+@@ -281,14 +316,12 @@
+                 # really new printer or fax - show tray icon with magnifier
+                 bus = dbus.SystemBus()
+                 try:
+-                    syslog (LOG_DEBUG, "Calling GetReady")
+                     obj = bus.get_object("com.redhat.NewPrinterNotification",
+                                          "/com/redhat/NewPrinterNotification")
+                     notification = dbus.Interface(obj,
+                                                   "com.redhat.NewPrinterNotification")
+-                    notification.GetReady ()
+                 except dbus.DBusException, e:
+-                    syslog (LOG_DEBUG, "D-Bus method call failed: %s" % e)
++                    syslog (LOG_DEBUG, "D-Bus problem: %s" % e)
+                     notification = None
+             else:
+                 notification = None
+@@ -310,10 +343,18 @@
+ 
+                 info = "%s %s" % (self.make, self.model)
+ 
++                # if there's no printer configured, set the new one as default
++                set_as_default = (len(self.cups_connection.getPrinters()) == 0)
++
+                 self.cups_connection.addPrinter(self.name,
+                                                 device=self.get_cups_uri(),
+                                                 ppdname=ppdname, info=info,
+                                                 location=os.uname ()[1])
++
++                if set_as_default:
++                    syslog(LOG_INFO, "Setting %s as default printer" % self.name)
++                    self.cups_connection.setDefault(self.name)
++
+                 self.cups_connection.enablePrinter(self.name)
+                 self.cups_connection.acceptJobs(self.name)
+                 syslog (LOG_INFO, "Added printer %s" % self.name)
+@@ -342,6 +383,7 @@
+                     n = self.name
+                     m = self.model
+                 try:
++                    syslog(LOG_INFO, "Calling NewPrinter()")
+                     notification.NewPrinter (status, n,
+                                              self.make, m,
+                                              self.description,
+@@ -460,7 +502,7 @@
+     def addPrinter(self):
+         printer = HalPrinter()
+         printer.add()
+-        
++
+     def removePrinter(self):
+         printer = HalPrinter()
+         printer.remove()

@@ -1,0 +1,33 @@
+diff -up synergy-1.3.1/lib/platform/CXWindowsScreen.cpp.dpms synergy-1.3.1/lib/platform/CXWindowsScreen.cpp
+--- synergy-1.3.1/lib/platform/CXWindowsScreen.cpp.dpms	2008-06-02 19:32:47.000000000 +0200
++++ synergy-1.3.1/lib/platform/CXWindowsScreen.cpp	2008-06-02 19:39:32.000000000 +0200
+@@ -36,6 +36,9 @@
+ #	define XK_MISCELLANY
+ #	define XK_XKB_KEYS
+ #	include <X11/keysymdef.h>
++	extern "C" {
++#	include <X11/extensions/dpms.h>
++	}
+ #	if HAVE_X11_EXTENSIONS_XTEST_H
+ #		include <X11/extensions/XTest.h>
+ #	else
+@@ -230,6 +233,19 @@ CXWindowsScreen::enter()
+ 		XSetInputFocus(m_display, m_lastFocus, m_lastFocusRevert, CurrentTime);
+ 	}
+ 
++	// Force the DPMS to turn screen back on since we don't
++	// actually cause physical hardware input to trigger it
++	int dummy;
++	CARD16 powerlevel;
++	BOOL enabled;
++	if (DPMSQueryExtension(m_display, &dummy, &dummy) &&
++	    DPMSCapable(m_display) &&
++	    DPMSInfo(m_display, &powerlevel, &enabled))
++	{
++		if (enabled && powerlevel != DPMSModeOn)
++			DPMSForceLevel(m_display, DPMSModeOn);
++	}
++
+ 	// unmap the hider/grab window.  this also ungrabs the mouse and
+ 	// keyboard if they're grabbed.
+ 	XUnmapWindow(m_display, m_window);

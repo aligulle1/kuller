@@ -1,0 +1,22 @@
+diff -Nur RutilTv0.16-old/configure.sh RutilTv0.16/configure.sh
+--- RutilTv0.16-old/configure.sh	2008-04-02 20:27:02.000000000 +0300
++++ RutilTv0.16/configure.sh	2008-04-02 20:27:15.000000000 +0300
+@@ -65,10 +65,14 @@
+ #
+ #
+ # Parse options :
+-for arg_iter in $@; do
+-    arg=`echo $arg_iter | cut -f1 -d=`
+-    arg_value=`echo $arg_iter | cut -f2 -d=`
+-    case $arg in
++for arg_iter in "$@"; do
++    arg="${arg_iter%%=*}"
++    if [ "x$arg" != "x$arg_iter" ]; then
++	arg_value="${arg_iter#*=}"
++    else
++	arg_value=''
++    fi
++    case "$arg" in
+         --help)
+ echo "This script generates RutilT's configuration and build files. It also
+ checks if all dependencies are fulfilled.

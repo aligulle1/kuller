@@ -1,0 +1,46 @@
+diff -ruN slang-2.1.3-old/src/slang.h slang-2.1.3/src/slang.h
+--- slang-2.1.3-old/src/slang.h	2005-03-23 06:54:30.000000000 +0000
++++ slang-2.1.3/src/slang.h	2005-03-31 21:17:31.524770128 +0100
+@@ -1609,6 +1609,9 @@
+ SL_EXTERN char *SLtt_tigetent (char *);
+ SL_EXTERN char *SLtt_tigetstr (char *, char **);
+ SL_EXTERN int SLtt_tigetnum (char *, char **);
++SL_EXTERN int SLtt_tgetent(char *name);
++SL_EXTERN char *SLtt_tgoto(char *cap, int col, int row);
++SL_EXTERN int SLtt_tputs(char *str, int affcnt, int (*putc)(int));
+ # endif
+ #endif
+ 
+diff -ruN slang-2.1.3-old/src/sldisply.c slang-2.1.3/src/sldisply.c
+--- slang-2.1.3-old/src/sldisply.c	2005-03-23 06:54:30.000000000 +0000
++++ slang-2.1.3/src/sldisply.c	2005-03-31 21:16:32.129799536 +0100
+@@ -2236,6 +2236,29 @@
+ }
+ #endif
+ 
++int Sltt_tgetent(char *term)
++{
++   return SLtt_initialize(term) == 0;
++}
++
++int SLtt_tputs(char *str, int affcnt, int (*p)(int))
++{
++   while (*str) (*p)(*str++);
++   return 0;
++}
++
++char *SLtt_tgoto(char *cap, int col, int row)
++{
++  static char buf[64];
++
++  /* beware of overflows. 2^64 is 20 bytes printed */
++  if (strlen(cap) > 23)
++	strcpy(buf, "capability too long");
++  else
++	tt_sprintf(buf, sizeof(buf), cap, row, col);
++  return buf;
++}
++
+ static int Vt100_Like = 0;
+ 
+ void SLtt_get_terminfo (void)

@@ -1,0 +1,6813 @@
+From 2da6a8f520514082e9570498bcbe0400fbdac2b8 Mon Sep 17 00:00:00 2001
+From: Mehmet Emre ATASEVER <memre@memre-pardus.(none)>
+Date: Tue, 19 Jan 2010 16:23:20 +0200
+Subject: [PATCH] cross-compile
+
+---
+ Makefile                   |  188 +++++
+ Makefile.config.SH         |  150 ++++
+ cnf/config.guess           | 1526 ++++++++++++++++++++++++++++++++++++++++
+ cnf/config.sub             | 1658 ++++++++++++++++++++++++++++++++++++++++++++
+ cnf/configure              |  179 +++++
+ cnf/configure__f.sh        |  258 +++++++
+ cnf/configure_args.sh      |  100 +++
+ cnf/configure_byte.sh      |   21 +
+ cnf/configure_dirs_host.sh |   18 +
+ cnf/configure_dirs_targ.sh |   31 +
+ cnf/configure_func.sh      |  302 ++++++++
+ cnf/configure_gencfg.sh    | 1092 +++++++++++++++++++++++++++++
+ cnf/configure_hdrs.sh      |   90 +++
+ cnf/configure_help.sh      |   67 ++
+ cnf/configure_hint.sh      |   62 ++
+ cnf/configure_link.sh      |   61 ++
+ cnf/configure_mods.sh      |   91 +++
+ cnf/configure_prog.sh      |   54 ++
+ cnf/configure_sigs.sh      |   47 ++
+ cnf/configure_target.sh    |   69 ++
+ cnf/configure_type.sh      |   95 +++
+ cnf/configure_type_ext.sh  |   65 ++
+ cnf/configure_type_sel.sh  |  123 ++++
+ cnf/configure_vars.sh      |   26 +
+ cnf/configure_version.sh   |   14 +
+ cnf/hints/default          |    8 +
+ configpm                   |   19 +-
+ configure                  |    4 +
+ lib/Pod/Man.pm             |    4 +-
+ utils/Makefile             |   82 +--
+ x2p/Makefile               |   21 +
+ 31 files changed, 6441 insertions(+), 84 deletions(-)
+ create mode 100644 Makefile
+ create mode 100755 Makefile.config.SH
+ create mode 100755 cnf/config.guess
+ create mode 100755 cnf/config.sub
+ create mode 100755 cnf/configure
+ create mode 100644 cnf/configure__f.sh
+ create mode 100644 cnf/configure_args.sh
+ create mode 100644 cnf/configure_byte.sh
+ create mode 100644 cnf/configure_dirs_host.sh
+ create mode 100644 cnf/configure_dirs_targ.sh
+ create mode 100644 cnf/configure_func.sh
+ create mode 100644 cnf/configure_gencfg.sh
+ create mode 100644 cnf/configure_hdrs.sh
+ create mode 100644 cnf/configure_help.sh
+ create mode 100644 cnf/configure_hint.sh
+ create mode 100644 cnf/configure_link.sh
+ create mode 100644 cnf/configure_mods.sh
+ create mode 100644 cnf/configure_prog.sh
+ create mode 100644 cnf/configure_sigs.sh
+ create mode 100644 cnf/configure_target.sh
+ create mode 100644 cnf/configure_type.sh
+ create mode 100644 cnf/configure_type_ext.sh
+ create mode 100644 cnf/configure_type_sel.sh
+ create mode 100644 cnf/configure_vars.sh
+ create mode 100644 cnf/configure_version.sh
+ create mode 100644 cnf/hints/default
+ create mode 100755 configure
+ create mode 100644 x2p/Makefile
+
+diff --git a/Makefile b/Makefile
+new file mode 100644
+index 0000000..2daea34
+--- /dev/null
++++ b/Makefile
+@@ -0,0 +1,188 @@
++default: all
++
++include Makefile.config
++
++DYNALOADER = DynaLoader$o
++CONFIGPM = lib/Config.pm lib/Config_heavy.pl
++XCONFIGPM = xlib/Config.pm xlib/Config_heavy.pl
++STATIC = static
++MINIPERL = miniperl$X
++RUNPERL = ./miniperl$X -Ilib
++
++POD1 = $(wildcard pod/*.pod)
++MAN1 = $(patsubst pod/%.pod,man/man1/%$(man1ext),$(POD1))
++
++obj += gv$o toke$o perly$o pad$o regcomp$o dump$o util$o mg$o reentr$o mro$o
++obj += hv$o av$o perl$o run$o pp_hot$o sv$o pp$o scope$o pp_ctl$o pp_sys$o
++obj += doop$o doio$o regexec$o utf8$o taint$o deb$o universal$o xsutils$o
++obj += globals$o perlio$o perlapi$o numeric$o mathoms$o locale$o pp_pack$o pp_sort$o 
++plextract = pod/pod2html pod/pod2latex pod/pod2man pod/pod2text \
++	pod/pod2usage pod/podchecker pod/podselect
++
++ext = $(dynamic_ext) $(static_ext) $(nonxs_ext)
++
++# ---[ common ]-----------------------------------------------------------------
++
++# Force early building of miniperl -- not really necessary, but makes
++# build process more logical (don't try CC if HOSTCC fails)
++all: miniperl$X perl$x utilities translators extensions
++
++clean:
++	rm -f *$o *$O uudmap.h opmini.c generate_uudmap $(CONFIGPM)
++	@for i in utils; do make -C $$i clean; done
++
++config.h: config.sh config_h.SH
++	CONFIG_H=$@ CONFIG_SH=$< ./config_h.SH
++
++xconfig.h: xconfig.sh config_h.SH
++	CONFIG_H=$@ CONFIG_SH=$< ./config_h.SH
++
++config-pm: $(CONFIGPM)
++
++xconfig-pm: $(XCONFIGPM)
++
++# Tprevent the following rule from overwriting Makefile
++Makefile:
++	touch $@
++
++%: %.SH config.sh
++	./$*.SH
++
++# ---[ host/miniperl ]----------------------------------------------------------
++
++miniperl$X: $& miniperlmain$O $(obj:$o=$O) opmini$O
++	$(HOSTCC) -o $@ $(filter %$O,$^) $(HOSTLIBS)
++
++generate_uudmap$X: generate_uudmap.c
++	$(HOSTCC) $(HOSTCFLAGS) -o $@ $^
++
++ifneq ($O,$o)
++%$O: %.c xconfig.h
++	$(HOSTCC) $(HOSTCFLAGS) -c -o $@ $<
++endif
++
++opmini$O: opmini.c
++	$(HOSTCC) $(HOSTCFMINI) -c -o $@ $<
++
++globals$O: uudmap.h
++
++uudmap.h: generate_uudmap$X
++	./generate_uudmap > $@
++
++opmini.c: op.c
++	cp -f $^ $@
++
++# ---[ site/perl ]--------------------------------------------------------------
++
++perl$x: $& perlmain$o $(obj) libperl$a op$o
++	$(CC) -o $@ -Wl,-E $(filter %$o,$^) $(filter %$a,$^) $(LIBS)
++
++%$o: %.c config.h
++	$(CC) $(CFLAGS) -c -o $@ $<
++
++globals.o: uudmap.h
++
++perlmain.c: miniperlmain.c writemain
++	sh writemain $(DYNALOADER) $(static_ext) > perlmain.c
++
++# ---[ site/library ]-----------------------------------------------------------
++
++libperl$a: $(obj) $(DYNALOADER)
++	$(AR) cru $@ $(filter %.o,$^)
++	$(RANLIB) $@
++
++#$(DYNALOADER): miniperl$e preplibrary
++#	$(MAKE) -C ext/DynaLoader DynaLoader.o
++#	cp ext/DynaLoader/DynaLoader.o .
++
++.PHONY: preplibrary
++preplibrary: miniperl$x lib/lib.pm
++	@mkdir -p lib/auto
++	./miniperl -Ilib -e 'use AutoSplit; \
++		autosplit_lib_modules(@ARGV)' lib/*.pm
++	./miniperl -Ilib -e 'use AutoSplit; \
++		autosplit_lib_modules(@ARGV)' lib/*/*.pm
++	$(MAKE) lib/re.pm
++
++lib/lib.pm: miniperl$e $(CONFIGPM)
++	./miniperl -Ilib lib/lib_pm.PL
++
++lib/Config.pod $(CONFIGPM): miniperl$e configpm config.sh
++	./miniperl -Ilib configpm
++
++$(XCONFIGPM): tconfig.sh
++	@mkdir -p xlib
++	./miniperl -Ilib configpm --config-sh=tconfig.sh --config-pm=xlib/Config.pm --config-pod=xlib/Config.pod
++
++lib/re.pm: ext/re/re.pm
++	cp -f ext/re/re.pm lib/re.pm
++
++# ---[ Modules ]----------------------------------------------------------------
++
++extensions: uni.data cflags $(dynamic_ext) $(static_ext) $(nonxs_ext)
++
++cflags: cflags.SH
++	sh $<
++
++$(DYNALOADER): miniperl$x preplibrary
++	sh ext/util/make_ext $(STATIC) $@ MAKE=$(MAKE) LIBPERL_A=$(LIBPERL)
++
++d_dummy $(dynamic_ext): miniperl$x makeppport
++	sh ext/util/make_ext dynamic $@ MAKE=$(MAKE) LIBPERL_A=$(LIBPERL)
++
++s_dummy $(static_ext): miniperl$x makeppport
++	sh ext/util/make_ext $(STATIC) $@ MAKE=$(MAKE) LIBPERL_A=$(LIBPERL)
++
++n_dummy $(nonxs_ext): miniperl$x makeppport
++	sh ext/util/make_ext nonxs $@ MAKE=$(MAKE) LIBPERL_A=$(LIBPERL)
++
++.PHONY: makeppport
++makeppport: miniperl$X $(CONFIGPM)
++	./miniperl$X -Ilib mkppport
++
++# ---[ Misc ]-------------------------------------------------------------------
++
++utilities: miniperl$x $(CONFIGPM) $(plextract) lib/lib.pm
++	$(MAKE) -C utils all
++
++translators: miniperl$x $(CONFIGPM)
++	$(MAKE) -C x2p all
++
++uni.data: miniperl$X $(CONFIGPM) lib/unicore/mktables
++	cd lib/unicore && ../../miniperl -I../../lib mktables -w
++	touch uni.data
++
++pod/%: pod/%.PL config.sh
++	cd pod && ../miniperl$X -I../lib $*.PL
++
++# ---[ modules ]----------------------------------------------------------------
++modules modules.done: modules.list uni.data
++	echo -n > modules.done
++	-cat $< | (while read i; do $(MAKE) -C $$i && echo $$i >> modules.done; done)
++
++modules.pm.list: modules.done
++	-cat $< | (while read i; do find $$i -name '*.pm'; done) > $@
++
++modules.list: $(CONFIGPM) $(MODLISTS) cflags
++	./modconfig_all
++
++# ---[ install ]----------------------------------------------------------------
++.PHONY: install install.perl install.pod
++
++META.yml: Porting/makemeta Porting/Maintainers.pl Porting/Maintainers.pm
++	$(RUNPERL) $<
++
++install: install.perl install.man
++
++install.perl: installperl
++	$(RUNPERL) installperl --destdir=$(DESTDIR) $(INSTALLFLAGS) $(STRIPFLAGS)
++	-@test ! -s extras.lst || $(MAKE) extras.install
++
++install.man: installman
++	$(RUNPERL) installman --destdir=$(DESTDIR) $(INSTALLFLAGS)
++
++install.miniperl: miniperl$X xlib/Config.pm xlib/Config_heavy.pl
++	install -D -m 0755 miniperl $(hostbin)/$(target_name)-miniperl$X
++	-ln -s $(target_name)-miniperl$X $(hostbin)/$(target_arch)-miniperl$X 
++	install -D -m 0644 xlib/Config.pm $(hostprefix)/$(target_arch)/lib/perl/Config.pm
++	install -D -m 0644 xlib/Config_heavy.pl $(hostprefix)/$(target_arch)/lib/perl/Config_heavy.pl
+diff --git a/Makefile.config.SH b/Makefile.config.SH
+new file mode 100755
+index 0000000..59ec7b1
+--- /dev/null
++++ b/Makefile.config.SH
+@@ -0,0 +1,150 @@
++#!/bin/sh
++
++if [ ! -f config.sh ]; then
++	echo "config.sh not found" >&2
++	exit -1
++fi
++
++. config.sh
++echo -n > Makefile.config
++if [ "$usecrosscompile" == 'define' ]; then
++	unset cc
++	unset cflags
++	unset ar
++	unset ranlib
++	unset libs
++	if [ ! -f 'xconfig.sh' ]; then
++		echo 'xconfig.sh not found' >&2
++		exit -1
++	fi
++	
++	. xconfig.sh
++	hostcc="$cc"
++	hostcflags="$cflags"
++	hostar="$ar"
++	hostranlib="$ranlib"
++	hostlibs="$libs"
++	host_o="$_o"
++	host_exe="$_exe"
++	hostbin="$bin"
++	hostprefix="$prefix"
++	# it's "from host", not host-arch
++	target_name="$target_name"
++	target_arch="$target_arch"
++	sysroot="$sysroot"
++
++	. config.sh
++fi
++
++cc="$cc"
++cflags="$cflags"
++ar="$ar"
++ranlib="$ranlib"
++libs="$libs"
++ 
++dynamic_list=''
++for f in $dynamic_ext; do
++	base=`echo "$f" | sed 's/.*\///'`
++	dynamic_list="${dynamic_list}lib/auto/$f/$base.$dlext "
++done
++
++static_list=''
++for f in $static_ext; do
++	base=`echo "$f" | sed 's/.*\///'`
++	static_list="${static_list}lib/auto/$f/$base\$_a "
++done
++
++nonxs_list=''
++for f in $nonxs_ext; do
++    base=`echo "$f" | sed 's/.*\///'`
++    nonxs_list="${nonxs_list}ext/$f/pm_to_blib "
++done
++
++function ifprefixed() {
++	val=`echo "$2" | sed -e "s/^$1-//"`
++	if [ "$1-$val" == "$2" ]; then
++		echo "\$(CROSS)$val"
++	else
++		echo "$2"
++	fi
++}
++
++cflags='-DPERL_CORE -std=c89 -W -ansi'
++if [ "$usecrosscompile" == "define" ]; then
++cat >> Makefile.config <<END
++CROSS = $target_name-
++CC = `ifprefixed "$target_name" "$cc"`
++AR = `ifprefixed "$target_name" "$ar"`
++RANLIB = `ifprefixed "$target_name" "$ranlib"`
++CFLAGS = $cflags
++LIBS = $libs
++
++HOSTCC = $hostcc
++HOSTCFLAGS = -DUSE_CROSS_COMPILE $cflags
++HOSTCFMINI = \$(HOSTCFLAGS) -DPERL_EXTERNAL_GLOB
++HOSTLIBS = $hostlibs
++hostbin = \$(DESTDIR)$hostbin
++hostarch = \$(DESTDIR)$hostarch
++hostprefix = \$(DESTDIR)$hostprefix
++target_name = $target_name
++target_arch = $target_arch
++sysroot = $sysroot
++
++# suffixes for static library, object and executable files
++# lowercase for target platform or native build, uppercase
++# for build platform.
++a = $_a
++o = $_o
++x =
++O = .host$host_o
++X = $host_exe
++so = $dlext
++
++install: install.miniperl
++extensions: xconfig-pm
++END
++else
++cat >> Makefile.config <<END
++CC = $cc
++AR = $ar
++RANLIB = $ranlib
++CFLAGS = $cflags
++LIBS = $libs
++
++HOSTCC = \$(CC)
++HOSTCFLAGS = \$(CFLAGS)
++HOSTCFMINI = \$(HOSTCFLAGS) -DPERL_EXTERNAL_GLOB
++HOSTLIBS = \$(LIBS)
++
++# suffixes for static library, object and executable files
++# lowercase for target platform or native build, uppercase
++# for build platform.
++a = $_a
++o = $_o
++x = $_exe
++O = $_o
++X = $_exe
++END
++fi
++
++
++cat >> Makefile.config <<END
++
++.SUFFIXES: .c \$o \$O
++
++LNS = $lns
++
++root = \$(DESTDIR)\$(sysroot)
++bindir = \$(root)$installbin
++scriptdir = \$(root)$installscript
++privlib = \$(root)$installprivlib
++archlib = \$(root)$installarchlib
++man1dir = \$(root)$installman1dir
++man3dir = \$(root)$installman3dir
++man1ext = $installman1ext
++man3ext = $installman3ext
++
++dynamic_ext = $dynamic_list
++static_ext = $static_list
++nonxs_ext = $nonxs_list
++END
+diff --git a/cnf/config.guess b/cnf/config.guess
+new file mode 100755
+index 0000000..f32079a
+--- /dev/null
++++ b/cnf/config.guess
+@@ -0,0 +1,1526 @@
++#! /bin/sh
++# Attempt to guess a canonical system name.
++#   Copyright (C) 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
++#   2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008
++#   Free Software Foundation, Inc.
++
++timestamp='2008-01-23'
++
++# This file is free software; you can redistribute it and/or modify it
++# under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 2 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful, but
++# WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++# General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program; if not, write to the Free Software
++# Foundation, Inc., 51 Franklin Street - Fifth Floor, Boston, MA
++# 02110-1301, USA.
++#
++# As a special exception to the GNU General Public License, if you
++# distribute this file as part of a program that contains a
++# configuration script generated by Autoconf, you may include it under
++# the same distribution terms that you use for the rest of that program.
++
++
++# Originally written by Per Bothner <per@bothner.com>.
++# Please send patches to <config-patches@gnu.org>.  Submit a context
++# diff and a properly formatted ChangeLog entry.
++#
++# This script attempts to guess a canonical system name similar to
++# config.sub.  If it succeeds, it prints the system name on stdout, and
++# exits with 0.  Otherwise, it exits with 1.
++#
++# The plan is that this can be called by configure scripts if you
++# don't specify an explicit build system type.
++
++me=`echo "$0" | sed -e 's,.*/,,'`
++
++usage="\
++Usage: $0 [OPTION]
++
++Output the configuration name of the system \`$me' is run on.
++
++Operation modes:
++  -h, --help         print this help, then exit
++  -t, --time-stamp   print date of last modification, then exit
++  -v, --version      print version number, then exit
++
++Report bugs and patches to <config-patches@gnu.org>."
++
++version="\
++GNU config.guess ($timestamp)
++
++Originally written by Per Bothner.
++Copyright (C) 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001,
++2002, 2003, 2004, 2005, 2006, 2007, 2008 Free Software Foundation, Inc.
++
++This is free software; see the source for copying conditions.  There is NO
++warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
++
++help="
++Try \`$me --help' for more information."
++
++# Parse command line
++while test $# -gt 0 ; do
++  case $1 in
++    --time-stamp | --time* | -t )
++       echo "$timestamp" ; exit ;;
++    --version | -v )
++       echo "$version" ; exit ;;
++    --help | --h* | -h )
++       echo "$usage"; exit ;;
++    -- )     # Stop option processing
++       shift; break ;;
++    - )	# Use stdin as input.
++       break ;;
++    -* )
++       echo "$me: invalid option $1$help" >&2
++       exit 1 ;;
++    * )
++       break ;;
++  esac
++done
++
++if test $# != 0; then
++  echo "$me: too many arguments$help" >&2
++  exit 1
++fi
++
++trap 'exit 1' 1 2 15
++
++# CC_FOR_BUILD -- compiler used by this script. Note that the use of a
++# compiler to aid in system detection is discouraged as it requires
++# temporary files to be created and, as you can see below, it is a
++# headache to deal with in a portable fashion.
++
++# Historically, `CC_FOR_BUILD' used to be named `HOST_CC'. We still
++# use `HOST_CC' if defined, but it is deprecated.
++
++# Portable tmp directory creation inspired by the Autoconf team.
++
++set_cc_for_build='
++trap "exitcode=\$?; (rm -f \$tmpfiles 2>/dev/null; rmdir \$tmp 2>/dev/null) && exit \$exitcode" 0 ;
++trap "rm -f \$tmpfiles 2>/dev/null; rmdir \$tmp 2>/dev/null; exit 1" 1 2 13 15 ;
++: ${TMPDIR=/tmp} ;
++ { tmp=`(umask 077 && mktemp -d "$TMPDIR/cgXXXXXX") 2>/dev/null` && test -n "$tmp" && test -d "$tmp" ; } ||
++ { test -n "$RANDOM" && tmp=$TMPDIR/cg$$-$RANDOM && (umask 077 && mkdir $tmp) ; } ||
++ { tmp=$TMPDIR/cg-$$ && (umask 077 && mkdir $tmp) && echo "Warning: creating insecure temp directory" >&2 ; } ||
++ { echo "$me: cannot create a temporary directory in $TMPDIR" >&2 ; exit 1 ; } ;
++dummy=$tmp/dummy ;
++tmpfiles="$dummy.c $dummy.o $dummy.rel $dummy" ;
++case $CC_FOR_BUILD,$HOST_CC,$CC in
++ ,,)    echo "int x;" > $dummy.c ;
++	for c in cc gcc c89 c99 ; do
++	  if ($c -c -o $dummy.o $dummy.c) >/dev/null 2>&1 ; then
++	     CC_FOR_BUILD="$c"; break ;
++	  fi ;
++	done ;
++	if test x"$CC_FOR_BUILD" = x ; then
++	  CC_FOR_BUILD=no_compiler_found ;
++	fi
++	;;
++ ,,*)   CC_FOR_BUILD=$CC ;;
++ ,*,*)  CC_FOR_BUILD=$HOST_CC ;;
++esac ; set_cc_for_build= ;'
++
++# This is needed to find uname on a Pyramid OSx when run in the BSD universe.
++# (ghazi@noc.rutgers.edu 1994-08-24)
++if (test -f /.attbin/uname) >/dev/null 2>&1 ; then
++	PATH=$PATH:/.attbin ; export PATH
++fi
++
++UNAME_MACHINE=`(uname -m) 2>/dev/null` || UNAME_MACHINE=unknown
++UNAME_RELEASE=`(uname -r) 2>/dev/null` || UNAME_RELEASE=unknown
++UNAME_SYSTEM=`(uname -s) 2>/dev/null`  || UNAME_SYSTEM=unknown
++UNAME_VERSION=`(uname -v) 2>/dev/null` || UNAME_VERSION=unknown
++
++# Note: order is significant - the case branches are not exclusive.
++
++case "${UNAME_MACHINE}:${UNAME_SYSTEM}:${UNAME_RELEASE}:${UNAME_VERSION}" in
++    *:NetBSD:*:*)
++	# NetBSD (nbsd) targets should (where applicable) match one or
++	# more of the tupples: *-*-netbsdelf*, *-*-netbsdaout*,
++	# *-*-netbsdecoff* and *-*-netbsd*.  For targets that recently
++	# switched to ELF, *-*-netbsd* would select the old
++	# object file format.  This provides both forward
++	# compatibility and a consistent mechanism for selecting the
++	# object file format.
++	#
++	# Note: NetBSD doesn't particularly care about the vendor
++	# portion of the name.  We always set it to "unknown".
++	sysctl="sysctl -n hw.machine_arch"
++	UNAME_MACHINE_ARCH=`(/sbin/$sysctl 2>/dev/null || \
++	    /usr/sbin/$sysctl 2>/dev/null || echo unknown)`
++	case "${UNAME_MACHINE_ARCH}" in
++	    armeb) machine=armeb-unknown ;;
++	    arm*) machine=arm-unknown ;;
++	    sh3el) machine=shl-unknown ;;
++	    sh3eb) machine=sh-unknown ;;
++	    sh5el) machine=sh5le-unknown ;;
++	    *) machine=${UNAME_MACHINE_ARCH}-unknown ;;
++	esac
++	# The Operating System including object format, if it has switched
++	# to ELF recently, or will in the future.
++	case "${UNAME_MACHINE_ARCH}" in
++	    arm*|i386|m68k|ns32k|sh3*|sparc|vax)
++		eval $set_cc_for_build
++		if echo __ELF__ | $CC_FOR_BUILD -E - 2>/dev/null \
++			| grep __ELF__ >/dev/null
++		then
++		    # Once all utilities can be ECOFF (netbsdecoff) or a.out (netbsdaout).
++		    # Return netbsd for either.  FIX?
++		    os=netbsd
++		else
++		    os=netbsdelf
++		fi
++		;;
++	    *)
++	        os=netbsd
++		;;
++	esac
++	# The OS release
++	# Debian GNU/NetBSD machines have a different userland, and
++	# thus, need a distinct triplet. However, they do not need
++	# kernel version information, so it can be replaced with a
++	# suitable tag, in the style of linux-gnu.
++	case "${UNAME_VERSION}" in
++	    Debian*)
++		release='-gnu'
++		;;
++	    *)
++		release=`echo ${UNAME_RELEASE}|sed -e 's/[-_].*/\./'`
++		;;
++	esac
++	# Since CPU_TYPE-MANUFACTURER-KERNEL-OPERATING_SYSTEM:
++	# contains redundant information, the shorter form:
++	# CPU_TYPE-MANUFACTURER-OPERATING_SYSTEM is used.
++	echo "${machine}-${os}${release}"
++	exit ;;
++    *:OpenBSD:*:*)
++	UNAME_MACHINE_ARCH=`arch | sed 's/OpenBSD.//'`
++	echo ${UNAME_MACHINE_ARCH}-unknown-openbsd${UNAME_RELEASE}
++	exit ;;
++    *:ekkoBSD:*:*)
++	echo ${UNAME_MACHINE}-unknown-ekkobsd${UNAME_RELEASE}
++	exit ;;
++    *:SolidBSD:*:*)
++	echo ${UNAME_MACHINE}-unknown-solidbsd${UNAME_RELEASE}
++	exit ;;
++    macppc:MirBSD:*:*)
++	echo powerpc-unknown-mirbsd${UNAME_RELEASE}
++	exit ;;
++    *:MirBSD:*:*)
++	echo ${UNAME_MACHINE}-unknown-mirbsd${UNAME_RELEASE}
++	exit ;;
++    alpha:OSF1:*:*)
++	case $UNAME_RELEASE in
++	*4.0)
++		UNAME_RELEASE=`/usr/sbin/sizer -v | awk '{print $3}'`
++		;;
++	*5.*)
++	        UNAME_RELEASE=`/usr/sbin/sizer -v | awk '{print $4}'`
++		;;
++	esac
++	# According to Compaq, /usr/sbin/psrinfo has been available on
++	# OSF/1 and Tru64 systems produced since 1995.  I hope that
++	# covers most systems running today.  This code pipes the CPU
++	# types through head -n 1, so we only detect the type of CPU 0.
++	ALPHA_CPU_TYPE=`/usr/sbin/psrinfo -v | sed -n -e 's/^  The alpha \(.*\) processor.*$/\1/p' | head -n 1`
++	case "$ALPHA_CPU_TYPE" in
++	    "EV4 (21064)")
++		UNAME_MACHINE="alpha" ;;
++	    "EV4.5 (21064)")
++		UNAME_MACHINE="alpha" ;;
++	    "LCA4 (21066/21068)")
++		UNAME_MACHINE="alpha" ;;
++	    "EV5 (21164)")
++		UNAME_MACHINE="alphaev5" ;;
++	    "EV5.6 (21164A)")
++		UNAME_MACHINE="alphaev56" ;;
++	    "EV5.6 (21164PC)")
++		UNAME_MACHINE="alphapca56" ;;
++	    "EV5.7 (21164PC)")
++		UNAME_MACHINE="alphapca57" ;;
++	    "EV6 (21264)")
++		UNAME_MACHINE="alphaev6" ;;
++	    "EV6.7 (21264A)")
++		UNAME_MACHINE="alphaev67" ;;
++	    "EV6.8CB (21264C)")
++		UNAME_MACHINE="alphaev68" ;;
++	    "EV6.8AL (21264B)")
++		UNAME_MACHINE="alphaev68" ;;
++	    "EV6.8CX (21264D)")
++		UNAME_MACHINE="alphaev68" ;;
++	    "EV6.9A (21264/EV69A)")
++		UNAME_MACHINE="alphaev69" ;;
++	    "EV7 (21364)")
++		UNAME_MACHINE="alphaev7" ;;
++	    "EV7.9 (21364A)")
++		UNAME_MACHINE="alphaev79" ;;
++	esac
++	# A Pn.n version is a patched version.
++	# A Vn.n version is a released version.
++	# A Tn.n version is a released field test version.
++	# A Xn.n version is an unreleased experimental baselevel.
++	# 1.2 uses "1.2" for uname -r.
++	echo ${UNAME_MACHINE}-dec-osf`echo ${UNAME_RELEASE} | sed -e 's/^[PVTX]//' | tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz'`
++	exit ;;
++    Alpha\ *:Windows_NT*:*)
++	# How do we know it's Interix rather than the generic POSIX subsystem?
++	# Should we change UNAME_MACHINE based on the output of uname instead
++	# of the specific Alpha model?
++	echo alpha-pc-interix
++	exit ;;
++    21064:Windows_NT:50:3)
++	echo alpha-dec-winnt3.5
++	exit ;;
++    Amiga*:UNIX_System_V:4.0:*)
++	echo m68k-unknown-sysv4
++	exit ;;
++    *:[Aa]miga[Oo][Ss]:*:*)
++	echo ${UNAME_MACHINE}-unknown-amigaos
++	exit ;;
++    *:[Mm]orph[Oo][Ss]:*:*)
++	echo ${UNAME_MACHINE}-unknown-morphos
++	exit ;;
++    *:OS/390:*:*)
++	echo i370-ibm-openedition
++	exit ;;
++    *:z/VM:*:*)
++	echo s390-ibm-zvmoe
++	exit ;;
++    *:OS400:*:*)
++        echo powerpc-ibm-os400
++	exit ;;
++    arm:RISC*:1.[012]*:*|arm:riscix:1.[012]*:*)
++	echo arm-acorn-riscix${UNAME_RELEASE}
++	exit ;;
++    arm:riscos:*:*|arm:RISCOS:*:*)
++	echo arm-unknown-riscos
++	exit ;;
++    SR2?01:HI-UX/MPP:*:* | SR8000:HI-UX/MPP:*:*)
++	echo hppa1.1-hitachi-hiuxmpp
++	exit ;;
++    Pyramid*:OSx*:*:* | MIS*:OSx*:*:* | MIS*:SMP_DC-OSx*:*:*)
++	# akee@wpdis03.wpafb.af.mil (Earle F. Ake) contributed MIS and NILE.
++	if test "`(/bin/universe) 2>/dev/null`" = att ; then
++		echo pyramid-pyramid-sysv3
++	else
++		echo pyramid-pyramid-bsd
++	fi
++	exit ;;
++    NILE*:*:*:dcosx)
++	echo pyramid-pyramid-svr4
++	exit ;;
++    DRS?6000:unix:4.0:6*)
++	echo sparc-icl-nx6
++	exit ;;
++    DRS?6000:UNIX_SV:4.2*:7* | DRS?6000:isis:4.2*:7*)
++	case `/usr/bin/uname -p` in
++	    sparc) echo sparc-icl-nx7; exit ;;
++	esac ;;
++    sun4H:SunOS:5.*:*)
++	echo sparc-hal-solaris2`echo ${UNAME_RELEASE}|sed -e 's/[^.]*//'`
++	exit ;;
++    sun4*:SunOS:5.*:* | tadpole*:SunOS:5.*:*)
++	echo sparc-sun-solaris2`echo ${UNAME_RELEASE}|sed -e 's/[^.]*//'`
++	exit ;;
++    i86pc:SunOS:5.*:* | i86xen:SunOS:5.*:*)
++	echo i386-pc-solaris2`echo ${UNAME_RELEASE}|sed -e 's/[^.]*//'`
++	exit ;;
++    sun4*:SunOS:6*:*)
++	# According to config.sub, this is the proper way to canonicalize
++	# SunOS6.  Hard to guess exactly what SunOS6 will be like, but
++	# it's likely to be more like Solaris than SunOS4.
++	echo sparc-sun-solaris3`echo ${UNAME_RELEASE}|sed -e 's/[^.]*//'`
++	exit ;;
++    sun4*:SunOS:*:*)
++	case "`/usr/bin/arch -k`" in
++	    Series*|S4*)
++		UNAME_RELEASE=`uname -v`
++		;;
++	esac
++	# Japanese Language versions have a version number like `4.1.3-JL'.
++	echo sparc-sun-sunos`echo ${UNAME_RELEASE}|sed -e 's/-/_/'`
++	exit ;;
++    sun3*:SunOS:*:*)
++	echo m68k-sun-sunos${UNAME_RELEASE}
++	exit ;;
++    sun*:*:4.2BSD:*)
++	UNAME_RELEASE=`(sed 1q /etc/motd | awk '{print substr($5,1,3)}') 2>/dev/null`
++	test "x${UNAME_RELEASE}" = "x" && UNAME_RELEASE=3
++	case "`/bin/arch`" in
++	    sun3)
++		echo m68k-sun-sunos${UNAME_RELEASE}
++		;;
++	    sun4)
++		echo sparc-sun-sunos${UNAME_RELEASE}
++		;;
++	esac
++	exit ;;
++    aushp:SunOS:*:*)
++	echo sparc-auspex-sunos${UNAME_RELEASE}
++	exit ;;
++    # The situation for MiNT is a little confusing.  The machine name
++    # can be virtually everything (everything which is not
++    # "atarist" or "atariste" at least should have a processor
++    # > m68000).  The system name ranges from "MiNT" over "FreeMiNT"
++    # to the lowercase version "mint" (or "freemint").  Finally
++    # the system name "TOS" denotes a system which is actually not
++    # MiNT.  But MiNT is downward compatible to TOS, so this should
++    # be no problem.
++    atarist[e]:*MiNT:*:* | atarist[e]:*mint:*:* | atarist[e]:*TOS:*:*)
++        echo m68k-atari-mint${UNAME_RELEASE}
++	exit ;;
++    atari*:*MiNT:*:* | atari*:*mint:*:* | atarist[e]:*TOS:*:*)
++	echo m68k-atari-mint${UNAME_RELEASE}
++        exit ;;
++    *falcon*:*MiNT:*:* | *falcon*:*mint:*:* | *falcon*:*TOS:*:*)
++        echo m68k-atari-mint${UNAME_RELEASE}
++	exit ;;
++    milan*:*MiNT:*:* | milan*:*mint:*:* | *milan*:*TOS:*:*)
++        echo m68k-milan-mint${UNAME_RELEASE}
++        exit ;;
++    hades*:*MiNT:*:* | hades*:*mint:*:* | *hades*:*TOS:*:*)
++        echo m68k-hades-mint${UNAME_RELEASE}
++        exit ;;
++    *:*MiNT:*:* | *:*mint:*:* | *:*TOS:*:*)
++        echo m68k-unknown-mint${UNAME_RELEASE}
++        exit ;;
++    m68k:machten:*:*)
++	echo m68k-apple-machten${UNAME_RELEASE}
++	exit ;;
++    powerpc:machten:*:*)
++	echo powerpc-apple-machten${UNAME_RELEASE}
++	exit ;;
++    RISC*:Mach:*:*)
++	echo mips-dec-mach_bsd4.3
++	exit ;;
++    RISC*:ULTRIX:*:*)
++	echo mips-dec-ultrix${UNAME_RELEASE}
++	exit ;;
++    VAX*:ULTRIX*:*:*)
++	echo vax-dec-ultrix${UNAME_RELEASE}
++	exit ;;
++    2020:CLIX:*:* | 2430:CLIX:*:*)
++	echo clipper-intergraph-clix${UNAME_RELEASE}
++	exit ;;
++    mips:*:*:UMIPS | mips:*:*:RISCos)
++	eval $set_cc_for_build
++	sed 's/^	//' << EOF >$dummy.c
++#ifdef __cplusplus
++#include <stdio.h>  /* for printf() prototype */
++	int main (int argc, char *argv[]) {
++#else
++	int main (argc, argv) int argc; char *argv[]; {
++#endif
++	#if defined (host_mips) && defined (MIPSEB)
++	#if defined (SYSTYPE_SYSV)
++	  printf ("mips-mips-riscos%ssysv\n", argv[1]); exit (0);
++	#endif
++	#if defined (SYSTYPE_SVR4)
++	  printf ("mips-mips-riscos%ssvr4\n", argv[1]); exit (0);
++	#endif
++	#if defined (SYSTYPE_BSD43) || defined(SYSTYPE_BSD)
++	  printf ("mips-mips-riscos%sbsd\n", argv[1]); exit (0);
++	#endif
++	#endif
++	  exit (-1);
++	}
++EOF
++	$CC_FOR_BUILD -o $dummy $dummy.c &&
++	  dummyarg=`echo "${UNAME_RELEASE}" | sed -n 's/\([0-9]*\).*/\1/p'` &&
++	  SYSTEM_NAME=`$dummy $dummyarg` &&
++	    { echo "$SYSTEM_NAME"; exit; }
++	echo mips-mips-riscos${UNAME_RELEASE}
++	exit ;;
++    Motorola:PowerMAX_OS:*:*)
++	echo powerpc-motorola-powermax
++	exit ;;
++    Motorola:*:4.3:PL8-*)
++	echo powerpc-harris-powermax
++	exit ;;
++    Night_Hawk:*:*:PowerMAX_OS | Synergy:PowerMAX_OS:*:*)
++	echo powerpc-harris-powermax
++	exit ;;
++    Night_Hawk:Power_UNIX:*:*)
++	echo powerpc-harris-powerunix
++	exit ;;
++    m88k:CX/UX:7*:*)
++	echo m88k-harris-cxux7
++	exit ;;
++    m88k:*:4*:R4*)
++	echo m88k-motorola-sysv4
++	exit ;;
++    m88k:*:3*:R3*)
++	echo m88k-motorola-sysv3
++	exit ;;
++    AViiON:dgux:*:*)
++        # DG/UX returns AViiON for all architectures
++        UNAME_PROCESSOR=`/usr/bin/uname -p`
++	if [ $UNAME_PROCESSOR = mc88100 ] || [ $UNAME_PROCESSOR = mc88110 ]
++	then
++	    if [ ${TARGET_BINARY_INTERFACE}x = m88kdguxelfx ] || \
++	       [ ${TARGET_BINARY_INTERFACE}x = x ]
++	    then
++		echo m88k-dg-dgux${UNAME_RELEASE}
++	    else
++		echo m88k-dg-dguxbcs${UNAME_RELEASE}
++	    fi
++	else
++	    echo i586-dg-dgux${UNAME_RELEASE}
++	fi
++ 	exit ;;
++    M88*:DolphinOS:*:*)	# DolphinOS (SVR3)
++	echo m88k-dolphin-sysv3
++	exit ;;
++    M88*:*:R3*:*)
++	# Delta 88k system running SVR3
++	echo m88k-motorola-sysv3
++	exit ;;
++    XD88*:*:*:*) # Tektronix XD88 system running UTekV (SVR3)
++	echo m88k-tektronix-sysv3
++	exit ;;
++    Tek43[0-9][0-9]:UTek:*:*) # Tektronix 4300 system running UTek (BSD)
++	echo m68k-tektronix-bsd
++	exit ;;
++    *:IRIX*:*:*)
++	echo mips-sgi-irix`echo ${UNAME_RELEASE}|sed -e 's/-/_/g'`
++	exit ;;
++    ????????:AIX?:[12].1:2)   # AIX 2.2.1 or AIX 2.1.1 is RT/PC AIX.
++	echo romp-ibm-aix     # uname -m gives an 8 hex-code CPU id
++	exit ;;               # Note that: echo "'`uname -s`'" gives 'AIX '
++    i*86:AIX:*:*)
++	echo i386-ibm-aix
++	exit ;;
++    ia64:AIX:*:*)
++	if [ -x /usr/bin/oslevel ] ; then
++		IBM_REV=`/usr/bin/oslevel`
++	else
++		IBM_REV=${UNAME_VERSION}.${UNAME_RELEASE}
++	fi
++	echo ${UNAME_MACHINE}-ibm-aix${IBM_REV}
++	exit ;;
++    *:AIX:2:3)
++	if grep bos325 /usr/include/stdio.h >/dev/null 2>&1; then
++		eval $set_cc_for_build
++		sed 's/^		//' << EOF >$dummy.c
++		#include <sys/systemcfg.h>
++
++		main()
++			{
++			if (!__power_pc())
++				exit(1);
++			puts("powerpc-ibm-aix3.2.5");
++			exit(0);
++			}
++EOF
++		if $CC_FOR_BUILD -o $dummy $dummy.c && SYSTEM_NAME=`$dummy`
++		then
++			echo "$SYSTEM_NAME"
++		else
++			echo rs6000-ibm-aix3.2.5
++		fi
++	elif grep bos324 /usr/include/stdio.h >/dev/null 2>&1; then
++		echo rs6000-ibm-aix3.2.4
++	else
++		echo rs6000-ibm-aix3.2
++	fi
++	exit ;;
++    *:AIX:*:[456])
++	IBM_CPU_ID=`/usr/sbin/lsdev -C -c processor -S available | sed 1q | awk '{ print $1 }'`
++	if /usr/sbin/lsattr -El ${IBM_CPU_ID} | grep ' POWER' >/dev/null 2>&1; then
++		IBM_ARCH=rs6000
++	else
++		IBM_ARCH=powerpc
++	fi
++	if [ -x /usr/bin/oslevel ] ; then
++		IBM_REV=`/usr/bin/oslevel`
++	else
++		IBM_REV=${UNAME_VERSION}.${UNAME_RELEASE}
++	fi
++	echo ${IBM_ARCH}-ibm-aix${IBM_REV}
++	exit ;;
++    *:AIX:*:*)
++	echo rs6000-ibm-aix
++	exit ;;
++    ibmrt:4.4BSD:*|romp-ibm:BSD:*)
++	echo romp-ibm-bsd4.4
++	exit ;;
++    ibmrt:*BSD:*|romp-ibm:BSD:*)            # covers RT/PC BSD and
++	echo romp-ibm-bsd${UNAME_RELEASE}   # 4.3 with uname added to
++	exit ;;                             # report: romp-ibm BSD 4.3
++    *:BOSX:*:*)
++	echo rs6000-bull-bosx
++	exit ;;
++    DPX/2?00:B.O.S.:*:*)
++	echo m68k-bull-sysv3
++	exit ;;
++    9000/[34]??:4.3bsd:1.*:*)
++	echo m68k-hp-bsd
++	exit ;;
++    hp300:4.4BSD:*:* | 9000/[34]??:4.3bsd:2.*:*)
++	echo m68k-hp-bsd4.4
++	exit ;;
++    9000/[34678]??:HP-UX:*:*)
++	HPUX_REV=`echo ${UNAME_RELEASE}|sed -e 's/[^.]*.[0B]*//'`
++	case "${UNAME_MACHINE}" in
++	    9000/31? )            HP_ARCH=m68000 ;;
++	    9000/[34]?? )         HP_ARCH=m68k ;;
++	    9000/[678][0-9][0-9])
++		if [ -x /usr/bin/getconf ]; then
++		    sc_cpu_version=`/usr/bin/getconf SC_CPU_VERSION 2>/dev/null`
++                    sc_kernel_bits=`/usr/bin/getconf SC_KERNEL_BITS 2>/dev/null`
++                    case "${sc_cpu_version}" in
++                      523) HP_ARCH="hppa1.0" ;; # CPU_PA_RISC1_0
++                      528) HP_ARCH="hppa1.1" ;; # CPU_PA_RISC1_1
++                      532)                      # CPU_PA_RISC2_0
++                        case "${sc_kernel_bits}" in
++                          32) HP_ARCH="hppa2.0n" ;;
++                          64) HP_ARCH="hppa2.0w" ;;
++			  '') HP_ARCH="hppa2.0" ;;   # HP-UX 10.20
++                        esac ;;
++                    esac
++		fi
++		if [ "${HP_ARCH}" = "" ]; then
++		    eval $set_cc_for_build
++		    sed 's/^              //' << EOF >$dummy.c
++
++              #define _HPUX_SOURCE
++              #include <stdlib.h>
++              #include <unistd.h>
++
++              int main ()
++              {
++              #if defined(_SC_KERNEL_BITS)
++                  long bits = sysconf(_SC_KERNEL_BITS);
++              #endif
++                  long cpu  = sysconf (_SC_CPU_VERSION);
++
++                  switch (cpu)
++              	{
++              	case CPU_PA_RISC1_0: puts ("hppa1.0"); break;
++              	case CPU_PA_RISC1_1: puts ("hppa1.1"); break;
++              	case CPU_PA_RISC2_0:
++              #if defined(_SC_KERNEL_BITS)
++              	    switch (bits)
++              		{
++              		case 64: puts ("hppa2.0w"); break;
++              		case 32: puts ("hppa2.0n"); break;
++              		default: puts ("hppa2.0"); break;
++              		} break;
++              #else  /* !defined(_SC_KERNEL_BITS) */
++              	    puts ("hppa2.0"); break;
++              #endif
++              	default: puts ("hppa1.0"); break;
++              	}
++                  exit (0);
++              }
++EOF
++		    (CCOPTS= $CC_FOR_BUILD -o $dummy $dummy.c 2>/dev/null) && HP_ARCH=`$dummy`
++		    test -z "$HP_ARCH" && HP_ARCH=hppa
++		fi ;;
++	esac
++	if [ ${HP_ARCH} = "hppa2.0w" ]
++	then
++	    eval $set_cc_for_build
++
++	    # hppa2.0w-hp-hpux* has a 64-bit kernel and a compiler generating
++	    # 32-bit code.  hppa64-hp-hpux* has the same kernel and a compiler
++	    # generating 64-bit code.  GNU and HP use different nomenclature:
++	    #
++	    # $ CC_FOR_BUILD=cc ./config.guess
++	    # => hppa2.0w-hp-hpux11.23
++	    # $ CC_FOR_BUILD="cc +DA2.0w" ./config.guess
++	    # => hppa64-hp-hpux11.23
++
++	    if echo __LP64__ | (CCOPTS= $CC_FOR_BUILD -E - 2>/dev/null) |
++		grep __LP64__ >/dev/null
++	    then
++		HP_ARCH="hppa2.0w"
++	    else
++		HP_ARCH="hppa64"
++	    fi
++	fi
++	echo ${HP_ARCH}-hp-hpux${HPUX_REV}
++	exit ;;
++    ia64:HP-UX:*:*)
++	HPUX_REV=`echo ${UNAME_RELEASE}|sed -e 's/[^.]*.[0B]*//'`
++	echo ia64-hp-hpux${HPUX_REV}
++	exit ;;
++    3050*:HI-UX:*:*)
++	eval $set_cc_for_build
++	sed 's/^	//' << EOF >$dummy.c
++	#include <unistd.h>
++	int
++	main ()
++	{
++	  long cpu = sysconf (_SC_CPU_VERSION);
++	  /* The order matters, because CPU_IS_HP_MC68K erroneously returns
++	     true for CPU_PA_RISC1_0.  CPU_IS_PA_RISC returns correct
++	     results, however.  */
++	  if (CPU_IS_PA_RISC (cpu))
++	    {
++	      switch (cpu)
++		{
++		  case CPU_PA_RISC1_0: puts ("hppa1.0-hitachi-hiuxwe2"); break;
++		  case CPU_PA_RISC1_1: puts ("hppa1.1-hitachi-hiuxwe2"); break;
++		  case CPU_PA_RISC2_0: puts ("hppa2.0-hitachi-hiuxwe2"); break;
++		  default: puts ("hppa-hitachi-hiuxwe2"); break;
++		}
++	    }
++	  else if (CPU_IS_HP_MC68K (cpu))
++	    puts ("m68k-hitachi-hiuxwe2");
++	  else puts ("unknown-hitachi-hiuxwe2");
++	  exit (0);
++	}
++EOF
++	$CC_FOR_BUILD -o $dummy $dummy.c && SYSTEM_NAME=`$dummy` &&
++		{ echo "$SYSTEM_NAME"; exit; }
++	echo unknown-hitachi-hiuxwe2
++	exit ;;
++    9000/7??:4.3bsd:*:* | 9000/8?[79]:4.3bsd:*:* )
++	echo hppa1.1-hp-bsd
++	exit ;;
++    9000/8??:4.3bsd:*:*)
++	echo hppa1.0-hp-bsd
++	exit ;;
++    *9??*:MPE/iX:*:* | *3000*:MPE/iX:*:*)
++	echo hppa1.0-hp-mpeix
++	exit ;;
++    hp7??:OSF1:*:* | hp8?[79]:OSF1:*:* )
++	echo hppa1.1-hp-osf
++	exit ;;
++    hp8??:OSF1:*:*)
++	echo hppa1.0-hp-osf
++	exit ;;
++    i*86:OSF1:*:*)
++	if [ -x /usr/sbin/sysversion ] ; then
++	    echo ${UNAME_MACHINE}-unknown-osf1mk
++	else
++	    echo ${UNAME_MACHINE}-unknown-osf1
++	fi
++	exit ;;
++    parisc*:Lites*:*:*)
++	echo hppa1.1-hp-lites
++	exit ;;
++    C1*:ConvexOS:*:* | convex:ConvexOS:C1*:*)
++	echo c1-convex-bsd
++        exit ;;
++    C2*:ConvexOS:*:* | convex:ConvexOS:C2*:*)
++	if getsysinfo -f scalar_acc
++	then echo c32-convex-bsd
++	else echo c2-convex-bsd
++	fi
++        exit ;;
++    C34*:ConvexOS:*:* | convex:ConvexOS:C34*:*)
++	echo c34-convex-bsd
++        exit ;;
++    C38*:ConvexOS:*:* | convex:ConvexOS:C38*:*)
++	echo c38-convex-bsd
++        exit ;;
++    C4*:ConvexOS:*:* | convex:ConvexOS:C4*:*)
++	echo c4-convex-bsd
++        exit ;;
++    CRAY*Y-MP:*:*:*)
++	echo ymp-cray-unicos${UNAME_RELEASE} | sed -e 's/\.[^.]*$/.X/'
++	exit ;;
++    CRAY*[A-Z]90:*:*:*)
++	echo ${UNAME_MACHINE}-cray-unicos${UNAME_RELEASE} \
++	| sed -e 's/CRAY.*\([A-Z]90\)/\1/' \
++	      -e y/ABCDEFGHIJKLMNOPQRSTUVWXYZ/abcdefghijklmnopqrstuvwxyz/ \
++	      -e 's/\.[^.]*$/.X/'
++	exit ;;
++    CRAY*TS:*:*:*)
++	echo t90-cray-unicos${UNAME_RELEASE} | sed -e 's/\.[^.]*$/.X/'
++	exit ;;
++    CRAY*T3E:*:*:*)
++	echo alphaev5-cray-unicosmk${UNAME_RELEASE} | sed -e 's/\.[^.]*$/.X/'
++	exit ;;
++    CRAY*SV1:*:*:*)
++	echo sv1-cray-unicos${UNAME_RELEASE} | sed -e 's/\.[^.]*$/.X/'
++	exit ;;
++    *:UNICOS/mp:*:*)
++	echo craynv-cray-unicosmp${UNAME_RELEASE} | sed -e 's/\.[^.]*$/.X/'
++	exit ;;
++    F30[01]:UNIX_System_V:*:* | F700:UNIX_System_V:*:*)
++	FUJITSU_PROC=`uname -m | tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz'`
++        FUJITSU_SYS=`uname -p | tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz' | sed -e 's/\///'`
++        FUJITSU_REL=`echo ${UNAME_RELEASE} | sed -e 's/ /_/'`
++        echo "${FUJITSU_PROC}-fujitsu-${FUJITSU_SYS}${FUJITSU_REL}"
++        exit ;;
++    5000:UNIX_System_V:4.*:*)
++        FUJITSU_SYS=`uname -p | tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz' | sed -e 's/\///'`
++        FUJITSU_REL=`echo ${UNAME_RELEASE} | tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz' | sed -e 's/ /_/'`
++        echo "sparc-fujitsu-${FUJITSU_SYS}${FUJITSU_REL}"
++	exit ;;
++    i*86:BSD/386:*:* | i*86:BSD/OS:*:* | *:Ascend\ Embedded/OS:*:*)
++	echo ${UNAME_MACHINE}-pc-bsdi${UNAME_RELEASE}
++	exit ;;
++    sparc*:BSD/OS:*:*)
++	echo sparc-unknown-bsdi${UNAME_RELEASE}
++	exit ;;
++    *:BSD/OS:*:*)
++	echo ${UNAME_MACHINE}-unknown-bsdi${UNAME_RELEASE}
++	exit ;;
++    *:FreeBSD:*:*)
++	case ${UNAME_MACHINE} in
++	    pc98)
++		echo i386-unknown-freebsd`echo ${UNAME_RELEASE}|sed -e 's/[-(].*//'` ;;
++	    amd64)
++		echo x86_64-unknown-freebsd`echo ${UNAME_RELEASE}|sed -e 's/[-(].*//'` ;;
++	    *)
++		echo ${UNAME_MACHINE}-unknown-freebsd`echo ${UNAME_RELEASE}|sed -e 's/[-(].*//'` ;;
++	esac
++	exit ;;
++    i*:CYGWIN*:*)
++	echo ${UNAME_MACHINE}-pc-cygwin
++	exit ;;
++    *:MINGW*:*)
++	echo ${UNAME_MACHINE}-pc-mingw32
++	exit ;;
++    i*:windows32*:*)
++    	# uname -m includes "-pc" on this system.
++    	echo ${UNAME_MACHINE}-mingw32
++	exit ;;
++    i*:PW*:*)
++	echo ${UNAME_MACHINE}-pc-pw32
++	exit ;;
++    *:Interix*:[3456]*)
++    	case ${UNAME_MACHINE} in
++	    x86)
++		echo i586-pc-interix${UNAME_RELEASE}
++		exit ;;
++	    EM64T | authenticamd)
++		echo x86_64-unknown-interix${UNAME_RELEASE}
++		exit ;;
++	    IA64)
++		echo ia64-unknown-interix${UNAME_RELEASE}
++		exit ;;
++	esac ;;
++    [345]86:Windows_95:* | [345]86:Windows_98:* | [345]86:Windows_NT:*)
++	echo i${UNAME_MACHINE}-pc-mks
++	exit ;;
++    i*:Windows_NT*:* | Pentium*:Windows_NT*:*)
++	# How do we know it's Interix rather than the generic POSIX subsystem?
++	# It also conflicts with pre-2.0 versions of AT&T UWIN. Should we
++	# UNAME_MACHINE based on the output of uname instead of i386?
++	echo i586-pc-interix
++	exit ;;
++    i*:UWIN*:*)
++	echo ${UNAME_MACHINE}-pc-uwin
++	exit ;;
++    amd64:CYGWIN*:*:* | x86_64:CYGWIN*:*:*)
++	echo x86_64-unknown-cygwin
++	exit ;;
++    p*:CYGWIN*:*)
++	echo powerpcle-unknown-cygwin
++	exit ;;
++    prep*:SunOS:5.*:*)
++	echo powerpcle-unknown-solaris2`echo ${UNAME_RELEASE}|sed -e 's/[^.]*//'`
++	exit ;;
++    *:GNU:*:*)
++	# the GNU system
++	echo `echo ${UNAME_MACHINE}|sed -e 's,[-/].*$,,'`-unknown-gnu`echo ${UNAME_RELEASE}|sed -e 's,/.*$,,'`
++	exit ;;
++    *:GNU/*:*:*)
++	# other systems with GNU libc and userland
++	echo ${UNAME_MACHINE}-unknown-`echo ${UNAME_SYSTEM} | sed 's,^[^/]*/,,' | tr '[A-Z]' '[a-z]'``echo ${UNAME_RELEASE}|sed -e 's/[-(].*//'`-gnu
++	exit ;;
++    i*86:Minix:*:*)
++	echo ${UNAME_MACHINE}-pc-minix
++	exit ;;
++    arm*:Linux:*:*)
++	eval $set_cc_for_build
++	if echo __ARM_EABI__ | $CC_FOR_BUILD -E - 2>/dev/null \
++	    | grep -q __ARM_EABI__
++	then
++	    echo ${UNAME_MACHINE}-unknown-linux-gnu
++	else
++	    echo ${UNAME_MACHINE}-unknown-linux-gnueabi
++	fi
++	exit ;;
++    avr32*:Linux:*:*)
++	echo ${UNAME_MACHINE}-unknown-linux-gnu
++	exit ;;
++    cris:Linux:*:*)
++	echo cris-axis-linux-gnu
++	exit ;;
++    crisv32:Linux:*:*)
++	echo crisv32-axis-linux-gnu
++	exit ;;
++    frv:Linux:*:*)
++    	echo frv-unknown-linux-gnu
++	exit ;;
++    ia64:Linux:*:*)
++	echo ${UNAME_MACHINE}-unknown-linux-gnu
++	exit ;;
++    m32r*:Linux:*:*)
++	echo ${UNAME_MACHINE}-unknown-linux-gnu
++	exit ;;
++    m68*:Linux:*:*)
++	echo ${UNAME_MACHINE}-unknown-linux-gnu
++	exit ;;
++    mips:Linux:*:*)
++	eval $set_cc_for_build
++	sed 's/^	//' << EOF >$dummy.c
++	#undef CPU
++	#undef mips
++	#undef mipsel
++	#if defined(__MIPSEL__) || defined(__MIPSEL) || defined(_MIPSEL) || defined(MIPSEL)
++	CPU=mipsel
++	#else
++	#if defined(__MIPSEB__) || defined(__MIPSEB) || defined(_MIPSEB) || defined(MIPSEB)
++	CPU=mips
++	#else
++	CPU=
++	#endif
++	#endif
++EOF
++	eval "`$CC_FOR_BUILD -E $dummy.c 2>/dev/null | sed -n '
++	    /^CPU/{
++		s: ::g
++		p
++	    }'`"
++	test x"${CPU}" != x && { echo "${CPU}-unknown-linux-gnu"; exit; }
++	;;
++    mips64:Linux:*:*)
++	eval $set_cc_for_build
++	sed 's/^	//' << EOF >$dummy.c
++	#undef CPU
++	#undef mips64
++	#undef mips64el
++	#if defined(__MIPSEL__) || defined(__MIPSEL) || defined(_MIPSEL) || defined(MIPSEL)
++	CPU=mips64el
++	#else
++	#if defined(__MIPSEB__) || defined(__MIPSEB) || defined(_MIPSEB) || defined(MIPSEB)
++	CPU=mips64
++	#else
++	CPU=
++	#endif
++	#endif
++EOF
++	eval "`$CC_FOR_BUILD -E $dummy.c 2>/dev/null | sed -n '
++	    /^CPU/{
++		s: ::g
++		p
++	    }'`"
++	test x"${CPU}" != x && { echo "${CPU}-unknown-linux-gnu"; exit; }
++	;;
++    or32:Linux:*:*)
++	echo or32-unknown-linux-gnu
++	exit ;;
++    ppc:Linux:*:*)
++	echo powerpc-unknown-linux-gnu
++	exit ;;
++    ppc64:Linux:*:*)
++	echo powerpc64-unknown-linux-gnu
++	exit ;;
++    alpha:Linux:*:*)
++	case `sed -n '/^cpu model/s/^.*: \(.*\)/\1/p' < /proc/cpuinfo` in
++	  EV5)   UNAME_MACHINE=alphaev5 ;;
++	  EV56)  UNAME_MACHINE=alphaev56 ;;
++	  PCA56) UNAME_MACHINE=alphapca56 ;;
++	  PCA57) UNAME_MACHINE=alphapca56 ;;
++	  EV6)   UNAME_MACHINE=alphaev6 ;;
++	  EV67)  UNAME_MACHINE=alphaev67 ;;
++	  EV68*) UNAME_MACHINE=alphaev68 ;;
++        esac
++	objdump --private-headers /bin/sh | grep ld.so.1 >/dev/null
++	if test "$?" = 0 ; then LIBC="libc1" ; else LIBC="" ; fi
++	echo ${UNAME_MACHINE}-unknown-linux-gnu${LIBC}
++	exit ;;
++    parisc:Linux:*:* | hppa:Linux:*:*)
++	# Look for CPU level
++	case `grep '^cpu[^a-z]*:' /proc/cpuinfo 2>/dev/null | cut -d' ' -f2` in
++	  PA7*) echo hppa1.1-unknown-linux-gnu ;;
++	  PA8*) echo hppa2.0-unknown-linux-gnu ;;
++	  *)    echo hppa-unknown-linux-gnu ;;
++	esac
++	exit ;;
++    parisc64:Linux:*:* | hppa64:Linux:*:*)
++	echo hppa64-unknown-linux-gnu
++	exit ;;
++    s390:Linux:*:* | s390x:Linux:*:*)
++	echo ${UNAME_MACHINE}-ibm-linux
++	exit ;;
++    sh64*:Linux:*:*)
++    	echo ${UNAME_MACHINE}-unknown-linux-gnu
++	exit ;;
++    sh*:Linux:*:*)
++	echo ${UNAME_MACHINE}-unknown-linux-gnu
++	exit ;;
++    sparc:Linux:*:* | sparc64:Linux:*:*)
++	echo ${UNAME_MACHINE}-unknown-linux-gnu
++	exit ;;
++    vax:Linux:*:*)
++	echo ${UNAME_MACHINE}-dec-linux-gnu
++	exit ;;
++    x86_64:Linux:*:*)
++	echo x86_64-unknown-linux-gnu
++	exit ;;
++    xtensa*:Linux:*:*)
++    	echo ${UNAME_MACHINE}-unknown-linux-gnu
++	exit ;;
++    i*86:Linux:*:*)
++	# The BFD linker knows what the default object file format is, so
++	# first see if it will tell us. cd to the root directory to prevent
++	# problems with other programs or directories called `ld' in the path.
++	# Set LC_ALL=C to ensure ld outputs messages in English.
++	ld_supported_targets=`cd /; LC_ALL=C ld --help 2>&1 \
++			 | sed -ne '/supported targets:/!d
++				    s/[ 	][ 	]*/ /g
++				    s/.*supported targets: *//
++				    s/ .*//
++				    p'`
++        case "$ld_supported_targets" in
++	  elf32-i386)
++		TENTATIVE="${UNAME_MACHINE}-pc-linux-gnu"
++		;;
++	  a.out-i386-linux)
++		echo "${UNAME_MACHINE}-pc-linux-gnuaout"
++		exit ;;
++	  coff-i386)
++		echo "${UNAME_MACHINE}-pc-linux-gnucoff"
++		exit ;;
++	  "")
++		# Either a pre-BFD a.out linker (linux-gnuoldld) or
++		# one that does not give us useful --help.
++		echo "${UNAME_MACHINE}-pc-linux-gnuoldld"
++		exit ;;
++	esac
++	# Determine whether the default compiler is a.out or elf
++	eval $set_cc_for_build
++	sed 's/^	//' << EOF >$dummy.c
++	#include <features.h>
++	#ifdef __ELF__
++	# ifdef __GLIBC__
++	#  if __GLIBC__ >= 2
++	LIBC=gnu
++	#  else
++	LIBC=gnulibc1
++	#  endif
++	# else
++	LIBC=gnulibc1
++	# endif
++	#else
++	#if defined(__INTEL_COMPILER) || defined(__PGI) || defined(__SUNPRO_C) || defined(__SUNPRO_CC)
++	LIBC=gnu
++	#else
++	LIBC=gnuaout
++	#endif
++	#endif
++	#ifdef __dietlibc__
++	LIBC=dietlibc
++	#endif
++EOF
++	eval "`$CC_FOR_BUILD -E $dummy.c 2>/dev/null | sed -n '
++	    /^LIBC/{
++		s: ::g
++		p
++	    }'`"
++	test x"${LIBC}" != x && {
++		echo "${UNAME_MACHINE}-pc-linux-${LIBC}"
++		exit
++	}
++	test x"${TENTATIVE}" != x && { echo "${TENTATIVE}"; exit; }
++	;;
++    i*86:DYNIX/ptx:4*:*)
++	# ptx 4.0 does uname -s correctly, with DYNIX/ptx in there.
++	# earlier versions are messed up and put the nodename in both
++	# sysname and nodename.
++	echo i386-sequent-sysv4
++	exit ;;
++    i*86:UNIX_SV:4.2MP:2.*)
++        # Unixware is an offshoot of SVR4, but it has its own version
++        # number series starting with 2...
++        # I am not positive that other SVR4 systems won't match this,
++	# I just have to hope.  -- rms.
++        # Use sysv4.2uw... so that sysv4* matches it.
++	echo ${UNAME_MACHINE}-pc-sysv4.2uw${UNAME_VERSION}
++	exit ;;
++    i*86:OS/2:*:*)
++	# If we were able to find `uname', then EMX Unix compatibility
++	# is probably installed.
++	echo ${UNAME_MACHINE}-pc-os2-emx
++	exit ;;
++    i*86:XTS-300:*:STOP)
++	echo ${UNAME_MACHINE}-unknown-stop
++	exit ;;
++    i*86:atheos:*:*)
++	echo ${UNAME_MACHINE}-unknown-atheos
++	exit ;;
++    i*86:syllable:*:*)
++	echo ${UNAME_MACHINE}-pc-syllable
++	exit ;;
++    i*86:LynxOS:2.*:* | i*86:LynxOS:3.[01]*:* | i*86:LynxOS:4.0*:*)
++	echo i386-unknown-lynxos${UNAME_RELEASE}
++	exit ;;
++    i*86:*DOS:*:*)
++	echo ${UNAME_MACHINE}-pc-msdosdjgpp
++	exit ;;
++    i*86:*:4.*:* | i*86:SYSTEM_V:4.*:*)
++	UNAME_REL=`echo ${UNAME_RELEASE} | sed 's/\/MP$//'`
++	if grep Novell /usr/include/link.h >/dev/null 2>/dev/null; then
++		echo ${UNAME_MACHINE}-univel-sysv${UNAME_REL}
++	else
++		echo ${UNAME_MACHINE}-pc-sysv${UNAME_REL}
++	fi
++	exit ;;
++    i*86:*:5:[678]*)
++    	# UnixWare 7.x, OpenUNIX and OpenServer 6.
++	case `/bin/uname -X | grep "^Machine"` in
++	    *486*)	     UNAME_MACHINE=i486 ;;
++	    *Pentium)	     UNAME_MACHINE=i586 ;;
++	    *Pent*|*Celeron) UNAME_MACHINE=i686 ;;
++	esac
++	echo ${UNAME_MACHINE}-unknown-sysv${UNAME_RELEASE}${UNAME_SYSTEM}${UNAME_VERSION}
++	exit ;;
++    i*86:*:3.2:*)
++	if test -f /usr/options/cb.name; then
++		UNAME_REL=`sed -n 's/.*Version //p' </usr/options/cb.name`
++		echo ${UNAME_MACHINE}-pc-isc$UNAME_REL
++	elif /bin/uname -X 2>/dev/null >/dev/null ; then
++		UNAME_REL=`(/bin/uname -X|grep Release|sed -e 's/.*= //')`
++		(/bin/uname -X|grep i80486 >/dev/null) && UNAME_MACHINE=i486
++		(/bin/uname -X|grep '^Machine.*Pentium' >/dev/null) \
++			&& UNAME_MACHINE=i586
++		(/bin/uname -X|grep '^Machine.*Pent *II' >/dev/null) \
++			&& UNAME_MACHINE=i686
++		(/bin/uname -X|grep '^Machine.*Pentium Pro' >/dev/null) \
++			&& UNAME_MACHINE=i686
++		echo ${UNAME_MACHINE}-pc-sco$UNAME_REL
++	else
++		echo ${UNAME_MACHINE}-pc-sysv32
++	fi
++	exit ;;
++    pc:*:*:*)
++	# Left here for compatibility:
++        # uname -m prints for DJGPP always 'pc', but it prints nothing about
++        # the processor, so we play safe by assuming i386.
++	echo i386-pc-msdosdjgpp
++        exit ;;
++    Intel:Mach:3*:*)
++	echo i386-pc-mach3
++	exit ;;
++    paragon:*:*:*)
++	echo i860-intel-osf1
++	exit ;;
++    i860:*:4.*:*) # i860-SVR4
++	if grep Stardent /usr/include/sys/uadmin.h >/dev/null 2>&1 ; then
++	  echo i860-stardent-sysv${UNAME_RELEASE} # Stardent Vistra i860-SVR4
++	else # Add other i860-SVR4 vendors below as they are discovered.
++	  echo i860-unknown-sysv${UNAME_RELEASE}  # Unknown i860-SVR4
++	fi
++	exit ;;
++    mini*:CTIX:SYS*5:*)
++	# "miniframe"
++	echo m68010-convergent-sysv
++	exit ;;
++    mc68k:UNIX:SYSTEM5:3.51m)
++	echo m68k-convergent-sysv
++	exit ;;
++    M680?0:D-NIX:5.3:*)
++	echo m68k-diab-dnix
++	exit ;;
++    M68*:*:R3V[5678]*:*)
++	test -r /sysV68 && { echo 'm68k-motorola-sysv'; exit; } ;;
++    3[345]??:*:4.0:3.0 | 3[34]??A:*:4.0:3.0 | 3[34]??,*:*:4.0:3.0 | 3[34]??/*:*:4.0:3.0 | 4400:*:4.0:3.0 | 4850:*:4.0:3.0 | SKA40:*:4.0:3.0 | SDS2:*:4.0:3.0 | SHG2:*:4.0:3.0 | S7501*:*:4.0:3.0)
++	OS_REL=''
++	test -r /etc/.relid \
++	&& OS_REL=.`sed -n 's/[^ ]* [^ ]* \([0-9][0-9]\).*/\1/p' < /etc/.relid`
++	/bin/uname -p 2>/dev/null | grep 86 >/dev/null \
++	  && { echo i486-ncr-sysv4.3${OS_REL}; exit; }
++	/bin/uname -p 2>/dev/null | /bin/grep entium >/dev/null \
++	  && { echo i586-ncr-sysv4.3${OS_REL}; exit; } ;;
++    3[34]??:*:4.0:* | 3[34]??,*:*:4.0:*)
++        /bin/uname -p 2>/dev/null | grep 86 >/dev/null \
++          && { echo i486-ncr-sysv4; exit; } ;;
++    m68*:LynxOS:2.*:* | m68*:LynxOS:3.0*:*)
++	echo m68k-unknown-lynxos${UNAME_RELEASE}
++	exit ;;
++    mc68030:UNIX_System_V:4.*:*)
++	echo m68k-atari-sysv4
++	exit ;;
++    TSUNAMI:LynxOS:2.*:*)
++	echo sparc-unknown-lynxos${UNAME_RELEASE}
++	exit ;;
++    rs6000:LynxOS:2.*:*)
++	echo rs6000-unknown-lynxos${UNAME_RELEASE}
++	exit ;;
++    PowerPC:LynxOS:2.*:* | PowerPC:LynxOS:3.[01]*:* | PowerPC:LynxOS:4.0*:*)
++	echo powerpc-unknown-lynxos${UNAME_RELEASE}
++	exit ;;
++    SM[BE]S:UNIX_SV:*:*)
++	echo mips-dde-sysv${UNAME_RELEASE}
++	exit ;;
++    RM*:ReliantUNIX-*:*:*)
++	echo mips-sni-sysv4
++	exit ;;
++    RM*:SINIX-*:*:*)
++	echo mips-sni-sysv4
++	exit ;;
++    *:SINIX-*:*:*)
++	if uname -p 2>/dev/null >/dev/null ; then
++		UNAME_MACHINE=`(uname -p) 2>/dev/null`
++		echo ${UNAME_MACHINE}-sni-sysv4
++	else
++		echo ns32k-sni-sysv
++	fi
++	exit ;;
++    PENTIUM:*:4.0*:*) # Unisys `ClearPath HMP IX 4000' SVR4/MP effort
++                      # says <Richard.M.Bartel@ccMail.Census.GOV>
++        echo i586-unisys-sysv4
++        exit ;;
++    *:UNIX_System_V:4*:FTX*)
++	# From Gerald Hewes <hewes@openmarket.com>.
++	# How about differentiating between stratus architectures? -djm
++	echo hppa1.1-stratus-sysv4
++	exit ;;
++    *:*:*:FTX*)
++	# From seanf@swdc.stratus.com.
++	echo i860-stratus-sysv4
++	exit ;;
++    i*86:VOS:*:*)
++	# From Paul.Green@stratus.com.
++	echo ${UNAME_MACHINE}-stratus-vos
++	exit ;;
++    *:VOS:*:*)
++	# From Paul.Green@stratus.com.
++	echo hppa1.1-stratus-vos
++	exit ;;
++    mc68*:A/UX:*:*)
++	echo m68k-apple-aux${UNAME_RELEASE}
++	exit ;;
++    news*:NEWS-OS:6*:*)
++	echo mips-sony-newsos6
++	exit ;;
++    R[34]000:*System_V*:*:* | R4000:UNIX_SYSV:*:* | R*000:UNIX_SV:*:*)
++	if [ -d /usr/nec ]; then
++	        echo mips-nec-sysv${UNAME_RELEASE}
++	else
++	        echo mips-unknown-sysv${UNAME_RELEASE}
++	fi
++        exit ;;
++    BeBox:BeOS:*:*)	# BeOS running on hardware made by Be, PPC only.
++	echo powerpc-be-beos
++	exit ;;
++    BeMac:BeOS:*:*)	# BeOS running on Mac or Mac clone, PPC only.
++	echo powerpc-apple-beos
++	exit ;;
++    BePC:BeOS:*:*)	# BeOS running on Intel PC compatible.
++	echo i586-pc-beos
++	exit ;;
++    SX-4:SUPER-UX:*:*)
++	echo sx4-nec-superux${UNAME_RELEASE}
++	exit ;;
++    SX-5:SUPER-UX:*:*)
++	echo sx5-nec-superux${UNAME_RELEASE}
++	exit ;;
++    SX-6:SUPER-UX:*:*)
++	echo sx6-nec-superux${UNAME_RELEASE}
++	exit ;;
++    SX-7:SUPER-UX:*:*)
++	echo sx7-nec-superux${UNAME_RELEASE}
++	exit ;;
++    SX-8:SUPER-UX:*:*)
++	echo sx8-nec-superux${UNAME_RELEASE}
++	exit ;;
++    SX-8R:SUPER-UX:*:*)
++	echo sx8r-nec-superux${UNAME_RELEASE}
++	exit ;;
++    Power*:Rhapsody:*:*)
++	echo powerpc-apple-rhapsody${UNAME_RELEASE}
++	exit ;;
++    *:Rhapsody:*:*)
++	echo ${UNAME_MACHINE}-apple-rhapsody${UNAME_RELEASE}
++	exit ;;
++    *:Darwin:*:*)
++	UNAME_PROCESSOR=`uname -p` || UNAME_PROCESSOR=unknown
++	case $UNAME_PROCESSOR in
++	    unknown) UNAME_PROCESSOR=powerpc ;;
++	esac
++	echo ${UNAME_PROCESSOR}-apple-darwin${UNAME_RELEASE}
++	exit ;;
++    *:procnto*:*:* | *:QNX:[0123456789]*:*)
++	UNAME_PROCESSOR=`uname -p`
++	if test "$UNAME_PROCESSOR" = "x86"; then
++		UNAME_PROCESSOR=i386
++		UNAME_MACHINE=pc
++	fi
++	echo ${UNAME_PROCESSOR}-${UNAME_MACHINE}-nto-qnx${UNAME_RELEASE}
++	exit ;;
++    *:QNX:*:4*)
++	echo i386-pc-qnx
++	exit ;;
++    NSE-?:NONSTOP_KERNEL:*:*)
++	echo nse-tandem-nsk${UNAME_RELEASE}
++	exit ;;
++    NSR-?:NONSTOP_KERNEL:*:*)
++	echo nsr-tandem-nsk${UNAME_RELEASE}
++	exit ;;
++    *:NonStop-UX:*:*)
++	echo mips-compaq-nonstopux
++	exit ;;
++    BS2000:POSIX*:*:*)
++	echo bs2000-siemens-sysv
++	exit ;;
++    DS/*:UNIX_System_V:*:*)
++	echo ${UNAME_MACHINE}-${UNAME_SYSTEM}-${UNAME_RELEASE}
++	exit ;;
++    *:Plan9:*:*)
++	# "uname -m" is not consistent, so use $cputype instead. 386
++	# is converted to i386 for consistency with other x86
++	# operating systems.
++	if test "$cputype" = "386"; then
++	    UNAME_MACHINE=i386
++	else
++	    UNAME_MACHINE="$cputype"
++	fi
++	echo ${UNAME_MACHINE}-unknown-plan9
++	exit ;;
++    *:TOPS-10:*:*)
++	echo pdp10-unknown-tops10
++	exit ;;
++    *:TENEX:*:*)
++	echo pdp10-unknown-tenex
++	exit ;;
++    KS10:TOPS-20:*:* | KL10:TOPS-20:*:* | TYPE4:TOPS-20:*:*)
++	echo pdp10-dec-tops20
++	exit ;;
++    XKL-1:TOPS-20:*:* | TYPE5:TOPS-20:*:*)
++	echo pdp10-xkl-tops20
++	exit ;;
++    *:TOPS-20:*:*)
++	echo pdp10-unknown-tops20
++	exit ;;
++    *:ITS:*:*)
++	echo pdp10-unknown-its
++	exit ;;
++    SEI:*:*:SEIUX)
++        echo mips-sei-seiux${UNAME_RELEASE}
++	exit ;;
++    *:DragonFly:*:*)
++	echo ${UNAME_MACHINE}-unknown-dragonfly`echo ${UNAME_RELEASE}|sed -e 's/[-(].*//'`
++	exit ;;
++    *:*VMS:*:*)
++    	UNAME_MACHINE=`(uname -p) 2>/dev/null`
++	case "${UNAME_MACHINE}" in
++	    A*) echo alpha-dec-vms ; exit ;;
++	    I*) echo ia64-dec-vms ; exit ;;
++	    V*) echo vax-dec-vms ; exit ;;
++	esac ;;
++    *:XENIX:*:SysV)
++	echo i386-pc-xenix
++	exit ;;
++    i*86:skyos:*:*)
++	echo ${UNAME_MACHINE}-pc-skyos`echo ${UNAME_RELEASE}` | sed -e 's/ .*$//'
++	exit ;;
++    i*86:rdos:*:*)
++	echo ${UNAME_MACHINE}-pc-rdos
++	exit ;;
++esac
++
++#echo '(No uname command or uname output not recognized.)' 1>&2
++#echo "${UNAME_MACHINE}:${UNAME_SYSTEM}:${UNAME_RELEASE}:${UNAME_VERSION}" 1>&2
++
++eval $set_cc_for_build
++cat >$dummy.c <<EOF
++#ifdef _SEQUENT_
++# include <sys/types.h>
++# include <sys/utsname.h>
++#endif
++main ()
++{
++#if defined (sony)
++#if defined (MIPSEB)
++  /* BFD wants "bsd" instead of "newsos".  Perhaps BFD should be changed,
++     I don't know....  */
++  printf ("mips-sony-bsd\n"); exit (0);
++#else
++#include <sys/param.h>
++  printf ("m68k-sony-newsos%s\n",
++#ifdef NEWSOS4
++          "4"
++#else
++	  ""
++#endif
++         ); exit (0);
++#endif
++#endif
++
++#if defined (__arm) && defined (__acorn) && defined (__unix)
++  printf ("arm-acorn-riscix\n"); exit (0);
++#endif
++
++#if defined (hp300) && !defined (hpux)
++  printf ("m68k-hp-bsd\n"); exit (0);
++#endif
++
++#if defined (NeXT)
++#if !defined (__ARCHITECTURE__)
++#define __ARCHITECTURE__ "m68k"
++#endif
++  int version;
++  version=`(hostinfo | sed -n 's/.*NeXT Mach \([0-9]*\).*/\1/p') 2>/dev/null`;
++  if (version < 4)
++    printf ("%s-next-nextstep%d\n", __ARCHITECTURE__, version);
++  else
++    printf ("%s-next-openstep%d\n", __ARCHITECTURE__, version);
++  exit (0);
++#endif
++
++#if defined (MULTIMAX) || defined (n16)
++#if defined (UMAXV)
++  printf ("ns32k-encore-sysv\n"); exit (0);
++#else
++#if defined (CMU)
++  printf ("ns32k-encore-mach\n"); exit (0);
++#else
++  printf ("ns32k-encore-bsd\n"); exit (0);
++#endif
++#endif
++#endif
++
++#if defined (__386BSD__)
++  printf ("i386-pc-bsd\n"); exit (0);
++#endif
++
++#if defined (sequent)
++#if defined (i386)
++  printf ("i386-sequent-dynix\n"); exit (0);
++#endif
++#if defined (ns32000)
++  printf ("ns32k-sequent-dynix\n"); exit (0);
++#endif
++#endif
++
++#if defined (_SEQUENT_)
++    struct utsname un;
++
++    uname(&un);
++
++    if (strncmp(un.version, "V2", 2) == 0) {
++	printf ("i386-sequent-ptx2\n"); exit (0);
++    }
++    if (strncmp(un.version, "V1", 2) == 0) { /* XXX is V1 correct? */
++	printf ("i386-sequent-ptx1\n"); exit (0);
++    }
++    printf ("i386-sequent-ptx\n"); exit (0);
++
++#endif
++
++#if defined (vax)
++# if !defined (ultrix)
++#  include <sys/param.h>
++#  if defined (BSD)
++#   if BSD == 43
++      printf ("vax-dec-bsd4.3\n"); exit (0);
++#   else
++#    if BSD == 199006
++      printf ("vax-dec-bsd4.3reno\n"); exit (0);
++#    else
++      printf ("vax-dec-bsd\n"); exit (0);
++#    endif
++#   endif
++#  else
++    printf ("vax-dec-bsd\n"); exit (0);
++#  endif
++# else
++    printf ("vax-dec-ultrix\n"); exit (0);
++# endif
++#endif
++
++#if defined (alliant) && defined (i860)
++  printf ("i860-alliant-bsd\n"); exit (0);
++#endif
++
++  exit (1);
++}
++EOF
++
++$CC_FOR_BUILD -o $dummy $dummy.c 2>/dev/null && SYSTEM_NAME=`$dummy` &&
++	{ echo "$SYSTEM_NAME"; exit; }
++
++# Apollos put the system type in the environment.
++
++test -d /usr/apollo && { echo ${ISP}-apollo-${SYSTYPE}; exit; }
++
++# Convex versions that predate uname can use getsysinfo(1)
++
++if [ -x /usr/convex/getsysinfo ]
++then
++    case `getsysinfo -f cpu_type` in
++    c1*)
++	echo c1-convex-bsd
++	exit ;;
++    c2*)
++	if getsysinfo -f scalar_acc
++	then echo c32-convex-bsd
++	else echo c2-convex-bsd
++	fi
++	exit ;;
++    c34*)
++	echo c34-convex-bsd
++	exit ;;
++    c38*)
++	echo c38-convex-bsd
++	exit ;;
++    c4*)
++	echo c4-convex-bsd
++	exit ;;
++    esac
++fi
++
++cat >&2 <<EOF
++$0: unable to guess system type
++
++This script, last modified $timestamp, has failed to recognize
++the operating system you are using. It is advised that you
++download the most up to date version of the config scripts from
++
++  http://git.savannah.gnu.org/gitweb/?p=config.git;a=blob_plain;f=config.guess;hb=HEAD
++and
++  http://git.savannah.gnu.org/gitweb/?p=config.git;a=blob_plain;f=config.sub;hb=HEAD
++
++If the version you run ($0) is already up to date, please
++send the following data and any information you think might be
++pertinent to <config-patches@gnu.org> in order to provide the needed
++information to handle your system.
++
++config.guess timestamp = $timestamp
++
++uname -m = `(uname -m) 2>/dev/null || echo unknown`
++uname -r = `(uname -r) 2>/dev/null || echo unknown`
++uname -s = `(uname -s) 2>/dev/null || echo unknown`
++uname -v = `(uname -v) 2>/dev/null || echo unknown`
++
++/usr/bin/uname -p = `(/usr/bin/uname -p) 2>/dev/null`
++/bin/uname -X     = `(/bin/uname -X) 2>/dev/null`
++
++hostinfo               = `(hostinfo) 2>/dev/null`
++/bin/universe          = `(/bin/universe) 2>/dev/null`
++/usr/bin/arch -k       = `(/usr/bin/arch -k) 2>/dev/null`
++/bin/arch              = `(/bin/arch) 2>/dev/null`
++/usr/bin/oslevel       = `(/usr/bin/oslevel) 2>/dev/null`
++/usr/convex/getsysinfo = `(/usr/convex/getsysinfo) 2>/dev/null`
++
++UNAME_MACHINE = ${UNAME_MACHINE}
++UNAME_RELEASE = ${UNAME_RELEASE}
++UNAME_SYSTEM  = ${UNAME_SYSTEM}
++UNAME_VERSION = ${UNAME_VERSION}
++EOF
++
++exit 1
++
++# Local variables:
++# eval: (add-hook 'write-file-hooks 'time-stamp)
++# time-stamp-start: "timestamp='"
++# time-stamp-format: "%:y-%02m-%02d"
++# time-stamp-end: "'"
++# End:
+diff --git a/cnf/config.sub b/cnf/config.sub
+new file mode 100755
+index 0000000..6759825
+--- /dev/null
++++ b/cnf/config.sub
+@@ -0,0 +1,1658 @@
++#! /bin/sh
++# Configuration validation subroutine script.
++#   Copyright (C) 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
++#   2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008
++#   Free Software Foundation, Inc.
++
++timestamp='2008-01-16'
++
++# This file is (in principle) common to ALL GNU software.
++# The presence of a machine in this file suggests that SOME GNU software
++# can handle that machine.  It does not imply ALL GNU software can.
++#
++# This file is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 2 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program; if not, write to the Free Software
++# Foundation, Inc., 51 Franklin Street - Fifth Floor, Boston, MA
++# 02110-1301, USA.
++#
++# As a special exception to the GNU General Public License, if you
++# distribute this file as part of a program that contains a
++# configuration script generated by Autoconf, you may include it under
++# the same distribution terms that you use for the rest of that program.
++
++
++# Please send patches to <config-patches@gnu.org>.  Submit a context
++# diff and a properly formatted ChangeLog entry.
++#
++# Configuration subroutine to validate and canonicalize a configuration type.
++# Supply the specified configuration type as an argument.
++# If it is invalid, we print an error message on stderr and exit with code 1.
++# Otherwise, we print the canonical config type on stdout and succeed.
++
++# This file is supposed to be the same for all GNU packages
++# and recognize all the CPU types, system types and aliases
++# that are meaningful with *any* GNU software.
++# Each package is responsible for reporting which valid configurations
++# it does not support.  The user should be able to distinguish
++# a failure to support a valid configuration from a meaningless
++# configuration.
++
++# The goal of this file is to map all the various variations of a given
++# machine specification into a single specification in the form:
++#	CPU_TYPE-MANUFACTURER-OPERATING_SYSTEM
++# or in some cases, the newer four-part form:
++#	CPU_TYPE-MANUFACTURER-KERNEL-OPERATING_SYSTEM
++# It is wrong to echo any other type of specification.
++
++me=`echo "$0" | sed -e 's,.*/,,'`
++
++usage="\
++Usage: $0 [OPTION] CPU-MFR-OPSYS
++       $0 [OPTION] ALIAS
++
++Canonicalize a configuration name.
++
++Operation modes:
++  -h, --help         print this help, then exit
++  -t, --time-stamp   print date of last modification, then exit
++  -v, --version      print version number, then exit
++
++Report bugs and patches to <config-patches@gnu.org>."
++
++version="\
++GNU config.sub ($timestamp)
++
++Copyright (C) 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001,
++2002, 2003, 2004, 2005, 2006, 2007, 2008 Free Software Foundation, Inc.
++
++This is free software; see the source for copying conditions.  There is NO
++warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
++
++help="
++Try \`$me --help' for more information."
++
++# Parse command line
++while test $# -gt 0 ; do
++  case $1 in
++    --time-stamp | --time* | -t )
++       echo "$timestamp" ; exit ;;
++    --version | -v )
++       echo "$version" ; exit ;;
++    --help | --h* | -h )
++       echo "$usage"; exit ;;
++    -- )     # Stop option processing
++       shift; break ;;
++    - )	# Use stdin as input.
++       break ;;
++    -* )
++       echo "$me: invalid option $1$help"
++       exit 1 ;;
++
++    *local*)
++       # First pass through any local machine types.
++       echo $1
++       exit ;;
++
++    * )
++       break ;;
++  esac
++done
++
++case $# in
++ 0) echo "$me: missing argument$help" >&2
++    exit 1;;
++ 1) ;;
++ *) echo "$me: too many arguments$help" >&2
++    exit 1;;
++esac
++
++# Separate what the user gave into CPU-COMPANY and OS or KERNEL-OS (if any).
++# Here we must recognize all the valid KERNEL-OS combinations.
++maybe_os=`echo $1 | sed 's/^\(.*\)-\([^-]*-[^-]*\)$/\2/'`
++case $maybe_os in
++  nto-qnx* | linux-gnu* | linux-dietlibc | linux-newlib* | linux-uclibc* | \
++  uclinux-uclibc* | uclinux-gnu* | kfreebsd*-gnu* | knetbsd*-gnu* | netbsd*-gnu* | \
++  storm-chaos* | os2-emx* | rtmk-nova*)
++    os=-$maybe_os
++    basic_machine=`echo $1 | sed 's/^\(.*\)-\([^-]*-[^-]*\)$/\1/'`
++    ;;
++  *)
++    basic_machine=`echo $1 | sed 's/-[^-]*$//'`
++    if [ $basic_machine != $1 ]
++    then os=`echo $1 | sed 's/.*-/-/'`
++    else os=; fi
++    ;;
++esac
++
++### Let's recognize common machines as not being operating systems so
++### that things like config.sub decstation-3100 work.  We also
++### recognize some manufacturers as not being operating systems, so we
++### can provide default operating systems below.
++case $os in
++	-sun*os*)
++		# Prevent following clause from handling this invalid input.
++		;;
++	-dec* | -mips* | -sequent* | -encore* | -pc532* | -sgi* | -sony* | \
++	-att* | -7300* | -3300* | -delta* | -motorola* | -sun[234]* | \
++	-unicom* | -ibm* | -next | -hp | -isi* | -apollo | -altos* | \
++	-convergent* | -ncr* | -news | -32* | -3600* | -3100* | -hitachi* |\
++	-c[123]* | -convex* | -sun | -crds | -omron* | -dg | -ultra | -tti* | \
++	-harris | -dolphin | -highlevel | -gould | -cbm | -ns | -masscomp | \
++	-apple | -axis | -knuth | -cray)
++		os=
++		basic_machine=$1
++		;;
++	-sim | -cisco | -oki | -wec | -winbond)
++		os=
++		basic_machine=$1
++		;;
++	-scout)
++		;;
++	-wrs)
++		os=-vxworks
++		basic_machine=$1
++		;;
++	-chorusos*)
++		os=-chorusos
++		basic_machine=$1
++		;;
++ 	-chorusrdb)
++ 		os=-chorusrdb
++		basic_machine=$1
++ 		;;
++	-hiux*)
++		os=-hiuxwe2
++		;;
++	-sco6)
++		os=-sco5v6
++		basic_machine=`echo $1 | sed -e 's/86-.*/86-pc/'`
++		;;
++	-sco5)
++		os=-sco3.2v5
++		basic_machine=`echo $1 | sed -e 's/86-.*/86-pc/'`
++		;;
++	-sco4)
++		os=-sco3.2v4
++		basic_machine=`echo $1 | sed -e 's/86-.*/86-pc/'`
++		;;
++	-sco3.2.[4-9]*)
++		os=`echo $os | sed -e 's/sco3.2./sco3.2v/'`
++		basic_machine=`echo $1 | sed -e 's/86-.*/86-pc/'`
++		;;
++	-sco3.2v[4-9]*)
++		# Don't forget version if it is 3.2v4 or newer.
++		basic_machine=`echo $1 | sed -e 's/86-.*/86-pc/'`
++		;;
++	-sco5v6*)
++		# Don't forget version if it is 3.2v4 or newer.
++		basic_machine=`echo $1 | sed -e 's/86-.*/86-pc/'`
++		;;
++	-sco*)
++		os=-sco3.2v2
++		basic_machine=`echo $1 | sed -e 's/86-.*/86-pc/'`
++		;;
++	-udk*)
++		basic_machine=`echo $1 | sed -e 's/86-.*/86-pc/'`
++		;;
++	-isc)
++		os=-isc2.2
++		basic_machine=`echo $1 | sed -e 's/86-.*/86-pc/'`
++		;;
++	-clix*)
++		basic_machine=clipper-intergraph
++		;;
++	-isc*)
++		basic_machine=`echo $1 | sed -e 's/86-.*/86-pc/'`
++		;;
++	-lynx*)
++		os=-lynxos
++		;;
++	-ptx*)
++		basic_machine=`echo $1 | sed -e 's/86-.*/86-sequent/'`
++		;;
++	-windowsnt*)
++		os=`echo $os | sed -e 's/windowsnt/winnt/'`
++		;;
++	-psos*)
++		os=-psos
++		;;
++	-mint | -mint[0-9]*)
++		basic_machine=m68k-atari
++		os=-mint
++		;;
++esac
++
++# Decode aliases for certain CPU-COMPANY combinations.
++case $basic_machine in
++	# Recognize the basic CPU types without company name.
++	# Some are omitted here because they have special meanings below.
++	1750a | 580 \
++	| a29k \
++	| alpha | alphaev[4-8] | alphaev56 | alphaev6[78] | alphapca5[67] \
++	| alpha64 | alpha64ev[4-8] | alpha64ev56 | alpha64ev6[78] | alpha64pca5[67] \
++	| am33_2.0 \
++	| arc | arm | arm[bl]e | arme[lb] | armv[2345] | armv[345][lb] | avr | avr32 \
++	| bfin \
++	| c4x | clipper \
++	| d10v | d30v | dlx | dsp16xx \
++	| fido | fr30 | frv \
++	| h8300 | h8500 | hppa | hppa1.[01] | hppa2.0 | hppa2.0[nw] | hppa64 \
++	| i370 | i860 | i960 | ia64 \
++	| ip2k | iq2000 \
++	| m32c | m32r | m32rle | m68000 | m68k | m88k \
++	| maxq | mb | microblaze | mcore | mep \
++	| mips | mipsbe | mipseb | mipsel | mipsle \
++	| mips16 \
++	| mips64 | mips64el \
++	| mips64vr | mips64vrel \
++	| mips64orion | mips64orionel \
++	| mips64vr4100 | mips64vr4100el \
++	| mips64vr4300 | mips64vr4300el \
++	| mips64vr5000 | mips64vr5000el \
++	| mips64vr5900 | mips64vr5900el \
++	| mipsisa32 | mipsisa32el \
++	| mipsisa32r2 | mipsisa32r2el \
++	| mipsisa64 | mipsisa64el \
++	| mipsisa64r2 | mipsisa64r2el \
++	| mipsisa64sb1 | mipsisa64sb1el \
++	| mipsisa64sr71k | mipsisa64sr71kel \
++	| mipstx39 | mipstx39el \
++	| mn10200 | mn10300 \
++	| mt \
++	| msp430 \
++	| nios | nios2 \
++	| ns16k | ns32k \
++	| or32 \
++	| pdp10 | pdp11 | pj | pjl \
++	| powerpc | powerpc64 | powerpc64le | powerpcle | ppcbe \
++	| pyramid \
++	| score \
++	| sh | sh[1234] | sh[24]a | sh[23]e | sh[34]eb | sheb | shbe | shle | sh[1234]le | sh3ele \
++	| sh64 | sh64le \
++	| sparc | sparc64 | sparc64b | sparc64v | sparc86x | sparclet | sparclite \
++	| sparcv8 | sparcv9 | sparcv9b | sparcv9v \
++	| spu | strongarm \
++	| tahoe | thumb | tic4x | tic80 | tron \
++	| v850 | v850e \
++	| we32k \
++	| x86 | xc16x | xscale | xscalee[bl] | xstormy16 | xtensa \
++	| z8k)
++		basic_machine=$basic_machine-unknown
++		;;
++	m6811 | m68hc11 | m6812 | m68hc12)
++		# Motorola 68HC11/12.
++		basic_machine=$basic_machine-unknown
++		os=-none
++		;;
++	m88110 | m680[12346]0 | m683?2 | m68360 | m5200 | v70 | w65 | z8k)
++		;;
++	ms1)
++		basic_machine=mt-unknown
++		;;
++
++	# We use `pc' rather than `unknown'
++	# because (1) that's what they normally are, and
++	# (2) the word "unknown" tends to confuse beginning users.
++	i*86 | x86_64)
++	  basic_machine=$basic_machine-pc
++	  ;;
++	# Object if more than one company name word.
++	*-*-*)
++		echo Invalid configuration \`$1\': machine \`$basic_machine\' not recognized 1>&2
++		exit 1
++		;;
++	# Recognize the basic CPU types with company name.
++	580-* \
++	| a29k-* \
++	| alpha-* | alphaev[4-8]-* | alphaev56-* | alphaev6[78]-* \
++	| alpha64-* | alpha64ev[4-8]-* | alpha64ev56-* | alpha64ev6[78]-* \
++	| alphapca5[67]-* | alpha64pca5[67]-* | arc-* \
++	| arm-*  | armbe-* | armle-* | armeb-* | armv*-* \
++	| avr-* | avr32-* \
++	| bfin-* | bs2000-* \
++	| c[123]* | c30-* | [cjt]90-* | c4x-* | c54x-* | c55x-* | c6x-* \
++	| clipper-* | craynv-* | cydra-* \
++	| d10v-* | d30v-* | dlx-* \
++	| elxsi-* \
++	| f30[01]-* | f700-* | fido-* | fr30-* | frv-* | fx80-* \
++	| h8300-* | h8500-* \
++	| hppa-* | hppa1.[01]-* | hppa2.0-* | hppa2.0[nw]-* | hppa64-* \
++	| i*86-* | i860-* | i960-* | ia64-* \
++	| ip2k-* | iq2000-* \
++	| m32c-* | m32r-* | m32rle-* \
++	| m68000-* | m680[012346]0-* | m68360-* | m683?2-* | m68k-* \
++	| m88110-* | m88k-* | maxq-* | mcore-* \
++	| mips-* | mipsbe-* | mipseb-* | mipsel-* | mipsle-* \
++	| mips16-* \
++	| mips64-* | mips64el-* \
++	| mips64vr-* | mips64vrel-* \
++	| mips64orion-* | mips64orionel-* \
++	| mips64vr4100-* | mips64vr4100el-* \
++	| mips64vr4300-* | mips64vr4300el-* \
++	| mips64vr5000-* | mips64vr5000el-* \
++	| mips64vr5900-* | mips64vr5900el-* \
++	| mipsisa32-* | mipsisa32el-* \
++	| mipsisa32r2-* | mipsisa32r2el-* \
++	| mipsisa64-* | mipsisa64el-* \
++	| mipsisa64r2-* | mipsisa64r2el-* \
++	| mipsisa64sb1-* | mipsisa64sb1el-* \
++	| mipsisa64sr71k-* | mipsisa64sr71kel-* \
++	| mipstx39-* | mipstx39el-* \
++	| mmix-* \
++	| mt-* \
++	| msp430-* \
++	| nios-* | nios2-* \
++	| none-* | np1-* | ns16k-* | ns32k-* \
++	| orion-* \
++	| pdp10-* | pdp11-* | pj-* | pjl-* | pn-* | power-* \
++	| powerpc-* | powerpc64-* | powerpc64le-* | powerpcle-* | ppcbe-* \
++	| pyramid-* \
++	| romp-* | rs6000-* \
++	| sh-* | sh[1234]-* | sh[24]a-* | sh[23]e-* | sh[34]eb-* | sheb-* | shbe-* \
++	| shle-* | sh[1234]le-* | sh3ele-* | sh64-* | sh64le-* \
++	| sparc-* | sparc64-* | sparc64b-* | sparc64v-* | sparc86x-* | sparclet-* \
++	| sparclite-* \
++	| sparcv8-* | sparcv9-* | sparcv9b-* | sparcv9v-* | strongarm-* | sv1-* | sx?-* \
++	| tahoe-* | thumb-* \
++	| tic30-* | tic4x-* | tic54x-* | tic55x-* | tic6x-* | tic80-* \
++	| tron-* \
++	| v850-* | v850e-* | vax-* \
++	| we32k-* \
++	| x86-* | x86_64-* | xc16x-* | xps100-* | xscale-* | xscalee[bl]-* \
++	| xstormy16-* | xtensa*-* \
++	| ymp-* \
++	| z8k-*)
++		;;
++	# Recognize the basic CPU types without company name, with glob match.
++	xtensa*)
++		basic_machine=$basic_machine-unknown
++		;;
++	# Recognize the various machine names and aliases which stand
++	# for a CPU type and a company and sometimes even an OS.
++	386bsd)
++		basic_machine=i386-unknown
++		os=-bsd
++		;;
++	3b1 | 7300 | 7300-att | att-7300 | pc7300 | safari | unixpc)
++		basic_machine=m68000-att
++		;;
++	3b*)
++		basic_machine=we32k-att
++		;;
++	a29khif)
++		basic_machine=a29k-amd
++		os=-udi
++		;;
++    	abacus)
++		basic_machine=abacus-unknown
++		;;
++	adobe68k)
++		basic_machine=m68010-adobe
++		os=-scout
++		;;
++	alliant | fx80)
++		basic_machine=fx80-alliant
++		;;
++	altos | altos3068)
++		basic_machine=m68k-altos
++		;;
++	am29k)
++		basic_machine=a29k-none
++		os=-bsd
++		;;
++	amd64)
++		basic_machine=x86_64-pc
++		;;
++	amd64-*)
++		basic_machine=x86_64-`echo $basic_machine | sed 's/^[^-]*-//'`
++		;;
++	amdahl)
++		basic_machine=580-amdahl
++		os=-sysv
++		;;
++	amiga | amiga-*)
++		basic_machine=m68k-unknown
++		;;
++	amigaos | amigados)
++		basic_machine=m68k-unknown
++		os=-amigaos
++		;;
++	amigaunix | amix)
++		basic_machine=m68k-unknown
++		os=-sysv4
++		;;
++	apollo68)
++		basic_machine=m68k-apollo
++		os=-sysv
++		;;
++	apollo68bsd)
++		basic_machine=m68k-apollo
++		os=-bsd
++		;;
++	aux)
++		basic_machine=m68k-apple
++		os=-aux
++		;;
++	balance)
++		basic_machine=ns32k-sequent
++		os=-dynix
++		;;
++	blackfin)
++		basic_machine=bfin-unknown
++		os=-linux
++		;;
++	blackfin-*)
++		basic_machine=bfin-`echo $basic_machine | sed 's/^[^-]*-//'`
++		os=-linux
++		;;
++	c90)
++		basic_machine=c90-cray
++		os=-unicos
++		;;
++	convex-c1)
++		basic_machine=c1-convex
++		os=-bsd
++		;;
++	convex-c2)
++		basic_machine=c2-convex
++		os=-bsd
++		;;
++	convex-c32)
++		basic_machine=c32-convex
++		os=-bsd
++		;;
++	convex-c34)
++		basic_machine=c34-convex
++		os=-bsd
++		;;
++	convex-c38)
++		basic_machine=c38-convex
++		os=-bsd
++		;;
++	cray | j90)
++		basic_machine=j90-cray
++		os=-unicos
++		;;
++	craynv)
++		basic_machine=craynv-cray
++		os=-unicosmp
++		;;
++	cr16)
++		basic_machine=cr16-unknown
++		os=-elf
++		;;
++	crds | unos)
++		basic_machine=m68k-crds
++		;;
++	crisv32 | crisv32-* | etraxfs*)
++		basic_machine=crisv32-axis
++		;;
++	cris | cris-* | etrax*)
++		basic_machine=cris-axis
++		;;
++	crx)
++		basic_machine=crx-unknown
++		os=-elf
++		;;
++	da30 | da30-*)
++		basic_machine=m68k-da30
++		;;
++	decstation | decstation-3100 | pmax | pmax-* | pmin | dec3100 | decstatn)
++		basic_machine=mips-dec
++		;;
++	decsystem10* | dec10*)
++		basic_machine=pdp10-dec
++		os=-tops10
++		;;
++	decsystem20* | dec20*)
++		basic_machine=pdp10-dec
++		os=-tops20
++		;;
++	delta | 3300 | motorola-3300 | motorola-delta \
++	      | 3300-motorola | delta-motorola)
++		basic_machine=m68k-motorola
++		;;
++	delta88)
++		basic_machine=m88k-motorola
++		os=-sysv3
++		;;
++	djgpp)
++		basic_machine=i586-pc
++		os=-msdosdjgpp
++		;;
++	dpx20 | dpx20-*)
++		basic_machine=rs6000-bull
++		os=-bosx
++		;;
++	dpx2* | dpx2*-bull)
++		basic_machine=m68k-bull
++		os=-sysv3
++		;;
++	ebmon29k)
++		basic_machine=a29k-amd
++		os=-ebmon
++		;;
++	elxsi)
++		basic_machine=elxsi-elxsi
++		os=-bsd
++		;;
++	encore | umax | mmax)
++		basic_machine=ns32k-encore
++		;;
++	es1800 | OSE68k | ose68k | ose | OSE)
++		basic_machine=m68k-ericsson
++		os=-ose
++		;;
++	fx2800)
++		basic_machine=i860-alliant
++		;;
++	genix)
++		basic_machine=ns32k-ns
++		;;
++	gmicro)
++		basic_machine=tron-gmicro
++		os=-sysv
++		;;
++	go32)
++		basic_machine=i386-pc
++		os=-go32
++		;;
++	h3050r* | hiux*)
++		basic_machine=hppa1.1-hitachi
++		os=-hiuxwe2
++		;;
++	h8300hms)
++		basic_machine=h8300-hitachi
++		os=-hms
++		;;
++	h8300xray)
++		basic_machine=h8300-hitachi
++		os=-xray
++		;;
++	h8500hms)
++		basic_machine=h8500-hitachi
++		os=-hms
++		;;
++	harris)
++		basic_machine=m88k-harris
++		os=-sysv3
++		;;
++	hp300-*)
++		basic_machine=m68k-hp
++		;;
++	hp300bsd)
++		basic_machine=m68k-hp
++		os=-bsd
++		;;
++	hp300hpux)
++		basic_machine=m68k-hp
++		os=-hpux
++		;;
++	hp3k9[0-9][0-9] | hp9[0-9][0-9])
++		basic_machine=hppa1.0-hp
++		;;
++	hp9k2[0-9][0-9] | hp9k31[0-9])
++		basic_machine=m68000-hp
++		;;
++	hp9k3[2-9][0-9])
++		basic_machine=m68k-hp
++		;;
++	hp9k6[0-9][0-9] | hp6[0-9][0-9])
++		basic_machine=hppa1.0-hp
++		;;
++	hp9k7[0-79][0-9] | hp7[0-79][0-9])
++		basic_machine=hppa1.1-hp
++		;;
++	hp9k78[0-9] | hp78[0-9])
++		# FIXME: really hppa2.0-hp
++		basic_machine=hppa1.1-hp
++		;;
++	hp9k8[67]1 | hp8[67]1 | hp9k80[24] | hp80[24] | hp9k8[78]9 | hp8[78]9 | hp9k893 | hp893)
++		# FIXME: really hppa2.0-hp
++		basic_machine=hppa1.1-hp
++		;;
++	hp9k8[0-9][13679] | hp8[0-9][13679])
++		basic_machine=hppa1.1-hp
++		;;
++	hp9k8[0-9][0-9] | hp8[0-9][0-9])
++		basic_machine=hppa1.0-hp
++		;;
++	hppa-next)
++		os=-nextstep3
++		;;
++	hppaosf)
++		basic_machine=hppa1.1-hp
++		os=-osf
++		;;
++	hppro)
++		basic_machine=hppa1.1-hp
++		os=-proelf
++		;;
++	i370-ibm* | ibm*)
++		basic_machine=i370-ibm
++		;;
++# I'm not sure what "Sysv32" means.  Should this be sysv3.2?
++	i*86v32)
++		basic_machine=`echo $1 | sed -e 's/86.*/86-pc/'`
++		os=-sysv32
++		;;
++	i*86v4*)
++		basic_machine=`echo $1 | sed -e 's/86.*/86-pc/'`
++		os=-sysv4
++		;;
++	i*86v)
++		basic_machine=`echo $1 | sed -e 's/86.*/86-pc/'`
++		os=-sysv
++		;;
++	i*86sol2)
++		basic_machine=`echo $1 | sed -e 's/86.*/86-pc/'`
++		os=-solaris2
++		;;
++	i386mach)
++		basic_machine=i386-mach
++		os=-mach
++		;;
++	i386-vsta | vsta)
++		basic_machine=i386-unknown
++		os=-vsta
++		;;
++	iris | iris4d)
++		basic_machine=mips-sgi
++		case $os in
++		    -irix*)
++			;;
++		    *)
++			os=-irix4
++			;;
++		esac
++		;;
++	isi68 | isi)
++		basic_machine=m68k-isi
++		os=-sysv
++		;;
++	m68knommu)
++		basic_machine=m68k-unknown
++		os=-linux
++		;;
++	m68knommu-*)
++		basic_machine=m68k-`echo $basic_machine | sed 's/^[^-]*-//'`
++		os=-linux
++		;;
++	m88k-omron*)
++		basic_machine=m88k-omron
++		;;
++	magnum | m3230)
++		basic_machine=mips-mips
++		os=-sysv
++		;;
++	merlin)
++		basic_machine=ns32k-utek
++		os=-sysv
++		;;
++	mingw32)
++		basic_machine=i386-pc
++		os=-mingw32
++		;;
++	mingw32ce)
++		basic_machine=arm-unknown
++		os=-mingw32ce
++		;;
++	miniframe)
++		basic_machine=m68000-convergent
++		;;
++	*mint | -mint[0-9]* | *MiNT | *MiNT[0-9]*)
++		basic_machine=m68k-atari
++		os=-mint
++		;;
++	mips3*-*)
++		basic_machine=`echo $basic_machine | sed -e 's/mips3/mips64/'`
++		;;
++	mips3*)
++		basic_machine=`echo $basic_machine | sed -e 's/mips3/mips64/'`-unknown
++		;;
++	monitor)
++		basic_machine=m68k-rom68k
++		os=-coff
++		;;
++	morphos)
++		basic_machine=powerpc-unknown
++		os=-morphos
++		;;
++	msdos)
++		basic_machine=i386-pc
++		os=-msdos
++		;;
++	ms1-*)
++		basic_machine=`echo $basic_machine | sed -e 's/ms1-/mt-/'`
++		;;
++	mvs)
++		basic_machine=i370-ibm
++		os=-mvs
++		;;
++	ncr3000)
++		basic_machine=i486-ncr
++		os=-sysv4
++		;;
++	netbsd386)
++		basic_machine=i386-unknown
++		os=-netbsd
++		;;
++	netwinder)
++		basic_machine=armv4l-rebel
++		os=-linux
++		;;
++	news | news700 | news800 | news900)
++		basic_machine=m68k-sony
++		os=-newsos
++		;;
++	news1000)
++		basic_machine=m68030-sony
++		os=-newsos
++		;;
++	news-3600 | risc-news)
++		basic_machine=mips-sony
++		os=-newsos
++		;;
++	necv70)
++		basic_machine=v70-nec
++		os=-sysv
++		;;
++	next | m*-next )
++		basic_machine=m68k-next
++		case $os in
++		    -nextstep* )
++			;;
++		    -ns2*)
++		      os=-nextstep2
++			;;
++		    *)
++		      os=-nextstep3
++			;;
++		esac
++		;;
++	nh3000)
++		basic_machine=m68k-harris
++		os=-cxux
++		;;
++	nh[45]000)
++		basic_machine=m88k-harris
++		os=-cxux
++		;;
++	nindy960)
++		basic_machine=i960-intel
++		os=-nindy
++		;;
++	mon960)
++		basic_machine=i960-intel
++		os=-mon960
++		;;
++	nonstopux)
++		basic_machine=mips-compaq
++		os=-nonstopux
++		;;
++	np1)
++		basic_machine=np1-gould
++		;;
++	nsr-tandem)
++		basic_machine=nsr-tandem
++		;;
++	op50n-* | op60c-*)
++		basic_machine=hppa1.1-oki
++		os=-proelf
++		;;
++	openrisc | openrisc-*)
++		basic_machine=or32-unknown
++		;;
++	os400)
++		basic_machine=powerpc-ibm
++		os=-os400
++		;;
++	OSE68000 | ose68000)
++		basic_machine=m68000-ericsson
++		os=-ose
++		;;
++	os68k)
++		basic_machine=m68k-none
++		os=-os68k
++		;;
++	pa-hitachi)
++		basic_machine=hppa1.1-hitachi
++		os=-hiuxwe2
++		;;
++	paragon)
++		basic_machine=i860-intel
++		os=-osf
++		;;
++	parisc)
++		basic_machine=hppa-unknown
++		os=-linux
++		;;
++	parisc-*)
++		basic_machine=hppa-`echo $basic_machine | sed 's/^[^-]*-//'`
++		os=-linux
++		;;
++	pbd)
++		basic_machine=sparc-tti
++		;;
++	pbb)
++		basic_machine=m68k-tti
++		;;
++	pc532 | pc532-*)
++		basic_machine=ns32k-pc532
++		;;
++	pc98)
++		basic_machine=i386-pc
++		;;
++	pc98-*)
++		basic_machine=i386-`echo $basic_machine | sed 's/^[^-]*-//'`
++		;;
++	pentium | p5 | k5 | k6 | nexgen | viac3)
++		basic_machine=i586-pc
++		;;
++	pentiumpro | p6 | 6x86 | athlon | athlon_*)
++		basic_machine=i686-pc
++		;;
++	pentiumii | pentium2 | pentiumiii | pentium3)
++		basic_machine=i686-pc
++		;;
++	pentium4)
++		basic_machine=i786-pc
++		;;
++	pentium-* | p5-* | k5-* | k6-* | nexgen-* | viac3-*)
++		basic_machine=i586-`echo $basic_machine | sed 's/^[^-]*-//'`
++		;;
++	pentiumpro-* | p6-* | 6x86-* | athlon-*)
++		basic_machine=i686-`echo $basic_machine | sed 's/^[^-]*-//'`
++		;;
++	pentiumii-* | pentium2-* | pentiumiii-* | pentium3-*)
++		basic_machine=i686-`echo $basic_machine | sed 's/^[^-]*-//'`
++		;;
++	pentium4-*)
++		basic_machine=i786-`echo $basic_machine | sed 's/^[^-]*-//'`
++		;;
++	pn)
++		basic_machine=pn-gould
++		;;
++	power)	basic_machine=power-ibm
++		;;
++	ppc)	basic_machine=powerpc-unknown
++		;;
++	ppc-*)	basic_machine=powerpc-`echo $basic_machine | sed 's/^[^-]*-//'`
++		;;
++	ppcle | powerpclittle | ppc-le | powerpc-little)
++		basic_machine=powerpcle-unknown
++		;;
++	ppcle-* | powerpclittle-*)
++		basic_machine=powerpcle-`echo $basic_machine | sed 's/^[^-]*-//'`
++		;;
++	ppc64)	basic_machine=powerpc64-unknown
++		;;
++	ppc64-*) basic_machine=powerpc64-`echo $basic_machine | sed 's/^[^-]*-//'`
++		;;
++	ppc64le | powerpc64little | ppc64-le | powerpc64-little)
++		basic_machine=powerpc64le-unknown
++		;;
++	ppc64le-* | powerpc64little-*)
++		basic_machine=powerpc64le-`echo $basic_machine | sed 's/^[^-]*-//'`
++		;;
++	ps2)
++		basic_machine=i386-ibm
++		;;
++	pw32)
++		basic_machine=i586-unknown
++		os=-pw32
++		;;
++	rdos)
++		basic_machine=i386-pc
++		os=-rdos
++		;;
++	rom68k)
++		basic_machine=m68k-rom68k
++		os=-coff
++		;;
++	rm[46]00)
++		basic_machine=mips-siemens
++		;;
++	rtpc | rtpc-*)
++		basic_machine=romp-ibm
++		;;
++	s390 | s390-*)
++		basic_machine=s390-ibm
++		;;
++	s390x | s390x-*)
++		basic_machine=s390x-ibm
++		;;
++	sa29200)
++		basic_machine=a29k-amd
++		os=-udi
++		;;
++	sb1)
++		basic_machine=mipsisa64sb1-unknown
++		;;
++	sb1el)
++		basic_machine=mipsisa64sb1el-unknown
++		;;
++	sde)
++		basic_machine=mipsisa32-sde
++		os=-elf
++		;;
++	sei)
++		basic_machine=mips-sei
++		os=-seiux
++		;;
++	sequent)
++		basic_machine=i386-sequent
++		;;
++	sh)
++		basic_machine=sh-hitachi
++		os=-hms
++		;;
++	sh5el)
++		basic_machine=sh5le-unknown
++		;;
++	sh64)
++		basic_machine=sh64-unknown
++		;;
++	sparclite-wrs | simso-wrs)
++		basic_machine=sparclite-wrs
++		os=-vxworks
++		;;
++	sps7)
++		basic_machine=m68k-bull
++		os=-sysv2
++		;;
++	spur)
++		basic_machine=spur-unknown
++		;;
++	st2000)
++		basic_machine=m68k-tandem
++		;;
++	stratus)
++		basic_machine=i860-stratus
++		os=-sysv4
++		;;
++	sun2)
++		basic_machine=m68000-sun
++		;;
++	sun2os3)
++		basic_machine=m68000-sun
++		os=-sunos3
++		;;
++	sun2os4)
++		basic_machine=m68000-sun
++		os=-sunos4
++		;;
++	sun3os3)
++		basic_machine=m68k-sun
++		os=-sunos3
++		;;
++	sun3os4)
++		basic_machine=m68k-sun
++		os=-sunos4
++		;;
++	sun4os3)
++		basic_machine=sparc-sun
++		os=-sunos3
++		;;
++	sun4os4)
++		basic_machine=sparc-sun
++		os=-sunos4
++		;;
++	sun4sol2)
++		basic_machine=sparc-sun
++		os=-solaris2
++		;;
++	sun3 | sun3-*)
++		basic_machine=m68k-sun
++		;;
++	sun4)
++		basic_machine=sparc-sun
++		;;
++	sun386 | sun386i | roadrunner)
++		basic_machine=i386-sun
++		;;
++	sv1)
++		basic_machine=sv1-cray
++		os=-unicos
++		;;
++	symmetry)
++		basic_machine=i386-sequent
++		os=-dynix
++		;;
++	t3e)
++		basic_machine=alphaev5-cray
++		os=-unicos
++		;;
++	t90)
++		basic_machine=t90-cray
++		os=-unicos
++		;;
++	tic54x | c54x*)
++		basic_machine=tic54x-unknown
++		os=-coff
++		;;
++	tic55x | c55x*)
++		basic_machine=tic55x-unknown
++		os=-coff
++		;;
++	tic6x | c6x*)
++		basic_machine=tic6x-unknown
++		os=-coff
++		;;
++	tile*)
++		basic_machine=tile-unknown
++		os=-linux-gnu
++		;;
++	tx39)
++		basic_machine=mipstx39-unknown
++		;;
++	tx39el)
++		basic_machine=mipstx39el-unknown
++		;;
++	toad1)
++		basic_machine=pdp10-xkl
++		os=-tops20
++		;;
++	tower | tower-32)
++		basic_machine=m68k-ncr
++		;;
++	tpf)
++		basic_machine=s390x-ibm
++		os=-tpf
++		;;
++	udi29k)
++		basic_machine=a29k-amd
++		os=-udi
++		;;
++	ultra3)
++		basic_machine=a29k-nyu
++		os=-sym1
++		;;
++	v810 | necv810)
++		basic_machine=v810-nec
++		os=-none
++		;;
++	vaxv)
++		basic_machine=vax-dec
++		os=-sysv
++		;;
++	vms)
++		basic_machine=vax-dec
++		os=-vms
++		;;
++	vpp*|vx|vx-*)
++		basic_machine=f301-fujitsu
++		;;
++	vxworks960)
++		basic_machine=i960-wrs
++		os=-vxworks
++		;;
++	vxworks68)
++		basic_machine=m68k-wrs
++		os=-vxworks
++		;;
++	vxworks29k)
++		basic_machine=a29k-wrs
++		os=-vxworks
++		;;
++	w65*)
++		basic_machine=w65-wdc
++		os=-none
++		;;
++	w89k-*)
++		basic_machine=hppa1.1-winbond
++		os=-proelf
++		;;
++	xbox)
++		basic_machine=i686-pc
++		os=-mingw32
++		;;
++	xps | xps100)
++		basic_machine=xps100-honeywell
++		;;
++	ymp)
++		basic_machine=ymp-cray
++		os=-unicos
++		;;
++	z8k-*-coff)
++		basic_machine=z8k-unknown
++		os=-sim
++		;;
++	none)
++		basic_machine=none-none
++		os=-none
++		;;
++
++# Here we handle the default manufacturer of certain CPU types.  It is in
++# some cases the only manufacturer, in others, it is the most popular.
++	w89k)
++		basic_machine=hppa1.1-winbond
++		;;
++	op50n)
++		basic_machine=hppa1.1-oki
++		;;
++	op60c)
++		basic_machine=hppa1.1-oki
++		;;
++	romp)
++		basic_machine=romp-ibm
++		;;
++	mmix)
++		basic_machine=mmix-knuth
++		;;
++	rs6000)
++		basic_machine=rs6000-ibm
++		;;
++	vax)
++		basic_machine=vax-dec
++		;;
++	pdp10)
++		# there are many clones, so DEC is not a safe bet
++		basic_machine=pdp10-unknown
++		;;
++	pdp11)
++		basic_machine=pdp11-dec
++		;;
++	we32k)
++		basic_machine=we32k-att
++		;;
++	sh[1234] | sh[24]a | sh[34]eb | sh[1234]le | sh[23]ele)
++		basic_machine=sh-unknown
++		;;
++	sparc | sparcv8 | sparcv9 | sparcv9b | sparcv9v)
++		basic_machine=sparc-sun
++		;;
++	cydra)
++		basic_machine=cydra-cydrome
++		;;
++	orion)
++		basic_machine=orion-highlevel
++		;;
++	orion105)
++		basic_machine=clipper-highlevel
++		;;
++	mac | mpw | mac-mpw)
++		basic_machine=m68k-apple
++		;;
++	pmac | pmac-mpw)
++		basic_machine=powerpc-apple
++		;;
++	*-unknown)
++		# Make sure to match an already-canonicalized machine name.
++		;;
++	*)
++		echo Invalid configuration \`$1\': machine \`$basic_machine\' not recognized 1>&2
++		exit 1
++		;;
++esac
++
++# Here we canonicalize certain aliases for manufacturers.
++case $basic_machine in
++	*-digital*)
++		basic_machine=`echo $basic_machine | sed 's/digital.*/dec/'`
++		;;
++	*-commodore*)
++		basic_machine=`echo $basic_machine | sed 's/commodore.*/cbm/'`
++		;;
++	*)
++		;;
++esac
++
++# Decode manufacturer-specific aliases for certain operating systems.
++
++if [ x"$os" != x"" ]
++then
++case $os in
++        # First match some system type aliases
++        # that might get confused with valid system types.
++	# -solaris* is a basic system type, with this one exception.
++	-solaris1 | -solaris1.*)
++		os=`echo $os | sed -e 's|solaris1|sunos4|'`
++		;;
++	-solaris)
++		os=-solaris2
++		;;
++	-svr4*)
++		os=-sysv4
++		;;
++	-unixware*)
++		os=-sysv4.2uw
++		;;
++	-gnu/linux*)
++		os=`echo $os | sed -e 's|gnu/linux|linux-gnu|'`
++		;;
++	# First accept the basic system types.
++	# The portable systems comes first.
++	# Each alternative MUST END IN A *, to match a version number.
++	# -sysv* is not here because it comes later, after sysvr4.
++	-gnu* | -bsd* | -mach* | -minix* | -genix* | -ultrix* | -irix* \
++	      | -*vms* | -sco* | -esix* | -isc* | -aix* | -sunos | -sunos[34]*\
++	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -solaris* | -sym* \
++	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
++	      | -aos* \
++	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
++	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
++	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
++	      | -openbsd* | -solidbsd* \
++	      | -ekkobsd* | -kfreebsd* | -freebsd* | -riscix* | -lynxos* \
++	      | -bosx* | -nextstep* | -cxux* | -aout* | -elf* | -oabi* \
++	      | -ptx* | -coff* | -ecoff* | -winnt* | -domain* | -vsta* \
++	      | -udi* | -eabi* | -lites* | -ieee* | -go32* | -aux* \
++	      | -chorusos* | -chorusrdb* \
++	      | -cygwin* | -pe* | -psos* | -moss* | -proelf* | -rtems* \
++	      | -mingw32* | -linux-gnu* | -linux-newlib* | -linux-uclibc* \
++	      | -uxpv* | -beos* | -mpeix* | -udk* \
++	      | -interix* | -uwin* | -mks* | -rhapsody* | -darwin* | -opened* \
++	      | -openstep* | -oskit* | -conix* | -pw32* | -nonstopux* \
++	      | -storm-chaos* | -tops10* | -tenex* | -tops20* | -its* \
++	      | -os2* | -vos* | -palmos* | -uclinux* | -nucleus* \
++	      | -morphos* | -superux* | -rtmk* | -rtmk-nova* | -windiss* \
++	      | -powermax* | -dnix* | -nx6 | -nx7 | -sei* | -dragonfly* \
++	      | -skyos* | -haiku* | -rdos* | -toppers* | -drops*)
++	# Remember, each alternative MUST END IN *, to match a version number.
++		;;
++	-qnx*)
++		case $basic_machine in
++		    x86-* | i*86-*)
++			;;
++		    *)
++			os=-nto$os
++			;;
++		esac
++		;;
++	-nto-qnx*)
++		;;
++	-nto*)
++		os=`echo $os | sed -e 's|nto|nto-qnx|'`
++		;;
++	-sim | -es1800* | -hms* | -xray | -os68k* | -none* | -v88r* \
++	      | -windows* | -osx | -abug | -netware* | -os9* | -beos* | -haiku* \
++	      | -macos* | -mpw* | -magic* | -mmixware* | -mon960* | -lnews*)
++		;;
++	-mac*)
++		os=`echo $os | sed -e 's|mac|macos|'`
++		;;
++	-linux-dietlibc)
++		os=-linux-dietlibc
++		;;
++	-linux*)
++		os=`echo $os | sed -e 's|linux|linux-gnu|'`
++		;;
++	-sunos5*)
++		os=`echo $os | sed -e 's|sunos5|solaris2|'`
++		;;
++	-sunos6*)
++		os=`echo $os | sed -e 's|sunos6|solaris3|'`
++		;;
++	-opened*)
++		os=-openedition
++		;;
++        -os400*)
++		os=-os400
++		;;
++	-wince*)
++		os=-wince
++		;;
++	-osfrose*)
++		os=-osfrose
++		;;
++	-osf*)
++		os=-osf
++		;;
++	-utek*)
++		os=-bsd
++		;;
++	-dynix*)
++		os=-bsd
++		;;
++	-acis*)
++		os=-aos
++		;;
++	-atheos*)
++		os=-atheos
++		;;
++	-syllable*)
++		os=-syllable
++		;;
++	-386bsd)
++		os=-bsd
++		;;
++	-ctix* | -uts*)
++		os=-sysv
++		;;
++	-nova*)
++		os=-rtmk-nova
++		;;
++	-ns2 )
++		os=-nextstep2
++		;;
++	-nsk*)
++		os=-nsk
++		;;
++	# Preserve the version number of sinix5.
++	-sinix5.*)
++		os=`echo $os | sed -e 's|sinix|sysv|'`
++		;;
++	-sinix*)
++		os=-sysv4
++		;;
++        -tpf*)
++		os=-tpf
++		;;
++	-triton*)
++		os=-sysv3
++		;;
++	-oss*)
++		os=-sysv3
++		;;
++	-svr4)
++		os=-sysv4
++		;;
++	-svr3)
++		os=-sysv3
++		;;
++	-sysvr4)
++		os=-sysv4
++		;;
++	# This must come after -sysvr4.
++	-sysv*)
++		;;
++	-ose*)
++		os=-ose
++		;;
++	-es1800*)
++		os=-ose
++		;;
++	-xenix)
++		os=-xenix
++		;;
++	-*mint | -mint[0-9]* | -*MiNT | -MiNT[0-9]*)
++		os=-mint
++		;;
++	-aros*)
++		os=-aros
++		;;
++	-kaos*)
++		os=-kaos
++		;;
++	-zvmoe)
++		os=-zvmoe
++		;;
++	-none)
++		;;
++	*)
++		# Get rid of the `-' at the beginning of $os.
++		os=`echo $os | sed 's/[^-]*-//'`
++		echo Invalid configuration \`$1\': system \`$os\' not recognized 1>&2
++		exit 1
++		;;
++esac
++else
++
++# Here we handle the default operating systems that come with various machines.
++# The value should be what the vendor currently ships out the door with their
++# machine or put another way, the most popular os provided with the machine.
++
++# Note that if you're going to try to match "-MANUFACTURER" here (say,
++# "-sun"), then you have to tell the case statement up towards the top
++# that MANUFACTURER isn't an operating system.  Otherwise, code above
++# will signal an error saying that MANUFACTURER isn't an operating
++# system, and we'll never get to this point.
++
++case $basic_machine in
++        score-*)
++		os=-elf
++		;;
++        spu-*)
++		os=-elf
++		;;
++	*-acorn)
++		os=-riscix1.2
++		;;
++	arm*-rebel)
++		os=-linux
++		;;
++	arm*-semi)
++		os=-aout
++		;;
++        c4x-* | tic4x-*)
++        	os=-coff
++		;;
++	# This must come before the *-dec entry.
++	pdp10-*)
++		os=-tops20
++		;;
++	pdp11-*)
++		os=-none
++		;;
++	*-dec | vax-*)
++		os=-ultrix4.2
++		;;
++	m68*-apollo)
++		os=-domain
++		;;
++	i386-sun)
++		os=-sunos4.0.2
++		;;
++	m68000-sun)
++		os=-sunos3
++		# This also exists in the configure program, but was not the
++		# default.
++		# os=-sunos4
++		;;
++	m68*-cisco)
++		os=-aout
++		;;
++        mep-*)
++		os=-elf
++		;;
++	mips*-cisco)
++		os=-elf
++		;;
++	mips*-*)
++		os=-elf
++		;;
++	or32-*)
++		os=-coff
++		;;
++	*-tti)	# must be before sparc entry or we get the wrong os.
++		os=-sysv3
++		;;
++	sparc-* | *-sun)
++		os=-sunos4.1.1
++		;;
++	*-be)
++		os=-beos
++		;;
++	*-haiku)
++		os=-haiku
++		;;
++	*-ibm)
++		os=-aix
++		;;
++    	*-knuth)
++		os=-mmixware
++		;;
++	*-wec)
++		os=-proelf
++		;;
++	*-winbond)
++		os=-proelf
++		;;
++	*-oki)
++		os=-proelf
++		;;
++	*-hp)
++		os=-hpux
++		;;
++	*-hitachi)
++		os=-hiux
++		;;
++	i860-* | *-att | *-ncr | *-altos | *-motorola | *-convergent)
++		os=-sysv
++		;;
++	*-cbm)
++		os=-amigaos
++		;;
++	*-dg)
++		os=-dgux
++		;;
++	*-dolphin)
++		os=-sysv3
++		;;
++	m68k-ccur)
++		os=-rtu
++		;;
++	m88k-omron*)
++		os=-luna
++		;;
++	*-next )
++		os=-nextstep
++		;;
++	*-sequent)
++		os=-ptx
++		;;
++	*-crds)
++		os=-unos
++		;;
++	*-ns)
++		os=-genix
++		;;
++	i370-*)
++		os=-mvs
++		;;
++	*-next)
++		os=-nextstep3
++		;;
++	*-gould)
++		os=-sysv
++		;;
++	*-highlevel)
++		os=-bsd
++		;;
++	*-encore)
++		os=-bsd
++		;;
++	*-sgi)
++		os=-irix
++		;;
++	*-siemens)
++		os=-sysv4
++		;;
++	*-masscomp)
++		os=-rtu
++		;;
++	f30[01]-fujitsu | f700-fujitsu)
++		os=-uxpv
++		;;
++	*-rom68k)
++		os=-coff
++		;;
++	*-*bug)
++		os=-coff
++		;;
++	*-apple)
++		os=-macos
++		;;
++	*-atari*)
++		os=-mint
++		;;
++	*)
++		os=-none
++		;;
++esac
++fi
++
++# Here we handle the case where we know the os, and the CPU type, but not the
++# manufacturer.  We pick the logical manufacturer.
++vendor=unknown
++case $basic_machine in
++	*-unknown)
++		case $os in
++			-riscix*)
++				vendor=acorn
++				;;
++			-sunos*)
++				vendor=sun
++				;;
++			-aix*)
++				vendor=ibm
++				;;
++			-beos*)
++				vendor=be
++				;;
++			-hpux*)
++				vendor=hp
++				;;
++			-mpeix*)
++				vendor=hp
++				;;
++			-hiux*)
++				vendor=hitachi
++				;;
++			-unos*)
++				vendor=crds
++				;;
++			-dgux*)
++				vendor=dg
++				;;
++			-luna*)
++				vendor=omron
++				;;
++			-genix*)
++				vendor=ns
++				;;
++			-mvs* | -opened*)
++				vendor=ibm
++				;;
++			-os400*)
++				vendor=ibm
++				;;
++			-ptx*)
++				vendor=sequent
++				;;
++			-tpf*)
++				vendor=ibm
++				;;
++			-vxsim* | -vxworks* | -windiss*)
++				vendor=wrs
++				;;
++			-aux*)
++				vendor=apple
++				;;
++			-hms*)
++				vendor=hitachi
++				;;
++			-mpw* | -macos*)
++				vendor=apple
++				;;
++			-*mint | -mint[0-9]* | -*MiNT | -MiNT[0-9]*)
++				vendor=atari
++				;;
++			-vos*)
++				vendor=stratus
++				;;
++		esac
++		basic_machine=`echo $basic_machine | sed "s/unknown/$vendor/"`
++		;;
++esac
++
++echo $basic_machine$os
++exit
++
++# Local variables:
++# eval: (add-hook 'write-file-hooks 'time-stamp)
++# time-stamp-start: "timestamp='"
++# time-stamp-format: "%:y-%02m-%02d"
++# time-stamp-end: "'"
++# End:
+diff --git a/cnf/configure b/cnf/configure
+new file mode 100755
+index 0000000..a6e6ca3
+--- /dev/null
++++ b/cnf/configure
+@@ -0,0 +1,179 @@
++#!/bin/sh
++
++if [ -z "$base" ]; then export base=.; else export base; fi
++#export CFLAGS='-D_POSIX_C_SOURCE -D_XOPEN_SOURCE -D_GNU_SOURCE'
++
++config='config.bad'
++cfglog='config.log'
++
++. $base/configure__f.sh
++. $base/configure_args.sh
++
++if [ "$mode" == 'help' ]; then
++	. $base/configure_help.sh
++	exit
++fi
++
++if [ -z "$mode" ]; then
++	echo -n > $cfglog
++	mstart "Guessing build platform"
++	if [ "x$build" == "x" ]; then
++		buildarch=`$base/config.guess 2>>$cfglog`
++	else
++		buildarch=`$base/config.sub "$build" 2>>$cfglog`
++	fi
++	if [ -z "$buildarch" ]; then
++		result "unknown"
++		die "Can't guess build platform"
++	else
++		result "$buildarch"
++	fi
++
++	if [ -z "$target" -o "$target" == "$build" ]; then
++		msg "Assuming native build"
++		mode='native'
++		targetarch="$buildarch"
++		target="$build"
++	else
++		msg "Assuming cross-compilation for '$target'"
++		mode='cross'
++		mstart "Guessing target architecture"	
++		targetarch=`$base/config.sub "$target" 2>>$cfglog`
++		if [ -z "$targetarch" ]; then
++			gcctarget=`$target-gcc -v 2>&1 | grep Target | sed -e 's/Target: *//'`
++			targetarch=`$base/config.sub "$gcctarget" 2>>$cfglog`
++			if [ -z "$targetarch" ]; then
++				result "unknown"
++				die "Can't determine target architecture"
++			fi
++		fi
++		result "$targetarch"
++	fi
++fi
++
++if [ "$mode" == "cross" -o "$mode" == "native" -o "$mode" == "target" ]; then
++	. $base/configure_dirs_targ.sh
++elif [ "$mode" == "buildmini" ]; then
++	. $base/configure_dirs_host.sh
++fi
++
++if [ "$mode" == "cross" ]; then
++	msg "Respawning configure for build and target platforms"
++	msg
++	run $0 $hco --mode=buildmini --targetarch="$buildarch"\
++		--target-name="$target" --target-arch="$targetarch" --sysroot="$sysroot"\
++		|| die "configure --mode=buildmini failed"
++	msg
++       	run $0 "$@" --mode=target --target="$target" --targetarch="$targetarch"\
++		|| die "configure --mode=target failed"
++	msg
++elif [ "$mode" == "buildmini" ]; then
++	targetlabel=`archlabel "$target" "$targetarch"`
++	msg "Configuring build-time miniperl for $targetlabel"
++	if [ "x$target" != "x" ]; then pf1="$target-"; else pf1=""; fi
++	pf2="$target-"
++	config='xconfig.sh'
++elif [ "$mode" == "target" ]; then
++	targetlabel=`archlabel "$target" "$targetarch"`
++	msg "Configuring primary perl executable for $targetlabel"
++	if [ "x$target" != "x" ]; then pf1="$target-"; else pf1="$targetarch-"; fi
++	pf2="$target-"
++	config='config.sh'
++elif [ "$mode" == "native" ]; then 
++	msg "Configuring for native build"
++	config='config.sh'
++fi
++
++if [ "$mode" == "target" ]; then
++	const 'usecrosscompile' 'define'
++fi
++
++if [ "$mode" == 'native' -o "$mode" == 'buildmini' -o "$mode" == "target" ]; then
++	. $base/configure_version.sh
++	. $base/configure_vars.sh
++	. $base/configure_hint.sh
++	. $base/configure_prog.sh
++	. $base/configure_hdrs.sh
++	. $base/configure_type.sh
++	. $base/configure_type_ext.sh
++	. $base/configure_type_sel.sh
++	. $base/configure_byte.sh
++	. $base/configure_sigs.sh
++	. $base/configure_func.sh
++	. $base/configure_link.sh
++	failpoint
++	. $base/configure_mods.sh
++	failpoint
++	. $base/configure_gencfg.sh
++	failpoint
++	if [ "$mode" == 'target' ]; then
++		config="tconfig.sh"
++		. $base/configure_target.sh
++		. $base/configure_gencfg.sh
++		failpoint
++	fi
++fi
++
++
++if [ "$mode" == 'native' ]; then
++	echo "Generating config.h"
++	./config_h.SH
++	echo "Generating Makefile.config"
++	./Makefile.config.SH
++
++	echo
++	echo "Configuration completed for native build"
++	echo
++	echo "            platform:  $archname"
++	echo "          c compiler:  $cc"
++	echo "                  ld:  $ld"
++	echo "                  ar:  $ar"
++	echo "              ranlib:  $ranlib"
++	echo "              prefix:  $prefix"
++	echo " installation prefix:  $installprefix"
++	echo
++elif [ "$mode" == 'cross' ]; then
++	echo "Generating config.h and xconfig.h"
++	CONFIG_SH=config.sh  CONFIG_H=config.h  ./config_h.SH
++	CONFIG_SH=xconfig.sh CONFIG_H=xconfig.h ./config_h.SH
++	echo "Generating Makefile.config"
++	./Makefile.config.SH
++	echo
++	echo "Configuration completed for cross build"
++	echo
++	. xconfig.sh
++	echo "      build platform:  $archname"
++	echo "          C compiler:  $cc"
++	echo "              linker:  $ld"
++	echo "                  ar:  $ar"
++	echo "              ranlib:  $ranlib"
++	echo "             objdump:  $objdump"
++	echo
++	. config.sh
++	echo "     target platform:  $archname"
++	echo "          C compiler:  $cc"
++	echo "                  ld:  $ld"
++	echo "                  ar:  $ar"
++	echo "              ranlib:  $ranlib"
++	echo "             objdump:  $objdump"
++	echo
++	echo "              prefix:  $prefix"
++	echo "             sysroot:  $sysroot"
++	echo " installation prefix:  $installprefix"
++	echo "         executables:  $bin"
++	echo "             scripts:  $bin"
++	echo "             privlib:  $privlib"
++	echo "             archlib:  $archlib"
++	echo " section 1 man pages:  $man1dir  (with '$man1ext' extension)"
++	echo " section 3 man pages:  $man3dir  (with '$man3ext' extension)"
++	echo
++elif [ "$mode" == "regen" ]; then
++	if [ -f config.sh ]; then
++		CONFIG_SH=config.sh  CONFIG_H=config.h  ./config_h.SH
++	fi
++	if [ -f xconfig.sh ]; then
++		CONFIG_SH=xconfig.sh CONFIG_H=xconfig.h ./config_h.SH
++	fi
++	echo "Generating Makefile.config"
++	./Makefile.config.SH
++fi
+diff --git a/cnf/configure__f.sh b/cnf/configure__f.sh
+new file mode 100644
+index 0000000..4f5a5bd
+--- /dev/null
++++ b/cnf/configure__f.sh
+@@ -0,0 +1,258 @@
++#!/bin/sh
++
++# General-purpose functions used by most of other modules
++
++# Note: one-letter variables are "local"
++
++function die {
++	echo "ERROR: $*" >> $cfglog
++	echo "ERROR: $*" >&2
++	exit -1
++}
++
++function result {
++	echo "Result: $*" >> $cfglog
++	echo >> $cfglog
++	echo "$@" >&2
++}
++
++function log {
++	echo -e "$@" >> $cfglog
++}
++
++function msg {
++	echo -e "$@" >> $cfglog
++	echo -e "$@" >&2
++}
++
++function run {
++	echo "> $@" >> $cfglog
++	"$@"
++}
++
++# Let user see the whole bunch of errors instead of stopping on the first
++function fail {
++	echo "ERROR: $*" >& 2
++	fail=1
++}
++
++function failpoint {
++	if [ -n "$fail" ]; then
++		exit -1
++	fi
++}
++
++function mstart {
++	echo "$@" >> $cfglog
++	echo -n "$* ... " >& 2
++}
++
++# setvar name value
++# emulates (incorrect in sh) statement $$1="$2"
++function setvar {
++	eval $1="'$2'"
++	log "Set $1='$2'"
++}
++
++# putvar name value
++# just writes given variable to config
++function putvar {
++	echo "$1='$2'" >> $config
++	setvar "$1" "$2"
++}
++
++function setifndef {
++	v=`valueof "$1"`
++	if [ -z "$v" ]; then
++		setvar "$1" "$2"
++	fi
++}
++
++# default name value
++function default {
++	v=`valueof "$1"`
++	if [ -z "$v" ]; then
++		putvar "$1" "$2"
++	else
++		putvar "$1" "$v"
++	fi
++}
++
++# required name
++function required {
++	v=`valueof "$1"`
++	if [ -n "$v" ]; then
++		putvar "$1" "$v"
++	else
++		fail "Required variable $1 not defined"
++	fi
++}
++
++function const {
++	putvar "$1" "$2"
++}
++
++# archlabel target targetarch -> label
++function archlabel {
++	if [ -n "$1" -a -n "$2" ]; then
++		echo "$1 ($2)"
++	elif [ -n "$2" ]; then
++		echo "$2"
++	elif [ -n "$1" ]; then
++		echo "$1"
++	else
++		echo "unknown"
++	fi
++}
++
++# Was more meaningful in the past, but now just a stub.
++function check {
++	"$@"
++}
++
++function not { if "$@"; then false; else true; fi; }
++
++function require {
++	v=`valueof "$1"`
++	if [ -z "$v" ]; then
++		die "Required $1 is not set"
++	fi
++}
++
++function symbolname {
++	echo "$1" | sed -e 's/^\(struct|enum|union|unsigned\) /s_/'\
++		-e 's/\*/ptr/g' -e 's/\.h$//' -e 's/[^A-Za-z0-9_]//' |\
++		tr 'A-Z' 'a-z'
++}
++
++function try_start {
++	echo -n > try.c
++}
++
++function try_includes {
++	for i in "$@"; do 
++		s=i_`symbolname "$i"`
++		v=`valueof "$s"`
++		if [ "$v" == 'define' ]; then
++			echo "#include <$i>" >> try.c
++		else 
++			echo "/* <$i> missing */" >> try.c
++		fi
++	done
++}
++
++function try_add {
++	echo "$@" >> try.c
++}
++
++function try_dump {
++	cat try.c | sed -e 's/^/| /' >> $cfglog
++}
++
++function try_dump_out {
++	cat try.out | sed -e 's/^/| /' >> $cfglog
++}
++
++function try_preproc {
++	require 'cpp'
++	#try_dump
++	run $cpp $cflags try.c > try.out 2>> $cfglog
++}
++
++function try_compile {
++	require 'cc'
++	require '_o'
++	try_dump
++	run $cc $cflags -c -o try$_o try.c >> $cfglog 2>&1
++}
++
++function try_link_libs {
++	require 'cc'
++	try_dump
++	run $cc $cflags -o try$_e try.c $* >> $cfglog 2>&1
++}
++
++function try_link {
++	try_link_libs $libs
++}
++
++function try_readelf {
++	require 'readelf'
++	require '_o'
++	run $readelf $* try$_o
++}
++
++function try_objdump {
++	require 'objdump'
++	require '_o'
++	run $objdump $* try.o > try.out
++}
++
++function isset {
++	z=`valueof "$1"`
++	if test -n "$z"; then
++		log "Skipping check for $1, value already set ($z)"
++		true
++	else
++		false
++	fi
++}
++
++function bytes { if [ "$1" == 1 ]; then echo "byte"; else echo "bytes"; fi }
++
++function valueof { eval echo "\"\$$1\""; }
++
++# $1=$$2
++function pullval {
++	log "Setting $1 from $2"
++	eval "$1=\"\$$2\""
++}
++
++function ifhint {
++	h=`valueof "$1"`
++	if test -n "$h"; then
++		log "Hint for $1: $h"
++		result "(hinted) $h"
++		return 0
++	else
++		return -1
++	fi
++}
++
++function ifhintdefined {
++	h=`valueof "$1"`
++	if test -n "$h"; then
++		log "Hint for $1: $h"
++		if [ "$h" == 'define' ]; then
++			log "Hint for $1: $2 (yes, define)"
++			result "(hinted) $2"
++			__=0
++		else
++			log "Hint for $1: $2 (no, undef)"
++			result "(hinted) $3"
++			__=-1
++		fi	
++		return 0
++	else
++		return -1
++	fi
++}
++
++# resdef result-yes result-no symbol symbol2
++function resdef {
++	if [ $? == 0 ]; then
++		setvar "$3" "define"
++		test -n "$4" && setvar "$4" 'define'
++		result "$1"
++		return 0
++	else
++		setvar "$3" 'undef'
++		test -n "$4" && setvar "$4" 'undef'
++		result "$2"
++		return -1
++	fi	
++}
++
++function modsymname {
++	echo "$1" | sed -e 's![:/]!_!g' | tr A-Z a-z
++}
+diff --git a/cnf/configure_args.sh b/cnf/configure_args.sh
+new file mode 100644
+index 0000000..57dd8ca
+--- /dev/null
++++ b/cnf/configure_args.sh
+@@ -0,0 +1,100 @@
++#!/bin/bash
++
++function defineyesno {
++	if [ "$2" == "yes" ]; then
++		setvar "$1" "$3"
++	elif [ "$2" == "no" ]; then
++		setvar "$1" "$4"
++	elif [ -z "$2" ]; then
++		setvar "$1" "$3"
++	else
++		die "Bad value for $1, only 'yes' and 'no' are allowed"
++	fi
++}
++
++function defyes { defineyesno "$1" "$2" 'define' 'undef'; }
++function defno  { defineyesno "$1" "$2" 'undef' 'define'; }
++
++for arg in "$@"; do
++	a=`echo "$arg" | sed -e 's/=.*//' -e 's/^--//'`
++	v=`echo "$arg" | sed -e 's/[^=]*=//'`
++	A="$a"
++	case "$a" in 
++		with-*) a=`echo "$a" | sed -e 's/^with-//'` ;;
++	esac
++	case "$a" in
++		mode) test -z "$mode" && setvar $a "$v" || die "Can't set mode twice!" ;;
++		help) setvar "mode" "help" ;;
++		regen|regenerate) setvar "mode" "regen" ;;
++		prefix|html[13]dir|libsdir)	setvar $a "$v" ;;
++		man[13]dir|otherlibsdir)	setvar $a "$v" ;;
++		siteprefix|sitehtml[13]dir)	setvar $a "$v" ;;
++		siteman[13]dir|vendorman[13]dir)setvar $a "$v" ;;
++		vendorprefix|vendorhtml[13]dir)	setvar $a "$v" ;;
++		byteorder)			setvar $a "$v" ;;
++		build|target|targetarch)	setvar $a "$v" ;;
++		cc|cpp|ar|ranlib|objdump)	setvar $a "$v" ;;
++		sysroot)			setvar $a "$v" ;;
++		hint|hints)
++			if [ -n "$userhints" ]; then
++				userhints="$userhints,$v"
++			else
++				userhints="$v"
++			fi
++			;;
++		libs)
++			if [ -n "$v" ]; then
++				v=`echo ",$v" | sed -e 's/,\([^,]\+\)/-l\1 /g'`
++				setvar 'libs' "$v"
++			fi
++			;;
++		host-*)
++			what=`echo "$a" | sed -e 's/^host-//'`
++			hco="$hco --$what='$v'"
++			;;
++		target-*)
++			what=`echo "$a" | sed -s 's/-/_/g'`
++			setvar "$what" "$v"
++			;;
++		disable-mod|disable-module)
++			s=`modsymname "$v"`
++			setvar "disable_$s" "1"
++			;;
++		use-*)
++			what=`echo "$a" | sed -e 's/^use-//'`
++			setvar "use$what" 'define'
++			;;
++		dont-use-*)
++			what=`echo "$a" | sed -e 's/^dont-use-//'`
++			setvar "use$what" 'undef'
++			;;
++		set-*)
++			what=`echo "$a" | sed -e 's/^set-//' -e 's/-/_/g'`
++			test -z "$v" && msg "--$a=<empty> has no effect"
++			setvar "$what" "$v"
++			;;
++		has-*)
++			what=`echo "$a" | sed -e 's/^has-//'`
++			defyes "d_$what" "$v"
++			;;
++		no-*)
++			what=`echo "$a" | sed -e 's/^no-//' -e 's/_/-/g'`
++			defno "d_$what" "$v"
++			;;
++		lacks-*)
++			what=`echo "$a" | sed -e 's/^lacks-//' -e 's/_/-/g'`
++			defno "d_$what" "$v"
++			;;
++		include-*)
++			what=`echo "$a" | sed -e 's/^include-//' -e 's/-h$//' -e 's![/.-]!!g'`
++			defyes "i_$what" "$v"
++			;;
++		dont-include-*)
++			what=`echo "$a" | sed -e 's/^dont-include-//' -e 's/-h$//' -e 's![/.-]!!g'`
++			defno "i_$what" "$v"
++			;;
++		mode|host|target|build)
++			;;
++		*) die "Unknown argument $a" ;;
++	esac
++done
+diff --git a/cnf/configure_byte.sh b/cnf/configure_byte.sh
+new file mode 100644
+index 0000000..c22bbf7
+--- /dev/null
++++ b/cnf/configure_byte.sh
+@@ -0,0 +1,21 @@
++#!/bin/sh
++
++function byteorder {
++	mstart "Guessing byte order"
++	ifhint 'byteorder' && return 0
++
++	try_start
++	try_add 'int foo = 0x44332211;'
++	if try_compile; then
++		if try_objdump -j .data -s; then
++			byteorder=`grep '11' try.out | grep '44' | sed -e 's/  .*//' -e 's/[^1-4]//g' -e 's/\([1-4]\)\1/\1/g'`
++			result "$byteorder"
++			return 0
++		fi
++	fi
++
++	result 'unknown'
++	return -1
++}
++
++check byteorder
+diff --git a/cnf/configure_dirs_host.sh b/cnf/configure_dirs_host.sh
+new file mode 100644
+index 0000000..c91cecc
+--- /dev/null
++++ b/cnf/configure_dirs_host.sh
+@@ -0,0 +1,18 @@
++#!/bin/sh
++
++# This is only included when $mode == 'buildmini'
++require 'targetarch'
++require 'target_arch'
++
++setifndef prefix "/usr"
++setifndef bin "$prefix/bin"
++
++setifndef html1dir 'none'
++setifndef html3dir 'none'
++setifndef man1dir 'none'
++setifndef man3dir 'none'
++setifndef perlpath 'none'
++setifndef otherlibdirs "$sysroot$targetprefix/lib/perl"
++setifndef libsdirs ' '
++setifndef privlib "$prefix/$target_arch/lib/perl"
++setifndef archlib "$prefix/$target_arch/lib/perl/arch"
+diff --git a/cnf/configure_dirs_targ.sh b/cnf/configure_dirs_targ.sh
+new file mode 100644
+index 0000000..de094dc
+--- /dev/null
++++ b/cnf/configure_dirs_targ.sh
+@@ -0,0 +1,31 @@
++#!/bin/sh
++
++function addhco {
++	v=`valueof "$1"`
++	hco="$hco --target-$1='$v'"
++}
++
++# Included if $mode == 'cross', 'native' or 'target'.
++# We need to know decisions for target to set the right
++# options for configure --mode=buildmini
++
++setifndef prefix "/usr"
++setifndef sharedir "$prefix/share"
++setifndef html1dir "$sharedir/doc/perl/html"
++setifndef html3dir "$sharedir/doc/perl/html"
++setifndef man1dir "$sharedir/man/man1"
++setifndef man1ext "1"
++setifndef man3dir "$sharedir/man/man3"
++setifndef man3ext "3"
++setifndef bin "$prefix/bin"
++setifndef scriptdir "$prefix/bin"
++setifndef otherlibdirs ' '
++setifndef libsdirs ' '
++setifndef privlib "$prefix/lib/perl"
++setifndef archlib "$prefix/lib/perl/arch"
++setifndef perlpath "$prefix/bin/perl"
++setifndef d_archlib 'define'
++
++addhco 'prefix'
++addhco 'privlib'
++addhco 'archlib'
+diff --git a/cnf/configure_func.sh b/cnf/configure_func.sh
+new file mode 100644
+index 0000000..a2726e0
+--- /dev/null
++++ b/cnf/configure_func.sh
+@@ -0,0 +1,302 @@
++#!/bin/sh
++
++# haslibs symbol libs...
++function haslibs {
++	require 'cc'
++	mstart "Checking libraries"
++	ifhint 'libs' && return
++
++	try_start
++	try_add "int main(void) { return 0; }"
++
++	_libs=""
++	for l in $*; do
++		if try_link_libs $L $l; then
++			_libs="$_libs $l"
++		fi
++	done
++
++	setvar "$1" "$_libs"
++	result "$_libs"
++}
++
++# hasfunc name args includes [symbol]
++function hasfunc {
++	if [ -n "$4" ]; then _s="$4"; else _s="d_$1"; fi
++
++	require 'cc'
++	mstart "Checking for $1"
++	ifhintdefined "$_s" 'present' 'missing' && return $__
++
++	try_start
++	try_includes $3
++	try_add "int main(void) { $1($2); return 0; }"
++	try_link
++	resdef 'found' 'not found' "$_s"
++}
++
++# hasvar name includes
++# We use try_link here instead of try_compile to be sure we have the
++# variable in question not only declared but also present in libraries we use.
++function hasvar {
++	require 'cc'
++	mstart "Checking for $1"
++	ifhintdefined "d_$1" 'present' 'missing' && return $__
++
++	try_start
++	try_includes $2
++	try_add "void foo() { };"
++	try_add "int main() { foo($1); return 0; }"
++	try_link
++	resdef 'found' 'not found' "d_$1"
++}
++
++function isvoid {
++	require 'cc'
++	isset "d_$1" || return -1
++	mstart "Checking whether $1 is void"
++
++	try_start
++	try_includes $3
++	try_add "int main() { return $1($2); }"
++	not try_compile
++	resdef 'yes' 'no' "d_void_$1"
++}
++
++check haslibs libs -lm -lcrypt -ldl
++
++check hasfunc _fwalk
++check hasfunc access "NULL,0" 'stdlib.h unistd.h'
++check hasfunc accessx
++check hasfunc aintl
++check hasfunc alarm "0" 'unistd.h'
++check hasfunc atolf
++check hasfunc atoll
++check hasfunc bcmp "NULL,NULL,0" 'stdlib.h string.h'
++check hasfunc bcopy "NULL,NULL,0" 'stdlib.h string.h'
++check hasfunc bzero "NULL,0" 'stdlib.h string.h'
++check hasfunc chown "NULL,0,0" 'stdlib.h unistd.h'
++check hasfunc chroot "NULL" 'unistd.h'
++check hasfunc chsize
++check hasfunc class
++check hasfunc clearenv "" 'stdlib.h'
++check hasfunc closedir
++check hasfunc copysignl "0.0,0.0" 'math.h'
++check hasfunc crypt
++check hasfunc ctermid
++check hasfunc cuserid
++check hasfunc difftime
++check hasfunc dirfd
++check hasfunc dlerror
++check hasfunc dup2
++check hasfunc eaccess
++check hasfunc endgrent
++check hasfunc endhostent
++check hasfunc endnetent
++check hasfunc endprotoent
++check hasfunc endpwent
++check hasfunc endservent
++check hasfunc fchdir "0" 'unistd.h'
++check hasfunc fchmod "0,0" 'unistd.h'
++check hasfunc fchown "0,0,0" 'unistd.h'
++check hasfunc fcntl "0,0" 'unistd.h fcntl.h'
++check hasfunc fgetpos "NULL, 0" 'stdlib.h stdio.h'
++check hasfunc finite "0.0" 'math.h'
++check hasfunc finitel "0.0" 'math.h'
++check hasfunc flock "0,0" 'unistd.h sys/file.h'
++check hasfunc fork "" 'unistd.h'
++check hasfunc fp_class
++check hasfunc fpathconf "0,0" 'unistd.h'
++check hasfunc fpclass
++check hasfunc fpclassify
++check hasfunc fpclassl
++check hasfunc frexpl
++check hasfunc fseeko
++check hasfunc fsetpos
++check hasfunc fstatfs
++check hasfunc fstatvfs
++check hasfunc fsync
++check hasfunc ftello
++check hasfunc futimes
++check hasfunc getcwd
++check hasfunc getespwnam
++check hasfunc getfsstat
++check hasfunc getgrent
++check hasfunc getgroups
++check hasfunc gethostbyaddr
++check hasfunc gethostbyname
++check hasfunc gethostent
++check hasfunc gethostname
++check hasfunc getitimer
++check hasfunc getlogin
++check hasfunc getmnt
++check hasfunc getmntent
++check hasfunc getnetbyaddr
++check hasfunc getnetbyname
++check hasfunc getnetent
++check hasfunc getpagesize
++check hasfunc getpgid
++check hasfunc getpgrp "" 'unistd.h'
++check hasfunc getpgrp2
++check hasfunc getppid
++check hasfunc getpriority
++check hasfunc getpriority "0,0" 'sys/time.h sys/resource.h'
++check hasfunc getprotobyaddr
++check hasfunc getprotobyname
++check hasfunc getprotobynumber
++check hasfunc getprotoent
++check hasfunc getprpwnam
++check hasfunc getpwent
++check hasfunc getservbyaddr
++check hasfunc getservbyname
++check hasfunc getservbyport
++check hasfunc getservent
++check hasfunc getspnam
++check hasfunc gettimeofday
++check hasfunc hasmntopt
++check hasfunc htonl "0" 'stdio.h sys/types.h netinet/in.h arpa/inet.h'
++check hasfunc ilogbl
++check hasfunc index "NULL,0" 'stdlib.h string.h strings.h'
++check hasfunc inet_aton
++check hasfunc isascii "'A'" 'stdio.h stdlib.h ctype.h'
++check hasfunc isfinite "0.0" 'math.h'
++check hasfunc isinf "0.0" 'math.h'
++check hasfunc isnan "0.0" 'math.h'
++check hasfunc isnanl "0.0" 'math.h'
++check hasfunc killpg
++check hasfunc lchown "NULL, 0, 0" 'stdlib.h unistd.h'
++check hasfunc link
++check hasfunc localeconv
++check hasfunc lockf
++check hasfunc lstat
++check hasfunc madvise
++check hasfunc malloc_good_size
++check hasfunc malloc_size
++check hasfunc mblen
++check hasfunc mbstowcs
++check hasfunc mbtowc
++check hasfunc memchr "NULL, 0, 0" 'stdlib.h string.h'
++check hasfunc memcmp "NULL, NULL, 0" 'stdlib.h string.h'
++check hasfunc memcpy "NULL, NULL, 0" 'stdlib.h string.h'
++check hasfunc memmove "NULL, NULL, 0" 'stdlib.h string.h'
++check hasfunc memset "NULL, 0, 0" 'stdlib.h string.h'
++check hasfunc mkdir
++check hasfunc mkdtemp
++check hasfunc mkfifo
++check hasfunc mkstemp
++check hasfunc mkstemps
++check hasfunc mktime
++check hasfunc mmap
++check hasfunc modfl "0.0,NULL" 'stdlib.h math.h'
++check hasfunc mprotect
++check hasfunc msgctl
++check hasfunc msgget
++check hasfunc msgrcv
++check hasfunc msgsnd
++check hasfunc msync
++check hasfunc munmap
++check hasfunc nice
++check hasfunc nl_langinfo
++check hasfunc open "NULL,0,0" 'stdlib.h sys/types.h sys/stat.h fcntl.h' d_open3
++check hasfunc pathconf
++check hasfunc pause
++check hasfunc pipe
++check hasfunc poll
++check hasfunc pthread_atfork
++check hasfunc pthread_attr_setscope
++check hasfunc pthread_yield
++check hasfunc readdir
++check hasfunc readlink
++check hasfunc readv
++check hasfunc recvmsg
++check hasfunc rename
++check hasfunc rewinddir
++check hasfunc rmdir
++check hasfunc scalbnl "0.0,0" 'math.h'
++check hasfunc sched_yield
++check hasfunc seekdir
++check hasfunc select
++check hasfunc semctl
++check hasfunc semget
++check hasfunc semop
++check hasfunc sendmsg
++check hasfunc setegid
++check hasfunc seteuid
++check hasfunc setgrent
++check hasfunc setgroups
++check hasfunc sethostent
++check hasfunc setitimer
++check hasfunc setlinebuf
++check hasfunc setlocale "0,NULL" 'stdlib.h locale.h'
++check hasfunc setnetent
++check hasfunc setpgid
++check hasfunc setpgrp
++check hasfunc setpgrp2
++check hasfunc setpriority
++check hasfunc setproctitle
++check hasfunc setprotoent
++check hasfunc setpwent
++check hasfunc setregid
++check hasfunc setresgid
++check hasfunc setresuid
++check hasfunc setreuid
++check hasfunc setrgid
++check hasfunc setruid
++check hasfunc setservent
++check hasfunc setsid
++check hasfunc setvbuf
++check hasfunc sfreserve "" 'sfio.h'
++check hasfunc shmdt
++check hasfunc sigaction
++check hasfunc signbit
++check hasfunc sigprocmask
++check hasfunc sigsetjmp "NULL,0" 'stdlib.h setjmp.h'
++check hasfunc snprintf
++check hasfunc sockatmark
++check hasfunc socket "0,0,0" 'sys/types.h sys/socket.h'
++check hasfunc socketpair
++check hasfunc socks5_init
++check hasfunc sqrtl "0.0" 'math.h'
++check hasfunc strchr "NULL,0" 'stdlib.h string.h strings.h'
++check hasfunc strcoll "NULL,NULL" 'stdlib.h string.h'
++check hasfunc strerror "0" 'string.h stdlib.h'
++check hasfunc strftime "NULL,0,NULL,NULL" 'stdlib.h time.h'
++check hasfunc strlcat
++check hasfunc strlcpy
++check hasfunc strtod
++check hasfunc strtol
++check hasfunc strtold
++check hasfunc strtoll
++check hasfunc strtoq
++check hasfunc strtoul
++check hasfunc strtoull
++check hasfunc strtouq
++check hasfunc strxfrm
++check hasfunc symlink
++check hasfunc syscall
++check hasfunc sysconf
++check hasfunc system
++check hasfunc tcgetpgrp
++check hasfunc tcsetpgrp
++check hasfunc telldir
++check hasfunc time
++check hasfunc times
++check hasfunc truncate
++check hasfunc ualarm
++check hasfunc umask
++check hasfunc uname
++check hasfunc unordered
++check hasfunc unsetenv
++check hasfunc usleep
++check hasfunc ustat
++##check hasfunc vfork
++check hasfunc vprintf
++check hasfunc vsnprintf
++check hasfunc wait4
++check hasfunc waitpid
++check hasfunc wcstombs
++check hasfunc wctomb
++check hasfunc writev
++
++check isvoid closedir "NULL" 'stdlib.h sys/types.h dirent.h'
++check hasvar sys_errlist 'stdio.h'
+diff --git a/cnf/configure_gencfg.sh b/cnf/configure_gencfg.sh
+new file mode 100644
+index 0000000..b91ae91
+--- /dev/null
++++ b/cnf/configure_gencfg.sh
+@@ -0,0 +1,1092 @@
++#!/bin/bash
++
++# Missing variable in config.sh may result in syntactically incorrect
++# config.h (or even more nasty things, if it's in the right part of #define)
++# This file should write all possible variables to $config, either taking
++# their values from environment, or using some defaults, or dying when value
++# is not set.
++
++# Except for directory- and typesize-related things put in front, all variables
++# here are sorted alphabetically.
++
++# Keep this file in sync with Glossary
++
++test -n "$config" || die "Can't generate don't-know-what (no \$config set)"
++
++function default_inst {
++	if [ -n "$2" ]; then
++		z="$2"
++		s="$1"
++	else
++		z="$1"
++		s="$1"
++	fi
++	v=`valueof "$s"`
++	if [ -n "$v" -a "$v" != ' ' ]; then
++		default "install$z" "$installprefix$v"
++	else
++		default "install$z" ''
++	fi
++}
++
++msg "Generating $config"
++echo -ne "#!/bin/sh\n\n" > $config
++
++default prefix "/usr"
++default sharedir "$prefix/share"
++default html1dir "$sharedir/doc/perl/html"
++default html3dir "$sharedir/doc/perl/html"
++default man1dir "$sharedir/man/man1"
++default man1ext "1"
++default man3dir "$sharedir/man/man3"
++default man3ext "3"
++default bin "$prefix/bin"
++default scriptdir "$prefix/bin"
++default otherlibdirs ' '
++default libsdirs ' '
++default privlib "$prefix/lib/perl"
++default archlib "$prefix/lib/perl/arch"
++default perlpath "$prefix/bin/perl"
++
++default vendorman1dir "$man1dir"
++default vendorman3dir "$man3dir"
++default vendorhtml1dir "$html1dir"
++default vendorhtml3dir "$html3dir"
++default siteman1dir "$man1dir"
++default siteman3dir "$man3dir"
++default sitehtml1dir "$html1dir"
++default sitehtml3dir "$html3dir"
++
++default installprefix "$sysroot"
++default_inst html1dir
++default_inst html3dir
++default_inst man1dir
++default_inst man1ext
++default_inst man3dir
++default_inst man3ext
++default_inst scriptdir
++default_inst otherlibdirs
++default_inst libsdirs
++default_inst archlib
++default_inst bin
++default_inst html1dir
++default_inst html3dir
++default_inst privlib
++default_inst scriptdir script
++default_inst sitearch
++default_inst sitebin
++default_inst sitehtml1dir 
++default_inst sitehtml3dir
++default_inst sitelib 
++default_inst siteman1dir
++default_inst siteman3dir
++default_inst sitescriptdir sitescript
++default_inst vendorarch
++default_inst vendorbin
++default_inst vendorhtml1dir
++default_inst vendorhtml3dir
++default_inst vendorlib
++default_inst vendorman1dir
++default_inst vendorman3dir
++default_inst vendorscriptdir vendorscript
++default installstyle lib/perl5
++default installusrbinperl define
++
++const prefixexp "$prefix"
++const installprefixexp "$installprefix"
++const html1direxp "$html1dir"
++const html3direxp "$html3dir"
++const vendorman1direxp "$vendorman1dir"
++const vendorman3direxp "$vendorman3dir"
++const vendorhtml1direxp "$vendorhtml1dir"
++const vendorhtml3direxp "$vendorhtml3dir"
++const siteman1direxp "$siteman1dir"
++const siteman3direxp "$siteman3dir"
++const sitehtml1direxp "$sitehtml1dir"
++const sitehtml3direxp "$sitehtml3dir"
++const scriptdirexp "$scriptdir"
++const man1direxp "$man1dir"
++const man3direxp "$man3dir"
++const archlibexp "$archlib"
++const privlibexp "$privlib"
++const binexp "$bin"
++
++required PERL_API_REVISION
++required PERL_API_SUBVERSION
++required PERL_API_VERSION
++required PERL_CONFIG_SH
++required PERL_REVISION
++required PERL_SUBVERSION
++required PERL_VERSION
++required api_revision
++required api_subversion
++required api_version
++required api_versionstring
++default archname ''
++required doublesize
++required i16size
++required i16type
++required i32size
++required i32type
++required i64size
++required i64type
++required i8size
++required i8type
++required intsize
++required ivsize
++required ivtype
++required longdblsize
++required longlongsize
++required longsize
++required nvsize
++required nvtype
++required u16size
++required u16type
++required u32size
++required u32type
++required u64size
++required u64type
++required u8size
++required u8type
++required uvsize
++required uvtype
++
++default Mcc Mcc
++default PERL_PATCHLEVEL
++default _a .a
++default _exe
++default _o .o
++default afs
++default afsroot
++default alignbytes 8
++default ansi2knr
++default aphostname /bin/hostname
++default ar ar
++default archname64
++default archobjs
++default asctime_r_proto  0
++default awk
++default baserev
++default bash
++default bison
++default byacc byacc
++default byteorder
++default c '\c'
++default castflags 0
++default cat
++default cc cc
++default cccdlflags '-fPIC'
++default ccdlflags '-Wl,-E'
++default ccflags '-fno-strict-aliasing -pipe -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64'
++default ccflags_uselargefiles '-D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64'
++default ccname
++default ccsymbols
++default ccversion
++default cf_by 'Anonymous'
++default cf_email nobody@nowhere.land
++default cf_time
++default chgrp chgrp
++default chmod chmod
++default chown chown
++default clocktype
++default comm comm
++default compress
++default contains grep
++default cp cp
++default cpio cpio
++required cpp
++default cpp_stuff 42
++default cppccsymbols
++default cppflags
++default cpplast -
++default cppminus -
++default cpprun "$cpp"
++default cppstdin "$cpp"
++default cppsymbols
++default crypt_r_proto 0
++default cryptlib
++default csh csh
++default ctermid_r_proto 0
++default ctime_r_proto 0
++default d_Gconvert 'sprintf((b),"%.*g",(n),(x))'
++default d_PRIEUldbl undef
++default d_PRIFUldbl undef
++default d_PRIGUldbl undef
++default d_PRIXU64 undef
++default d_PRId64 undef
++default d_PRIeldbl undef
++default d_PRIfldbl undef
++default d_PRIgldbl undef
++default d_PRIi64 undef
++default d_PRIo64 undef
++default d_PRIu64 undef
++default d_PRIx64 undef
++default d_SCNfldbl undef
++default d__fwalk undef
++default d_access undef
++default d_accessx undef
++default d_aintl undef
++default d_alarm undef
++default d_archlib undef
++default d_asctime_r undef
++default d_atolf undef
++default d_atoll undef
++default d_attribute_format undef
++default d_attribute_malloc undef
++default d_attribute_nonnull undef
++default d_attribute_noreturn undef
++default d_attribute_pure undef
++default d_attribute_unused undef
++default d_attribute_warn_unused_result undef
++default d_bcmp undef
++default d_bcopy undef
++default d_bsd undef
++default d_bsdgetpgrp undef
++default d_bsdsetpgrp undef
++default d_builtin_choose_expr define
++default d_builtin_expect undef
++default d_bzero undef
++default d_c99_variadic_macros define
++default d_casti32 undef
++default d_castneg define
++default d_charvspr undef
++default d_chown undef
++default d_chroot undef
++default d_chsize undef
++default d_class undef
++default d_clearenv undef
++default d_closedir undef
++default d_cmsghdr_s undef
++default d_const define
++default d_copysignl undef
++default d_cplusplus undef
++default d_crypt undef
++default d_crypt_r undef
++default d_csh define
++default d_ctermid undef
++default d_ctermid_r undef
++default d_ctime_r undef
++default d_cuserid undef
++default d_dbl_dig undef
++default d_dbminitproto define
++default d_difftime undef
++default d_dir_dd_fd undef
++default d_dirfd undef
++default d_dirnamlen undef
++default d_dlerror undef
++default d_dlopen undef
++default d_dlsymun undef
++default d_dosuid undef
++default d_drand48_r undef
++default d_drand48proto define
++default d_dup2 undef
++default d_eaccess undef
++default d_endgrent undef
++default d_endgrent_r undef
++default d_endhent undef
++default d_endhostent_r undef
++default d_endnent undef
++default d_endnetent_r undef
++default d_endpent undef
++default d_endprotoent_r define
++default d_endpwent undef
++default d_endpwent_r undef
++default d_endsent undef
++default d_endservent_r undef
++default d_eofnblk define
++default d_eunice undef
++default d_faststdio undef
++default d_fchdir undef
++default d_fchmod undef
++default d_fchown undef
++default d_fcntl undef
++default d_fcntl_can_lock undef
++default d_fd_macros undef
++default d_fd_set undef
++default d_fds_bits undef
++default d_fgetpos undef
++default d_finite undef
++default d_finitel undef
++default d_flexfnam define
++default d_flock undef
++default d_flockproto define
++default d_fork undef
++default d_fp_class undef
++default d_fpathconf undef
++default d_fpclass undef
++default d_fpclassify undef
++default d_fpclassl undef
++default d_fpos64_t undef
++default d_frexpl undef
++default d_fs_data_s undef
++default d_fseeko undef
++default d_fsetpos undef
++default d_fstatfs undef
++default d_fstatvfs undef
++default d_fsync undef
++default d_ftello undef
++default d_ftime undef
++default d_futimes undef
++default d_getcwd undef
++default d_getespwnam undef
++default d_getfsstat undef
++default d_getgrent undef
++default d_getgrent_r undef
++default d_getgrgid_r undef
++default d_getgrnam_r undef
++default d_getgrps undef
++default d_gethbyaddr undef
++default d_gethbyname undef
++default d_gethent undef
++default d_gethname undef
++default d_gethostbyaddr_r undef
++default d_gethostbyname_r undef
++default d_gethostent_r undef
++default d_gethostprotos define
++default d_getitimer undef
++default d_getlogin undef
++default d_getlogin_r undef
++default d_getmnt undef
++default d_getmntent undef
++default d_getnbyaddr undef
++default d_getnbyname undef
++default d_getnent undef
++default d_getnetbyaddr_r undef
++default d_getnetbyname_r undef
++default d_getnetent_r undef
++default d_getnetprotos define
++default d_getpagsz undef
++default d_getpbyname undef
++default d_getpbynumber undef
++default d_getpent undef
++default d_getpgid undef
++default d_getpgrp undef
++default d_getpgrp2 undef
++default d_getppid undef
++default d_getprior undef
++default d_getprotobyname_r define
++default d_getprotobynumber_r define
++default d_getprotoent_r define
++default d_getprotoprotos define
++default d_getprpwnam undef
++default d_getpwent undef
++default d_getpwent_r undef
++default d_getpwnam_r undef
++default d_getpwuid_r undef
++default d_getsbyname undef
++default d_getsbyport undef
++default d_getsent undef
++default d_getservbyname_r undef
++default d_getservbyport_r undef
++default d_getservent_r undef
++default d_getservprotos define
++default d_getspnam undef
++default d_getspnam_r undef
++default d_gettimeod undef
++default d_gmtime_r undef
++default d_gnulibc define
++default d_grpasswd undef
++default d_hasmntopt undef
++default d_htonl undef
++default d_ilogbl undef
++default d_inc_version_list undef
++default d_index undef
++default d_inetaton undef
++default d_int64_t undef
++default d_isascii undef
++default d_isfinite undef
++default d_isinf undef
++default d_isnan undef
++default d_isnanl undef
++default d_killpg undef
++default d_lchown undef
++default d_ldbl_dig undef
++default d_libm_lib_version undef
++default d_link undef
++default d_localtime_r undef
++default d_localtime_r_needs_tzset undef
++default d_locconv undef
++default d_lockf undef
++default d_longdbl undef
++default d_longlong undef
++default d_lseekproto define
++default d_lstat undef
++default d_madvise undef
++default d_malloc_good_size undef
++default d_malloc_size undef
++default d_mblen undef
++default d_mbstowcs undef
++default d_mbtowc undef
++default d_memchr undef
++default d_memcmp undef
++default d_memcpy undef
++default d_memmove undef
++default d_memset undef
++default d_mkdir undef
++default d_mkdtemp undef
++default d_mkfifo undef
++default d_mkstemp undef
++default d_mkstemps undef
++default d_mktime undef
++default d_mmap undef
++default d_modfl undef
++default d_modfl_pow32_bug undef
++default d_modflproto define
++default d_mprotect undef
++default d_msg undef
++default d_msg_ctrunc undef
++default d_msg_dontroute undef
++default d_msg_oob undef
++default d_msg_peek undef
++default d_msg_proxy undef
++default d_msgctl undef
++default d_msgget undef
++default d_msghdr_s undef
++default d_msgrcv undef
++default d_msgsnd undef
++default d_msync undef
++default d_munmap undef
++default d_mymalloc undef
++default d_nice undef
++default d_nl_langinfo undef
++default d_nv_preserves_uv define
++default d_nv_zero_is_allbits_zero define
++default d_off64_t undef
++default d_old_pthread_create_joinable undef
++default d_oldpthreads undef
++default d_oldsock undef
++default d_open3 undef
++default d_pathconf undef
++default d_pause undef
++default d_perl_otherlibdirs undef
++default d_phostname undef
++default d_pipe undef
++default d_poll undef
++default d_portable undef
++default d_printf_format_null define
++default d_procselfexe undef
++default d_pseudofork undef
++default d_pthread_atfork undef
++default d_pthread_attr_setscope undef
++default d_pthread_yield undef
++default d_pwage undef
++default d_pwchange undef
++default d_pwclass undef
++default d_pwcomment undef
++default d_pwexpire undef
++default d_pwgecos undef
++default d_pwpasswd undef
++default d_pwquota undef
++default d_qgcvt undef
++default d_quad undef
++default d_random_r undef
++default d_readdir undef
++default d_readdir64_r undef
++default d_readdir_r undef
++default d_readlink undef
++default d_readv undef
++default d_recvmsg undef
++default d_rename undef
++default d_rewinddir undef
++default d_rmdir undef
++default d_safebcpy undef
++default d_safemcpy undef
++default d_sanemcmp define
++default d_sbrkproto define
++default d_scalbnl undef
++default d_sched_yield undef
++default d_scm_rights undef
++default d_seekdir undef
++default d_select undef
++default d_sem define
++default d_semctl undef
++default d_semctl_semid_ds undef
++default d_semctl_semun undef
++default d_semget undef
++default d_semop undef
++default d_sendmsg undef
++default d_setegid undef
++default d_seteuid undef
++default d_setgrent undef
++default d_setgrent_r undef
++default d_setgrps undef
++default d_sethent undef
++default d_sethostent_r undef
++default d_setitimer undef
++default d_setlinebuf undef
++default d_setlocale undef
++default d_setlocale_r undef
++default d_setnent undef
++default d_setnetent_r undef
++default d_setpent undef
++default d_setpgid undef
++default d_setpgrp undef
++default d_setpgrp2 undef
++default d_setprior undef
++default d_setproctitle undef
++default d_setprotoent_r define
++default d_setpwent undef
++default d_setpwent_r undef
++default d_setregid undef
++default d_setresgid undef
++default d_setresuid undef
++default d_setreuid undef
++default d_setrgid undef
++default d_setruid undef
++default d_setsent undef
++default d_setservent_r undef
++default d_setsid undef
++default d_setvbuf undef
++default d_sfio undef
++default d_shm define
++default d_shmat undef
++default d_shmatprototype define
++default d_shmctl undef
++default d_shmdt undef
++default d_shmget undef
++default d_sigaction undef
++default d_signbit undef
++default d_sigprocmask undef
++default d_sigsetjmp undef
++default d_sitearch undef
++default d_snprintf undef
++default d_sockatmark undef
++default d_sockatmarkproto define
++default d_socket undef
++default d_socklen_t undef
++default d_sockpair undef
++default d_socks5_init undef
++default d_sprintf_returns_strlen undef
++default d_sqrtl undef
++default d_srand48_r undef
++default d_srandom_r undef
++default d_sresgproto define
++default d_sresuproto define
++default d_statblks undef
++default d_statfs_f_flags undef
++default d_statfs_s undef
++default d_statvfs undef
++default d_stdio_cnt_lval undef
++default d_stdio_ptr_lval undef
++default d_stdio_ptr_lval_nochange_cnt undef
++default d_stdio_ptr_lval_sets_cnt undef
++default d_stdio_stream_array undef
++default d_stdiobase undef
++default d_stdstdio undef
++default d_strchr undef
++default d_strcoll undef
++default d_strctcpy define
++default d_strerrm 'strerror(e)'
++default d_strerror undef
++default d_strerror_r undef
++default d_strftime undef
++default d_strlcat undef
++default d_strlcpy undef
++default d_strtod undef
++default d_strtol undef
++default d_strtold undef
++default d_strtoll undef
++default d_strtoq undef
++default d_strtoul undef
++default d_strtoull undef
++default d_strtouq undef
++default d_strxfrm undef
++default d_suidsafe undef
++default d_symlink undef
++default d_syscall undef
++default d_syscallproto define
++default d_sysconf undef
++default d_sysernlst undef
++default d_syserrlst undef
++default d_system undef
++default d_tcgetpgrp undef
++default d_tcsetpgrp undef
++default d_telldir undef
++default d_telldirproto define
++default d_time undef
++default d_times undef
++default d_tm_tm_gmtoff undef
++default d_tm_tm_zone undef
++default d_tmpnam_r undef
++default d_truncate undef
++default d_ttyname_r undef
++default d_tz_name undef
++default d_tzname undef
++default d_u32align undef
++default d_ualarm undef
++default d_umask undef
++default d_uname undef
++default d_union_semun undef
++default d_unordered undef
++default d_unsetenv undef
++default d_usleep undef
++default d_usleepproto define
++default d_ustat undef
++default d_vendorarch undef
++default d_vendorbin undef
++default d_vendorlib undef
++default d_vendorscript undef
++default d_vfork undef
++default d_void_closedir undef
++default d_voidsig undef
++default d_voidtty undef
++default d_volatile undef
++default d_vprintf undef
++default d_vsnprintf undef
++default d_wait4 undef
++default d_waitpid undef
++default d_wcstombs undef
++default d_wctomb undef
++default d_writev undef
++default d_xenix undef
++default date date
++default db_hashtype
++default db_prefixtype
++default db_version_major
++default db_version_minor
++default db_version_patch
++default defvoidused 15
++default direntrytype 'struct dirent'
++default dlext 'so'
++default dlsrc dl_dlopen.xs
++default drand01 'drand48()'
++default drand48_r_proto 0
++default dynamic_ext
++default eagain EAGAIN
++default ebcdic undef
++default echo echo
++default egrep egrep
++default emacs
++default endgrent_r_proto 0
++default endhostent_r_proto 0
++default endnetent_r_proto 0
++default endprotoent_r_proto 0
++default endpwent_r_proto 0
++default endservent_r_proto 0
++default eunicefix ':'
++default exe_ext
++default expr
++default expr expr
++default extensions "$dynamic_ext$nonxs_ext"
++default extras
++default fflushNULL define
++default fflushall undef
++default find
++default firstmakefile
++default firstmakefile Makefile
++default flex
++required fpossize
++required fpostype
++default freetype void
++default from :
++default full_ar ar
++default full_csh csh
++default full_sed sed
++default gccansipedantic
++default gccosandvers
++default gccversion
++default getgrent_r_proto 0
++default getgrgid_r_proto 0
++default getgrnam_r_proto 0
++default gethostbyaddr_r_proto 0
++default gethostbyname_r_proto 0
++default gethostent_r_proto 0
++default getlogin_r_proto 0
++default getnetbyaddr_r_proto 0
++default getnetbyname_r_proto 0
++default getnetent_r_proto 0
++default getprotobyname_r_proto 0
++default getprotobynumber_r_proto 0
++default getprotoent_r_proto 0
++default getpwent_r_proto 0
++default getpwnam_r_proto 0
++default getpwuid_r_proto 0
++default getservbyname_r_proto 0
++default getservbyport_r_proto 0
++default getservent_r_proto 0
++default getspnam_r_proto 0
++default gidformat '"lu"'
++default gidsign -1
++required gidsize
++required gidtype
++default glibpth
++default gmake gmake
++default gmtime_r_proto 0
++default gnulibc_version
++default grep grep
++default groupcat 'cat /etc/group'
++default groupstype gid_t
++default gzip gzip
++default h_fcntl
++default h_sysfile
++default hint 'default'
++default hostcat 'cat /etc/hosts'
++default i_arpainet undef
++default i_bsdioctl undef
++default i_crypt undef
++default i_db undef
++default i_dbm undef
++default i_dirent undef
++default i_dld undef
++default i_dlfcn undef
++default i_fcntl undef
++default i_float define
++default i_fp undef
++default i_fp_class undef
++default i_gdbm undef
++default i_grp undef
++default i_ieeefp undef
++default i_inttypes undef
++default i_langinfo undef
++default i_libutil undef
++default i_limits define
++default i_locale undef
++default i_machcthr undef
++default i_malloc undef
++default i_math undef
++default i_memory undef
++default i_mntent undef
++default i_ndbm undef
++default i_netdb undef
++default i_neterrno undef
++default i_netinettcp undef
++default i_niin undef
++default i_poll undef
++default i_prot undef
++default i_pthread undef
++default i_pwd undef
++default i_rpcsvcdbm undef
++default i_sfio undef
++default i_sgtty undef
++default i_shadow undef
++default i_socks undef
++default i_stdarg undef
++default i_stddef undef
++default i_stdlib undef
++default i_string undef
++default i_sunmath undef
++default i_sysaccess undef
++default i_sysdir undef
++default i_sysfile undef
++default i_sysfilio undef
++default i_sysin undef
++default i_sysioctl undef
++default i_syslog undef
++default i_sysmman undef
++default i_sysmode undef
++default i_sysmount undef
++default i_sysndir undef
++default i_sysparam undef
++default i_sysresrc undef
++default i_syssecrt undef
++default i_sysselct undef
++default i_syssockio undef
++default i_sysstat undef
++default i_sysstatfs undef
++default i_sysstatvfs undef
++default i_systime undef
++default i_systimek undef
++default i_systimes undef
++default i_systypes undef
++default i_sysuio undef
++default i_sysun undef
++default i_sysutsname undef
++default i_sysvfs undef
++default i_syswait undef
++default i_termio undef
++default i_termios undef
++default i_time undef
++default i_unistd undef
++default i_ustat undef
++default i_utime undef
++default i_values undef
++default i_varargs undef
++default i_varhdr undef
++default i_vfork undef
++default ignore_versioned_solibs
++default inc_version_list
++default inc_version_list_init
++default incpath
++default inews
++default initialinstalllocation
++default issymlink "test -L"
++default ivdformat '"ld"'
++default known_extensions
++default ksh
++default ld ld
++default lddlflags '-shared '
++default ldflags
++default ldflags_uselargefiles
++default ldlibpthname 'LD_LIBRARY_PATH'
++default less less
++default lib_ext .a
++default libc
++default libperl libperl.a
++default libpth
++default libs
++default libsfiles
++default libsfound
++default libspath
++default libswanted
++default libswanted_uselargefiles
++default line
++default lint
++default lkflags
++default ln 'ln'
++default lns "$ln -s"
++default localtime_r_proto 0
++default locincpth
++default loclibpth
++default lp
++default lpr
++default ls ls
++required lseeksize
++required lseektype
++default mad undef
++default madlyh
++default madlyobj
++default madlysrc
++default mail
++default mailx
++default make make
++default make_set_make '#'
++default mallocobj
++default mallocsrc
++default malloctype 'void*'
++default mips_type
++default mistrustnm
++default mkdir mkdir
++default mmaptype 'void *'
++default modetype mode_t
++default more more
++default multiarch undef
++default mv
++default myarchname
++default mydomain
++default myhostname
++default myuname
++default n -n
++default need_va_copy undef
++default netdb_hlen_type 'socklen_t'
++default netdb_host_type 'const void *'
++default netdb_name_type int
++default netdb_net_type 'uint32_t'
++default nm nm
++default nm_opt
++default nm_so_opt
++default nonxs_ext
++default nroff nroff
++default nvEUformat '"%E"'
++default nvFUformat '"%F"'
++default nvGUformat '"%G"'
++default nv_preserves_uv_bits 32
++default nveformat '"e"'
++default nvfformat '"f"'
++default nvgformat '"g"'
++default o_nonblock O_NONBLOCK
++default obj_ext .o
++default objdump objdump
++default old_pthread_create_joinable PTHREAD_CREATE_JOINABLE
++default optimize
++default orderlib
++default osname
++default osvers
++default package
++default pager less
++default passcat 'cat /etc/passwd'
++default patchlevel
++default path_sep /
++default perl
++default perl5
++default perl_patchlevel
++default perladmin 'nobody@nowhere.land'
++default perllibs
++default pg pg
++default phostname hostname
++default pidtype pid_t
++default plibpth
++default pmake
++default pr
++default procselfexe /proc/self/exe
++default procselfpath "/proc/self/exe"
++default prototype define
++default ptrsize
++default quadkind
++default quadtype
++default randbits 48
++default randfunc
++default random_r_proto 0
++default randseedtype long
++default ranlib ranlib
++default rd_nodata -1
++default readdir64_r_proto 0
++default readdir_r_proto 0
++default rm rm
++default rm_try
++default rmail
++default run
++default runnm
++default sPRIEUldbl '"E"'
++default sPRIFUldbl '"F"'
++default sPRIGUldbl '"G"'
++default sPRIXU64 '"lU"'
++default sPRId64 '"ld"'
++default sPRIeldbl '"Le"'
++default sPRIfldbl '"Lf"'
++default sPRIgldbl '"Lg"'
++default sPRIi64 'li"'
++default sPRIo64 '"lo"'
++default sPRIu64 '"lu"'
++default sPRIx64 '"lx"'
++default sSCNfldbl '"f"'
++default sched_yield 'sched_yield()'
++default sed
++default seedfunc srand48
++default selectminbits '32'
++default selecttype 'fd_set *'
++default sendmail
++default setgrent_r_proto 0
++default sethostent_r_proto 0
++default setlocale_r_proto 0
++default setnetent_r_proto 0
++default setprotoent_r_proto 0
++default setpwent_r_proto 0
++default setservent_r_proto 0
++default sh /bin/sh
++default shar
++default sharpbang '#!'
++default shmattype 'void *'
++required shortsize
++default shrpenv
++default shsharp true
++default sig_count
++default sig_name
++default sig_name_init
++default sig_num
++default sig_num_init
++default sig_size
++default signal_t void
++default sitearch
++default sitearchexp
++default sitebin
++default sitebinexp
++default sitelib
++default sitelib_stem
++default sitelibexp
++default siteprefix
++default siteprefixexp
++default sitescript
++default sitescriptexp
++default sizesize
++default sizetype
++default sleep
++default smail
++default so so
++default sockethdr
++default socketlib
++default socksizetype socklen_t
++default sort
++default spackage
++default spitshell cat
++default srand48_r_proto 0
++default srandom_r_proto 0
++default src
++default ssizetype
++default startperl "$sharpbang$perlpath"
++default startsh
++default static_ext
++default stdchar char
++default stdio_base
++default stdio_bufsiz
++default stdio_bufsize
++default stdio_cnt
++default stdio_filbuf
++default stdio_ptr
++default stdio_stream_array
++default strerror_r_proto 0
++default strings
++default submit
++default subversion
++default sysman
++default tail
++default tar
++default tbl
++default tee
++default test
++default timeincl
++default timetype
++default tmpnam_r_proto 0
++default to
++default touch
++default tr
++default trnl
++default troff
++default ttyname_r_proto 0
++default uidformat '"lu"'
++default uidsign
++default uidsize
++default uidtype
++default uname
++default uniq
++default uquadtype
++default use5005threads undef
++default use64bitall undef
++default use64bitint undef
++default usecrosscompile undef
++default usedl define
++default usefaststdio undef
++default useithreads undef
++default uselargefiles define
++default uselongdouble undef
++default usemallocwrap define
++default usemorebits undef
++default usemultiplicity undef
++default usemymalloc undef
++default usenm undef
++default useopcode undef
++default useperlio define
++default useposix define
++default usereentrant undef
++default userelocatableinc undef
++default usesfio undef
++default useshrplib undef
++default usesitecustomize undef
++default usesocks undef
++default usethreads undef
++default usevendorprefix undef
++default usevfork undef
++default usrinc
++default uuname
++default uvXUformat '"lX"'
++default uvoformat '"lo"'
++default uvuformat '"lu"'
++default uvxformat '"lx"'
++default vendorarch
++default vendorarchexp
++default vendorbin
++default vendorbinexp
++default vendorlib
++default vendorlib_stem
++default vendorlibexp
++default vendorprefix
++default vendorprefixexp
++default vendorscript
++default vendorscriptexp
++default version "$api_versionstring"
++default version_patchlevel_string
++default versiononly
++default vi
++default voidflags 15
++default xlibpth
++default yacc
++default yaccflags
++default zcat
++default zip
++
++if [ "$mode" == "buildmini" ]; then
++	required target_name
++	required target_arch
++	default sysroot
++fi
++
++failpoint
+diff --git a/cnf/configure_hdrs.sh b/cnf/configure_hdrs.sh
+new file mode 100644
+index 0000000..1a7afb3
+--- /dev/null
++++ b/cnf/configure_hdrs.sh
+@@ -0,0 +1,90 @@
++#!/bin/sh
++
++# We can't really check if header is there (gcc reports no errors for (some?) missing
++# headers). And, in fact, we need not to. All we want to know is whether it's
++# safe to include this header, i.e., won't it break compilation.
++
++function hashdr {
++	_hdrname=`symbolname "$1"`
++	
++	mstart "Checking whether to include <$1>"
++	ifhintdefined "i_${_hdrname}" 'yes' 'no' && return $__
++	try_start
++	try_add "#include <$1>"
++	try_compile
++	resdef 'yes' 'no' "i_${_hdrname}"
++}
++
++check hashdr 'stdarg.h'
++check hashdr 'stddef.h'
++check hashdr 'stdio.h'
++check hashdr 'stdlib.h'
++check hashdr 'string.h'
++check hashdr 'strings.h'
++check hashdr 'stdint.h'
++check hashdr 'unistd.h'
++check hashdr 'limits.h'
++check hashdr 'math.h'
++check hashdr 'float.h'
++
++check hashdr 'time.h'
++check hashdr 'crypt.h'
++check hashdr 'dirent.h'
++check hashdr 'dlfcn.h'
++check hashdr 'fcntl.h'
++check hashdr 'grp.h'
++check hashdr 'inttypes.h'
++check hashdr 'locale.h'
++check hashdr 'memory.h'
++check hashdr 'pwd.h'
++check hashdr 'setjmp.h'
++check hashdr 'sfio.h'
++check hashdr 'signal.h'
++check hashdr 'sgtty.h'
++check hashdr 'shadow.h'
++check hashdr 'syslog.h'
++check hashdr 'termio.h'
++check hashdr 'termios.h'
++check hashdr 'time.h'
++check hashdr 'ustat.h'
++check hashdr 'utime.h'
++check hashdr 'values.h'
++check hashdr 'varargs.h'
++check hashdr 'vfork.h'
++
++check hashdr 'sys/access.h'
++check hashdr 'sys/dir.h'
++check hashdr 'sys/file.h'
++check hashdr 'sys/filio.h'
++check hashdr 'sys/mode.h'
++check hashdr 'sys/mount.h'
++check hashdr 'sys/ndir.h'
++check hashdr 'sys/param.h'
++check hashdr 'sys/resource.h'
++check hashdr 'sys/security.h'
++check hashdr 'sys/select.h'
++check hashdr 'sys/socket.h'
++check hashdr 'sys/sockio.h'
++check hashdr 'sys/stat.h'
++check hashdr 'sys/statfs.h'
++check hashdr 'sys/statvfs.h'
++check hashdr 'sys/times.h'
++check hashdr 'sys/types.h'
++check hashdr 'sys/uio.h'
++check hashdr 'sys/un.h'
++check hashdr 'sys/utsname.h'
++check hashdr 'sys/vfs.h'
++check hashdr 'sys/wait.h'
++check hashdr 'sys/time.h'
++
++check hashdr 'dbm.h'
++check hashdr 'gdbm.h'
++check hashdr 'mach/cthreads.h'
++check hashdr 'ndbm.h'
++check hashdr 'net/errno.h'
++check hashdr 'netdb.h'
++check hashdr 'netinet/in.h'
++check hashdr 'netinet/tcp.h'
++check hashdr 'rpcsvc/dbm.h'
++
++const i_systimek undef
+diff --git a/cnf/configure_help.sh b/cnf/configure_help.sh
+new file mode 100644
+index 0000000..72ca6e3
+--- /dev/null
++++ b/cnf/configure_help.sh
+@@ -0,0 +1,67 @@
++#!/bin/sh
++
++cat <<EOF
++Usage:
++	configure [--option[=value]] ...
++
++Options are either self-explainatory or too obscure to be
++documented here. In latter case check which config.sh variable you're
++interested in and refer to Porting/Glossary for description (most
++options are just slightly modified variable names).
++
++	--help				show this message
++	--mode=<mode>			(don't use this)
++		--mode=cross		Force cross-compilation mode
++	--regenerate			Re-generate config.h, xconfig.h and Makefile.config
++					from config.sh and xconfig.sh
++
++	--prefix=/usr			Used for default values only
++	--html1dir=<dir>		For HTML documentation
++	--html3dir=<dir>
++	--man1dir=<dir>			For manual pages
++	--man3dir=<dir>
++
++	--build=<machine>		Default prefix for \$HOSTCC etc.
++	--target=<machine>		Same, for primary \$CC
++	--hints=<h1>,<h2>,...		Use specified hints (cnf/hints/<h1> etc.)
++					Does not affect hint selection for modules
++	
++	--with-libs=<libs>		Comma-separated list of libraries to use
++					(only basenames, use "dl" to have -ldl passed to linker)
++
++	--with-cc=			C compiler
++	--with-cpp=			C preprocessor
++	--with-ranlib=			ranlib; set to 'true' or 'echo' if you don't need it
++	--with-objdump=			objdump; only needed for some configure tests
++					(all for target system when cross-compiling)
++		
++	--host-cc=			Same, for host system
++	--host-cpp=			(only useful when cross-compiling)
++	--host-ranlib=
++	--host-objdump=			
++	--host-libs=
++
++	--target-cc=			Same, for/on target system.
++	--target-cpp=			(not used by this script *at all*; set these
++	--target-ranlib=		if you want to build modules natively on the
++	--target-objdump=		target system)
++
++	--sysroot=			path to (copy of) target system root
++
++	--enable-<something>		See use<something> in Glossary
++	--has-<function>		See d_<function> in Glossary
++	--include-<header>[=yes|no]	Assume given header is present (or missing)
++					in the system. E.g., disabling <sys/time.h>:
++						--include-sys-time-h=no
++	--set-<something>=value		See <something> in Glossary
++
++	--host-<option>[=value]		Results in --<option>[=value] being passed to
++					configure for the host system
++					(only useful when cross-compiling)
++
++Note: unlike traditional autoconf'ed scripts, this configure does not allow option values
++without = sign ("--option value").
++
++config.log contains verbose description of what was tested, and how.
++Check it if configure output looks suspicious.
++EOF
+diff --git a/cnf/configure_hint.sh b/cnf/configure_hint.sh
+new file mode 100644
+index 0000000..b857d40
+--- /dev/null
++++ b/cnf/configure_hint.sh
+@@ -0,0 +1,62 @@
++#!/bin/sh
++
++# We want to see
++#	var=value
++# in hint files, but this will break things (say, overwrite variables
++# set by user). So we use sed to make those lines look like
++#	hint "var" "value"
++# The first, not the last occurence of a variable is effective.
++# That's why more specific hint files are tried first.
++
++function usehints {
++	hintfile="$base/hints/$1"
++	if [ -f "$hintfile" ]; then
++		msg "	using $hintfile"
++		sed -e '/^\([A-Za-z0-9_]\+\)=/s//hint \1 /' "$hintfile" > config.hint.tmp
++		. config.hint.tmp
++		rm -f config.hint.tmp
++	fi
++}
++
++function hint {
++	eval _value="\"\$$1\""
++	if [ -z "$_value" ]; then
++		setvar "$1" "$2"
++	fi
++}
++
++msg "Checking which hints to use"
++if [ -n "$userhints" ]; then
++	for h in `echo "$userhints" | sed -e 's/,/ /g'`; do
++		usehints "$h"
++	done
++fi
++	
++# For i686-pc-linux-gnu, try such hints:
++#	i686-pc-linux-gnu	(complete target arch)
++#	linux-gnu		(os name)
++#	linux
++#	i686-pc			(machine name)
++#	i686
++if [ -n "$targetarch" ]; then
++	h_arch=`echo "$targetarch" | cut -d - -f 1`
++	h_mach=`echo "$targetarch" | cut -d - -f 2`
++	h_base=`echo "$targetarch" | cut -d - -f 3`
++	h_type=`echo "$targetarch" | cut -d - -f 3-`
++	log "	got arch='$h_arch' mach='$h_mach' base='$h_base' type='$h_type'"
++	usehints "a/$targetarch"
++	usehints "t/$h_type"
++	usehints "t/$h_base"
++	usehints "h/$h_arch-$h_mach"
++	usehints "h/$h_arch"
++	# Once we get all this $h_*, let's set archname
++	default archname "$h_type"
++elif [ -n "$target" ]; then
++	usehints "z/$target"
++	default archname "$target"
++fi
++
++usehints "default"
++
++# Add separator to log file
++log
+diff --git a/cnf/configure_link.sh b/cnf/configure_link.sh
+new file mode 100644
+index 0000000..a90381a
+--- /dev/null
++++ b/cnf/configure_link.sh
+@@ -0,0 +1,61 @@
++#!/bin/sh
++
++# Names of some variables in original configure are shortened
++# (e.g. i_niin for <netinet/in.h>), and it breaks strict pattern
++# used here. To resolve this, we'll "link" new names to old shorter
++# (pull possibly set value from one to another).
++
++# It's possible to make has* functions set several variables at once,
++# but this complicates hint/cache reporting and processing.
++
++# linkvar old new
++function linkvar {
++	eval _v1="\"\$$1\""
++	eval _v2="\"\$$2\""
++	if [ -z "$_v1" ]; then
++		setvar "$1" "$_v2"
++	fi
++}
++
++linkvar longdblsize longdoublesize
++
++linkvar i_sysresrc i_sysresource
++linkvar i_sysselct i_sysselect
++linkvar i_niin i_netinetin
++
++linkvar d_endhent d_endhostent
++linkvar d_endnent d_endnetent
++linkvar d_endpent d_endprotoent
++linkvar d_endsent d_endservent
++linkvar d_getgrps d_getgroups
++linkvar d_gethbyaddr d_gethostbyaddr
++linkvar d_gethbyname d_gethostbyname
++linkvar d_gethent d_gethostent
++linkvar d_gethname d_gethostname
++linkvar d_getnbyaddr d_getnetbyaddr
++linkvar d_getnbyname d_getnetbyname
++linkvar d_getnent d_getnetent
++linkvar d_getpagsz d_getpagesize
++linkvar d_getpbyaddr d_getprotobyaddr
++linkvar d_getpbyname d_getprotobyname
++linkvar d_getpbynumber d_getprotobynumber
++linkvar d_getpent d_getprotoent
++linkvar d_getprior d_getpriority
++linkvar d_getsbyaddr d_getservbyaddr
++linkvar d_getsbyname d_getservbyname
++linkvar d_getsbyport d_getservbyport
++linkvar d_getsent d_getservent
++linkvar d_gettimeod d_gettimeofday
++linkvar d_inetaton d_inet_aton
++linkvar d_locconv d_localeconv
++linkvar d_setgrps d_setgroups
++linkvar d_sethent d_sethostent
++linkvar d_setnent d_setnetent
++linkvar d_setpent d_setprotoent
++linkvar d_setprior d_setpriority
++linkvar d_setsent d_setservent
++linkvar d_sockpair d_socketpair
++
++linkvar ptrsize voidptrsize
++linkvar d_longdbl d_longdouble
++linkvar d_statfs_s d_structstatfs
+diff --git a/cnf/configure_mods.sh b/cnf/configure_mods.sh
+new file mode 100644
+index 0000000..a821449
+--- /dev/null
++++ b/cnf/configure_mods.sh
+@@ -0,0 +1,91 @@
++#!/bin/sh
++
++#function log { echo "$@"; }
++#function msg { echo -e "$@"; }
++#function modsymname {
++#	echo "$1" | sed -e 's![:/]!_!g' | tr A-Z a-z
++#}
++#function valueof { eval echo "\"\$$1\""; }
++
++function extrec {
++	for i in *; do
++		if [ -f "$i/$i.c" -o -f "$i/$i.xs" ]; then
++			extadd "xs" "$1$i"
++		elif [ -f "$i/Makefile.PL" ]; then
++			extadd "noxs" "$1$i"
++		elif [ -d "$i" -a $# -lt 10 ]; then
++			cd "$i" && extrec "$i/" "$@" && cd ..
++		fi
++	done
++}
++
++function extadd {
++	s=`modsymname "$2"`
++	if [ "$s" == "dynaloader" ]; then
++		msg "\tskipping $2"
++		return
++	fi
++	o=`valueof "only_$s"`
++	if [ -n "$onlyext" -a -z "$o" ]; then
++		msg "\tskipping $2"
++		return
++	fi
++	d=`valueof "disable_$s"`
++	if [ -n "$d" -a "$d" != "0" ]; then
++		msg "\tdisabled $2"
++		return
++	fi
++	t=`valueof "static_$s"`
++	if [ "$1" == "xs" -a -n "$t" -a "$t" != "0" ]; then
++		msg "\tstatic $2"
++		static_ext="$static_ext$2 "
++	elif [ "$1" == "xs" ]; then
++		msg "\tdynamic $2"
++		dynamic_ext="$dynamic_ext$2 "
++	else 
++		msg "\tnon-xs $2"
++		nonxs_ext="$nonxs_ext$2 "
++	fi
++	
++}
++
++function extonlyif {
++	n="$1"; shift
++	s=`modsymname "$n"`
++	if [ "$@" ]; then
++		return
++	else
++		log "pre-disabling $s"
++		eval "disable_$s=1"
++	fi
++
++}
++
++msg "Looking for extensions"
++
++extonlyif DB_File "$i_db" == 'define'
++extonlyif GDBM_File "$i_gdbm" == 'define'
++extonlyif NDBM_File "$i_ndbm" == 'define'
++extonlyif ODBM_File "$i_odbm" == 'define'
++extonlyif I18N/Langinfo "$i_langinfo" == 'define' -a "$d_nl_langinfo" == 'define'
++extonlyif IPC/SysV "$i_msg" == 'define' -o "$i_shm" == 'define' -o "$d_sem" == 'define'
++extonlyif Opcode "$useopcode" == 'define'
++extonlyif POSIX "$useposix" == 'define'
++extonlyif Socket "$d_socket" == 'define'
++extonlyif Sys/Syslog "$d_socket" == 'define'
++extonlyif Thread "$usethreads" == 'define'
++extonlyif XS/APItest "$usedl" == 'define'
++extonlyif XS/Typemap "$usedl" == 'define'
++
++if [ -n "$onlyext" ]; then
++	for e in $onlyext; do
++		s=`modsymname "$e"`
++		log "only-enabled $s"
++		eval "only_$s=1"
++	done
++fi
++
++log "recursive under ext/"
++cd ext && extrec && cd ..
++
++msg
+diff --git a/cnf/configure_prog.sh b/cnf/configure_prog.sh
+new file mode 100644
+index 0000000..e1cb2f7
+--- /dev/null
++++ b/cnf/configure_prog.sh
+@@ -0,0 +1,54 @@
++#!/bin/sh
++
++# Find out which progs to use (mostly by trying prefixes based on $target)
++
++# whichprog msg symbol fail prog1 prog2 ...
++function whichprog {
++	_what="$1"; shift
++	_symbol="$1"; shift
++	_fail="$1"; shift
++	eval _force="\"\$$_symbol\""
++	mstart "Checking for $_what"
++
++	if [ -n "$_force" ]; then
++		if which "$_force" >&/dev/null; then
++			result "$_force (forced)"
++			setvar "$_symbol" "$_force"
++			return 0
++		else
++			result "forced '$_force' not found"
++			if [ -n "$_fail" -a "$_fail" != "0" ]; then
++				fail "no $_what found"
++			fi
++			return -1
++		fi
++	fi
++	
++	for p in "$@"; do
++		if [ -n "$p" ]; then
++			if which "$p" >&/dev/null; then
++				result "$p"
++				setvar "$_symbol" "$p"
++				return 0
++			fi
++		fi
++	done	
++
++	result "none found"
++	if [ -n "$_fail" -a "$_fail" != "0" ]; then
++		fail "no $_what found"
++	fi
++
++	return -1
++}
++
++check whichprog "C compiler" cc 1      ${pf1}gcc ${pf1}cc ${pf2}gcc
++check whichprog "linker"     ld 1      ${pf1}ld ${pf2}ld
++check whichprog "ar"         ar 1      ${pf1}ar ${pf2}ar
++check whichprog "ranlib"     ranlib 0  ${pf1}ranlib ${pf2}ranlib
++check whichprog "readelf"    readelf 1 ${pf1}readelf ${pf2}readelf readelf
++check whichprog "objdump"    objdump 1 ${pf1}objdump ${pf2}objdump
++
++const 'cpp' "$cc -E"
++
++failpoint
+diff --git a/cnf/configure_sigs.sh b/cnf/configure_sigs.sh
+new file mode 100644
+index 0000000..2cb68be
+--- /dev/null
++++ b/cnf/configure_sigs.sh
+@@ -0,0 +1,47 @@
++#!/bin/sh
++
++# Check which signals we have defined.
++# This may seem a little barbaric, but the whole procedure
++# doesn't require running any compiled executables.
++
++msg "Checking available signal names"
++
++signals='ZERO'
++siginit='"ZERO"'
++signums='0'
++signumi='0'
++sigsize=1
++
++for sig in HUP INT QUIT ILL TRAP ABRT BUS FPE KILL USR1\
++	SEGV USR2 PIPE ALRM TERM STKFLT CHLD CONT STOP TSTP TTIN TTOU URG\
++	XCPU XFSZ VTALRM PROF WINCH IO PWR SYS IOT CLD POLL; do
++	try_start
++	try_includes 'signal.h'
++
++	# OH SHI--
++	try_add "#if SIG$sig == 0"
++	try_add "number 0"
++	for num in `seq 1 100`; do
++		try_add "#elif SIG$sig == $num"
++		try_add "number $num"
++	done
++	try_add "#endif"
++
++	if try_preproc; then
++		num=`grep 'number ' try.out | sed -e 's/[^0-9]//g'`
++		if [ -n "$num" -a "$num" != 0 ]; then
++			msg "\tgot SIG$sig = $num" >&2
++			signals="$signals SIG$sig"
++			siginit="$siginit, \"SIG$sig\""
++			signums="$signums $num"
++			signumi="$signumi, $num"
++			sigsize=$[sigsize+1]
++		fi
++	fi
++done
++
++setvar "sig_name" "$signals"
++setvar "sig_name_init" "$siginit"
++setvar "sig_num" "$signums"
++setvar "sig_num_init" "$signumi"
++setvar "sig_size" "$sigsize"
+diff --git a/cnf/configure_target.sh b/cnf/configure_target.sh
+new file mode 100644
+index 0000000..01fd5b4
+--- /dev/null
++++ b/cnf/configure_target.sh
+@@ -0,0 +1,69 @@
++#!/bin/sh
++
++# This is called before _gencfg is invoked for the second time
++# to generate tconfig.sh
++# It should forcibly set cc & Co. to some non-cross values.
++# Note: this is *not* tested, and probably can't be.
++
++function setvardefault {
++	if [ -n "$2" ]; then
++		setvar "$1" "$2"
++	else
++		setvar "$1" "$3"
++	fi
++}
++
++function default_tnat {
++	v=`valueof "target_$1"`
++	w=`valueof "$1"`
++	if [ -n "$v" -a "$v" != ' ' ]; then
++		setvar "install$1" "$v"
++	else
++		setvar "install$1" "$installprefix$w"
++	fi
++
++}
++
++setvardefault 'cc' "$target_cc" 'cc'
++setvardefault 'cpp' "$target_cpp" "$cc -E"
++setvardefault 'ld' "$target_ld" 'ld'
++setvardefault 'ar' "$target_ar" 'ar'
++setvardefault 'objdump' "$target_objdump" 'objdump'
++setvardefault 'ranlib' "$target_ranlib" 'ranlib'
++
++setvar 'cpprun' "$cpp"
++setvar 'cppstdin' "$cpp"
++
++setvardefault installprefix "$target_installprefix" ''
++
++default_tnat html1dir
++default_tnat html3dir
++default_tnat man1dir
++default_tnat man1ext
++default_tnat man3dir
++default_tnat man3ext
++default_tnat scriptdir
++default_tnat otherlibdirs
++default_tnat libsdirs
++default_tnat archlib
++default_tnat bin
++default_tnat html1dir
++default_tnat html3dir
++default_tnat privlib
++default_tnat script
++default_tnat sitearch
++default_tnat sitebin
++default_tnat sitehtml1dir 
++default_tnat sitehtml3dir
++default_tnat sitelib 
++default_tnat siteman1dir
++default_tnat siteman3dir
++default_tnat sitescript
++default_tnat vendorarch
++default_tnat vendorbin
++default_tnat vendorhtml1dir
++default_tnat vendorhtml3dir
++default_tnat vendorlib
++default_tnat vendorman1dir
++default_tnat vendorman3dir
++default_tnat vendorscript
+diff --git a/cnf/configure_type.sh b/cnf/configure_type.sh
+new file mode 100644
+index 0000000..cec3f15
+--- /dev/null
++++ b/cnf/configure_type.sh
+@@ -0,0 +1,95 @@
++#!/bin/sh
++
++# Check availability of some types, and possibly their size
++
++# hastype name 'includes'
++function hastype {
++	_typename=`symbolname "$1"`
++	
++	mstart "Checking type $1"
++	ifhintdefined "d_${_typename}" 'found' 'missing' && return 0
++
++	try_start
++	try_includes $2
++	try_add "$1 foo;"
++	if not try_compile; then
++		result 'missing'
++		return -1
++	fi
++
++	setvar "d_${_typename}" "define"
++	result "found"
++}
++
++# XXX: this probably won't work on non-ELF hosts.
++# TODO: add test for readelf usability, and switch
++# to objdump if possible
++
++# typesize name 'includes'
++function typesize {
++	_typename=`symbolname "$1"`
++
++	mstart "Checking size of $1"
++	ifhint "${_typename}size" && return 0
++	
++	try_start
++	try_includes $2
++	try_add "$1 foo;"
++	if not try_compile; then
++		result 'missing'
++		return -1
++	fi
++
++	setvar "d_${_typename}" "define"
++	if not try_readelf -s > try.out; then
++		result 'unknown'
++		return -1
++	fi
++
++	result=`grep foo try.out | sed -e 's/.*: [0-9]\+ \+//' -e 's/ .*//'`
++	if [ -z "$result" -o "$result" -le 0 ]; then
++		result "unknown"
++		return -1
++	fi
++
++	setvar "${_typename}size" "$result"
++	_bytes=`bytes "$result"`
++	result "$result $_bytes"
++}
++
++check typesize 'char'
++check typesize 'short'
++check typesize 'int'
++check typesize 'long'
++check typesize 'double'
++check typesize 'long double'
++check typesize 'long long'
++check typesize 'void*'
++check typesize int64_t 'stdint.h'
++check typesize int32_t 'stdint.h'
++check typesize int16_t 'stdint.h'
++check typesize int8_t 'stdint.h'
++
++check typesize 'off_t' sys/types.h
++check typesize 'size_t' sys/types.h
++check typesize 'ssize_t' sys/types.h
++check typesize 'uid_t' sys/types.h
++check typesize 'gid_t' sys/types.h
++check typesize 'fpos_t' stdio.h sys/types.h
++
++check hastype 'time_t' time.h
++
++check hastype 'struct msghdr' 'sys/types.h sys/socket.h sys/uio.h'
++check hastype 'struct statfs' 'sys/types.h sys/param.h sys/mount.h sys/vfs.h sys/statfs.h'
++check hastype 'union semun' 'sys/types.h sys/ipc.h sys/sem.h'
++check hastype 'fpos64_t' 'stdio.h'
++check hastype 'off64_t' 'sys/types.h'
++
++check hastype 'struct msghdr' 'sys/types.h sys/socket.h sys/uio.h'
++check hastype 'union semun' 'sys/types.h sys/ipc.h sys/sem.h'
++check hastype 'struct statfs' 'sys/types.h sys/param.h sys/mount.h sys/vfs.h sys/statfs.h'
++check hastype 'struct cmsghdr' 'netinet/in.h'
++check hastype 'struct fs_data' 'sys/vfs.h'
++check hastype 'struct statfs' 'sys/vfs.h'
++check hastype 'struct msghdr' 'sys/types.h sys/socket.h'
++check hastype 'fd_set' 'sys/types.h' 
+diff --git a/cnf/configure_type_ext.sh b/cnf/configure_type_ext.sh
+new file mode 100644
+index 0000000..e7cd634
+--- /dev/null
++++ b/cnf/configure_type_ext.sh
+@@ -0,0 +1,65 @@
++#!/bin/sh
++
++# hasdef name 'includes'
++function hasdef {
++	_defname=`symbolname "$1"`
++	mstart "Checking whether $1 is defined"
++	ifhintdefined "d_${_defname}" 'yes' 'no' && return 0
++	
++	try_start
++	try_includes $2
++	try_add "#ifndef $1"
++	try_add "#error $1 undefined"
++	try_add "#endif"
++	if try_compile; then
++		setvar "d_${_defname}" "define"
++		result "yes"
++		return 0
++	else
++		setvar "d_${_defname}" "undef"
++		result 'no'
++		return -1
++	fi
++}
++
++# hasfield name field 'includes'
++function hasfield {
++	mstart "Checking whether $2 has $3"
++	ifhintdefined "$1" 'yes' 'no' && return 0
++	
++	try_start
++	try_includes $4
++	try_add 'void foo();'
++	try_add 'void bar()'
++        try_add "{"
++	try_add "	$2 value;"
++	try_add "	foo(value.$3);"
++	try_add "}"
++	if try_compile; then
++		setvar "$1" "define"
++		result "yes"
++		return 0
++	else
++		setvar "$1" "undef"
++		result 'no'
++		return -1
++	fi
++}
++
++check hasdef DBL_DIG 'float.h limits.h'
++check hasdef LDBL_DIG 'float.h limits.h'
++
++check hasfield d_statfs_f_flags 'struct statfs' f_flags sys/vfs.h
++check hasfield d_tm_tm_zone 'struct tm' tm_zone time.h
++check hasfield d_tm_tm_gmtoff 'struct tm' tm_gmtoff time.h
++check hasfield d_pwquota 'struct passwd' pw_quota pwd.h
++check hasfield d_pwage 'struct passwd' pw_age pwd.h
++check hasfield d_pwchange 'struct passwd' pw_change pwd.h
++check hasfield d_pwclass 'struct passwd' pw_class pwd.h
++check hasfield d_pwexpire 'struct passwd' pw_expire pwd.h
++check hasfield d_pwcomment 'struct passwd' pw_comment pwd.h
++check hasfield d_pwgecos 'struct passwd' pw_gecos pwd.h
++check hasfield d_pwpasswd 'struct passwd' pw_passwd pwd.h
++check hasfield d_statblks 'struct stat' st_blocks sys/types.h sys/stat.h
++check hasfield d_dirnamlen 'struct dirent' d_namelen sys/types.h dirent.define 
++check hasfield d_grpasswd 'struct group' gr_passwd grp.h
+diff --git a/cnf/configure_type_sel.sh b/cnf/configure_type_sel.sh
+new file mode 100644
+index 0000000..6f238b6
+--- /dev/null
++++ b/cnf/configure_type_sel.sh
+@@ -0,0 +1,123 @@
++#!/bin/sh
++
++# After we known what types we have, we've got to chose which
++# of them to use.
++
++# typeselect symb required-size it1 ut1 it2 ut2 ...
++# Note: types are always selected in pairs, signed-unsigned,
++# and it's assumed that sizeof(it[j]) == sizeof(ut[j])
++function typeselect () {
++	_rqsize="$1"; shift
++	_symboli="$1"; shift
++	_symbolu="$1"; shift
++	#isset "$_symboli" && isset "$_symbolu" && return
++
++	mstart "Looking which type to use for $_symboli"
++	for _itype in "$@"; do
++		_utype=`unsignedof "$_itype"`
++		_isymb=`symbolname "$_itype"`
++		_usymb=`symbolname "$_utype"`
++		eval _mark="\$d_${_isymb}"
++		eval _size="\$${_isymb}size"
++		log "	checking $_utype/$_itype ($_size)"
++		if [ "$_mark" == 'define' -a "$_size" == "$_rqsize" ]; then
++			setvar ${_symboli}size $_size
++			setvar ${_symboli}type $_itype
++			setvar ${_symbolu}size $_size
++			setvar ${_symbolu}type $_utype
++			result "$_itype / $_utype"
++			return 0
++		fi
++	done
++	result "nothing suitable found"
++	return -1
++}
++
++# unsigned of type -> unsigned-type
++function unsignedof {
++	case "$1" in
++		int*_t) echo "u$1" ;;
++		*) echo "unsigned $1" ;;
++	esac
++}
++
++typeselect 1  i8  u8  int8_t 'char'
++typeselect 2 i16 u16 int16_t 'short'
++typeselect 4 i32 u32 int32_t 'int'
++typeselect 8 i64 u64 int64_t 'long' 'long long'
++typeselect 8 quad uquad int64_t 'long long' 'long' 'int'
++
++log "Looking whether quad is defined ($quadtype)"
++setvar d_quad 'define'
++case "$quadtype" in 
++	int64_t)	setvar quadkind QUAD_IS_INT64_T ;;
++	long*long)	setvar quadkind QUAD_IS_LONG_LONG ;;
++	long)		setvar quadkind QUAD_IS_LONG ;;
++	int)		setvar quadkind QUAD_IS_INT ;;
++	*)		setvar d_quad 'undef' ;;
++esac
++
++msg "Choosing C types to be used for perl internal types"
++case "$use64bitint:$d_quad:$quadtype" in
++define:define:?*)
++	const ivtype "$quadtype"
++	const uvtype "$uquadtype"
++	const ivsize 8
++	const uvsize 8
++	;;
++*)	const ivtype "long"
++	const uvtype "unsigned long"
++	const ivsize $longsize
++	const uvsize $longsize
++	;;
++esac
++
++case "$uselongdouble:$d_longdouble" in
++define:define)
++	const nvtype "long double"
++	const nvsize $longdblsize
++	;;
++*)	const nvtype double
++	const nvsize $doublesize
++	;;
++esac
++
++msg "	IV will be "$ivtype", $ivsize bytes"
++msg "	UV will be "$uvtype", $uvsize bytes"
++msg "	NV will be "$nvtype", $nvsize bytes"
++
++# typeorfallback base primary-type
++# typeorfallback base primary-type fallback-type
++function typeorfallback {
++	isset "${1}type" && isset "${1}size" && return 0		
++
++	mstart "Looking which type to use as ${1}type"
++	_dst="$1"; shift
++	for t in "$@"; do
++		_sym=`symbolname "$t"`
++		_def=`valueof "d_$_sym"`
++		_size=`valueof "${_sym}size"`
++		log "\tsym=$_sym def=$_def size=$_size"
++		if [ "$_def" == 'define' ]; then
++			setvar "${_dst}type" "$t"
++			setvar "${_dst}size" "$_size"	
++			result "$t"
++			return 0
++		fi
++	done
++
++	result "none found"
++	fail "No $_dst type found"
++	return -1
++}
++
++typeorfallback 'fpos' 'fpos_t' 'uint64_t' 'unsigned long'
++typeorfallback 'gid' 'gid_t' 'int'
++typeorfallback 'lseek' 'off_t' 'uint64_t' 'unsigned long'
++typeorfallback 'size' 'size_t' 'uint64_t' 'unsigned long'
++typeorfallback 'ssize' 'ssize_t' 'int64_t' 'long'
++typeorfallback 'time' 'time_t' 'uint32_t' 'unsigned int'
++typeorfallback 'uid' 'uid_t' 'int'
++const uidsign '1'
++
++failpoint
+diff --git a/cnf/configure_vars.sh b/cnf/configure_vars.sh
+new file mode 100644
+index 0000000..c2f9fb7
+--- /dev/null
++++ b/cnf/configure_vars.sh
+@@ -0,0 +1,26 @@
++#!/bin/sh
++
++if [ "$mode" == "buildmini" ]; then
++	V="HOST"
++else
++	V=''
++fi
++
++# setfromvar what SHELLVAR
++function setfromvar {
++	v=`valueof "$1"`
++	w=`valueof "$V$2"`
++	if [ -z "$v" -a -n "$w" ]; then
++		log "Using $V$2 for $1"
++		setvar "$1" "$w"
++	fi
++}
++
++
++setfromvar cc CC
++setfromvar cflags CFLAGS
++setfromvar ld LD
++setfromvar ldflags LDFLAGS
++setfromvar ar AR
++setfromvar ranlib RANLIB
++setfromvar objdump OBJDUMP
+diff --git a/cnf/configure_version.sh b/cnf/configure_version.sh
+new file mode 100644
+index 0000000..fbfaee2
+--- /dev/null
++++ b/cnf/configure_version.sh
+@@ -0,0 +1,14 @@
++#!/bin/sh
++
++const PERL_CONFIG_SH true
++const PERL_REVISION 5
++const PERL_VERSION 10
++const PERL_SUBVERSION 0
++const PERL_PATCHLEVEL ''
++const PERL_API_REVISION $PERL_REVISION
++const PERL_API_VERSION $PERL_VERSION
++const PERL_API_SUBVERSION $PERL_SUBVERSION
++const api_revision $PERL_API_REVISION
++const api_version $PERL_VERSION
++const api_subversion $PERL_SUBVERSION
++const api_versionstring "$api_revision.$api_version.$api_subversion"
+diff --git a/cnf/hints/default b/cnf/hints/default
+new file mode 100644
+index 0000000..5c2ca7f
+--- /dev/null
++++ b/cnf/hints/default
+@@ -0,0 +1,8 @@
++_o=.o
++_a=.a
++so=so
++useposix=define
++# modules
++disable_win32=1
++disable_win32api_file=1
++disable_win32core=1
+diff --git a/configpm b/configpm
+index 1fb9c3e..d13938f 100755
+--- a/configpm
++++ b/configpm
+@@ -60,6 +60,9 @@ my %Allowed_Opts = (
+     'cross'    => '', # --cross=PLATFORM - crosscompiling for PLATFORM
+     'glossary' => 1,  # --no-glossary  - no glossary file inclusion,
+                       #                  for compactness
++    'config-sh' => 'config.sh',
++    'config-pm' => 'lib/Config.pm',
++    'config-pod' => 'lib/Config.pod'
+ );
+ 
+ sub opts {
+@@ -88,19 +91,9 @@ my %Opts = opts();
+ my ($Config_SH, $Config_PM, $Config_heavy, $Config_POD);
+ my $Glossary = 'Porting/Glossary';
+ 
+-if ($Opts{cross}) {
+-  # creating cross-platform config file
+-  mkdir "xlib";
+-  mkdir "xlib/$Opts{cross}";
+-  $Config_PM = "xlib/$Opts{cross}/Config.pm";
+-  $Config_POD = "xlib/$Opts{cross}/Config.pod";
+-  $Config_SH = "Cross/config-$Opts{cross}.sh";
+-}
+-else {
+-  $Config_PM = "lib/Config.pm";
+-  $Config_POD = "lib/Config.pod";
+-  $Config_SH = "config.sh";
+-}
++$Config_PM = $Opts{'config-pm'};
++$Config_POD = $Opts{'config-pod'};
++$Config_SH = $Opts{'config-sh'};
+ ($Config_heavy = $Config_PM) =~ s/\.pm$/_heavy.pl/;
+ die "Can't automatically determine name for Config_heavy.pl from '$Config_PM'"
+   if $Config_heavy eq $Config_PM;
+diff --git a/configure b/configure
+new file mode 100755
+index 0000000..dff73b3
+--- /dev/null
++++ b/configure
+@@ -0,0 +1,4 @@
++#!/bin/sh
++
++export base='cnf'
++$base/configure "$@"
+diff --git a/lib/Pod/Man.pm b/lib/Pod/Man.pm
+index 451ecc8..42a5b9f 100644
+--- a/lib/Pod/Man.pm
++++ b/lib/Pod/Man.pm
+@@ -33,7 +33,6 @@ use vars qw(@ISA %ESCAPES $PREAMBLE $VERSION);
+ 
+ use Carp qw(croak);
+ use Pod::Simple ();
+-use POSIX qw(strftime);
+ 
+ @ISA = qw(Pod::Simple);
+ 
+@@ -838,7 +837,8 @@ sub devise_date {
+     } else {
+         $time = time;
+     }
+-    return strftime ('%Y-%m-%d', localtime $time);
++    my @t = localtime($time);
++    return sprintf ('%04d-%02d-%02d', @t[5,4,3]);
+ }
+ 
+ # Print out the preamble and the title.  The meaning of the arguments to .TH
+diff --git a/utils/Makefile b/utils/Makefile
+index 4d56bea..9471edd 100644
+--- a/utils/Makefile
++++ b/utils/Makefile
+@@ -1,78 +1,22 @@
++TOP = ..
++include $(TOP)/Makefile.config
++PERL = $(TOP)/miniperl -I$(TOP)/lib
+ 
+-PERL = ../miniperl
+-REALPERL = ../perl
+-RUN =   # Used mainly cross-compilation setups.
+-
+-
+-# Files to be built with variable substitution after miniperl is
+-# available.  Dependencies handled manually below (for now).
+-
+-pl = c2ph.PL config_data.PL corelist.PL cpan.PL h2ph.PL h2xs.PL instmodsh.PL perlbug.PL perldoc.PL perlivp.PL pl2pm.PL prove.PL ptar.PL ptardiff.PL cpanp-run-perl.PL cpanp.PL cpan2dist.PL shasum.PL splain.PL dprofpp.PL libnetcfg.PL piconv.PL enc2xs.PL xsubpp.PL
+-plextract = c2ph config_data corelist cpan h2ph h2xs instmodsh perlbug perldoc perlivp pl2pm prove ptar ptardiff cpanp-run-perl cpanp cpan2dist shasum splain dprofpp libnetcfg piconv enc2xs xsubpp
+-plextractexe = ./c2ph ./config_data ./corelist ./cpan ./h2ph ./h2xs ./instmodsh ./perlbug ./perldoc ./perlivp ./pl2pm ./prove ./ptar ./ptardiff ./cpanp-run-perl ./cpanp ./cpan2dist ./shasum ./splain ./dprofpp ./libnetcfg ./piconv ./enc2xs ./xsubpp
++plextract = c2ph config_data corelist cpan h2ph h2xs instmodsh\
++	perlbug perldoc perlivp pl2pm prove ptar ptardiff cpanp-run-perl\
++       	cpanp cpan2dist shasum splain dprofpp libnetcfg piconv enc2xs xsubpp
+ 
+ all: $(plextract) 
+ 
+-$(plextract):
+-	$(RUN) $(PERL) -I../lib $@.PL
+-
+-c2ph:		c2ph.PL ../config.sh
+-
+-cpan:		cpan.PL ../config.sh
+-
+-config_data:	config_data.PL ../config.sh
+-
+-corelist:	corelist.PL ../config.sh
+-
+-h2ph:		h2ph.PL ../config.sh
+-
+-h2xs:		h2xs.PL ../config.sh
+-
+-instmodsh:	instmodsh.PL ../config.sh
+-
+-perlbug:	perlbug.PL ../config.sh ../patchlevel.h
+-
+-perldoc:	perldoc.PL ../config.sh
+-
+-perlivp:	perlivp.PL ../config.sh
+-
+-prove:		prove.PL ../config.sh
++%: %.PL ../config.sh
++	$(PERL) -I../lib $<
+ 
+-ptar:		ptar.PL ../config.sh
++perlbug: ../patchlevel.h
+ 
+-ptardiff:	ptardiff.PL ../config.sh
+-
+-cpanp-run-perl:	cpanp-run-perl.PL ../config.sh
+-
+-cpanp:	cpanp.PL ../config.sh
+-
+-cpan2dist:	cpan2dist.PL ../config.sh
+-
+-pl2pm:		pl2pm.PL ../config.sh
+-
+-shasum:		shasum.PL ../config.sh
+-
+-splain:		splain.PL ../config.sh ../lib/diagnostics.pm
+-
+-dprofpp:	dprofpp.PL ../config.sh
+-
+-libnetcfg:	libnetcfg.PL ../config.sh
+-
+-piconv:		piconv.PL ../config.sh
+-
+-enc2xs:		enc2xs.PL ../config.sh
+-
+-xsubpp:		xsubpp.PL ../config.sh
++splain:	../lib/diagnostics.pm
+ 
+ clean:
++	rm -f $(plextract)
+ 
+-realclean:
+-	rm -rf $(plextract) pstruct $(plextractexe)
+-	rm -f ../t/_h2ph_pre.ph
+-
+-clobber:	realclean
+-
+-distclean:	clobber
+-
+-veryclean:	distclean
+-	-rm -f *~ *.org
++#install:
++#	for i in $(plextract); do install -m 0755 -D $$i $(scriptdir)/$$i; done
+diff --git a/x2p/Makefile b/x2p/Makefile
+new file mode 100644
+index 0000000..5d59036
+--- /dev/null
++++ b/x2p/Makefile
+@@ -0,0 +1,21 @@
++TOP = ..
++include $(TOP)/Makefile.config
++PERL = $(TOP)/miniperl -I$(TOP)/lib
++
++all: a2p$x find2perl s2p
++
++.c$o:
++	$(CC) $(CFLAGS) -DPERL_FOR_X2P -c -o $@ $<
++
++a2p$x: a2p$o hash$o str$o util$o walk$o
++	$(CC) -o $@ $(filter %$o,$^)
++
++%: %.PL
++	$(PERL) $<
++
++clean:
++	rm -f *$o find2perl s2p
++
++#install:
++#	install -D -m 0755 a2p$x $(bindir)/a2p$x
++#	install -D -m 0755 s2p $(scriptdir)/s2p
+-- 
+1.6.5.2
+

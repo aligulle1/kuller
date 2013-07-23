@@ -1,0 +1,34 @@
+From 46a0254b5a0bffe8c57322b085bcd38f893e4b27 Mon Sep 17 00:00:00 2001
+From: Aaron Plattner <aplattner@nvidia.com>
+Date: Tue, 9 Sep 2008 10:32:48 -0400
+Subject: [PATCH] Make sure the screen is a mach64 screen before doing anything in ATIMach64XVInitialiseAdaptor.
+
+---
+ src/atimach64xv.c |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
+
+diff --git xf86-video-mach64-6.8.0/src/atimach64xv.c xf86-video-mach64-6.8.0/src/atimach64xv.c
+index ef17861..21cd890 100644
+--- xf86-video-mach64-6.8.0/src/atimach64xv.c
++++ xf86-video-mach64-6.8.0/src/atimach64xv.c
+@@ -31,6 +31,7 @@
+ #include "atimach64accel.h"
+ #include "atimach64io.h"
+ #include "atixv.h"
++#include "atimach64version.h"
+ 
+ #include <X11/extensions/Xv.h>
+ #include "fourcc.h"
+@@ -1358,6 +1359,9 @@ ATIMach64XVInitialiseAdaptor
+     XF86OffscreenImagePtr surf0 = &(ATIMach64Surface[0]);
+     XF86OffscreenImagePtr surf1 = &(ATIMach64Surface[1]);
+ 
++    if (xf86NameCmp(pScreenInfo->driverName, MACH64_DRIVER_NAME) != 0)
++	return 0;
++
+     if (pppAdaptor)
+         *pppAdaptor = NULL;
+ 
+-- 
+1.6.0.1
+

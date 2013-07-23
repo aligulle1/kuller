@@ -1,0 +1,36 @@
+--- konversation/scripts/media	2007-06-24 17:55:02.000000000 +0300
++++ konversation/scripts/media	2007-06-24 17:50:48.000000000 +0300
+@@ -48,7 +48,7 @@
+ ## If you add a new player, you must add it here or it won't get checked when in audio-only or video-only modes.
+ playerRankings= {
+     'video' :['kaffeine', 'noatun', 'kdetv'],
+-    'audio' :['Amarok', 'JuK', 'Noatun', 'Kaffeine', 'kscd', 'XMMS', 'Yammi']
++    'audio' :['Amarok', 'JuK', 'Noatun', 'Kaffeine', 'kscd', 'XMMS', 'Yammi', 'LastFM']
+ }
+ 
+ ## Title, album and artist fields to be quoted depending on contents
+@@ -269,6 +269,16 @@
+ except ImportError:
+     XmmsPlayer=Player
+ 
++class LastFMPlayer(Player):
++    def __init__(self):
++        Player.__init__(self,"last.fm")
++
++    def getData(self):
++        title = subprocess.Popen(["qdbus","com.lastfm.DBusInterface","/","currentTrack"], stdout=subprocess.PIPE).communicate()[0].rstrip()
++        artist = subprocess.Popen(["qdbus","com.lastfm.DBusInterface","/","currentArtist"], stdout=subprocess.PIPE).communicate()[0].rstrip()
++        album = subprocess.Popen(["qdbus","com.lastfm.DBusInterface","/","currentAlbum"], stdout=subprocess.PIPE).communicate()[0].rstrip()
++        return (title,artist,album)
++
+ def playing(playerList, mode=None):
+     for i in playerList:
+         s=i.get(mode)
+@@ -331,6 +341,7 @@
+ XmmsPlayer('XMMS'),
+ DCOPPlayer("Yammi","yammi","YammiPlayer songTitle","YammiPlayer songArtist","YammiPlayer songAlbum"),
+ DCOPPlayer("kdetv","kdetv","KdetvIface channelName",playerType='video'),
++LastFMPlayer(),
+ ]
+ 
+ # Get rid of players that didn't get subclassed so they don't appear in the available players list

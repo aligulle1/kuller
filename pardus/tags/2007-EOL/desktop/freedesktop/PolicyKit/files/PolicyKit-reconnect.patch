@@ -1,0 +1,178 @@
+--- PolicyKit/polkitd/main.c	2006-08-22 15:44:25.000000000 +0200
++++ PolicyKit/polkitd/main.c	2006-10-25 17:24:13.000000000 +0200
+@@ -35,7 +35,11 @@
+ #include <fcntl.h>
+ #include <signal.h>
+ 
++#define DBUS_API_SUBJECT_TO_CHANGE 1
++
++#include <dbus/dbus.h>
+ #include <dbus/dbus-glib.h>
++#include <dbus/dbus-glib-lowlevel.h>
+ 
+ #include "polkit-session.h"
+ #include "polkit-manager.h"
+@@ -43,6 +47,8 @@
+ #include "polkit-interface-session-glue.h"
+ #include "polkit-interface-manager-glue.h"
+ 
++static gboolean dbus_reconnect (gpointer);
++
+ /** Print out program usage.
+  *
+  */
+@@ -109,15 +117,102 @@
+ 	return TRUE;
+ }
+ 
++static void
++manager_destroy_cb (DBusGProxy *bus_proxy,
++		    PolicyKitManager *manager)
++{
++	g_object_unref ((GObject*) manager);
++	manager = NULL;
++	g_timeout_add (3 * 1000, dbus_reconnect, manager);
++}
++
++static DBusGProxy *
++dbus_init_bus_proxy (DBusGConnection *bus)
++{
++	DBusGProxy *bus_proxy;
++	GError *error = NULL;
++	guint request_name_result;
++
++	bus_proxy = dbus_g_proxy_new_for_name (bus, "org.freedesktop.DBus",
++					       "/org/freedesktop/DBus",
++					       "org.freedesktop.DBus");
++	if (!dbus_g_proxy_call (bus_proxy, "RequestName", &error,
++				G_TYPE_STRING, "org.freedesktop.PolicyKit",
++				G_TYPE_UINT, 0,
++				G_TYPE_INVALID,
++				G_TYPE_UINT, &request_name_result,
++				G_TYPE_INVALID)) {
++		g_warning ("Failed to acquire org.freedesktop.PolicyKit: %s", error->message);
++		g_error_free (error);
++		goto out;
++	}
++
++	if (request_name_result != DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER) {
++		g_warning ("There is already a primary owner of the name org.freedesktop.PolicyKit");
++		goto out;
++	}
++
++out:
++	return bus_proxy; 
++}
++
++static DBusGConnection *
++dbus_init_bus (void)
++{
++	GError *error = NULL;
++	DBusGConnection *bus;
++	DBusConnection  *connection;
++
++	bus = dbus_g_bus_get (DBUS_BUS_SYSTEM, &error);
++	if (bus == NULL) {
++		g_warning ("Couldn't connect to system bus: %s", error->message);
++		g_error_free (error);
++		goto out;
++	}
++	connection = dbus_g_connection_get_connection (bus);
++	dbus_connection_set_exit_on_disconnect (connection, FALSE);
++out:
++	return bus;
++}
++
++static gboolean
++dbus_reconnect (gpointer user_data)
++{
++	DBusGConnection *bus;
++	DBusGProxy *bus_proxy;
++	PolicyKitManager *manager = user_data;
++	gboolean ret = TRUE;
++
++	bus = dbus_init_bus ();
++	if (bus) {
++		bus_proxy = dbus_init_bus_proxy (bus);
++		if (bus_proxy == NULL) {
++			g_warning ("Could not construct bus_proxy object; bailing out");
++			exit (1);
++		}
++
++		manager = polkit_manager_new (bus, bus_proxy);
++		if (manager == NULL) {
++			g_warning ("Could not construct manager object; bailing out");
++			exit (1);
++		}
++		g_signal_connect (G_OBJECT (bus_proxy), "destroy",
++				  G_CALLBACK (manager_destroy_cb), manager);
++
++		g_debug ("Successfully re-connected to D-Bus");
++		ret = FALSE;
++	}
++
++	return ret;
++}
++
+ 
+ int
+ main (int argc, char *argv[])
+ {
+ 	DBusGConnection *bus;
+ 	DBusGProxy *bus_proxy;
+-	GError *error = NULL;
+ 	GMainLoop *mainloop;
+-	guint request_name_result;
+ 	int ret;
+ 	gboolean no_daemon = FALSE;
+ 	gboolean is_verbose = FALSE;
+@@ -258,39 +353,25 @@
+ 	/* setup UNIX signal handler for SIGUSR1 */
+ 	signal (SIGUSR1, handle_sigusr1);
+ 
+-	bus = dbus_g_bus_get (DBUS_BUS_SYSTEM, &error);
++	bus = dbus_init_bus ();
+ 	if (bus == NULL) {
+-		g_warning ("Couldn't connect to system bus: %s", error->message);
+-		g_error_free (error);
++		g_warning ("Could not construct bus object; bailing out");
+ 		goto out;
+ 	}
+ 
+-	bus_proxy = dbus_g_proxy_new_for_name (bus, "org.freedesktop.DBus",
+-					       "/org/freedesktop/DBus",
+-					       "org.freedesktop.DBus");
+-	if (!dbus_g_proxy_call (bus_proxy, "RequestName", &error,
+-				G_TYPE_STRING, "org.freedesktop.PolicyKit",
+-				G_TYPE_UINT, 0,
+-				G_TYPE_INVALID,
+-				G_TYPE_UINT, &request_name_result,
+-				G_TYPE_INVALID)) {
+-		g_warning ("Failed to acquire org.freedesktop.PolicyKit: %s", error->message);
+-		g_error_free (error);
+-		goto out;
+-	}
+-
+-	if (request_name_result != DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER) {
+-		g_warning ("There is already a primary owner of the name org.freedesktop.PolicyKit");
++	bus_proxy = dbus_init_bus_proxy (bus);
++	if (bus_proxy == NULL) {
++		g_warning ("Could not construct bus_proxy object; bailing out");
+ 		goto out;
+ 	}
+-	
+ 
+ 	manager = polkit_manager_new (bus, bus_proxy);
+ 	if (manager == NULL) {
+ 		g_warning ("Could not construct manager object; bailing out");
+ 		goto out;
+ 	}
+-
++	g_signal_connect (G_OBJECT (bus_proxy), "destroy", G_CALLBACK (manager_destroy_cb), manager);
++	
+ 	g_debug ("service running");
+ 
+ 	polkit_manager_update_desktop_console_privileges (manager);
+
+
+

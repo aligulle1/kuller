@@ -1,0 +1,18 @@
+Index: linux-2.6.31/drivers/usb/core/hub.c
+===================================================================
+--- linux-2.6.31.orig/drivers/usb/core/hub.c
++++ linux-2.6.31/drivers/usb/core/hub.c
+@@ -1305,11 +1305,11 @@ void usb_set_device_state(struct usb_dev
+ 					|| new_state == USB_STATE_SUSPENDED)
+ 				;	/* No change to wakeup settings */
+ 			else if (new_state == USB_STATE_CONFIGURED)
+-				device_init_wakeup(&udev->dev,
++				device_set_wakeup_capable(&udev->dev,
+ 					(udev->actconfig->desc.bmAttributes
+ 					 & USB_CONFIG_ATT_WAKEUP));
+ 			else
+-				device_init_wakeup(&udev->dev, 0);
++				device_set_wakeup_capable(&udev->dev, 0);
+ 		}
+ 		if (udev->state == USB_STATE_SUSPENDED &&
+ 			new_state != USB_STATE_SUSPENDED)

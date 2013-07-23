@@ -1,0 +1,127 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+
+<PISI>
+    <Source>
+        <Name>xen</Name>
+        <Homepage>http://xen.sourceforge.net</Homepage>
+        <Packager>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Packager>
+        <License>GPL-2</License>
+        <IsA>app:console</IsA>
+        <Summary>The Xen virtual machine monitor</Summary>
+        <Summary xml:lang="tr">Xen sanal makina yükleyicisi</Summary>
+        <Description>Xen is a virtual machine monitor for x86 that supports execution of multiple guest operating systems with unprecedented levels of performance and resource isolation</Description>
+        <Description xml:lang="tr">Xen, sisteminize sanal makina desteği vererek bir den fazla işletim sisteminin birbirlerine zarar vermeden çalışmasına imkan verir. 3. den sonraki sürümlerde özgür olmayan işletim sistemlerine de destek vermesi düşünülmektedir</Description>
+        <Archive sha1sum="7ca5af70996215229e143c7563e69b3719284a95" type="targz">http://bits.xensource.com/oss-xen/release/3.0.4-1/src.tgz/xen-3.0.4_1-src.tgz</Archive>
+        <BuildDependencies>
+            <Dependency releaseFrom="9">gmp</Dependency>
+            <Dependency>libsdl</Dependency>
+            <Dependency>libvncserver</Dependency>
+            <Dependency>dhcp</Dependency>
+            <Dependency>tetex</Dependency>
+            <Dependency>ghostscript</Dependency>
+            <Dependency>dev86</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <Patch level="1">gcc42.patch</Patch>
+            <Patch level="1">kdump.patch</Patch>
+            <Patch level="1">vtpm.patch</Patch>
+            <Patch level="1">bimodal.patch</Patch>
+            <Patch level="1">13405:fd0f2b4b707160ffdf1e6d56f0cf8ad166a1f147.patch</Patch>
+            <Patch level="1">8a4c107eae1e306674e4523bbbcca4b50773a186.patch</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>xen</Name>
+        <Files>
+            <Path fileType="data">/boot</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>xen-tools</Name>
+        <RuntimeDependencies>
+            <Dependency>bridge-utils</Dependency>
+            <Dependency>screen</Dependency>
+            <Dependency>logrotate</Dependency>
+            <Dependency>iproute2</Dependency>
+            <Dependency>libvncserver</Dependency>
+            <Dependency>dhcp</Dependency>
+            <Dependency>tightvnc</Dependency>
+            <Dependency>dev86</Dependency>
+            <Dependency>xen</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="config">/etc</Path>
+            <Path fileType="executable">/usr/bin</Path>
+            <Path fileType="library">/usr/lib</Path>
+            <Path fileType="executable">/usr/sbin</Path>
+            <Path fileType="header">/usr/include</Path>
+            <Path fileType="doc">/usr/share/doc</Path>
+            <Path fileType="man">/usr/share/man</Path>
+            <Path fileType="data">/usr/share/xen</Path>
+            <Path fileType="data">/var</Path>
+        </Files>
+        <AdditionalFiles>
+            <!-- Keep as an example
+            <AdditionalFile owner="root" permission="0755" target="/etc/init.d/xend">xend</AdditionalFile>
+            <AdditionalFile owner="root" permission="0755" target="/etc/init.d/xendomains">xendomains.initd</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/etc/conf.d/xendomains">xendomains.confd</AdditionalFile>
+            -->
+            <AdditionalFile owner="root" permission="0644" target="/etc/udev/rules.d/80-xen-backend.rules">80-xen-backend.rules</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/etc/logrotate.d/xen-consoles.logrotate">xen-consoles.logrotate</AdditionalFile>
+        </AdditionalFiles>
+        <Provides>
+            <COMAR script="service.py">System.Service</COMAR>
+        </Provides>
+    </Package>
+
+    <History>
+        <Update release="6">
+            <Date>2007-01-29</Date>
+            <Version>3.0.4.1</Version>
+            <Comment>Fix device reordering that occurs when the config gets read into dictionaries.</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="5">
+            <Date>2007-01-20</Date>
+            <Version>3.0.4.1</Version>
+            <Comment>Fix order of kernel argument construction to prevent arg repeat bug</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="4">
+            <Date>2007-01-16</Date>
+            <Version>3.0.4.1</Version>
+            <Comment>Added dev86 as a dependency to enable HVM</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="3">
+            <Date>2007-01-10</Date>
+            <Version>3.0.4.1</Version>
+            <Comment>Version bump</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="2">
+            <Date>2006-10-17</Date>
+            <Version>3.0.3.0</Version>
+            <Comment>Version bump</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="1">
+            <Date>2006-08-25</Date>
+            <Version>3.0.2</Version>
+            <Comment>First release.</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+    </History>
+</PISI>

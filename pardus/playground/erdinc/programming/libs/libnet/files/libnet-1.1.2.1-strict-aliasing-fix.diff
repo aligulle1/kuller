@@ -1,0 +1,72 @@
+--- src/libnet_resolve.c
++++ src/libnet_resolve.c
+@@ -370,7 +370,11 @@
+     int i;
+     int32_t l;
+     int8_t *pp;
+-        
++    union {
++	int8_t *ipp;
++	char *cpp;
++    } upp = { &pp };
++ 
+     while (isspace(*s))
+     {
+         s++;
+@@ -390,7 +394,7 @@
+     /* expect len hex octets separated by ':' */
+     for (i = 0; i < *len + 1; i++)
+     {
+-        l = strtol(s, (char **)&pp, 16);
++        l = strtol(s, upp.cpp, 16);
+         if (pp == s || l > 0xff || l < 0)
+         {
+             *len = 0;
+--- src/libnet_checksum.c
++++ src/libnet_checksum.c
+@@ -58,6 +58,27 @@
+     return (sum);
+ }
+ 
++#include <assert.h>
++/* same as above, just takes *u_int32_t */
++int
++libnet_in_cksum32(u_int32_t *addr32, int len)
++{
++    int sum;
++
++    sum = 0;
++
++    while (len > 3)
++    {
++        sum += (*addr32) >> 16;
++        sum += (*addr32) & 0x0000ffff;
++        len -= 4;
++        addr32++;
++    }
++    assert(len == 0);
++
++    return (sum);
++}
++
+ int
+ libnet_toggle_checksum(libnet_t *l, libnet_ptag_t ptag, int mode)
+ {
+@@ -173,7 +194,7 @@
+             }
+             else
+             {
+-                sum = libnet_in_cksum((u_int16_t *)&iph_p->ip_src, 8);
++                sum = libnet_in_cksum32((u_int32_t *)&iph_p->ip_src, 8);
+             }
+             sum += ntohs(IPPROTO_TCP + len);
+             sum += libnet_in_cksum((u_int16_t *)tcph_p, len);
+@@ -191,7 +212,7 @@
+             }
+             else
+             {
+-                sum = libnet_in_cksum((u_int16_t *)&iph_p->ip_src, 8);
++                sum = libnet_in_cksum32((u_int32_t *)&iph_p->ip_src, 8);
+             }
+             sum += ntohs(IPPROTO_UDP + len);
+             sum += libnet_in_cksum((u_int16_t *)udph_p, len);

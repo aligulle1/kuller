@@ -1,0 +1,60 @@
+Index: libcap-2.16/libcap/Makefile
+===================================================================
+--- libcap-2.16.orig/libcap/Makefile
++++ libcap-2.16/libcap/Makefile
+@@ -33,7 +33,7 @@ INCLUDE_GPERF_OUTPUT = -include $(GPERF_
+ endif
+ 
+ _makenames: _makenames.c cap_names.list.h
+-	$(BUILD_CC) $(BUILD_CFLAGS) $< -o $@
++	$(HOSTCC) $(HOSTCFLAGS) $(HOSTLDFLAGS) $< -o $@
+ 
+ cap_names.h: _makenames
+ 	./_makenames > cap_names.h
+Index: libcap-2.16/Make.Rules
+===================================================================
+--- libcap-2.16.orig/Make.Rules
++++ libcap-2.16/Make.Rules
+@@ -5,6 +5,7 @@
+ # common 'packaging' directoty
+ 
+ FAKEROOT=$(DESTDIR)
++CROSSCOMPILE=
+ 
+ # Autoconf-style prefixes are activated when $(prefix) is defined.
+ # Otherwise binaries and libraraies are installed in /{lib,sbin}/,
+@@ -45,25 +46,24 @@ MINOR=16
+ KERNEL_HEADERS := $(topdir)/libcap/include
+ IPATH += -I$(topdir)/libcap/include -I$(KERNEL_HEADERS)
+ 
+-CC := gcc
+-CFLAGS := -O2
+-BUILD_CC := $(CC)
+-BUILD_CFLAGS := $(CFLAGS) $(IPATH)
+-AR := ar
+-RANLIB := ranlib
++CC = $(CROSSCOMPILE)gcc
++HOSTCC = gcc
++HOSTCFLAGS = $(IPATH)
++AR = $(CROSSCOMPILE)ar
++RANLIB = $(CROSSCOMPILE)ranlib
+ DEBUG = -g #-DDEBUG
+ WARNINGS=-fPIC -Wall -Wwrite-strings \
+         -Wpointer-arith -Wcast-qual -Wcast-align \
+         -Wstrict-prototypes -Wmissing-prototypes \
+         -Wnested-externs -Winline -Wshadow
+-LD=$(CC) -Wl,-x -shared
+-LDFLAGS := #-g
++LD=$(CC)
++LDFLAGS += -Wl,-x -shared #-g
+ 
+-SYSTEM_HEADERS = /usr/include
++SYSTEM_HEADERS = $(SYSROOT)/usr/include
+ INCS=$(topdir)/libcap/include/sys/capability.h
+ LDFLAGS += -L$(topdir)/libcap
+ CFLAGS += -Dlinux $(WARNINGS) $(DEBUG) $(IPATH)
+-PAM_CAP := $(shell if [ -f /usr/include/security/pam_modules.h ]; then echo yes ; else echo no ; fi)
++PAM_CAP := $(shell if [ -f $(SYSROOT)/usr/include/security/pam_modules.h ]; then echo yes ; else echo no ; fi)
+ INDENT := $(shell if [ -n "$(which indent 2>/dev/null)" ]; then echo "| indent -kr" ; fi)
+ DYNAMIC := $(shell if [ ! -d "$(topdir)/.git" ]; then echo yes; fi)
+ LIBATTR := yes

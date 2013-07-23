@@ -1,0 +1,55 @@
+diff -ur kdepim-3.5.3.orig/kmail/accountmanager.cpp kdepim-3.5.3/kmail/accountmanager.cpp
+--- kdepim-3.5.3.orig/kmail/accountmanager.cpp	2005-09-10 11:24:02.000000000 +0300
++++ kdepim-3.5.3/kmail/accountmanager.cpp	2006-07-08 22:37:39.000000000 +0300
+@@ -182,6 +182,15 @@
+     return;
+   }
+ 
++  if ( curAccount->type() == "imap" || curAccount->type() == "cachedimap" || curAccount->type() == "pop" )
++  {
++    if( kmkernel->isOffline() )
++    {
++      emit checkedMail( false, mInteractive, mTotalNewInFolder );
++      return;
++    }
++  }
++
+   connect( curAccount, SIGNAL( finishedCheck( bool, CheckStatus ) ),
+                 this, SLOT( processNextCheck( bool ) ) );
+ 
+diff -ur kdepim-3.5.3.orig/kmail/kmkernel.cpp kdepim-3.5.3/kmail/kmkernel.cpp
+--- kdepim-3.5.3.orig/kmail/kmkernel.cpp	2006-07-08 22:36:50.000000000 +0300
++++ kdepim-3.5.3/kmail/kmkernel.cpp	2006-07-08 22:38:05.000000000 +0300
+@@ -1167,7 +1167,32 @@
+   if ( GlobalSettings::self()->networkState() == GlobalSettings::EnumNetworkState::Offline )
+     return true;
+   else
++  {
++    // Check with the network status daemon whether the network is available
++    const int NetWorkStatusUnknown = 1;
++    const int NetWorkStatusOnline = 8;
++    QCString replyType;
++    QByteArray params;
++    QByteArray reply;
++    
++    QDataStream stream( params, IO_WriteOnly );
++    stream << "www.pardus.org.tr";
++    if ( kapp->dcopClient()->call( "kded", "networkstatus", "status(QString)", params, replyType, reply ) && ( replyType == "int" ) )
++    {
++      int result;
++      QDataStream stream2(  reply, IO_ReadOnly );
++      stream2 >> result;
++      kdDebug() << k_funcinfo << "networkstatus status = " << result << endl;
++      // if it's not unknown (no networks announced by network control apps), and not offline, give up now
++      if ( ( result == NetWorkStatusUnknown ) || ( result == NetWorkStatusOnline ) )
++      {
++        return false;
++      }
++      else
++        return true;
++    }
+     return false;
++  }
+ }
+ 
+ bool KMKernel::askToGoOnline()

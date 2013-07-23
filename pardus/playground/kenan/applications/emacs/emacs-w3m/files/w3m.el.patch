@@ -1,0 +1,133 @@
+--- w3m.el.orig	2008-04-24 23:19:37.000000000 +0300
++++ w3m.el	2008-04-24 23:24:48.000000000 +0300
+@@ -918,6 +918,30 @@
+ ;; backward-compatibility alias
+ (put 'w3m-history-current-url-face 'face-alias 'w3m-history-current-url)
+ 
++(defface w3m-h1 '((t (:bold t)))
++  "Face used for displaying h1 text."
++  :group 'w3m-face)
++
++(defface w3m-h2 '((t (:bold t)))
++  "Face used for displaying h2 text."
++  :group 'w3m-face)
++
++(defface w3m-h3 '((t (:bold t)))
++  "Face used for displaying h3 text."
++  :group 'w3m-face)
++
++(defface w3m-h4 '((t (:bold t)))
++  "Face used for displaying h4 text."
++  :group 'w3m-face)
++
++(defface w3m-h5 '((t (:bold t)))
++  "Face used for displaying h5 text."
++  :group 'w3m-face)
++
++(defface w3m-h6 '((t (:bold t)))
++  "Face used for displaying h6 text."
++  :group 'w3m-face)
++
+ (defface w3m-bold '((t (:bold t)))
+   "Face used for displaying bold text."
+   :group 'w3m-face)
+@@ -2604,7 +2628,7 @@
+ 		    (list "-I" 'charset)))
+ 	       "-o" "concurrent=0"))
+ 	((eq w3m-type 'w3m-m17n)
+-	 (list "-halfdump"
++	 (list "-halfdump_backend"
+ 	       "-o" "ext_halfdump=1"
+ 	       "-o" "strict_iso2022=0"
+ 	       "-o" "fix_width_conv=1"
+@@ -2628,8 +2652,8 @@
+ 		 (t
+ 		  "ISO-2022-JP-2"))))
+ 	((eq w3m-input-coding-system 'w3m-euc-japan)
+-	 (list "-halfdump" "-I" "e"))
+-	(t (list "-halfdump")))
++	 (list "-halfdump"_backend "-I" "e"))
++	(t (list "-halfdump_backend")))
+   "Arguments passed to the w3m command to run \"halfdump\".")
+ 
+ (defconst w3m-halfdump-command-common-arguments
+@@ -3298,6 +3322,66 @@
+ 			 (string-to-number (substring name 1)))))
+     (gethash name w3m-entity-table)))
+ 
++(defun w3m-fontify-h1 ()
++  "Fontify h1 text in the buffer containing halfdump."
++  (goto-char (point-min))
++  (while (search-forward "<h1>" nil t)
++    (let ((start (match-beginning 0)))
++      (delete-region start (match-end 0))
++      (when (re-search-forward "</h1[ \t\r\f\n]*>" nil t)
++	(delete-region (match-beginning 0) (match-end 0))
++	(w3m-add-face-property start (match-beginning 0) 'w3m-h1)))))
++
++(defun w3m-fontify-h2 ()
++  "Fontify h2 text in the buffer containing halfdump."
++  (goto-char (point-min))
++  (while (search-forward "<h2>" nil t)
++    (let ((start (match-beginning 0)))
++      (delete-region start (match-end 0))
++      (when (re-search-forward "</h2[ \t\r\f\n]*>" nil t)
++	(delete-region (match-beginning 0) (match-end 0))
++	(w3m-add-face-property start (match-beginning 0) 'w3m-h2)))))
++
++(defun w3m-fontify-h3 ()
++  "Fontify h3 text in the buffer containing halfdump."
++  (goto-char (point-min))
++  (while (search-forward "<h3>" nil t)
++    (let ((start (match-beginning 0)))
++      (delete-region start (match-end 0))
++      (when (re-search-forward "</h3[ \t\r\f\n]*>" nil t)
++	(delete-region (match-beginning 0) (match-end 0))
++	(w3m-add-face-property start (match-beginning 0) 'w3m-h3)))))
++
++(defun w3m-fontify-h4 ()
++  "Fontify h4 text in the buffer containing halfdump."
++  (goto-char (point-min))
++  (while (search-forward "<h4>" nil t)
++    (let ((start (match-beginning 0)))
++      (delete-region start (match-end 0))
++      (when (re-search-forward "</h4[ \t\r\f\n]*>" nil t)
++	(delete-region (match-beginning 0) (match-end 0))
++	(w3m-add-face-property start (match-beginning 0) 'w3m-h4)))))
++
++(defun w3m-fontify-h5 ()
++  "Fontify h5 text in the buffer containing halfdump."
++  (goto-char (point-min))
++  (while (search-forward "<h5>" nil t)
++    (let ((start (match-beginning 0)))
++      (delete-region start (match-end 0))
++      (when (re-search-forward "</h5[ \t\r\f\n]*>" nil t)
++	(delete-region (match-beginning 0) (match-end 0))
++	(w3m-add-face-property start (match-beginning 0) 'w3m-h5)))))
++
++(defun w3m-fontify-h6 ()
++  "Fontify h6 text in the buffer containing halfdump."
++  (goto-char (point-min))
++  (while (search-forward "<h6>" nil t)
++    (let ((start (match-beginning 0)))
++      (delete-region start (match-end 0))
++      (when (re-search-forward "</h6[ \t\r\f\n]*>" nil t)
++	(delete-region (match-beginning 0) (match-end 0))
++	(w3m-add-face-property start (match-beginning 0) 'w3m-h6)))))
++
+ (defun w3m-fontify-bold ()
+   "Fontify bold text in the buffer containing halfdump."
+   (goto-char (point-min))
+@@ -3930,6 +4014,12 @@
+ 	   (setq start (match-beginning 0))
+ 	   (search-forward "</title>" nil t)
+ 	   (delete-region start (match-end 0))))
++    (w3m-fontify-h1)
++    (w3m-fontify-h2)
++    (w3m-fontify-h3)
++    (w3m-fontify-h4)
++    (w3m-fontify-h5)
++    (w3m-fontify-h6)
+     (w3m-fontify-bold)
+     (w3m-fontify-italic)
+     (w3m-fontify-strike-through)

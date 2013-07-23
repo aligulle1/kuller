@@ -1,0 +1,127 @@
+diff -Naur plasma/dataengines/notifications-orig/CMakeLists.txt plasma/dataengines/notifications/CMakeLists.txt
+--- plasma/dataengines/notifications-orig/CMakeLists.txt	2009-06-07 20:29:57.728200972 +0300
++++ plasma/dataengines/notifications/CMakeLists.txt	2009-06-07 20:39:37.295133802 +0300
+@@ -5,6 +5,7 @@
+ )
+ 
+ qt4_add_dbus_adaptor( notifications_engine_SRCS org.kde.VisualNotifications.xml notificationsengine.h  NotificationsEngine )
++qt4_add_dbus_adaptor( notifications_engine_SRCS org.freedesktop.Notifications.xml notificationsengine.h  NotificationsEngine )
+ 
+ kde4_add_plugin(plasma_engine_notifications ${notifications_engine_SRCS})
+ 
+diff -Naur plasma/dataengines/notifications-orig/notificationsengine.cpp plasma/dataengines/notifications/notificationsengine.cpp
+--- plasma/dataengines/notifications-orig/notificationsengine.cpp	2009-06-07 20:29:57.727754051 +0300
++++ plasma/dataengines/notifications/notificationsengine.cpp	2009-06-07 21:57:21.997676348 +0300
+@@ -20,6 +20,7 @@
+ #include "notificationsengine.h"
+ #include "notificationservice.h"
+ #include "visualnotificationsadaptor.h"
++#include "notificationsadaptor.h"
+ 
+ #include <Plasma/DataContainer>
+ #include <Plasma/Service>
+@@ -30,20 +31,30 @@
+     : Plasma::DataEngine( parent, args ), m_nextId( 1 )
+ {
+     VisualNotificationsAdaptor* adaptor = new VisualNotificationsAdaptor(this);
++    NotificationsAdaptor* adaptor2 = new NotificationsAdaptor(this);
++
+     connect(this, SIGNAL(NotificationClosed(uint, uint)),
+             adaptor, SIGNAL(NotificationClosed(uint,uint)));
+     connect(this, SIGNAL(ActionInvoked(uint, const QString&)),
+             adaptor, SIGNAL(ActionInvoked(uint, const QString&)));
++    connect(this, SIGNAL(NotificationClosed(uint, uint)),
++            adaptor2, SIGNAL(NotificationClosed(uint,uint)));
++    connect(this, SIGNAL(ActionInvoked(uint, const QString&)),
++            adaptor2, SIGNAL(ActionInvoked(uint, const QString&)));
+ 
+     QDBusConnection dbus = QDBusConnection::sessionBus();
+     dbus.registerService( "org.kde.VisualNotifications" );
+     dbus.registerObject( "/VisualNotifications", this );
++
++    dbus.registerService( "org.freedesktop.Notifications" );
++    dbus.registerObject( "/org/freedesktop/Notifications", this );
+ }
+ 
+ NotificationsEngine::~NotificationsEngine()
+ {
+     QDBusConnection dbus = QDBusConnection::sessionBus();
+     dbus.unregisterService( "org.kde.VisualNotifications" );
++    dbus.unregisterService( "org.freedesktop.Notifications" );
+ }
+ 
+ void NotificationsEngine::init()
+@@ -100,6 +111,12 @@
+     return id;
+ }
+ 
++uint NotificationsEngine::Notify(const QString &app_name, uint replaces_id, const QString &app_icon, const QString &summary, const QString &body, const QStringList &actions, const QVariantMap &hints, int timeout)
++{
++    return Notify(app_name, replaces_id, QString(), app_name, summary, body, actions, hints, timeout);
++
++}
++
+ void NotificationsEngine::timerEvent(QTimerEvent *event)
+ {
+     QString source = m_timeouts.value(event->timerId());
+@@ -113,6 +130,11 @@
+     Plasma::DataEngine::timerEvent(event);
+ }
+ 
++QStringList NotificationsEngine::GetCapabilities( void )
++{
++    return QStringList() << "actions" <<  "body" << "body-hyperlinks" << "body-markup";
++}
++
+ void NotificationsEngine::CloseNotification(uint id)
+ {
+     removeSource(QString("notification %1").arg(id));
+diff -Naur plasma/dataengines/notifications-orig/notificationsengine.h plasma/dataengines/notifications/notificationsengine.h
+--- plasma/dataengines/notifications-orig/notificationsengine.h	2009-06-07 20:29:57.708068329 +0300
++++ plasma/dataengines/notifications/notificationsengine.h	2009-06-07 21:25:51.984105394 +0300
+@@ -45,8 +45,10 @@
+      *  Once called, will add notification source to the engine
+      */
+     uint Notify(const QString &app_name, uint replaces_id, const QString &event_id, const QString &app_icon, const QString &summary, const QString &body, const QStringList &actions, const QVariantMap &hints, int timeout);
++    uint Notify(const QString &app_name, uint replaces_id, const QString &app_icon, const QString &summary, const QString &body, const QStringList &actions, const QVariantMap &hints, int timeout);
+ 
+     void CloseNotification( uint id );
++    QStringList GetCapabilities( void );
+ 
+     Plasma::Service* serviceForSource(const QString& source);
+ 
+diff -Naur plasma/dataengines/notifications-orig/org.freedesktop.Notifications.xml plasma/dataengines/notifications/org.freedesktop.Notifications.xml
+--- plasma/dataengines/notifications-orig/org.freedesktop.Notifications.xml	1970-01-01 02:00:00.000000000 +0200
++++ plasma/dataengines/notifications/org.freedesktop.Notifications.xml	2009-06-07 21:22:35.864068988 +0300
+@@ -0,0 +1,31 @@
++<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN" "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
++<node>
++  <interface name="org.freedesktop.Notifications">
++    <signal name="NotificationClosed">
++      <arg name="id" type="u" direction="out"/>
++      <arg name="reason" type="u" direction="out"/>
++    </signal>
++    <signal name="ActionInvoked">
++      <arg name="id" type="u" direction="out"/>
++      <arg name="action_key" type="s" direction="out"/>
++    </signal>
++    <method name="Notify">
++      <annotation name="com.trolltech.QtDBus.QtTypeName.In6" value="QVariantMap"/>
++      <arg type="u" direction="out"/>
++      <arg name="app_name" type="s" direction="in"/>
++      <arg name="replaces_id" type="u" direction="in"/>
++      <arg name="app_icon" type="s" direction="in"/>
++      <arg name="summary" type="s" direction="in"/>
++      <arg name="body" type="s" direction="in"/>
++      <arg name="actions" type="as" direction="in"/>
++      <arg name="hints" type="a{sv}" direction="in"/>
++      <arg name="timeout" type="i" direction="in"/>
++    </method>
++    <method name="CloseNotification">
++      <arg name="id" type="u" direction="in"/>
++    </method>
++    <method name="GetCapabilities">
++      <arg type="as" name="return_caps" direction="out"/>
++    </method>
++  </interface>
++</node>

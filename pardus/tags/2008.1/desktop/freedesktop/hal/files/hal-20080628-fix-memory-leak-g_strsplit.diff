@@ -1,0 +1,26 @@
+From: Danny Kukawka <danny.kukawka@web.de>
+Subject: fixed possible memory leak
+
+Fixed possible memory leak due to usage of g_strsplit().
+
+Signed-off-by: Danny Kukawka <danny.kukawka@web.de>
+---
+
+ acpi.c |    4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/hald/linux/acpi.c b/hald/linux/acpi.c
+index a7892ea..6f76af6 100644
+--- a/hald/linux/acpi.c
++++ b/hald/linux/acpi.c
+@@ -530,6 +530,10 @@ get_processor_model_name (gint proc_num)
+ 				}
+ 			}
+ 		}
++
++		if (lines) {
++			g_strfreev (lines);
++		}
+ 	}
+ 	else {
+ 		HAL_ERROR (("Couldn't open /proc/cpuinfo: %s", error->message));

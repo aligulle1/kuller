@@ -1,0 +1,85 @@
+--- festival.orig/Makefile.orig	2003-01-25 02:15:05.000000000 +0200
++++ festival/Makefile	2007-10-29 23:55:28.000000000 +0200
+@@ -39,7 +39,7 @@
+ ###########################################################################
+ TOP=.
+ DIRNAME=.
+-BUILD_DIRS = src lib examples bin doc
++BUILD_DIRS = src lib examples bin
+ ALL_DIRS=config $(BUILD_DIRS) testsuite
+ CONFIG=configure configure.in config.sub config.guess \
+        missing install-sh mkinstalldirs
+diff -Naur festival.orig/examples/Makefile festival/examples/Makefile
+--- festival.orig/examples/Makefile	2007-10-25 17:47:53.000000000 +0300
++++ festival/examples/Makefile	2007-10-25 17:57:10.000000000 +0300
+@@ -55,7 +55,7 @@
+ $(ALL) : % : %.sh
+ 	rm -f $@
+ 	@echo "#!/bin/sh" >$@
+-	@echo "\"true\" ; exec "$(FESTIVAL_HOME)/bin/festival --script '$$0 $$*' >>$@
++	@echo "\"true\" ; exec "/usr/bin/festival --script '$$0 $$*' >>$@
+ 	cat $< >>$@
+ 	chmod +x $@
+ 
+diff -Naur festival.orig/examples/benchmark festival/examples/benchmark
+--- festival.orig/examples/benchmark	2001-04-04 14:55:20.000000000 +0300
++++ festival/examples/benchmark	2007-10-29 00:55:31.000000000 +0200
+@@ -1,6 +1,6 @@
+ #!/bin/sh
+ 
+-default_libdir="/projects/festival/lib"
++default_libdir="/usr/share/festival/lib"
+ 
+ while true
+ 	do
+@@ -15,9 +15,9 @@
+ 	esac
+ done
+ 
+-text=${1-"$HOME/projects/festival/examples/benchmark.text"}
++text=${1-"/usr/share/doc/srcTAG/examples/benchmark.text"}
+ 
+-for i in . src/main ../src/main $HOME/projects/festival/src/main /cstr/bin
++for i in . /usr/bin src/main ../src/main $HOME/projects/festival/src/main /cstr/bin
+ 	do
+ 	if [ -n "$festival" ]
+ 		then
+diff -Naur festival.orig/lib/festival.scm festival/lib/festival.scm
+--- festival.orig/lib/festival.scm	2005-10-21 15:34:01.000000000 +0300
++++ festival/lib/festival.scm	2007-10-29 00:58:05.000000000 +0200
+@@ -552,13 +552,13 @@
+ (define (intro)
+ "(intro)
+  Synthesize an introduction to the Festival Speech Synthesis System."
+-  (tts (path-append libdir "../examples/intro.text") nil))
++  (tts (path-append libdir "/usr/share/doc/srcTAG/examples/intro.text") nil))
+ 
+ (define (intro-spanish)
+ "(intro-spanish)
+  Synthesize an introduction to the Festival Speech Synthesis System
+  in spanish.  Spanish voice must already be selected for this."
+-  (tts (path-append libdir "../examples/spintro.text") nil))
++  (tts (path-append libdir "/usr/share/doc/srcTAG/examples/spintro.text") nil))
+ 
+ (define (na_play FILENAME)
+ "(play_wave FILENAME)
+diff -Naur festival.orig/testsuite/data/modes.scm festival/testsuite/data/modes.scm
+--- festival.orig/testsuite/data/modes.scm	2004-06-28 21:24:24.000000000 +0300
++++ festival/testsuite/data/modes.scm	2007-10-29 01:08:56.000000000 +0200
+@@ -42,13 +42,13 @@
+ 
+ (format t "\n\nSABLE mode\n")
+ (unwind-protect
+- (tts (string-append libdir "/../examples/example2.sable") nil))
++ (tts (string-append libdir "/usr/share/doc/srcTAG/examples/example2.sable") nil))
+ (format t "\n\nOGI's mark up mode\n")
+ (unwind-protect 
+- (tts (string-append libdir "/../examples/ex1.ogi") 'ogimarkup))
++ (tts (string-append libdir "/usr/share/doc/srcTAG/examples/ex1.ogi") 'ogimarkup))
+ (format t "\n\nAn email mode\n")
+ (unwind-protect
+- (tts (string-append libdir "/../examples/ex1.email") nil))
++ (tts (string-append libdir "/usr/share/doc/srcTAG/examples/ex1.email") nil))
+ 
+ (voice_kal_diphone)
+ (format t "\n\nA singing mode\n")

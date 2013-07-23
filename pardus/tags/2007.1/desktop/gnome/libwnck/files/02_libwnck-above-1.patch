@@ -1,0 +1,16 @@
+diff -ruN libwnck-2.16.0/libwnck/window.c libwnck-2.16.0-test/libwnck/window.c
+--- libwnck-2.16.0/libwnck/window.c	2006-07-21 03:45:44.000000000 +1000
++++ libwnck-2.16.0-test/libwnck/window.c	2006-09-17 20:00:30.000000000 +1000
+@@ -2191,6 +2191,12 @@
+     window->priv->actions |=
+         WNCK_WINDOW_ACTION_MAXIMIZE   |
+         WNCK_WINDOW_ACTION_UNMAXIMIZE;
++
++  /* There's no _NET_WM_ACTION_ABOVE hint so always add it if
++     window manager claims to support_NET_WM_STATE_ABOVE */
++  if (wnck_screen_net_wm_supports (wnck_window_get_screen (window),
++				   "_NET_WM_STATE_ABOVE"))
++      window->priv->actions |= WNCK_WINDOW_ACTION_ABOVE;
+ }
+ 
+ static void

@@ -1,0 +1,75 @@
+--- Makefile.orig	2008-01-22 17:38:20.000000000 +0200
++++ Makefile	2008-01-23 14:33:10.000000000 +0200
+@@ -2,7 +2,7 @@
+ # Excalibur: Morgana's Revenge will be installed.
+ 
+ # The directory under which most files are installed.
+-PREFIX=/usr/local
++PREFIX=/usr
+ 
+ # The directory where user programs are installed.  "emr" goes there.
+ BINDIR=$(PREFIX)/bin
+@@ -13,20 +13,22 @@
+ ICONDIR=$(DATADIR)/icons
+ SCENARIODIR=$(DATADIR)/emr
+ DOCDIR=$(DATADIR)/doc
+-EMRDOCDIR=$(DOCDIR)/emr
++EMR_SRC_TAG=
++EMRDOCDIR=$(DOCDIR)/$(EMR_SRC_TAG)/html
+ 
+ # The directory where man pages are installed.
+-MANDIR=$(PREFIX)/man
++MANDIR=$(PREFIX)/share/man
+ MAN6DIR=$(MANDIR)/man6
+ 
+ # The path to the actual alephone executable.
+-ALEPHONE=/usr/local/bin/alephone
++ALEPHONE=/usr/bin/alephone
+ 
+ # ----------------
+ CP=/bin/cp
+ RM=/bin/rm
+ INSTALL=install
+ INSTALLDATA=install -m 644
++MKDIR=mkdir -p
+ 
+ PRODUCTS=emr emr.desktop emr.6
+ 
+@@ -45,22 +47,23 @@
+ 	    -e s=@DATADIR@=$(DATADIR)=g < $@.in > $@
+ 
+ install: all installdirs
+-	$(INSTALL) emr $(BINDIR)
+-	$(INSTALLDATA) emr.6 $(MAN6DIR)
+-	$(CP) -r share-emr/* $(SCENARIODIR)
+-	$(CP) -r share-doc-emr/* $(EMRDOCDIR)
+-	$(INSTALLDATA) emr.desktop $(DESKTOPDIR)
+-	$(INSTALLDATA) emr.png $(ICONDIR)
++	$(INSTALL) emr $(DESTDIR)$(BINDIR)
++	$(INSTALLDATA) emr.6 $(DESTDIR)$(MAN6DIR)
++	$(CP) -r share-emr/* $(DESTDIR)$(SCENARIODIR)
++	$(CP) -r share-doc-emr/* $(DESTDIR)$(EMRDOCDIR)
++	$(INSTALLDATA) emr.desktop $(DESTDIR)$(DESKTOPDIR)
++	$(INSTALLDATA) emr.png $(DESTDIR)$(ICONDIR)
+ 
+ installdirs:
+-	test -e $(MANDIR) || mkdir $(MANDIR)
+-	test -e $(MAN6DIR) || mkdir $(MAN6DIR)
+-	test -e $(DATADIR) || mkdir $(DATADIR)
+-	test -e $(DESKTOPDIR) || mkdir $(DESKTOPDIR)
+-	test -e $(ICONDIR) || mkdir $(ICONDIR)
+-	test -e $(SCENARIODIR) || mkdir $(SCENARIODIR)
+-	test -e $(DOCDIR) || mkdir $(DOCDIR)
+-	test -e $(EMRDOCDIR) || mkdir $(EMRDOCDIR)
++	test -e $(DESTDIR)$(BINDIR) || $(MKDIR) $(DESTDIR)$(BINDIR)
++	test -e $(DESTDIR)$(MANDIR) || $(MKDIR) $(DESTDIR)$(MANDIR)
++	test -e $(DESTDIR)$(MAN6DIR) || $(MKDIR) $(DESTDIR)$(MAN6DIR)
++	test -e $(DESTDIR)$(DATADIR) || $(MKDIR) $(DESTDIR)$(DATADIR)
++	test -e $(DESTDIR)$(DESKTOPDIR) || $(MKDIR) $(DESTDIR)$(DESKTOPDIR)
++	test -e $(DESTDIR)$(ICONDIR) || $(MKDIR) $(DESTDIR)$(ICONDIR)
++	test -e $(DESTDIR)$(SCENARIODIR) || $(MKDIR) $(DESTDIR)$(SCENARIODIR)
++	test -e $(DESTDIR)$(DOCDIR) || $(MKDIR) $(DESTDIR)$(DOCDIR)
++	test -e $(DESTDIR)$(EMRDOCDIR) || $(MKDIR) $(DESTDIR)$(EMRDOCDIR)
+ 
+ uninstall:
+ 	-$(RM) $(BINDIR)/emr

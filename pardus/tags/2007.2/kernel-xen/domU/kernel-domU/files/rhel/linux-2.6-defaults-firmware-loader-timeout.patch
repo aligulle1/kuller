@@ -1,0 +1,26 @@
+
+https://bugzilla.redhat.com/bugzilla/show_bug.cgi?id=174589
+
+The ipw driver sometimes takes a long time to load its firmware.
+Whilst the ipw driver should be using the async interface of
+the firmware loader to make this a non-issue, this is a minimal fix.
+
+Signed-off-by: Dave Jones <davej@redhat.com>
+
+---
+ drivers/base/firmware_class.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+Index: linux-2.6.18/drivers/base/firmware_class.c
+===================================================================
+--- linux-2.6.18.orig/drivers/base/firmware_class.c
++++ linux-2.6.18/drivers/base/firmware_class.c
+@@ -32,7 +32,7 @@ enum {
+ 	FW_STATUS_READY_NOHOTPLUG,
+ };
+ 
+-static int loading_timeout = 10;	/* In seconds */
++static int loading_timeout = 60;	/* In seconds */
+ 
+ /* fw_lock could be moved to 'struct firmware_priv' but since it is just
+  * guarding for corner cases a global lock should be OK */

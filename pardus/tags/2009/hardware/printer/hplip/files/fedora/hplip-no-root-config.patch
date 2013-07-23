@@ -1,0 +1,30 @@
+diff -up hplip-3.9.2/base/g.py.no-root-config hplip-3.9.2/base/g.py
+--- hplip-3.9.2/base/g.py.no-root-config	2009-02-20 00:36:51.000000000 +0000
++++ hplip-3.9.2/base/g.py	2009-03-09 17:43:15.000000000 +0000
+@@ -111,6 +111,10 @@ class ConfigBase(object):
+ 
+     def read(self):
+         if self.filename is not None:
++            filename = self.filename
++            if filename.startswith ("/root/") or filename.startswith ("/var/"):
++                # Don't try opening a file in root's home directory.
++                return
+             try:
+                 fp = open(self.filename, "r")
+                 self.conf.readfp(fp)
+@@ -120,6 +124,15 @@ class ConfigBase(object):
+ 
+     def write(self):
+         if self.filename is not None:
++            filename = self.filename
++            if filename.startswith ("/root/") or filename.startswith ("/var/"):
++                # Don't try writing a file in root's home directory.
++                return
++            elif filename.startswith ("/etc/"):
++                # Certainly don't try writing the system-wide config file!
++                # See bug #479178.
++                return
++
+             try:
+                 fp = open(self.filename, "w")
+                 self.conf.write(fp)

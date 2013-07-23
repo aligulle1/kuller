@@ -1,0 +1,35 @@
+Index: xapian-bindings-1.2.6/python/Makefile.am
+===================================================================
+--- xapian-bindings-1.2.6.orig/python/Makefile.am
++++ xapian-bindings-1.2.6/python/Makefile.am
+@@ -35,7 +35,7 @@ pkgpylibdir = @PYTHON_LIB@/xapian
+ 
+ # Install as _DATA rather than _SCRIPTS because we don't want to make these
+ # executable (they don't have a #! line).
+-pkgpylib_DATA = xapian/__init__.py xapian/__init__.pyc xapian/__init__.pyo
++pkgpylib_DATA = xapian/__init__.py
+ 
+ pkgpylib_LTLIBRARIES = _xapian.la
+ 
+@@ -63,7 +63,7 @@ _xapian_la_LIBADD = $(XAPIAN_LIBS) $(PYT
+ # copy the .py file to the build directory from wherever it actually is and use
+ # the copy.  We also rename the copy to __init__.py so that it can be installed
+ # in a "xapian" directory and be treated as a package.
+-xapian/__init__.py: modern/xapian.py
++xapian/__init__.py: xapian/_xapian$(PYTHON_SO)
+ 	-test -d xapian || mkdir xapian
+ 	cp `test -f modern/xapian.py || echo '$(srcdir)/'`modern/xapian.py xapian/__init__.py
+ 
+Index: xapian-bindings-1.2.6/python/Makefile.in
+===================================================================
+--- xapian-bindings-1.2.6.orig/python/Makefile.in
++++ xapian-bindings-1.2.6/python/Makefile.in
+@@ -349,7 +349,7 @@ pkgpylibdir = @PYTHON_LIB@/xapian
+ 
+ # Install as _DATA rather than _SCRIPTS because we don't want to make these
+ # executable (they don't have a #! line).
+-pkgpylib_DATA = xapian/__init__.py xapian/__init__.pyc xapian/__init__.pyo
++pkgpylib_DATA = xapian/__init__.py
+ pkgpylib_LTLIBRARIES = _xapian.la
+ AM_CPPFLAGS = -I$(PYTHON_INC)
+ AM_CXXFLAGS = $(SWIG_CXXFLAGS) $(XAPIAN_CXXFLAGS)

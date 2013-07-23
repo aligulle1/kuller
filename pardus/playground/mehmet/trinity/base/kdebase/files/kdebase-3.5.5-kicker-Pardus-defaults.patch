@@ -1,0 +1,213 @@
+Index: kdebase/kcontrol/kicker/extensionInfo.cpp
+===================================================================
+--- kdebase.orig/kcontrol/kicker/extensionInfo.cpp
++++ kdebase/kcontrol/kicker/extensionInfo.cpp
+@@ -47,9 +47,9 @@ void ExtensionInfo::load()
+         _useStdSizes = true;
+         _customSizeMin = 24;
+         _customSizeMax = 256;
+-        _customSize = 56;
++        _customSize = 32;
+         _showLeftHB     = false;
+-        _showRightHB    = true;
++        _showRightHB    = false;
+ 	for (int i=0;i<4;i++) _allowedPosition[i]=true;
+     }
+     else
+Index: kdebase/kcontrol/kicker/positiontab_impl.cpp
+===================================================================
+--- kdebase.orig/kcontrol/kicker/positiontab_impl.cpp
++++ kdebase/kcontrol/kicker/positiontab_impl.cpp
+@@ -204,7 +204,7 @@ void PositionTab::defaults()
+         m_panelAlign = AlignLeft;
+     }
+ 
+-    m_panelSize->setCurrentItem(KPanelExtension::SizeSmall);
++    m_panelSize->setCurrentItem(KPanelExtension::SizeCustom);
+ 
+     // update the magic drawing
+     lengthenPanel(-1);
+Index: kdebase/kicker/applets/clock/clockapplet.kcfg
+===================================================================
+--- kdebase.orig/kicker/applets/clock/clockapplet.kcfg
++++ kdebase/kicker/applets/clock/clockapplet.kcfg
+@@ -42,7 +42,7 @@ defFont.setPointSize(8);
+     </entry>
+     <entry name="PlainShowDate" type="Bool" key="Show_Date">
+       <label>Show date.</label>
+-      <default>true</default>
++      <default>false</default>
+     </entry>
+     <entry name="PlainShowDayOfWeek" type="Bool" key="Show_DayOfWeek">
+       <label>Show day of week.</label>
+@@ -56,7 +56,7 @@ defFont.setPointSize(8);
+       <label>Font for the clock.</label>
+       <code>
+ defFont=KGlobalSettings::generalFont();
+-defFont.setPointSize(8);
++defFont.setPointSize(14);
+ defFont.setBold(true);
+       </code>
+       <default code="true">defFont</default>
+Index: kdebase/kicker/kicker/buttons/kbutton.cpp
+===================================================================
+--- kdebase.orig/kicker/kicker/buttons/kbutton.cpp
++++ kdebase/kicker/kicker/buttons/kbutton.cpp
+@@ -52,9 +52,15 @@ KButton::KButton( TQWidget* parent )
+ 
+     if (KickerSettings::showKMenuText())
+     {
+-        setButtonText(KickerSettings::kMenuText());
+-        setFont(KickerSettings::buttonFont());
++        setDrawArrow(false);
++
++        setButtonText("PARDUS");
++        TQFont f = KickerSettings::buttonFont();
++        f.setBold(true);
++        f.setFamily("pardus");
++        setFont(f);
+         setTextColor(KickerSettings::buttonTextColor());
++        setFontPercent(0.55); // a little bigger font for KMenu
+     }
+ }
+ 
+@@ -63,6 +69,11 @@ KButton::~KButton()
+     MenuManager::the()->unregisterKButton(this);
+ }
+ 
++int KButton::widthForHeight(int height) const
++{
++  return PanelButton::widthForHeight(height) + 10;
++}
++
+ void KButton::properties()
+ {
+     KApplication::startServiceByDesktopName("kmenuedit", TQStringList(),
+Index: kdebase/kicker/kicker/core/default-apps
+===================================================================
+--- kdebase.orig/kicker/kicker/core/default-apps
++++ kdebase/kicker/kicker/core/default-apps
+@@ -1,2 +1,3 @@
+ Home.desktop
+-Internet/konqbrowser.desktop
++Internet/Kontact.desktop
++Internet/mozillafirefox.desktop
+Index: kdebase/kicker/kicker/core/extensionSettings.kcfg
+===================================================================
+--- kdebase.orig/kicker/kicker/core/extensionSettings.kcfg
++++ kdebase/kicker/kicker/core/extensionSettings.kcfg
+@@ -101,12 +101,12 @@
+ 
+ <entry name="Size" type="Int">
+       <label>Size</label>
+-      <default code="true">KPanelExtension::SizeSmall</default>
++      <default code="true">KPanelExtension::SizeCustom</default>
+    </entry>
+ 
+ <entry name="CustomSize" type="Int" >
+       <label>Custom size</label>
+-      <default>30</default>
++      <default>32</default>
+       <min>16</min>
+    </entry>
+ 
+Index: kdebase/kicker/libkicker/kickerSettings.kcfg
+===================================================================
+--- kdebase.orig/kicker/libkicker/kickerSettings.kcfg
++++ kdebase/kicker/libkicker/kickerSettings.kcfg
+@@ -12,7 +12,7 @@
+ 
+ <entry name="Locked" type="Bool" >
+       <label>When this option is enabled, the panels may not be moved and items cannot be removed or added</label>
+-      <default>false</default>
++      <default>true</default>
+    </entry>
+ 
+ <entry name="ConserveSpace" type="Bool" >
+@@ -202,7 +202,7 @@
+ 
+ <entry name="MenuEntryHeight" type="Int" >
+       <label>Height of menu entries in pixels</label>
+-      <default>0</default>
++      <default>22</default>
+    </entry>
+ 
+ <entry name="ShowHiddenFiles" type="Bool" >
+@@ -228,7 +228,6 @@
+ 
+ <entry name="MenuExtensions" key="Extensions" type="StringList" >
+       <label>Optional Menus</label>
+-      <default>prefmenu.desktop,systemmenu.desktop</default>
+    </entry>
+ 
+ <entry name="RecentAppsStat" type="StringList" >
+@@ -237,13 +236,13 @@
+ 
+ <entry name="NumVisibleEntries" type="UInt" >
+       <label>Number of visible entries</label>
+-      <default>5</default>
++      <default>3</default>
+       <max>100</max>
+    </entry>
+ 
+ <entry name="RecentVsOften" type="Bool" >
+       <label>Show most recently used applications rather than most frequently used</label>
+-      <default>false</default>
++      <default>true</default>
+    </entry>
+ 
+ <entry name="Favorites" type="StringList">
+@@ -359,12 +358,12 @@
+ 
+ <entry name="ShowKMenuText" key="ShowText" type="Bool" >
+       <label>Show text on the K Menu button</label>
+-      <default>false</default>
++      <default>true</default>
+    </entry>
+ 
+ <entry name="KMenuText" key="Text" type="String" >
+       <label>Text to be shown on K Menu Button</label>
+-      <default code="true">i18n("Applications")</default>
++      <default code="true">i18n("Pardus")</default>
+    </entry>
+ 
+ <entry name="CustomKMenuIcon" key="CustomIcon" type="Path" >
+Index: kdebase/kcontrol/kicker/hidingtab_impl.cpp
+===================================================================
+--- kdebase.orig/kcontrol/kicker/hidingtab_impl.cpp
++++ kdebase/kcontrol/kicker/hidingtab_impl.cpp
+@@ -200,7 +200,7 @@ void HidingTab::defaults()
+    m_delaySpinBox->setValue( 3 );
+    m_autoHideSwitch->setChecked( false );
+    m_lHB->setChecked(  false );
+-   m_rHB->setChecked(  true );
++   m_rHB->setChecked(  false );
+    m_animateHiding->setChecked( true );
+    m_hideSlider->setValue( 10 );
+    m_delaySpinBox->setValue( 3 );
+Index: kdebase/kcontrol/kicker/menutab_impl.cpp
+===================================================================
+--- kdebase.orig/kcontrol/kicker/menutab_impl.cpp
++++ kdebase/kcontrol/kicker/menutab_impl.cpp
+@@ -162,7 +162,7 @@ void MenuTab::load( bool useDefaults )
+     connect(m_comboMenuStyle, TQT_SIGNAL(activated(int)), TQT_SLOT(menuStyleChanged()));
+     connect(m_openOnHover, TQT_SIGNAL(clicked()), TQT_SIGNAL(changed()));
+ 
+-    m_showFrequent->setChecked(true);
++    m_showFrequent->setChecked(false);
+ 
+     if ( useDefaults )
+        emit changed();
+Index: kdebase/kicker/kicker/buttons/kbutton.h
+===================================================================
+--- kdebase.orig/kicker/kicker/buttons/kbutton.h
++++ kdebase/kicker/kicker/buttons/kbutton.h
+@@ -41,6 +41,8 @@ public:
+ 
+     virtual void properties();
+ 
++    int widthForHeight(int height) const;
++
+ protected:
+     virtual TQString tileName() { return "KMenu"; }
+     virtual void initPopup();

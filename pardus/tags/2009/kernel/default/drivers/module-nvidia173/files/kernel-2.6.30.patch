@@ -1,0 +1,90 @@
+Index: NVIDIA-Linux-x86-173.14.18/usr/src/nv/nv.c
+===================================================================
+--- NVIDIA-Linux-x86-173.14.18.orig/usr/src/nv/nv.c
++++ NVIDIA-Linux-x86-173.14.18/usr/src/nv/nv.c
+@@ -360,7 +360,6 @@ static struct pci_driver nv_pci_driver =
+ /* character driver entry points */
+ 
+ static struct file_operations nv_fops = {
+-    .owner     = THIS_MODULE,
+     .poll      = nv_kern_poll,
+     .ioctl     = nv_kern_ioctl,
+ #if defined(HAVE_UNLOCKED_IOCTL)
+@@ -603,14 +602,6 @@ static void nvos_proc_create(void)
+     if (!proc_nvidia_warnings)
+         goto failed;
+ 
+-    /*
+-     * Set the module owner to ensure that the reference
+-     * count reflects accesses to the proc files.
+-     */
+-    proc_nvidia->owner = THIS_MODULE;
+-    proc_nvidia_cards->owner = THIS_MODULE;
+-    proc_nvidia_warnings->owner = THIS_MODULE;
+-
+     for (j = 0; j < num_nv_devices; j++)
+     {
+         nvl = &nv_linux_devices[j];
+@@ -629,7 +620,6 @@ static void nvos_proc_create(void)
+ 
+         entry->data = nv;
+         entry->read_proc = nv_kern_read_cardinfo;
+-        entry->owner = THIS_MODULE;
+ 
+         if (nvos_find_agp_capability(dev)) {
+             /*
+@@ -642,7 +632,6 @@ static void nvos_proc_create(void)
+                 goto failed;
+             }
+ 
+-            entry->owner = THIS_MODULE;
+             proc_nvidia_agp = entry;
+ 
+             entry = create_proc_entry("status", flags, proc_nvidia_agp);
+@@ -653,7 +642,6 @@ static void nvos_proc_create(void)
+ 
+             entry->data = nv;
+             entry->read_proc = nv_kern_read_status;
+-            entry->owner = THIS_MODULE;
+ 
+             entry = create_proc_entry("host-bridge", flags, proc_nvidia_agp);
+             if (!entry) {
+@@ -663,7 +651,6 @@ static void nvos_proc_create(void)
+ 
+             entry->data = NULL;
+             entry->read_proc = nv_kern_read_agpinfo;
+-            entry->owner = THIS_MODULE;
+ 
+             entry = create_proc_entry("card", flags, proc_nvidia_agp);
+             if (!entry) {
+@@ -673,7 +660,6 @@ static void nvos_proc_create(void)
+ 
+             entry->data = nv;
+             entry->read_proc = nv_kern_read_agpinfo;
+-            entry->owner = THIS_MODULE;
+         }
+ 
+         NV_PCI_DEV_PUT(dev);
+@@ -684,14 +670,12 @@ static void nvos_proc_create(void)
+         goto failed;
+ 
+     entry->read_proc = nv_kern_read_version;
+-    entry->owner = THIS_MODULE;
+ 
+     entry = create_proc_entry("registry", flags, proc_nvidia);
+     if (!entry)
+         goto failed;
+ 
+     entry->read_proc = nv_kern_read_registry;
+-    entry->owner = THIS_MODULE;
+ 
+     return;
+ 
+@@ -718,7 +702,6 @@ nvos_proc_add_warning_file(
+ 
+     entry->data = (void *)message;
+     entry->read_proc = nv_kern_read_warning;
+-    entry->owner = THIS_MODULE;
+ #endif
+ }
+ 

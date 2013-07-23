@@ -1,0 +1,66 @@
+From 52c034f5a41195f2b3193ec8c18b3f4ed7a763a3 Mon Sep 17 00:00:00 2001
+From: Adam Jackson <ajax@redhat.com>
+Date: Mon, 3 Nov 2008 15:01:58 -0500
+Subject: [PATCH] Do E-EDID if built against a server that supports it.
+
+---
+ src/g80_output.c |    4 ++++
+ src/nv_setup.c   |    7 ++++++-
+ src/riva_setup.c |    7 ++++++-
+ 3 files changed, 16 insertions(+), 2 deletions(-)
+
+diff --git xf86-video-nv-2.1.12/src/g80_output.c xf86-video-nv-2.1.12/src/g80_output.c
+index e906fbb..420a73e 100644
+--- xf86-video-nv-2.1.12/src/g80_output.c
++++ xf86-video-nv-2.1.12/src/g80_output.c
+@@ -307,7 +307,11 @@ ProbeDDC(I2CBusPtr i2c)
+             "Probing for EDID on I2C bus %i...\n", bus);
+     pNv->reg[addr/4] = 7;
+     /* Should probably use xf86OutputGetEDID here */
++#ifdef EDID_COMPLETE_RAWDATA
++    monInfo = xf86DoEEDID(pScrn->scrnIndex, i2c, TRUE);
++#else
+     monInfo = xf86DoEDID_DDC2(pScrn->scrnIndex, i2c);
++#endif
+     pNv->reg[addr/4] = 3;
+ 
+     if(monInfo) {
+diff --git xf86-video-nv-2.1.12/src/nv_setup.c xf86-video-nv-2.1.12/src/nv_setup.c
+index bea0050..132a96b 100644
+--- xf86-video-nv-2.1.12/src/nv_setup.c
++++ xf86-video-nv-2.1.12/src/nv_setup.c
+@@ -229,7 +229,12 @@ NVProbeDDC (ScrnInfoPtr pScrn, int bus)
+     xf86DrvMsg(pScrn->scrnIndex, X_INFO, 
+                "Probing for EDID on I2C bus %s...\n", bus ? "B" : "A");
+ 
+-    if ((MonInfo = xf86DoEDID_DDC2(pScrn->scrnIndex, pNv->I2C))) {
++#ifdef EDID_COMPLETE_RAWDATA
++    MonInfo = xf86DoEEDID(pScrn->scrnIndex, pNv->I2C, TRUE);
++#else
++    MonInfo = xf86DoEDID_DDC2(pScrn->scrnIndex, pNv->I2C);
++#endif
++    if (MonInfo) {
+        xf86DrvMsg(pScrn->scrnIndex, X_PROBED,
+                   "DDC detected a %s:\n", MonInfo->features.input_type ?
+                   "DFP" : "CRT");
+diff --git xf86-video-nv-2.1.12/src/riva_setup.c xf86-video-nv-2.1.12/src/riva_setup.c
+index b7352b6..b616798 100644
+--- xf86-video-nv-2.1.12/src/riva_setup.c
++++ xf86-video-nv-2.1.12/src/riva_setup.c
+@@ -167,7 +167,12 @@ RivaProbeDDC (ScrnInfoPtr pScrn)
+ 
+     xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Probing for EDID...\n");
+ 
+-    if ((MonInfo = xf86DoEDID_DDC2(pScrn->scrnIndex, pRiva->I2C))) {
++#ifdef EDID_COMPLETE_RAWDATA
++    MonInfo = xf86DoEEDID(pScrn->scrnIndex, pNv->I2C, TRUE);
++#else
++    MonInfo = xf86DoEDID_DDC2(pScrn->scrnIndex, pNv->I2C);
++#endif
++    if (MonInfo) {
+        xf86DrvMsg(pScrn->scrnIndex, X_INFO,
+                   "  ... found one\n");
+        xf86PrintEDID( MonInfo );
+-- 
+1.6.0.6
+

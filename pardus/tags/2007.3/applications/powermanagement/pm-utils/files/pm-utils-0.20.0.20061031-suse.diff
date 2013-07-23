@@ -1,0 +1,49 @@
+--- pm/functions
++++ pm/functions
+@@ -62,7 +62,7 @@
+ 
+ remove_suspend_lock()
+ {
+-	rm -f /var/run/pm-suspend
++#	rm -f /var/run/pm-suspend
+ 	chvt 1
+ 	chvt $VT
+ 	openvt -- sh -c "usleep $1 ; rm -f /.suspended >/dev/null 2>&1 0<&1" >/dev/null 2>&1 0<&1 &
+@@ -73,7 +72,7 @@
+ 	[ -z "$1" ] && return 0
+ 
+ 	[ -f /var/run/pm-suspend ] && . /var/run/pm-suspend
+-	rm -f /var/run/pm-suspend
++#	rm -f /var/run/pm-suspend
+ 
+ 	echo "$(date): running $1 hooks."
+ 
+--- pm/hooks/50modules
++++ pm/hooks/50modules
+@@ -6,6 +6,7 @@
+ {
+ 	[ -z "$SUSPEND_MODULES" ] && return 0
+ 	for x in $SUSPEND_MODULES ; do
++		echo "trying to unload: $x"
+ 		modunload $x
+ 	done
+ 	return 0
+@@ -15,6 +16,7 @@
+ {
+ 	[ -z "$RESUME_MODULES" ] && return 0
+ 	for x in $RESUME_MODULES ; do
++	 	echo "trying to reload: $x"
+ 		modprobe $x
+ 	done
+ }
+--- pm/hooks/94cpufreq
++++ pm/hooks/94cpufreq
+@@ -11,7 +11,7 @@
+ 		[ -f $x/cpufreq/scaling_governor ] || continue
+ 
+ 		savestate ${x}_governor $(cat $x/cpufreq/scaling_governor)
+-		sh -c "echo userspace > $x/cpufreq/scaling_governor" >/dev/null 2>&1
++		echo performance > $x/cpufreq/scaling_governor 2>/dev/null
+ 	done
+ 	popd >/dev/null 2>&1
+ }

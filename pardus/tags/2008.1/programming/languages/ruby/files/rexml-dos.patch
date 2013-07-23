@@ -1,0 +1,95 @@
+diff -Nur ruby-1.8.7-p72/lib/rexml/document.rb ruby-1.8.7-p72-new/lib/rexml/document.rb
+--- ruby-1.8.7-p72/lib/rexml/document.rb	2008-06-06 11:05:24.000000000 +0300
++++ ruby-1.8.7-p72-new/lib/rexml/document.rb	2008-08-30 12:36:51.000000000 +0300
+@@ -32,6 +32,7 @@
+ 	  # @param context if supplied, contains the context of the document;
+ 	  # this should be a Hash.
+ 		def initialize( source = nil, context = {} )
++            @entity_expansion_count = 0
+ 			super()
+ 			@context = context
+ 			return if source.nil?
+@@ -200,6 +201,26 @@
+ 			Parsers::StreamParser.new( source, listener ).parse
+ 		end
+ 
++        @@entity_expansion_limit = 10_000
++
++        # Set the entity expansion limit. By defualt the limit is set to 10000.
++        def Document::entity_expansion_limit=( val )
++          @@entity_expansion_limit = val
++        end
++
++        # Get the entity expansion limit. By defualt the limit is set to 10000.
++        def Document::entity_expansion_limit
++          return @@entity_expansion_limit
++        end
++        attr_reader :entity_expansion_count
++
++        def record_entity_expansion
++          @entity_expansion_count += 1
++          if @entity_expansion_count > @@entity_expansion_limit
++            raise "number of entity expansions exceeded, processing aborted."
++          end
++        end
++
+ 		private
+ 		def build( source )
+       Parsers::TreeParser.new( source, self ).parse
+diff -Nur ruby-1.8.7-p72/lib/rexml/entity.rb ruby-1.8.7-p72-new/lib/rexml/entity.rb
+--- ruby-1.8.7-p72/lib/rexml/entity.rb	2008-04-18 10:22:13.000000000 +0300
++++ ruby-1.8.7-p72-new/lib/rexml/entity.rb	2008-08-30 12:37:37.000000000 +0300
+@@ -73,6 +73,7 @@
+ 		# all entities -- both %ent; and &ent; entities.  This differs from
+ 		# +value()+ in that +value+ only replaces %ent; entities.
+ 		def unnormalized
++            document.record_entity_expansion
+ 			v = value()
+ 			return nil if v.nil?
+ 			@unnormalized = Text::unnormalize(v, parent)
+diff -Nur ruby-1.8.7-p72/test/rexml/test_document.rb ruby-1.8.7-p72-new/test/rexml/test_document.rb
+--- ruby-1.8.7-p72/test/rexml/test_document.rb	1970-01-01 02:00:00.000000000 +0200
++++ ruby-1.8.7-p72-new/test/rexml/test_document.rb	2008-08-30 12:40:40.000000000 +0300
+@@ -0,0 +1,42 @@
++require "rexml/document"
++require "test/unit"
++
++class REXML::TestDocument < Test::Unit::TestCase
++  def test_new
++    doc = REXML::Document.new(<<EOF)
++<?xml version="1.0" encoding="UTF-8"?>
++<message>Hello world!</message>
++EOF
++    assert_equal("Hello world!", doc.root.children.first.value)
++  end
++
++  XML_WITH_NESTED_ENTITY = <<EOF
++<?xml version="1.0" encoding="UTF-8"?>
++<!DOCTYPE member [
++  <!ENTITY a "&b;&b;&b;&b;&b;&b;&b;&b;&b;&b;">
++  <!ENTITY b "&c;&c;&c;&c;&c;&c;&c;&c;&c;&c;">
++  <!ENTITY c "&d;&d;&d;&d;&d;&d;&d;&d;&d;&d;">
++  <!ENTITY d "&e;&e;&e;&e;&e;&e;&e;&e;&e;&e;">
++  <!ENTITY e "&f;&f;&f;&f;&f;&f;&f;&f;&f;&f;">
++  <!ENTITY f "&g;&g;&g;&g;&g;&g;&g;&g;&g;&g;">
++  <!ENTITY g "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
++]>
++<member>
++&a;
++</member>
++EOF
++
++  def test_entity_expansion_limit
++    doc = REXML::Document.new(XML_WITH_NESTED_ENTITY)
++    assert_raise(RuntimeError) do
++      doc.root.children.first.value
++    end
++    REXML::Document.entity_expansion_limit = 100
++    assert_equal(100, REXML::Document.entity_expansion_limit)
++    doc = REXML::Document.new(XML_WITH_NESTED_ENTITY)
++    assert_raise(RuntimeError) do
++      doc.root.children.first.value
++    end
++    assert_equal(101, doc.entity_expansion_count)
++  end
++end

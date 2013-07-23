@@ -1,0 +1,33 @@
+Index: package-manager/src/package-manager.py
+===================================================================
+--- package-manager/src/package-manager.py	(revision 12247)
++++ package-manager/src/package-manager.py	(working copy)
+@@ -499,6 +499,7 @@
+         self.progressDialog.updateProgressBar(100)
+ 
+         if not self.command.inProgress():
++            self.progressDialog.totalPackages = 1
+             self.command.install([package])
+             self.progressDialog.setCurrentOperation(i18n("<b>Installing Package(s)</b>"))
+             self.progressDialog.show()
+@@ -548,6 +549,8 @@
+         if not self.confirmAction():
+             return
+ 
++        self.progressDialog.totalPackages = len(self.basket.packages + self.basket.extraPackages)
++
+         # remove action
+         if self.state == remove_state:
+             self.command.remove(self.basket.packages)
+@@ -741,11 +744,6 @@
+             self.progressDialog.setCurrentOperation(i18n("<b>Updating Repository</b>"))
+             self.progressDialog.setOperationDescription(i18n('Downloading package list of %1').arg(data[1]))
+ 
+-        else: # pisi.ui.packagetogo
+-            # pisi sends unnecessary remove order notify in the middle of install, upgrade, remove
+-            if self.progressDialog.totalPackages == 0:
+-                self.progressDialog.totalPackages = len(data)
+-
+     def showErrorMessage(self, message, error=i18n("Error")):
+         KMessageBox.error(self, message, error)
+ 

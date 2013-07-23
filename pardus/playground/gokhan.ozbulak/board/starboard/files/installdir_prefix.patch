@@ -1,0 +1,64 @@
+Index: install.sh
+===================================================================
+--- install.sh.orig
++++ install.sh
+@@ -18,33 +18,45 @@ MOVE="mv -f"
+ 
+ echo "##### Start the installation of StarBoardSoftware... #####"
+ 
+-if [ ! -d /usr/local/HitachiSolutions ]
++if [ ! -d $PREFIX/usr/local/HitachiSolutions ]
+ then
+-    $MKDIR /usr/local/HitachiSolutions/
++    $MKDIR $PREFIX/usr/local/HitachiSolutions/
+ fi
+ echo "##### Copying StarBoardSoftware Contents files... #####"
+-$INSTALL_DIR ./data/usr/local/HitachiSolutions/* /usr/local/HitachiSolutions
++$INSTALL_DIR ./data/usr/local/HitachiSolutions/* $PREFIX/usr/local/HitachiSolutions
+ 
+-if [ ! -d /usr/local/StarBoardSoftware ]
++if [ ! -d $PREFIX/usr/local/StarBoardSoftware ]
+ then
+-    $MKDIR /usr/local/StarBoardSoftware
++    $MKDIR $PREFIX/usr/local/StarBoardSoftware
+ fi
+ echo "##### Installing StarBoardSoftware files... #####"
+-$INSTALL_DIR ./data/usr/local/StarBoardSoftware/* /usr/local/StarBoardSoftware
++$INSTALL_DIR ./data/usr/local/StarBoardSoftware/* $PREFIX/usr/local/StarBoardSoftware
+ 
+-$INSTALL_FILE ./data/usr/share/applications/hitachi-starboard.desktop /usr/share/applications/
+-$INSTALL_FILE ./data/usr/share/applications/hitachi-starboard-calibrate.desktop /usr/share/applications/
++if [ ! -d $PREFIX/usr/share/applications ]
++then
++    $MKDIR $PREFIX/usr/share/applications
++fi
++$INSTALL_FILE ./data/usr/share/applications/hitachi-starboard.desktop $PREFIX/usr/share/applications/
++$INSTALL_FILE ./data/usr/share/applications/hitachi-starboard-calibrate.desktop $PREFIX/usr/share/applications/
+ 
+-$INSTALL_FILE ./data/usr/share/desktop-directories/StarBoard.directory /usr/share/desktop-directories/
++if [ ! -d $PREFIX/usr/share/desktop-directories ]
++then
++    $MKDIR $PREFIX/usr/share/desktop-directories
++fi
++$INSTALL_FILE ./data/usr/share/desktop-directories/StarBoard.directory $PREFIX/usr/share/desktop-directories/
+ 
+-$INSTALL_FILE ./data/usr/share/mime/packages/starboardsoftware.xml /usr/share/mime/packages/
++if [ ! -d $PREFIX/usr/share/mime/packages ]
++then
++    $MKDIR $PREFIX/usr/share/mime/packages
++fi
++$INSTALL_FILE ./data/usr/share/mime/packages/starboardsoftware.xml $PREFIX/usr/share/mime/packages/
+ 
+-if [ ! -d /etc/xdg/menus/applications-merged ]
++if [ ! -d $PREFIX/etc/xdg/menus/applications-merged ]
+ then
+-    $MKDIR /etc/xdg/menus/applications-merged
++    $MKDIR $PREFIX/etc/xdg/menus/applications-merged
+ fi
+-$INSTALL_FILE ./data/etc/xdg/menus/applications-merged/starboard.menu /etc/xdg/menus/applications-merged
++$INSTALL_FILE ./data/etc/xdg/menus/applications-merged/starboard.menu $PREFIX/etc/xdg/menus/applications-merged
+ 
+-/usr/local/StarBoardSoftware/install.sh app
++$PREFIX/usr/local/StarBoardSoftware/install.sh app
+ echo "##### Finish the installation of StarBoardSoftware!! #####"
+ 

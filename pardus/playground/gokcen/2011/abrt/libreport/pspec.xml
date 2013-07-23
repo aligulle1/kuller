@@ -1,0 +1,202 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>libreport</Name>
+        <Homepage>http://</Homepage>
+        <Packager>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Packager>
+        <License>GPLv2+</License>
+        <Summary>Generic library for reporting various problems</Summary>
+        <Description>libreport is a set of libraries providing API for reporting different problems in applications to different bug targets like Bugzilla, ftp, trac, etc...</Description>
+        <Archive sha1sum="2f43f1f9e0fc714fd97a21e7477289d8b054413f" type="targz">http://fedorahosted.org/released/abrt/libreport-2.0.6.tar.gz</Archive>
+        <AdditionalFiles>
+            <AdditionalFile target="po/tr.po">tr.po</AdditionalFile>
+        </AdditionalFiles>
+        <BuildDependencies>
+            <Dependency>xmlrpc-c-devel</Dependency>
+            <Dependency>newt-devel</Dependency>
+            <Dependency>gtk2-devel</Dependency>
+            <Dependency>pango-devel</Dependency>
+            <Dependency>libgnome-keyring-devel</Dependency>
+            <Dependency>asciidoc</Dependency>
+            <Dependency>libtar-devel</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <Patch level="1">2.0.6..f2fda52135ee.diff</Patch>
+
+            <Patch level="1">fix-curl-linking.diff</Patch>
+            <Patch level="1">disable-rht-support.patch</Patch>
+            <Patch level="1">fix-checkelf-undefined.diff</Patch>
+
+            <Patch level="1">0003-Ignore-files-which-seem-to-be-editor-backups.-Closes.patch</Patch>
+            <Patch level="1">add-tr-to-LINGUAS.diff</Patch>
+            <Patch level="1">use-pardus-bugzilla.diff</Patch>
+            <Patch level="1">rename-release-files.patch</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>libreport</Name>
+        <IsA>library</IsA>
+        <IsA>app:console</IsA>
+        <RuntimeDependencies>
+            <Dependency>xmlrpc-c</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="config">/etc</Path>
+            <Path fileType="executable">/usr/bin</Path>
+            <Path fileType="library">/usr/lib</Path>
+            <Path fileType="localedata">/usr/share/locale</Path>
+            <Path fileType="man">/usr/share/man</Path>
+            <Path fileType="doc">/usr/share/doc</Path>
+            <Path fileType="data">/usr/share</Path>
+            <Path fileType="data">/var</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>libreport-devel</Name>
+        <IsA>data</IsA>
+        <Summary>Development files for libreport</Summary>
+        <RuntimeDependencies>
+            <Dependency release="current">libreport</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="header">/usr/include</Path>
+            <Path fileType="data">/usr/lib/pkgconfig</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>python-libreport</Name>
+        <IsA>library</IsA>
+        <Summary>Python bindings for libreport</Summary>
+        <RuntimeDependencies>
+            <Dependency release="current">libreport</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="library">/usr/lib/python*</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>libreport-newt</Name>
+        <IsA>app:gui</IsA>
+        <Summary>newt front-end for libreport</Summary>
+        <RuntimeDependencies>
+            <Dependency release="current">libreport</Dependency>
+            <Dependency>newt</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="executable">/usr/bin/report-newt</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>libreport-gtk</Name>
+        <IsA>app:gui</IsA>
+        <Summary>GTK front-end for libreport</Summary>
+        <RuntimeDependencies>
+            <Dependency release="current">libreport</Dependency>
+            <Dependency>gtk2</Dependency>
+            <Dependency>pango</Dependency>
+            <Dependency>libgnome-keyring</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="executable">/usr/bin/report-gtk</Path>
+            <Path fileType="library">/usr/lib/libreport-gtk*</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>libreport-plugin-kerneloops</Name>
+        <IsA>app:console</IsA>
+        <Summary>kerneloops plugin for libreport</Summary>
+        <RuntimeDependencies>
+            <Dependency release="current">libreport</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="executable">/usr/bin/reporter-kerneloops</Path>
+            <Path fileType="config">/etc/libreport/events/report_Kerneloops.xml</Path>
+            <Path fileType="man">/usr/share/man/man1/reporter-kerneloops.1</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>libreport-plugin-logger</Name>
+        <IsA>app:console</IsA>
+        <Summary>Logger plugin for libreport</Summary>
+        <RuntimeDependencies>
+            <Dependency release="current">libreport</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="executable">/usr/bin/reporter-print</Path>
+            <Path fileType="config">/etc/libreport/events/report_Logger.xml</Path>
+            <Path fileType="config">/etc/libreport/events/report_Logger.conf</Path>
+            <Path fileType="config">/etc/libreport/events.d/print_event.conf</Path>
+            <Path fileType="man">/usr/share/man/man1/reporter-print.1</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>libreport-plugin-mailx</Name>
+        <IsA>app:console</IsA>
+        <Summary>mailx plugin for libreport</Summary>
+        <RuntimeDependencies>
+            <Dependency release="current">libreport</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="executable">/usr/bin/reporter-mailx</Path>
+            <Path fileType="config">/etc/libreport/events.d/mailx_event.conf</Path>
+            <Path fileType="config">/etc/libreport/events/report_Mailx.xml</Path>
+            <Path fileType="man">/usr/share/man/man1/reporter-mailx.1</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>libreport-plugin-bugzilla</Name>
+        <IsA>app:console</IsA>
+        <Summary>Bugzilla plugin for libreport</Summary>
+        <RuntimeDependencies>
+            <Dependency release="current">libreport</Dependency>
+            <Dependency>xmlrpc-c</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="executable">/usr/bin/reporter-bugzilla</Path>
+            <Path fileType="config">/etc/libreport/events.d/bugzilla_event.conf</Path>
+            <Path fileType="config">/etc/libreport/events/report_Bugzilla.xml</Path>
+            <Path fileType="config">/etc/libreport/events/report_Bugzilla.conf</Path>
+            <Path fileType="config">/etc/libreport/plugins/bugzilla.conf</Path>
+            <Path fileType="man">/usr/share/man/man1/reporter-bugzilla.1</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>libreport-plugin-reportuploader</Name>
+        <IsA>app:console</IsA>
+        <Summary>Plugin to report bugs into anonymous FTP site associated with ticketing system</Summary>
+        <RuntimeDependencies>
+            <Dependency release="current">libreport</Dependency>
+            <Dependency>libtar</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="executable">/usr/bin/reporter-upload</Path>
+            <Path fileType="config">/etc/libreport/events.d/uploader_event.conf</Path>
+            <Path fileType="config">/etc/libreport/events/report_Uploader.xml</Path>
+            <Path fileType="man">/usr/share/man/man1/reporter-upload.1</Path>
+        </Files>
+    </Package>
+
+    <History>
+        <Update release="1">
+            <Date>2011-10-02</Date>
+            <Version>2.0.6</Version>
+            <Comment>First release.</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+    </History>
+</PISI>

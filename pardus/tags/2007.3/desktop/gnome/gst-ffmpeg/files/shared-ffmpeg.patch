@@ -1,0 +1,95 @@
+--- gst-ffmpeg-0.10.2/ext/ffmpeg/gstffmpegdemux.c	2006-10-25 20:20:25.000000000 +0300
++++ gst-ffmpeg-hack/ext/ffmpeg/gstffmpegdemux.c	2007-02-24 12:28:06.000000000 +0200
+@@ -26,7 +26,6 @@
+ #include <string.h>
+ #ifdef HAVE_FFMPEG_UNINSTALLED
+ #include <avformat.h>
+-#include <avi.h>
+ #else
+ #include <ffmpeg/avformat.h>
+ #include <ffmpeg/avi.h>
+--- gst-ffmpeg-0.10.2/ext/ffmpeg/Makefile.in	2006-12-13 22:18:29.000000000 +0200
++++ gst-ffmpeg-hack/ext/ffmpeg/Makefile.in	2007-02-24 12:27:01.000000000 +0200
+@@ -69,8 +69,6 @@
+ pluginLTLIBRARIES_INSTALL = $(INSTALL)
+ LTLIBRARIES = $(plugin_LTLIBRARIES)
+ am__DEPENDENCIES_1 =
+-libgstffmpeg_la_DEPENDENCIES = $(top_builddir)/gst-libs/ext/ffmpeg/libavformat/libavformat.la \
+-	$(am__DEPENDENCIES_1)
+ am_libgstffmpeg_la_OBJECTS = libgstffmpeg_la-gstffmpeg.lo \
+ 	libgstffmpeg_la-gstffmpegprotocol.lo \
+ 	libgstffmpeg_la-gstffmpegcodecmap.lo \
+@@ -298,13 +296,10 @@
+ 			  gstffmpegdeinterlace.c	\
+ 			  gstffmpegscale.c
+ 
+-libgstffmpeg_la_CFLAGS = $(GST_CFLAGS) $(GST_PLUGINS_BASE_CFLAGS) \
+-	-I $(top_srcdir)/gst-libs/ext/ffmpeg/libavformat \
+-	-I $(top_srcdir)/gst-libs/ext/ffmpeg/libavutil \
+-	-I $(top_srcdir)/gst-libs/ext/ffmpeg/libavcodec
++libgstffmpeg_la_CFLAGS = $(GST_CFLAGS) $(GST_PLUGINS_BASE_CFLAGS) -I/usr/include/ffmpeg/
+ 
+ libgstffmpeg_la_LIBADD = \
+-	$(top_builddir)/gst-libs/ext/ffmpeg/libavformat/libavformat.la \
++	-lavformat \
+ 	$(GST_BASE_LIBS)
+ 
+ libgstffmpeg_la_LDFLAGS = $(GST_PLUGIN_LDFLAGS)
+--- gst-ffmpeg-0.10.2/ext/libpostproc/gstpostproc.c	2006-10-20 18:17:38.000000000 +0300
++++ gst-ffmpeg-hack/ext/libpostproc/gstpostproc.c	2007-02-24 12:32:50.000000000 +0200
+@@ -30,8 +30,7 @@
+ 
+ #ifdef HAVE_FFMPEG_UNINSTALLED
+ #include <avcodec.h>
+-#include <version.h>
+-#include <libpostproc/postprocess.h>
++#include <postproc/postprocess.h>
+ #else
+ #include <ffmpeg/avcodec.h>
+ #include <ffmpeg/version.h>
+@@ -899,6 +898,6 @@
+     "postproc",
+     "postprocessing elements",
+     plugin_init,
+-    FFMPEG_VERSION, "GPL", "FFMpeg", "http://ffmpeg.sourceforge.net/")
++    "SVN", "GPL", "FFMpeg", "http://ffmpeg.sourceforge.net/")
+ 
+ 
+--- gst-ffmpeg-0.10.2/ext/libpostproc/Makefile.in	2006-12-13 22:18:29.000000000 +0200
++++ gst-ffmpeg-hack/ext/libpostproc/Makefile.in	2007-02-24 12:29:30.000000000 +0200
+@@ -68,7 +68,6 @@
+ LTLIBRARIES = $(plugin_LTLIBRARIES)
+ am__DEPENDENCIES_1 =
+ libgstpostproc_la_DEPENDENCIES =  \
+-	$(top_builddir)/gst-libs/ext/ffmpeg/libavcodec/libavcodec.la \
+ 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
+ 	$(am__DEPENDENCIES_1)
+ am_libgstpostproc_la_OBJECTS = libgstpostproc_la-gstpostproc.lo
+@@ -278,14 +277,10 @@
+ target_alias = @target_alias@
+ plugin_LTLIBRARIES = libgstpostproc.la
+ libgstpostproc_la_SOURCES = gstpostproc.c
+-libgstpostproc_la_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) $(GST_CFLAGS) $(LIBOIL_CFLAGS) \
+-	-I $(top_srcdir)/gst-libs/ext/ffmpeg \
+-	-I $(top_srcdir)/gst-libs/ext/ffmpeg/libavformat \
+-	-I $(top_srcdir)/gst-libs/ext/ffmpeg/libavutil \
+-	-I $(top_srcdir)/gst-libs/ext/ffmpeg/libavcodec
++libgstpostproc_la_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) $(GST_CFLAGS) $(LIBOIL_CFLAGS) -I/usr/include/ffmpeg
+ 
+ libgstpostproc_la_LIBADD = -lgstvideo-@GST_MAJORMINOR@ \
+-	$(top_builddir)/gst-libs/ext/ffmpeg/libavcodec/libavcodec.la \
++	-lavcodec -lpostproc\
+ 	$(GST_PLUGINS_BASE_LIBS) $(GST_BASE_LIBS) $(LIBOIL_LIBS)
+ 
+ libgstpostproc_la_LDFLAGS = $(GST_PLUGIN_LDFLAGS)
+--- gst-ffmpeg-0.10.2/Makefile.in	2006-12-13 22:18:30.000000000 +0200
++++ gst-ffmpeg-hack/Makefile.in	2007-02-24 12:24:52.000000000 +0200
+@@ -276,7 +276,7 @@
+ sysconfdir = @sysconfdir@
+ target_alias = @target_alias@
+ DISTCHECK_CONFIGURE_FLAGS = --enable-gtk-doc
+-SUBDIRS = gst-libs ext docs common tests
++SUBDIRS = ext docs common tests
+ EXTRA_DIST = \
+ 	gst-ffmpeg.spec depcomp \
+ 	AUTHORS COPYING NEWS README ChangeLog

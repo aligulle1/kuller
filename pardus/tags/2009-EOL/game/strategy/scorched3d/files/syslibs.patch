@@ -1,0 +1,275 @@
+diff -Naur scorched.orig/src/client/GLEXT/GLState.h scorched/src/client/GLEXT/GLState.h
+--- scorched.orig/src/client/GLEXT/GLState.h	2008-12-29 19:38:23.000000000 +0200
++++ scorched/src/client/GLEXT/GLState.h	2010-04-05 09:34:28.149661187 +0300
+@@ -22,7 +22,7 @@
+ #define AFX_GLSTATE_H__32B0E2D0_566D_4438_94E4_B12FE82430B1__INCLUDED_
+ 
+ #define WIN32_LEAN_AND_MEAN		// Exclude rarely-used stuff from Windows headers
+-#include "glew.h"
++#include <GL/glew.h>
+ 
+ class GLState  
+ {
+diff -Naur scorched.orig/src/client/scorchedc/Makefile.am scorched/src/client/scorchedc/Makefile.am
+--- scorched.orig/src/client/scorchedc/Makefile.am	2010-04-03 02:01:34.000000000 +0300
++++ scorched/src/client/scorchedc/Makefile.am	2010-04-05 10:58:16.126662622 +0300
+@@ -80,7 +80,6 @@
+ 	../../common/common/RollingAverage.h \
+ 	../../common/common/sha2.cpp \
+ 	../../common/common/sha2.h \
+-	../../common/common/snprintf.c \
+ 	../../common/common/SplineCurve.cpp \
+ 	../../common/common/SplineCurve.h \
+ 	../../common/common/SplinePath.cpp \
+@@ -843,8 +842,6 @@
+ 	../GLEXT/GLCamera.h \
+ 	../GLEXT/GLCameraFrustum.cpp \
+ 	../GLEXT/GLCameraFrustum.h \
+-	../GLEXT/glew.c \
+-	../GLEXT/glew.h \
+ 	../GLEXT/GLFont2d.cpp \
+ 	../GLEXT/GLFont2d.h \
+ 	../GLEXT/GLFont2dFreeType.cpp \
+@@ -888,8 +885,6 @@
+ 	../GLEXT/GLVertexBufferObject.h \
+ 	../GLEXT/GLViewPort.cpp \
+ 	../GLEXT/GLViewPort.h \
+-	../GLEXT/glxew.h \
+-	../GLEXT/wglew.h \
+ 	../GLSL/GLSLProgram.cpp \
+ 	../GLSL/GLSLProgram.h \
+ 	../GLSL/GLSLShader.cpp \
+@@ -1458,5 +1453,5 @@
+ 	./main.cpp
+ 
+ AM_CPPFLAGS = -I../../common/porting -I../../common -I../../client -I../../server  @FFTW_CFLAGS@ @AL_CFLAGS@ @FT2_CFLAGS@ @OGG_CFLAGS@ @SDL_CFLAGS@
+-LDADD = @FFTW_LIBS@ @AL_LIBS@ @FT2_LIBS@ @GL_LIBS@ @OGG_LIBS@ @SDL_LIBS@
++LDADD = @FFTW_LIBS@ @AL_LIBS@ @FT2_LIBS@ @GL_LIBS@ @OGG_LIBS@ @SDL_LIBS@ -lGLEW
+ 
+diff -Naur scorched.orig/src/client/scorchedc/Makefile.in scorched/src/client/scorchedc/Makefile.in
+--- scorched.orig/src/client/scorchedc/Makefile.in	2010-04-03 02:01:41.000000000 +0300
++++ scorched/src/client/scorchedc/Makefile.in	2010-04-05 11:03:42.937786420 +0300
+@@ -67,7 +67,7 @@
+ 	OptionsParameters.$(OBJEXT) OptionsScorched.$(OBJEXT) \
+ 	OptionsTransient.$(OBJEXT) ProgressCounter.$(OBJEXT) \
+ 	RandomGenerator.$(OBJEXT) RollingAverage.$(OBJEXT) \
+-	sha2.$(OBJEXT) snprintf.$(OBJEXT) SplineCurve.$(OBJEXT) \
++	sha2.$(OBJEXT) SplineCurve.$(OBJEXT) \
+ 	SplinePath.$(OBJEXT) StatsLogger.$(OBJEXT) \
+ 	StatsLoggerDatabase.$(OBJEXT) StatsLoggerFile.$(OBJEXT) \
+ 	StatsLoggerMySQL.$(OBJEXT) StatsLoggerPGSQL.$(OBJEXT) \
+@@ -255,7 +255,7 @@
+ 	SkipDialog.$(OBJEXT) SoundDialog.$(OBJEXT) \
+ 	StartDialog.$(OBJEXT) TipDialog.$(OBJEXT) \
+ 	TutorialDialog.$(OBJEXT) GLCamera.$(OBJEXT) \
+-	GLCameraFrustum.$(OBJEXT) glew.$(OBJEXT) GLFont2d.$(OBJEXT) \
++	GLCameraFrustum.$(OBJEXT) GLFont2d.$(OBJEXT) \
+ 	GLFont2dFreeType.$(OBJEXT) GLFont2dStorage.$(OBJEXT) \
+ 	GLFrameBufferObject.$(OBJEXT) GLGlobalState.$(OBJEXT) \
+ 	GLImageItterator.$(OBJEXT) GLImageModifier.$(OBJEXT) \
+@@ -648,7 +648,6 @@
+ 	../../common/common/RollingAverage.h \
+ 	../../common/common/sha2.cpp \
+ 	../../common/common/sha2.h \
+-	../../common/common/snprintf.c \
+ 	../../common/common/SplineCurve.cpp \
+ 	../../common/common/SplineCurve.h \
+ 	../../common/common/SplinePath.cpp \
+@@ -1411,8 +1410,6 @@
+ 	../GLEXT/GLCamera.h \
+ 	../GLEXT/GLCameraFrustum.cpp \
+ 	../GLEXT/GLCameraFrustum.h \
+-	../GLEXT/glew.c \
+-	../GLEXT/glew.h \
+ 	../GLEXT/GLFont2d.cpp \
+ 	../GLEXT/GLFont2d.h \
+ 	../GLEXT/GLFont2dFreeType.cpp \
+@@ -1456,8 +1453,6 @@
+ 	../GLEXT/GLVertexBufferObject.h \
+ 	../GLEXT/GLViewPort.cpp \
+ 	../GLEXT/GLViewPort.h \
+-	../GLEXT/glxew.h \
+-	../GLEXT/wglew.h \
+ 	../GLSL/GLSLProgram.cpp \
+ 	../GLSL/GLSLProgram.h \
+ 	../GLSL/GLSLShader.cpp \
+@@ -2026,7 +2021,7 @@
+ 	./main.cpp
+ 
+ AM_CPPFLAGS = -I../../common/porting -I../../common -I../../client -I../../server  @FFTW_CFLAGS@ @AL_CFLAGS@ @FT2_CFLAGS@ @OGG_CFLAGS@ @SDL_CFLAGS@
+-LDADD = @FFTW_LIBS@ @AL_LIBS@ @FT2_LIBS@ @GL_LIBS@ @OGG_LIBS@ @SDL_LIBS@
++LDADD = @FFTW_LIBS@ @AL_LIBS@ @FT2_LIBS@ @GL_LIBS@ @OGG_LIBS@ @SDL_LIBS@ -lglew
+ all: all-am
+ 
+ .SUFFIXES:
+@@ -2799,7 +2794,6 @@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/aseFile.lex.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/aseFile.tab.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fixed.Po@am__quote@
+-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/glew.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lapi.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lauxlib.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lbaselib.Po@am__quote@
+@@ -2832,7 +2826,6 @@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lzio.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/main.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sha2.Po@am__quote@
+-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/snprintf.Po@am__quote@
+ 
+ .c.o:
+ @am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
+@@ -2848,34 +2841,6 @@
+ @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+ @am__fastdepCC_FALSE@	$(COMPILE) -c `$(CYGPATH_W) '$<'`
+ 
+-snprintf.o: ../../common/common/snprintf.c
+-@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT snprintf.o -MD -MP -MF $(DEPDIR)/snprintf.Tpo -c -o snprintf.o `test -f '../../common/common/snprintf.c' || echo '$(srcdir)/'`../../common/common/snprintf.c
+-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/snprintf.Tpo $(DEPDIR)/snprintf.Po
+-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../../common/common/snprintf.c' object='snprintf.o' libtool=no @AMDEPBACKSLASH@
+-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o snprintf.o `test -f '../../common/common/snprintf.c' || echo '$(srcdir)/'`../../common/common/snprintf.c
+-
+-snprintf.obj: ../../common/common/snprintf.c
+-@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT snprintf.obj -MD -MP -MF $(DEPDIR)/snprintf.Tpo -c -o snprintf.obj `if test -f '../../common/common/snprintf.c'; then $(CYGPATH_W) '../../common/common/snprintf.c'; else $(CYGPATH_W) '$(srcdir)/../../common/common/snprintf.c'; fi`
+-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/snprintf.Tpo $(DEPDIR)/snprintf.Po
+-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../../common/common/snprintf.c' object='snprintf.obj' libtool=no @AMDEPBACKSLASH@
+-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o snprintf.obj `if test -f '../../common/common/snprintf.c'; then $(CYGPATH_W) '../../common/common/snprintf.c'; else $(CYGPATH_W) '$(srcdir)/../../common/common/snprintf.c'; fi`
+-
+-glew.o: ../GLEXT/glew.c
+-@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT glew.o -MD -MP -MF $(DEPDIR)/glew.Tpo -c -o glew.o `test -f '../GLEXT/glew.c' || echo '$(srcdir)/'`../GLEXT/glew.c
+-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/glew.Tpo $(DEPDIR)/glew.Po
+-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../GLEXT/glew.c' object='glew.o' libtool=no @AMDEPBACKSLASH@
+-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o glew.o `test -f '../GLEXT/glew.c' || echo '$(srcdir)/'`../GLEXT/glew.c
+-
+-glew.obj: ../GLEXT/glew.c
+-@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT glew.obj -MD -MP -MF $(DEPDIR)/glew.Tpo -c -o glew.obj `if test -f '../GLEXT/glew.c'; then $(CYGPATH_W) '../GLEXT/glew.c'; else $(CYGPATH_W) '$(srcdir)/../GLEXT/glew.c'; fi`
+-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/glew.Tpo $(DEPDIR)/glew.Po
+-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../GLEXT/glew.c' object='glew.obj' libtool=no @AMDEPBACKSLASH@
+-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o glew.obj `if test -f '../GLEXT/glew.c'; then $(CYGPATH_W) '../GLEXT/glew.c'; else $(CYGPATH_W) '$(srcdir)/../GLEXT/glew.c'; fi`
+-
+ .cpp.o:
+ @am__fastdepCXX_TRUE@	$(CXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
+ @am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
+diff -Naur scorched.orig/src/launcher/scorched/Makefile.am scorched/src/launcher/scorched/Makefile.am
+--- scorched.orig/src/launcher/scorched/Makefile.am	2010-04-03 02:01:34.000000000 +0300
++++ scorched/src/launcher/scorched/Makefile.am	2010-04-05 11:04:32.028787167 +0300
+@@ -74,7 +74,6 @@
+ 	../../common/common/ProgressCounter.h \
+ 	../../common/common/RandomGenerator.cpp \
+ 	../../common/common/RandomGenerator.h \
+-	../../common/common/snprintf.c \
+ 	../../common/common/Vector.cpp \
+ 	../../common/common/Vector.h \
+ 	../../common/common/Vector4.cpp \
+diff -Naur scorched.orig/src/launcher/scorched/Makefile.in scorched/src/launcher/scorched/Makefile.in
+--- scorched.orig/src/launcher/scorched/Makefile.in	2010-04-03 02:01:41.000000000 +0300
++++ scorched/src/launcher/scorched/Makefile.in	2010-04-05 11:06:13.141661456 +0300
+@@ -67,7 +67,7 @@
+ 	LoggerI.$(OBJEXT) NumberParser.$(OBJEXT) OptionEntry.$(OBJEXT) \
+ 	OptionsGame.$(OBJEXT) OptionsParameters.$(OBJEXT) \
+ 	ProgressCounter.$(OBJEXT) RandomGenerator.$(OBJEXT) \
+-	snprintf.$(OBJEXT) Vector.$(OBJEXT) Vector4.$(OBJEXT) \
++	Vector.$(OBJEXT) Vector4.$(OBJEXT) \
+ 	VectorLib.$(OBJEXT) XMLFile.$(OBJEXT) XMLNode.$(OBJEXT) \
+ 	XMLParser.$(OBJEXT) XMLStringBuffer.$(OBJEXT) \
+ 	OptionsDisplay.$(OBJEXT) ModDirs.$(OBJEXT) \
+@@ -311,7 +311,6 @@
+ 	../../common/common/ProgressCounter.h \
+ 	../../common/common/RandomGenerator.cpp \
+ 	../../common/common/RandomGenerator.h \
+-	../../common/common/snprintf.c \
+ 	../../common/common/Vector.cpp \
+ 	../../common/common/Vector.h \
+ 	../../common/common/Vector4.cpp \
+@@ -525,7 +524,6 @@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/XMLStringBuffer.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fixed.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/main.Po@am__quote@
+-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/snprintf.Po@am__quote@
+ 
+ .c.o:
+ @am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
+@@ -541,20 +539,6 @@
+ @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+ @am__fastdepCC_FALSE@	$(COMPILE) -c `$(CYGPATH_W) '$<'`
+ 
+-snprintf.o: ../../common/common/snprintf.c
+-@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT snprintf.o -MD -MP -MF $(DEPDIR)/snprintf.Tpo -c -o snprintf.o `test -f '../../common/common/snprintf.c' || echo '$(srcdir)/'`../../common/common/snprintf.c
+-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/snprintf.Tpo $(DEPDIR)/snprintf.Po
+-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../../common/common/snprintf.c' object='snprintf.o' libtool=no @AMDEPBACKSLASH@
+-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o snprintf.o `test -f '../../common/common/snprintf.c' || echo '$(srcdir)/'`../../common/common/snprintf.c
+-
+-snprintf.obj: ../../common/common/snprintf.c
+-@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT snprintf.obj -MD -MP -MF $(DEPDIR)/snprintf.Tpo -c -o snprintf.obj `if test -f '../../common/common/snprintf.c'; then $(CYGPATH_W) '../../common/common/snprintf.c'; else $(CYGPATH_W) '$(srcdir)/../../common/common/snprintf.c'; fi`
+-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/snprintf.Tpo $(DEPDIR)/snprintf.Po
+-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../../common/common/snprintf.c' object='snprintf.obj' libtool=no @AMDEPBACKSLASH@
+-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o snprintf.obj `if test -f '../../common/common/snprintf.c'; then $(CYGPATH_W) '../../common/common/snprintf.c'; else $(CYGPATH_W) '$(srcdir)/../../common/common/snprintf.c'; fi`
+-
+ .cpp.o:
+ @am__fastdepCXX_TRUE@	$(CXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
+ @am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
+diff -Naur scorched.orig/src/server/scorcheds/Makefile.am scorched/src/server/scorcheds/Makefile.am
+--- scorched.orig/src/server/scorcheds/Makefile.am	2010-04-03 02:01:34.000000000 +0300
++++ scorched/src/server/scorcheds/Makefile.am	2010-04-05 11:06:36.885796540 +0300
+@@ -79,7 +79,6 @@
+ 	../../common/common/RollingAverage.h \
+ 	../../common/common/sha2.cpp \
+ 	../../common/common/sha2.h \
+-	../../common/common/snprintf.c \
+ 	../../common/common/SplineCurve.cpp \
+ 	../../common/common/SplineCurve.h \
+ 	../../common/common/SplinePath.cpp \
+diff -Naur scorched.orig/src/server/scorcheds/Makefile.in scorched/src/server/scorcheds/Makefile.in
+--- scorched.orig/src/server/scorcheds/Makefile.in	2010-04-03 02:01:44.000000000 +0300
++++ scorched/src/server/scorcheds/Makefile.in	2010-04-05 11:07:48.531661467 +0300
+@@ -67,7 +67,7 @@
+ 	OptionsParameters.$(OBJEXT) OptionsScorched.$(OBJEXT) \
+ 	OptionsTransient.$(OBJEXT) ProgressCounter.$(OBJEXT) \
+ 	RandomGenerator.$(OBJEXT) RollingAverage.$(OBJEXT) \
+-	sha2.$(OBJEXT) snprintf.$(OBJEXT) SplineCurve.$(OBJEXT) \
++	sha2.$(OBJEXT) SplineCurve.$(OBJEXT) \
+ 	SplinePath.$(OBJEXT) StatsLogger.$(OBJEXT) \
+ 	StatsLoggerDatabase.$(OBJEXT) StatsLoggerFile.$(OBJEXT) \
+ 	StatsLoggerMySQL.$(OBJEXT) StatsLoggerPGSQL.$(OBJEXT) \
+@@ -513,7 +513,6 @@
+ 	../../common/common/RollingAverage.h \
+ 	../../common/common/sha2.cpp \
+ 	../../common/common/sha2.h \
+-	../../common/common/snprintf.c \
+ 	../../common/common/SplineCurve.cpp \
+ 	../../common/common/SplineCurve.h \
+ 	../../common/common/SplinePath.cpp \
+@@ -1891,7 +1890,6 @@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lzio.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/main.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sha2.Po@am__quote@
+-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/snprintf.Po@am__quote@
+ 
+ .c.o:
+ @am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
+@@ -1907,20 +1905,6 @@
+ @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+ @am__fastdepCC_FALSE@	$(COMPILE) -c `$(CYGPATH_W) '$<'`
+ 
+-snprintf.o: ../../common/common/snprintf.c
+-@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT snprintf.o -MD -MP -MF $(DEPDIR)/snprintf.Tpo -c -o snprintf.o `test -f '../../common/common/snprintf.c' || echo '$(srcdir)/'`../../common/common/snprintf.c
+-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/snprintf.Tpo $(DEPDIR)/snprintf.Po
+-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../../common/common/snprintf.c' object='snprintf.o' libtool=no @AMDEPBACKSLASH@
+-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o snprintf.o `test -f '../../common/common/snprintf.c' || echo '$(srcdir)/'`../../common/common/snprintf.c
+-
+-snprintf.obj: ../../common/common/snprintf.c
+-@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT snprintf.obj -MD -MP -MF $(DEPDIR)/snprintf.Tpo -c -o snprintf.obj `if test -f '../../common/common/snprintf.c'; then $(CYGPATH_W) '../../common/common/snprintf.c'; else $(CYGPATH_W) '$(srcdir)/../../common/common/snprintf.c'; fi`
+-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/snprintf.Tpo $(DEPDIR)/snprintf.Po
+-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../../common/common/snprintf.c' object='snprintf.obj' libtool=no @AMDEPBACKSLASH@
+-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o snprintf.obj `if test -f '../../common/common/snprintf.c'; then $(CYGPATH_W) '../../common/common/snprintf.c'; else $(CYGPATH_W) '$(srcdir)/../../common/common/snprintf.c'; fi`
+-
+ .cpp.o:
+ @am__fastdepCXX_TRUE@	$(CXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
+ @am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po

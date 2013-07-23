@@ -1,0 +1,30 @@
+diff -Nur poppler-0.8.7-new/poppler/Form.cc poppler-0.8.7/poppler/Form.cc
+--- poppler-0.8.7-new/poppler/Form.cc	2008-07-26 01:23:10.000000000 +0300
++++ poppler-0.8.7/poppler/Form.cc	2009-02-12 13:53:25.000000000 +0200
+@@ -446,7 +446,9 @@
+         obj3.free();
+         obj4.free();
+       } else {
+-        error(-1, "FormWidgetChoice:: invalid Opt entry\n");
++        error(-1, "FormWidgetChoice:: invalid %d Opt entry\n", i);
++        parent->_setChoiceExportVal(i, new GooString(""));
++        parent->_setChoiceOptionName(i, new GooString(""));
+       }
+       obj2.free();
+     }
+diff -Nur poppler-0.8.7-new/poppler/JBIG2Stream.cc poppler-0.8.7/poppler/JBIG2Stream.cc
+--- poppler-0.8.7-new/poppler/JBIG2Stream.cc	2008-05-04 16:12:14.000000000 +0300
++++ poppler-0.8.7/poppler/JBIG2Stream.cc	2009-02-12 13:56:24.000000000 +0200
+@@ -1772,6 +1772,12 @@
+     ex = !ex;
+   }
+ 
++  for ( ; j < numExSyms; ++j) {
++    // this should never happen but happens on PDF we don't parse
++    // correctly like bug #19702
++    symbolDict->setBitmap(j, NULL);
++  }
++
+   for (i = 0; i < numNewSyms; ++i) {
+     delete bitmaps[numInputSyms + i];
+   }

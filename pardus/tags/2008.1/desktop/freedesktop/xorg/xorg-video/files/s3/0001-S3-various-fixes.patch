@@ -1,0 +1,1548 @@
+From 2128de2ad9fa67537d8ed56ff173b8a7b0422e0e Mon Sep 17 00:00:00 2001
+From: Evgeny M. Zubok <evgeny.zubok@tochka.ru>
+Date: Mon, 7 Jul 2008 14:31:10 -0400
+Subject: [PATCH] S3: various fixes
+
+        * src/s3_video.c:
+
+        Streams Processor initialization.
+
+        XVideo support for 16, 24 and 32 bpp (only for TRIO64V2).
+
+        * src/s3_driver.c:
+
+        Add XVideo option (enabled by default).
+
+        Replace "swcursor" by "hwcursor" option (HW cursor
+        not implemented yet for all chipsets).
+
+        Close bug #5527: 24-bit colour depth support (24bpp and
+        32bpp framebuffer) for TRIO64V2. Acceleration doesn't work
+        with packed colour mode (24 bpp FB) but works with 32bpp
+        framebuffer mode (hardware limitation? -- need data).
+
+        Fix system hang-up when switching between console and X session.
+
+        Some minor changes of driver messages.
+---
+ ChangeLog          |   24 +++
+ src/Makefile.am    |    5 +-
+ src/newmmio.h      |    6 +-
+ src/s3.h           |   14 ++-
+ src/s3_Trio64DAC.c |   72 ++++-----
+ src/s3_accel.c     |   16 ++-
+ src/s3_driver.c    |  340 ++++++++++++++++++++++++++++-----------
+ src/s3_reg.h       |   21 +++-
+ src/s3_video.c     |  459 +++++++++++++++++++++++++++++-----------------------
+ 9 files changed, 604 insertions(+), 353 deletions(-)
+
+diff --git a/ChangeLog b/ChangeLog
+index dc15e51..fab4ec7 100644
+--- xf86-video-s3-0.6.0/ChangeLog
++++ xf86-video-s3-0.6.0/ChangeLog
+@@ -1,3 +1,27 @@
++2008-07-06  Evgeny M. Zubok <evgeny.zubok@tochka.ru>
++
++	* src/s3_video.c: 
++
++	Streams Processor initialization.
++
++	XVideo support for 16, 24 and 32 bpp (only for TRIO64V2).
++
++	* src/s3_driver.c: 
++
++	Add XVideo option (enabled by default).
++
++	Replace "swcursor" by "hwcursor" option (HW cursor 
++	not implemented yet for all chipsets).
++
++	Close bug #5527: 24-bit colour depth support (24bpp and 
++	32bpp framebuffer) for TRIO64V2. Acceleration doesn't work
++	with packed colour mode (24 bpp FB) but works with 32bpp 
++	framebuffer mode (hardware limitation? -- need data).
++
++	Fix system hang-up when switching between console and X session.
++
++	Some minor changes of driver messages.
++
+ 2008-02-23  Evgeny M. Zubok <evgeny.zubok@tochka.ru>
+ 
+ 	* src/s3_driver.c: Add DPMS support for S3 Trio64V2 and possibly
+diff --git a/src/Makefile.am b/src/Makefile.am
+index 0d9ae4b..743babd 100644
+--- xf86-video-s3-0.6.0/src/Makefile.am
++++ xf86-video-s3-0.6.0/src/Makefile.am
+@@ -39,13 +39,12 @@ s3_drv_la_SOURCES = \
+ 	 s3_pcirename.h \
+          s3_reg.h \
+          s3_Ti.c \
+-         s3_Trio64DAC.c \
+-         s3_video.c
++         s3_Trio64DAC.c
+ 
+ noinst_LTLIBRARIES = libs3_accel_newmmio.la libs3_accel_pio.la
+ s3_drv_la_LIBADD = libs3_accel_newmmio.la libs3_accel_pio.la
+ 
+-libs3_accel_newmmio_la_SOURCES = s3_accel.c
++libs3_accel_newmmio_la_SOURCES = s3_accel.c s3_video.c
+ libs3_accel_newmmio_la_CFLAGS = $(AM_CFLAGS) -DS3_NEWMMIO=1
+ 
+ libs3_accel_pio_la_SOURCES = s3_accel.c
+diff --git a/src/newmmio.h b/src/newmmio.h
+index fdb0d34..e783647 100644
+--- xf86-video-s3-0.6.0/src/newmmio.h
++++ xf86-video-s3-0.6.0/src/newmmio.h
+@@ -248,10 +248,10 @@ typedef struct {
+ 
+ 	
+ #define WaitQueue(v)					\
+-	if(!(pS3->PCIRetry)) {				\
++        if(!(pS3->PCIRetry)) {				\
+ 	   mem_barrier();				\
+-	   while(inb(GP_STAT) & (0x0100 >> (v)));	\
+-	}
++	   while(INB_GP_STAT() & (0x0100 >> (v)));      \
++        }				
+ 
+ #define CMD_REG_WIDTH  0x200  	/* select 32bit command register */
+ 
+diff --git a/src/s3.h b/src/s3.h
+index 7c59236..a12ff6e 100644
+--- xf86-video-s3-0.6.0/src/s3.h
++++ xf86-video-s3-0.6.0/src/s3.h
+@@ -64,7 +64,7 @@ typedef struct _S3RegRec {
+ typedef struct {
+         unsigned char brightness;
+         unsigned char contrast;
+-        FBAreaPtr     area;
++        FBLinearPtr   area;
+         RegionRec     clip;
+         CARD32        colorKey;
+         CARD32        videoStatus;
+@@ -98,12 +98,15 @@ typedef struct _S3Rec {
+         OptionInfoPtr           Options;
+         unsigned int            Flags;
+         Bool                    NoAccel;
+-	Bool			SWCursor;
++	Bool			HWCursor;
+ 	Bool			SlowDRAMRefresh;
+ 	Bool			SlowDRAM;
+ 	Bool			SlowEDODRAM;
+ 	Bool			SlowVRAM;
+ 	Bool			S3NewMMIO;
++	Bool                    hasStreams;
++	int                     Streams_FIFO;
++	Bool                    XVideo;
+ 	Bool			PCIRetry;
+ 	Bool			ColorExpandBug;
+ 
+@@ -159,7 +162,7 @@ typedef struct _S3Rec {
+ 	unsigned char		*imageBuffer;
+ 	int			imageWidth;
+ 	int			imageHeight;
+-    Bool			hwCursor;
++	Bool			hwCursor;
+ } S3Rec, *S3Ptr;
+ 
+ #define S3PTR(p)		((S3Ptr)((p)->driverPrivate))
+@@ -234,9 +237,14 @@ Bool S3_CursorInit(ScreenPtr pScreen);
+ 
+ #define S3_964_SERIES()		((pS3->Chipset == PCI_CHIP_964_0) ||	\
+ 			 	 (pS3->Chipset == PCI_CHIP_964_1))
++
+ #define	S3_TRIO_SERIES()	((pS3->Chipset == PCI_CHIP_TRIO) ||	\
+ 			 	 (pS3->Chipset == PCI_CHIP_AURORA64VP) || \
+ 				 (pS3->Chipset == PCI_CHIP_TRIO64UVP) || \
+ 				 (pS3->Chipset == PCI_CHIP_TRIO64V2_DXGX))
+ 
++#define HAS_STREAMS_PROCESSOR() ((pS3->Chipset == PCI_CHIP_AURORA64VP) || \
++				 (pS3->Chipset == PCI_CHIP_TRIO64UVP) || \
++				 (pS3->Chipset == PCI_CHIP_TRIO64V2_DXGX))
++
+ #endif /* _S3_H */
+diff --git a/src/s3_Trio64DAC.c b/src/s3_Trio64DAC.c
+index 5b32146..e2cf257 100644
+--- xf86-video-s3-0.6.0/src/s3_Trio64DAC.c
++++ xf86-video-s3-0.6.0/src/s3_Trio64DAC.c
+@@ -35,6 +35,7 @@
+ #include "compiler.h"
+ 
+ #include "s3.h"
++#include "s3_reg.h"
+ 
+ /* this is really quite dumb */
+ Bool S3Trio64DACProbe(ScrnInfoPtr pScrn)
+@@ -232,33 +233,30 @@ static void S3TrioSetPLL(ScrnInfoPtr pScrn, int clk, unsigned char m,
+ 
+ 		outb(0x3c4, 0x08);
+ 		outb(0x3c5, 0x06);	/* unlock extended CR9-18 */
+-
+-		if (clk != 10) {
+-			outb(0x3c4, 0x12);
+-			outb(0x3c5, n);
+-			outb(0x3c4, 0x13);
+-			outb(0x3c5, m);
+-
+-			outb(0x3c4, 0x15);
+-			tmp = inb(0x3c5) & ~0x21;
+-			outb(0x3c5, tmp | 0x02);
+-			outb(0x3c5, tmp | 0x22);
+-			outb(0x3c5, tmp | 0x02);
+-		} else {
+-			outb(0x3c4, 0x10);
+-			outb(0x3c5, n);
+-			outb(0x3c4, 0x11);
+-			outb(0x3c5, m);
+-			outb(0x3c4, 0x1a);
+-			outb(0x3c5, n);
+-
+-			outb(0x3c4, 0x15);
+-			tmp = inb(0x3c5) & ~0x21;
+-			outb(0x3c5, tmp | 0x01);
+-			outb(0x3c5, tmp | 0x21);
+-			outb(0x3c5, tmp | 0x01);
+-			outb(0x3c5, tmp);
+-		}
++		
++		outb(0x3c4, 0x12);      /* write N1 and N2 to DCLK PLL */
++		outb(0x3c5, n);
++		outb(0x3c4, 0x13);      /* write M to DCLK PLL */
++		outb(0x3c5, m);
++
++#if 0
++/* this code was in previous driver version but it was never called. 
++   So I decide to comment it. */
++		outb(0x3c4, 0x10);     
++		outb(0x3c5, n);
++		outb(0x3c4, 0x11);
++		outb(0x3c5, m); */
++			
++		outb(0x3c4, 0x1a);
++		outb(0x3c5, n);
++#endif
++		/* Toggle cr15_5 by sequence 0->1->0 to immediately apply 
++		   new PLL parameters */
++		outb(0x3c4, 0x15);
++		tmp = inb(0x3c5) & ~0x20;
++		outb(0x3c5, tmp);
++		outb(0x3c5, tmp | 0x20);
++		outb(0x3c5, tmp);
+ 
+ 		outb(0x3c4, 0x08);
+ 		outb(0x3c5, 0x00);	/* lock em */
+@@ -331,18 +329,17 @@ void S3Trio64DAC_Init(ScrnInfoPtr pScrn, DisplayModePtr mode)
+ 		S3TrioSetClock(pScrn, mode->Clock, 2, 1, 1, 31, 0, 3, 2,
+ 			       135000, 270000);
+ 
+-
+-	outb(0x3c4, 1);
++	outb(0x3c4, 0x01);
+ 	blank = inb(0x3c5);
+ 	outb(0x3c5, blank | 0x20);	/* blank the screen */
+ 
+ 	outb(0x3c4, 0x08);
+ 	sr8 = inb(0x3c5);
+-	outb(0x3c5, 0x06);
++	outb(0x3c5, 0x06);       /* unlock extended sequenser register */
+ 
+-	outb(0x3c4, 0x0d0);
+-	tmp = inb(0x3c5) & ~1;
+-	outb(0x3c5, tmp);
++	outb(0x3c4, 0x0d);
++	tmp = inb(0x3c5) & ~0x01;
++	outb(0x3c5, tmp);       /* VCLK, HSYNC, VSYNC are outputs */
+ 
+ 	outb(0x3c4, 0x15);
+ 	sr15 = inb(0x3c5) & ~0x10;
+@@ -352,11 +349,6 @@ void S3Trio64DAC_Init(ScrnInfoPtr pScrn, DisplayModePtr mode)
+ 	outb(pS3->vgaCRIndex, 0x33);
+ 	cr33 = inb(pS3->vgaCRReg) & ~0x28;
+ 
+-	if (pS3->Chipset == PCI_CHIP_TRIO64V2_DXGX)
+-	{
+-	  cr33 |= 0x20;
+-	}
+-
+ 	/* ! pixmux */
+ 	switch (pScrn->depth) {
+ 	case 8:
+@@ -369,6 +361,7 @@ void S3Trio64DAC_Init(ScrnInfoPtr pScrn, DisplayModePtr mode)
+ 		cr33 |= 0x08;
+ 		pixmux = 0x50;
+ 		break;
++	case 24:
+ 	case 32:
+ 		pixmux = 0xd0;
+ 		break;
+@@ -377,6 +370,7 @@ void S3Trio64DAC_Init(ScrnInfoPtr pScrn, DisplayModePtr mode)
+ 	outb(pS3->vgaCRReg, cr33);
+ 
+ 	outb(pS3->vgaCRIndex, 0x67);
++	WaitVSync();
+ 	outb(pS3->vgaCRReg, pixmux | invert_vclk);
+ 
+ 	outb(0x3c4, 0x15);
+@@ -392,6 +386,6 @@ void S3Trio64DAC_Init(ScrnInfoPtr pScrn, DisplayModePtr mode)
+ 	outb(0x3c4, 0x08);
+ 	outb(0x3c5, sr8);
+ 
+-	outb(0x3c4, 1);
++	outb(0x3c4, 0x01);
+ 	outb(0x3c5, blank);	/* unblank the screen */
+ }
+diff --git a/src/s3_accel.c b/src/s3_accel.c
+index 675b823..78db3b1 100644
+--- xf86-video-s3-0.6.0/src/s3_accel.c
++++ xf86-video-s3-0.6.0/src/s3_accel.c
+@@ -140,7 +140,7 @@ static void S3SubsequentScreenToScreenCopy(ScrnInfoPtr pScrn,
+ 	}
+ }
+ 
+-
++#if 0
+ static void S3SetupForColor8x8PatternFill(ScrnInfoPtr pScrn,
+ 					  int patx, int paty,
+ 					  int rop, unsigned int planemask,
+@@ -182,6 +182,7 @@ static void S3SubsequentColor8x8PatternFillRect(ScrnInfoPtr pScrn,
+ 		SET_MULT_MISC(CMD_REG_WIDTH);
+ 	}
+ }
++#endif
+ 
+ #ifdef S3_NEWMMIO
+ static void S3SetupForCPUToScreenColorExpandFill(ScrnInfoPtr pScrn,
+@@ -569,9 +570,22 @@ Bool S3AccelInitPIO(ScreenPtr pScreen)
+ 
+ 	pXAA->SetupForScreenToScreenCopy = S3SetupForScreenToScreenCopy;
+ 	pXAA->SubsequentScreenToScreenCopy = S3SubsequentScreenToScreenCopy;
++	pXAA->ScreenToScreenCopyFlags = NO_TRANSPARENCY;
+ 
++#if 0
++/*
++  8x8 color pattern filling doesn't work properly after introducing 
++  framebuffer manager initialization before XAA initialization. There 
++  are problems with addressing a colour patterns from offscreen area.
++*/
+ 	pXAA->SetupForColor8x8PatternFill = S3SetupForColor8x8PatternFill;
+ 	pXAA->SubsequentColor8x8PatternFillRect = S3SubsequentColor8x8PatternFillRect;
++	pXAA->Color8x8PatternFillFlags = NO_TRANSPARENCY | 
++		HARDWARE_PATTERN_SCREEN_ORIGIN |
++		BIT_ORDER_IN_BYTE_MSBFIRST;
++
++	pXAA->CachePixelGranularity = 0;
++#endif
+ 
+ #ifdef S3_NEWMMIO
+ 	pXAA->SetupForCPUToScreenColorExpandFill =
+diff --git a/src/s3_driver.c b/src/s3_driver.c
+index 1a68202..797e0b3 100644
+--- xf86-video-s3-0.6.0/src/s3_driver.c
++++ xf86-video-s3-0.6.0/src/s3_driver.c
+@@ -152,20 +152,22 @@ static PciChipsets S3PciChipsets[] = {
+ 
+ typedef enum {
+ 	OPTION_NOACCEL,
+-	OPTION_SWCURS,
++	OPTION_HWCURS,
+ 	OPTION_SLOW_DRAM_REFRESH,
+ 	OPTION_SLOW_DRAM,
+ 	OPTION_SLOW_EDODRAM,
+-	OPTION_SLOW_VRAM
++	OPTION_SLOW_VRAM,
++	OPTION_XVIDEO
+ } S3Opts;
+ 
+ static OptionInfoRec S3Options[] = {
+ 	{ OPTION_NOACCEL, "noaccel", OPTV_BOOLEAN, {0}, FALSE },
+-	{ OPTION_SWCURS, "swcursor", OPTV_BOOLEAN, {0}, FALSE },
++	{ OPTION_HWCURS, "hwcursor", OPTV_BOOLEAN, {0}, FALSE },
+ 	{ OPTION_SLOW_DRAM_REFRESH, "slow_dram_refresh", OPTV_BOOLEAN, {0}, FALSE },
+ 	{ OPTION_SLOW_DRAM, "slow_dram", OPTV_BOOLEAN, {0}, FALSE },
+ 	{ OPTION_SLOW_EDODRAM, "slow_edodram", OPTV_BOOLEAN, {0}, FALSE },
+ 	{ OPTION_SLOW_VRAM, "slow_vram", OPTV_BOOLEAN, {0}, FALSE },
++	{ OPTION_XVIDEO, "XVideo", OPTV_BOOLEAN, {0}, FALSE },
+ 	{ -1, NULL, OPTV_NONE, {0}, FALSE }
+ };
+ 
+@@ -388,21 +390,20 @@ static Bool S3PreInit(ScrnInfoPtr pScrn, int flags)
+         pScrn->monitor = pScrn->confScreen->monitor;
+         
+         if (!xf86SetDepthBpp(pScrn, 0, 0, 0, Support24bppFb | Support32bppFb))
+-                return FALSE;
++	    return FALSE;
+ 
+         switch (pScrn->depth) {
+-            	case 8:
+-                case 15:
+-                case 16:
+-                case 24:
+-                case 32:
+-      	               /* OK */
+-                       break;
+-                default:
+-                       xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
+-                                  "Given depth (%d) is not  supported by this driver\n",
+-                                   pScrn->depth);
+-	                       return FALSE;
++	case 8:
++	case 15:
++	case 16:
++	case 24:
++		/* OK */
++		break;
++	default:
++		xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
++			   "Given depth (%d) is not  supported by this driver\n",
++			   pScrn->depth);
++		return FALSE;
+         }
+ 
+         xf86PrintDepthBpp(pScrn);
+@@ -427,37 +428,13 @@ static Bool S3PreInit(ScrnInfoPtr pScrn, int flags)
+         xf86CollectOptions(pScrn, NULL);
+         xf86ProcessOptions(pScrn->scrnIndex, pScrn->options, S3Options);
+          
+-        if (xf86ReturnOptValBool(S3Options, OPTION_NOACCEL, FALSE)) {
+-                pS3->NoAccel = TRUE;
+-                xf86DrvMsg(pScrn->scrnIndex, X_CONFIG, "Option: NoAccel - acceleration disabled\n");
+-        } else          
+-                pS3->NoAccel = FALSE;
+-	if (xf86ReturnOptValBool(S3Options, OPTION_SWCURS, FALSE)) {
+-		pS3->SWCursor = TRUE;
+-		xf86DrvMsg(pScrn->scrnIndex, X_CONFIG, "Option: SWCursor - using software cursor\n");
+-        } else
+-		pS3->SWCursor = FALSE;
+-	if (xf86ReturnOptValBool(S3Options, OPTION_SLOW_DRAM_REFRESH, FALSE)) {
+-		pS3->SlowDRAMRefresh = TRUE;
+-		xf86DrvMsg(pScrn->scrnIndex, X_CONFIG, "Option: Slow DRAM Refresh enabled\n");
+-	} else
+-		pS3->SlowDRAMRefresh = FALSE;
+-	if (xf86ReturnOptValBool(S3Options, OPTION_SLOW_DRAM, FALSE)) {
+-		pS3->SlowDRAM = TRUE;
+-		xf86DrvMsg(pScrn->scrnIndex, X_CONFIG, "Option: Slow DRAM enabled\n");
+-	} else
+-		pS3->SlowDRAM = FALSE;
+-	if (xf86ReturnOptValBool(S3Options, OPTION_SLOW_EDODRAM, FALSE)) {
+-		pS3->SlowEDODRAM = TRUE;
+-		xf86DrvMsg(pScrn->scrnIndex, X_CONFIG, "Option: Slow EDO DRAM enabled\n");
+-	} else
+-		pS3->SlowEDODRAM = FALSE;
+-	if (xf86ReturnOptValBool(S3Options, OPTION_SLOW_DRAM, FALSE)) {
+-		pS3->SlowVRAM = TRUE;
+-		xf86DrvMsg(pScrn->scrnIndex, X_CONFIG, "Option: Slow VRAM enabled\n");
+-	} else
+-		pS3->SlowVRAM = FALSE;
+-
++	pS3->XVideo = xf86ReturnOptValBool(S3Options, OPTION_XVIDEO, TRUE);
++	pS3->NoAccel = xf86ReturnOptValBool(S3Options, OPTION_NOACCEL, FALSE);
++	pS3->HWCursor = xf86ReturnOptValBool(S3Options, OPTION_HWCURS, FALSE);
++	pS3->SlowDRAMRefresh = xf86ReturnOptValBool(S3Options, OPTION_SLOW_DRAM_REFRESH, FALSE);
++	pS3->SlowDRAM = xf86ReturnOptValBool(S3Options, OPTION_SLOW_DRAM, FALSE);
++	pS3->SlowEDODRAM = xf86ReturnOptValBool(S3Options, OPTION_SLOW_EDODRAM, FALSE);
++	pS3->SlowVRAM = xf86ReturnOptValBool(S3Options, OPTION_SLOW_VRAM, FALSE);
+         if (pScrn->numEntities > 1) {      
+                 S3FreeRec(pScrn);
+                 return FALSE;
+@@ -532,6 +509,11 @@ static Bool S3PreInit(ScrnInfoPtr pScrn, int flags)
+ 		break;
+ 	}
+ 
++	if (HAS_STREAMS_PROCESSOR() && pS3->S3NewMMIO)
++        	pS3->hasStreams = TRUE;
++        else
++        	pS3->hasStreams = FALSE;
++ 
+ 	pS3->FBAddress = PCI_REGION_BASE(pS3->PciInfo, 0, REGION_MEM);
+ 	pScrn->memPhysBase = pS3->FBAddress;
+ 	pScrn->fbOffset = 0;
+@@ -581,9 +563,10 @@ static Bool S3PreInit(ScrnInfoPtr pScrn, int flags)
+ 
+ 	if (pS3->Chipset == PCI_CHIP_TRIO64V2_DXGX)
+ 	{
++          /* disable DAC power saving to avoid bright left edge */
+ 	  outb (0x3d4, 0x86);
+ 	  outb (0x3d5, 0x80);
+-	  
++	  /* disable the stream display fetch length control */
+ 	  outb (0x3d4, 0x90);
+ 	  outb (0x3d5, 0x00);
+ 	}
+@@ -664,17 +647,28 @@ static Bool S3PreInit(ScrnInfoPtr pScrn, int flags)
+ #endif
+ 		switch(pScrn->bitsPerPixel) {
+ 		case 8:
+-			pS3->MaxClock = 135000;
++			if (pS3->Chipset == PCI_CHIP_TRIO64V2_DXGX)
++				pS3->MaxClock = 170000;
++			else
++				pS3->MaxClock = 135000;
++
++			pScrn->rgbBits = 6;
+ 			break;
+ 		case 16:
+ 			pS3->MaxClock = 80000;
++			pScrn->rgbBits = 6;
+ 			break;
+ 		case 24:
+ 		case 32:
+-			pS3->MaxClock = 50000;
++			if (pS3->Chipset == PCI_CHIP_TRIO64V2_DXGX)
++				pS3->MaxClock = 56700;
++			else
++				pS3->MaxClock = 50000;
++
++			pScrn->rgbBits = 8;
+ 			break;
+ 		}
+-	        pScrn->rgbBits = 6;
++
+ 		pS3->LoadPalette = S3GenericLoadPalette;
+ 	}
+ 
+@@ -684,7 +678,7 @@ static Bool S3PreInit(ScrnInfoPtr pScrn, int flags)
+ 		return FALSE;
+ 	}
+ 
+-	if (pS3->SWCursor)
++	if (!pS3->HWCursor)
+ 		pS3->CursorInit = NULL;
+ 
+ 	pS3->RefClock = S3GetRefClock(pScrn);
+@@ -749,6 +743,7 @@ static Bool S3ScreenInit(int scrnIndex, ScreenPtr pScreen, int argc,
+ {
+ 	ScrnInfoPtr pScrn = xf86Screens[pScreen->myNum];
+ 	S3Ptr pS3 = S3PTR(pScrn);
++	BoxRec ScreenArea;
+ 
+ 	pScrn->fbOffset = 0;
+ 
+@@ -811,31 +806,71 @@ static Bool S3ScreenInit(int scrnIndex, ScreenPtr pScreen, int argc,
+         miInitializeBackingStore(pScreen);
+         xf86SetBackingStore(pScreen);
+ 
++	/* framebuffer manager setup */
++	ScreenArea.x1 = 0;
++	ScreenArea.y1 = 0;
++	ScreenArea.x2 = pScrn->displayWidth;
++	ScreenArea.y2 = (pScrn->videoRam * 1024) / pS3->s3BppDisplayWidth;
++
++	if (!xf86InitFBManager(pScreen, &ScreenArea)) {
++		xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
++			   "Memory manager initialization to (%d,%d) (%d,%d) failed\n",
++			   ScreenArea.x1, ScreenArea.y1,
++			   ScreenArea.x2, ScreenArea.y2);
++		return FALSE;
++	} else
++		xf86DrvMsg(pScrn->scrnIndex, X_INFO,
++			   "Memory manager initialized to (%d,%d) (%d,%d)\n",
++			   ScreenArea.x1, ScreenArea.y1, 
++			   ScreenArea.x2, ScreenArea.y2);
++	
++
++	/* 2D acceleration setup */
++
++	if (pS3->NoAccel)
++		xf86DrvMsg(pScrn->scrnIndex, X_CONFIG, 
++			   "Acceleration disabled (by option)\n");
++
++	/* It seems that acceleration isn't supported for 24-bit packed
++	   colour. Disable it for S3 Trio64V2 */
++	if (!pS3->NoAccel && (pScrn->bitsPerPixel == 24) &&
++	    (pS3->Chipset == PCI_CHIP_TRIO64V2_DXGX)) {
++		xf86DrvMsg(pScrn->scrnIndex, X_CONFIG, "Acceleration isn't supported for 24 bpp. Disabled.\n");
++		pS3->NoAccel = TRUE;
++	}
++
+ 	if (!pS3->NoAccel) {
+-		if (pS3->S3NewMMIO) {
++		if (pS3->S3NewMMIO)
+ 			if (S3AccelInitNewMMIO(pScreen)) {
+-				xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Acceleration enabled\n");
+-				xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Using NewMMIO\n");
++				xf86DrvMsg(pScrn->scrnIndex, X_INFO, 
++					   "Acceleration enabled\n");
++				xf86DrvMsg(pScrn->scrnIndex, X_INFO, 
++					   "Using NewMMIO\n");
+ 			} else {
+-				xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Acceleration initialization failed\n");
+-				xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Acceleration disabled\n");
++				xf86DrvMsg(pScrn->scrnIndex, X_ERROR, 
++					   "Acceleration initialization failed\n");
++				xf86DrvMsg(pScrn->scrnIndex, X_INFO, 
++					   "Acceleration disabled\n");
+ 			}
+-		} else {
++		else {
+ 			if (S3AccelInitPIO(pScreen)) {
+-				xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Acceleration enabled\n");
+-				xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Using PIO\n");
++				xf86DrvMsg(pScrn->scrnIndex, X_INFO, 
++					   "Acceleration enabled\n");
++				xf86DrvMsg(pScrn->scrnIndex, X_INFO, 
++					   "Using PIO\n");
+ 			} else {
+-				xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Acceleration initialization failed\n");
+-				xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Acceleration disabled\n");
++				xf86DrvMsg(pScrn->scrnIndex, X_ERROR, 
++					   "Acceleration initialization failed\n");
++				xf86DrvMsg(pScrn->scrnIndex, X_INFO, 
++					   "Acceleration disabled\n");
+ 			}
+ 		}
+-	} else {
+-		xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Acceleration disabled by option\n");
+ 	}
+-
++	
+         miDCInitialize(pScreen, xf86GetPointerScreenFuncs());
+ 
+-	/* hw cursor setup */
++	/* HW cursor setup */
++
+ 	if (pS3->CursorInit) {
+ 		if (pS3->CursorInit(pScreen))
+ 			xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Using HW cursor\n");
+@@ -869,10 +904,54 @@ static Bool S3ScreenInit(int scrnIndex, ScreenPtr pScreen, int argc,
+ 	pScrn->racIoFlags = pScrn->racMemFlags = RAC_COLORMAP
+ 	    | RAC_FB | RAC_VIEWPORT | RAC_CURSOR;
+ 
+-#if 0
+-	S3InitVideo(pScreen);
+-#endif
++	if (pS3->SlowEDODRAM)
++		xf86DrvMsg(pScrn->scrnIndex, X_INFO, 
++			   "SlowEDODRAM: Setting 2-cycle EDO\n");
++
++	if (pS3->SlowVRAM)
++		xf86DrvMsg(pScrn->scrnIndex, X_INFO, 
++			   "SlowVRAM: -RAS low time is 4.5 MCLKs\n");
++
++	if (pS3->SlowDRAM)
++		xf86DrvMsg(pScrn->scrnIndex, X_INFO, 
++			   "SlowDRAM: -RAS precharge time is 3.5 MCLKs\n");
++
++	if (pS3->SlowDRAMRefresh)
++		xf86DrvMsg(pScrn->scrnIndex, X_INFO, 
++			   "SlowDRAMRefresh: three refresh cycles per scanline\n");
++
++	/* XVideo setup */
++
++	if (pS3->XVideo) {
++		if (!pS3->hasStreams) {
++			xf86DrvMsg(pScrn->scrnIndex, X_CONFIG, "Overlay video isn't supported by video hardware. Disabled.\n");
++			pS3->XVideo = FALSE;
++		} else if (pScrn->bitsPerPixel < 16) {
++			xf86DrvMsg(pScrn->scrnIndex, X_CONFIG, "Overlay video isn't supported for %d bpp. Disabled.\n", pScrn->bitsPerPixel);
++			pS3->XVideo = FALSE;
++		}
++	} else
++		xf86DrvMsg(pScrn->scrnIndex, X_CONFIG, 
++			   "Overlay video disabled by option\n");
+ 	
++	/* At present time we support XV only for chips with New MMIO */
++	if ((pS3->XVideo) && (pS3->S3NewMMIO))
++		S3InitVideo(pScreen);
++	
++	switch (pScrn->bitsPerPixel) {
++	case 8:
++		pS3->Streams_FIFO = FIFO_PS16_SS8;
++		break;
++	case 15:
++	case 16:
++		pS3->Streams_FIFO = FIFO_PS12_SS12;
++		break;
++	case 24:
++	case 32: 
++		pS3->Streams_FIFO = FIFO_PS8_SS16;
++		break;
++	}
++		
+         return TRUE;
+ }                 
+ 
+@@ -1108,8 +1187,11 @@ static int S3GetPixMuxShift(ScrnInfoPtr pScrn)
+ 	else if (pS3->Chipset == PCI_CHIP_TRIO || 
+ 	         pS3->Chipset == PCI_CHIP_TRIO64UVP || 
+ 	         pS3->Chipset == PCI_CHIP_TRIO64V2_DXGX)
+-		shift = -(pS3->s3Bpp >> 1);
+-
++		if (pS3->s3Bpp == 2)
++			shift = -1; 
++		else 
++			shift = 0;
++				
+ 	return shift;
+ }
+ 
+@@ -1134,13 +1216,22 @@ static Bool S3ModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
+ 	pS3->s3ScissB = ((pScrn->videoRam * 1024) / pS3->s3BppDisplayWidth) - 1;
+ 	pS3->s3ScissR = pScrn->displayWidth - 1;
+ 
+-	if (mode->HTotal == mode->CrtcHTotal) {
++	/* 
++	   Set correct blanking for S3 Trio64V2. It's also needed
++	   to clear cr33_5.
++	*/
++	if (pS3->Chipset = PCI_CHIP_TRIO64V2_DXGX)
++		mode->CrtcHBlankStart = mode->CrtcHDisplay + 8;
++
++	if ((mode->HTotal == mode->CrtcHTotal) && (pS3->pixMuxShift != 0)) {
+ 		if (pS3->pixMuxShift > 0) {
+ 			/* XXX hack */
+ /* 			mode->Flags |= V_PIXMUX; */
+ 
+ 			mode->CrtcHTotal >>= pS3->pixMuxShift;
+ 			mode->CrtcHDisplay >>= pS3->pixMuxShift;
++			mode->CrtcHBlankStart >>= pS3->pixMuxShift;
++			mode->CrtcHBlankEnd >>= pS3->pixMuxShift;
+ 			mode->CrtcHSyncStart >>= pS3->pixMuxShift;
+ 			mode->CrtcHSyncEnd >>= pS3->pixMuxShift;
+ 			mode->CrtcHSkew >>= pS3->pixMuxShift;
+@@ -1149,6 +1240,8 @@ static Bool S3ModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
+ 
+ 			mode->CrtcHTotal <<= -pS3->pixMuxShift;
+ 			mode->CrtcHDisplay <<= -pS3->pixMuxShift;
++			mode->CrtcHBlankStart <<= -pS3->pixMuxShift;
++			mode->CrtcHBlankEnd <<= -pS3->pixMuxShift;
+ 			mode->CrtcHSyncStart <<= -pS3->pixMuxShift;
+ 			mode->CrtcHSyncEnd <<= -pS3->pixMuxShift;
+ 			mode->CrtcHSkew <<= -pS3->pixMuxShift;
+@@ -1202,13 +1295,12 @@ static Bool S3ModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
+ 	}
+ 
+ 	/* We need to set this first - S3 *is* broken */
+-	outw(vgaCRIndex, (pVga->CRTC[17] << 8) | 17);
++	outw(vgaCRIndex, (pVga->CRTC[17] << 8) | 17); 
+ 	for(r=0; r<25; r++)
+ 		outw(vgaCRIndex, (pVga->CRTC[r] << 8) | r);
+ 
+-	for(r=0; r<9; r++) {
++	for(r=0; r<9; r++)
+ 		outw(0x3ce, (pVga->Graphics[r] << 8) | r);
+-	}
+ 
+ 	inb(vgaIOBase + 0x0a);
+ 
+@@ -1235,19 +1327,14 @@ static Bool S3ModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
+ 	if ((pS3->Chipset == PCI_CHIP_964_0) ||
+ 	    (pS3->Chipset == PCI_CHIP_964_1))
+ 		new->cr33 = 0x20;
++	else if (pS3->Chipset == PCI_CHIP_TRIO64V2_DXGX)
++		new->cr33 &= ~0x20;
+ 	outb(vgaCRReg, new->cr33);
+ 	
+ 	new->cr34 = 0x10;
+ 	outb(vgaCRIndex, 0x34);
+ 	outb(vgaCRReg, new->cr34);
+ 
+-	if (pS3->SlowDRAMRefresh)
+-		new->cr3a = 0xb7;
+-	else
+-		new->cr3a = 0xb5;
+-	outb(vgaCRIndex, 0x3a);
+-	outb(vgaCRReg, new->cr3a);
+-
+ 	if (pS3->Chipset != PCI_CHIP_AURORA64VP) {
+ 		new->cr3b = (pVga->CRTC[0] + pVga->CRTC[4] + 1) / 2;
+ 		outb(vgaCRIndex, 0x3b);
+@@ -1302,7 +1389,7 @@ static Bool S3ModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
+ 		tmp |= 0x10;
+ 		break;
+ 	case 24:
+-		tmp |= 0x20;
++		tmp |= 0x20; /* there is no such value in spec s3.txt */
+ 		break;
+ 	case 32:
+ 		tmp |= 0x30;
+@@ -1373,6 +1460,16 @@ static Bool S3ModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
+ 	new->cr60 = n;
+ 	outb(vgaCRReg, new->cr60);
+ 
++	if (pS3->Chipset == PCI_CHIP_TRIO64V2_DXGX) {
++		new->cr60 = 255;		
++		outb(vgaCRIndex, 0x60);
++		outb(vgaCRReg, new->cr60);		
++
++		new->cr54 = 31 << 3;
++		outb(vgaCRIndex, 0x54);
++		outb(vgaCRReg, new->cr54);		
++	}
++
+ 	outb(vgaCRIndex, 0x55);
+ 	new->cr55 = (inb(vgaCRReg) & 0x08) | 0x40;
+ 	outb(vgaCRReg, new->cr55);
+@@ -1387,10 +1484,10 @@ static Bool S3ModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
+ 	{
+ 		int i;
+ 		unsigned int j;
+-
+-		i = ((((mode->CrtcHTotal >> 3) - 5) & 0x100) >> 8) 	|
+-		    ((((mode->CrtcHDisplay >> 3) - 1) & 0x100) >> 7) 	|
+-		    ((((mode->CrtcHSyncStart >> 3) - 1) & 0x100) >> 6)	|
++		
++		i = ((((mode->CrtcHTotal >> 3) - 5) & 0x100) >> 8)      |
++		    ((((mode->CrtcHDisplay >> 3) - 1) & 0x100) >> 7)    |
++		    ((((mode->CrtcHSyncStart >> 3) - 1) & 0x100) >> 6)  |
+ 		    ((mode->CrtcHSyncStart & 0x800) >> 7);
+ 		if ((mode->CrtcHSyncEnd >> 3) - (mode->CrtcHSyncStart >> 3) > 64)
+ 			i |= 0x08;
+@@ -1452,6 +1549,33 @@ static Bool S3ModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
+ 		outb(vgaCRReg, new->cr42);
+ 	}
+ 
++	if (pS3->Chipset == PCI_CHIP_TRIO64V2_DXGX) {
++		unsigned char a;
++
++		outb(vgaCRIndex, 0x67);
++		a = inb(vgaCRReg) & 0xfe;
++
++		switch (pScrn->depth) {
++		case 8:
++			break;
++		case 15:
++			a |= (3 << 4);
++			break;
++		case 16:
++			a |= (5 << 4);
++			break;
++		case 24:
++			a |= (13 << 4);
++			break;		 
++		}
++
++		if (pS3->hasStreams)
++			a |= (3 << 2);
++
++		WaitVSync(); /* Wait for VSync before setting mode */
++		outb(vgaCRReg, a);
++	}	    
++
+ 	if (pS3->Chipset == PCI_CHIP_968) {
+ 		unsigned char a;
+ 
+@@ -1513,6 +1637,35 @@ static Bool S3ModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
+ 		new->cr66 |= 0x80;
+ 	outb(vgaCRReg, new->cr66);
+ 
++	if (pS3->SlowDRAMRefresh)
++		new->cr3a = 0xb7;
++	else
++		new->cr3a = 0xb5;
++	outb(vgaCRIndex, 0x3a);
++	outb(vgaCRReg, new->cr3a);
++
++	/* 
++	   Set 3.5 MCLKs for -RAS low, 2.5 MCLKs for -RAS precharge, 
++	   disable -CAS/-OE adjustment. It seems that cr68 has different 
++	   format for 96x and TRIOs
++	*/
++	if (!((pS3->Chipset == PCI_CHIP_968) || 
++	      (pS3->Chipset == PCI_CHIP_964_0) ||
++	      (pS3->Chipset == PCI_CHIP_964_1))) {
++
++		outb(vgaCRIndex, 0x39);
++		outb(vgaCRReg, 0xa5);
++
++		outb(vgaCRIndex, 0x68);
++		tmp = inb(vgaCRReg) & ~0x0f;
++		outb(vgaCRReg, tmp | 0x0f);
++
++		/* Enable 1-cycle EDO access */
++		outb(vgaCRIndex, 0x36);
++		tmp = inb(vgaCRReg);
++		outb(vgaCRReg, tmp & 0xf3);
++	}
++	
+ 	if (pS3->SlowVRAM) {
+ 		/*
+ 		 * some Diamond Stealth 64 VRAM cards have a problem with
+@@ -1530,7 +1683,7 @@ static Bool S3ModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
+ 	if (pS3->SlowDRAM) {
+ 		/*
+ 		 * fixes some pixel errors for a SPEA Trio64V+ card
+-		 * increas -RAS precharge timing from 2.5 MCLKs
++		 * increase -RAS precharge timing from 2.5 MCLKs
+ 		 * to 3.5 MCLKs
+ 		 */
+ 		outb(vgaCRIndex, 0x39);
+@@ -1543,7 +1696,7 @@ static Bool S3ModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
+ 	if (pS3->SlowEDODRAM) {
+ 		/*
+ 		 * fixes some pixel errors for a SPEA Trio64V+ card
+-		 * increas from 1-cycle to 2-cycle EDO mode
++		 * increase from 1-cycle to 2-cycle EDO mode
+ 		 */
+ 		outb(vgaCRIndex, 0x39);
+ 
+@@ -1626,13 +1779,8 @@ static Bool S3ModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
+ 	WaitQueue(5);
+ 	SET_SCISSORS(0, 0, pS3->s3ScissR, pS3->s3ScissB);
+ 
+-	outb(vgaCRIndex, 0x6f);
+-
+-#if 0
+-	if (((pScrn->bitsPerPixel == 16) || 
+-	     (pScrn->bitsPerPixel == 24)) && (pS3->S3NewMMIO))
++	if (pS3->hasStreams)
+ 		S3InitStreams(pScrn, mode);
+-#endif
+ 
+ 	return TRUE;
+ }
+@@ -1784,7 +1932,7 @@ void S3Regdump(ScrnInfoPtr pScrn)
+         S3Ptr pS3 = S3PTR(pScrn);
+         int vgaCRIndex = pS3->vgaCRIndex, vgaCRReg = pS3->vgaCRReg;
+ 
+-#if 1
++#if 0
+ 	outb(vgaCRIndex, 0x31);
+ 	ErrorF("cr31 = 0x%x\n", inb(vgaCRReg));
+ 	outb(vgaCRIndex, 0x32);
+diff --git a/src/s3_reg.h b/src/s3_reg.h
+index 64e3633..8ef9fb5 100644
+--- xf86-video-s3-0.6.0/src/s3_reg.h
++++ xf86-video-s3-0.6.0/src/s3_reg.h
+@@ -139,6 +139,16 @@ the
+ #define VECDIR_315      0x00e0
+ #define SSVDRAW         0x0010
+ 
++/* 
++ * Some values for Streams FIFO.
++ * primary stream threshold | secondary stream threshold | 
++ * secondary stream slots (can be 0, 8, 12, 16, 24) from 24 total
++ */
++#define FIFO_PS0_SS24  (0 << 10) | (12 << 5) | 24
++#define FIFO_PS8_SS16  (8 << 10) | (12 << 5) | 16
++#define FIFO_PS12_SS12 (6 << 10) | (8 << 5) | 12
++#define FIFO_PS16_SS8  (8 << 10) | (4 << 5) | 8
++#define FIFO_PS24_SS0  (12 << 10) | (0 << 5) | 0
+ 
+ #define S3_OUTW(p,n)		outw(p, n)
+ #define S3_OUTL(p,n)		outl(p, n)
+@@ -153,6 +163,10 @@ the
+ 		while(inw(GP_STAT) & GPBUSY);	\
+ 	} while(0)
+ 
++#define WaitVSync() {					\
++	while (inb(0x3da) & 8);                         \
++	while (!(inb(0x3da) & 8));			\
++}
+ 
+ #ifdef S3_NEWMMIO
+ #include "newmmio.h"
+@@ -162,13 +176,15 @@ the
+  */
+ #define SET_BLEND_CNTL(val)     ((mmtr)s3MmioMem)->streams_regs.regs.blend_cntl = (val)
+ #define SET_PSTREAM_CNTL(val)   ((mmtr)s3MmioMem)->streams_regs.regs.prim_stream_cntl = (val)
+-#define SET_PSTREAM_FBADDR(val) ((mmtr)s3MmioMem)->streams_regs.regs.prim_fbaddr0 = (val)
++#define SET_PSTREAM_FBADDR0(val) ((mmtr)s3MmioMem)->streams_regs.regs.prim_fbaddr0 = (val)
++#define SET_PSTREAM_FBADDR1(val) ((mmtr)s3MmioMem)->streams_regs.regs.prim_fbaddr1 = (val)
+ #define SET_PSTREAM_STRIDE(val) ((mmtr)s3MmioMem)->streams_regs.regs.prim_stream_stride = (val)
+ #define SET_PSTREAM_START(val)  ((mmtr)s3MmioMem)->streams_regs.regs.prim_start_coord = (val)
+ #define SET_PSTREAM_WIND(val)   ((mmtr)s3MmioMem)->streams_regs.regs.prim_window_size = (val)
+ #define SET_SSTREAM_CNTL(val)   ((mmtr)s3MmioMem)->streams_regs.regs.second_stream_cntl = (val)
+ #define SET_SSTRETCH(val)       ((mmtr)s3MmioMem)->streams_regs.regs.second_stream_stretch = (val)
+-#define SET_SSTREAM_FBADDR(val) ((mmtr)s3MmioMem)->streams_regs.regs.second_fbaddr0 = (val)
++#define SET_SSTREAM_FBADDR0(val) ((mmtr)s3MmioMem)->streams_regs.regs.second_fbaddr0 = (val)
++#define SET_SSTREAM_FBADDR1(val) ((mmtr)s3MmioMem)->streams_regs.regs.second_fbaddr1 = (val)
+ #define SET_SSTREAM_STRIDE(val) ((mmtr)s3MmioMem)->streams_regs.regs.second_stream_stride = (val)
+ #define SET_SSTREAM_START(val)  ((mmtr)s3MmioMem)->streams_regs.regs.second_start_coord = (val)
+ #define SET_SSTREAM_WIND(val)   ((mmtr)s3MmioMem)->streams_regs.regs.second_window_size = (val)
+@@ -178,6 +194,7 @@ the
+ #define SET_CHROMA_KEY(val)     ((mmtr)s3MmioMem)->streams_regs.regs.col_chroma_key_cntl = (val)
+ #define SET_DOUBLE_BUFFER(val)  ((mmtr)s3MmioMem)->streams_regs.regs.double_buffer = (val)
+ #define SET_OPAQUE_OVERLAY(val) ((mmtr)s3MmioMem)->streams_regs.regs.opaq_overlay_cntl = (val)
++#define SET_FIFO_CNTL(val)     ((mmtr)s3MmioMem)->streams_regs.regs.streams_fifo = (val)
+ 
+ #else
+ 
+diff --git a/src/s3_video.c b/src/s3_video.c
+index e320329..ad68de0 100644
+--- xf86-video-s3-0.6.0/src/s3_video.c
++++ xf86-video-s3-0.6.0/src/s3_video.c
+@@ -29,8 +29,6 @@
+ #include "config.h"
+ #endif
+ 
+-#define S3_NEWMMIO	/* previously defined in Imakefile in monolith */
+-
+ #include "xf86.h"
+ #include "xf86_OSproc.h"
+ 
+@@ -59,7 +57,7 @@ static int  S3PutImage(ScrnInfoPtr, short, short, short, short, short,
+ static int  S3QueryImageAttributes(ScrnInfoPtr, int, unsigned short *,
+                         	   unsigned short *,  int *, int *);
+ static void S3ResetVideoOverlay(ScrnInfoPtr);
+-
++static FBLinearPtr S3XVMemAlloc(ScrnInfoPtr pScrn, pointer pVideo, int size);
+ 
+ 
+ void S3InitVideo(ScreenPtr pScreen)
+@@ -70,12 +68,8 @@ void S3InitVideo(ScreenPtr pScreen)
+ 	XF86VideoAdaptorPtr newAdaptor = NULL;
+ 	int num_adaptors;
+ 
+-	if (((pScrn->bitsPerPixel == 16) ||
+-	     (pScrn->bitsPerPixel == 24)) && (pS3->S3NewMMIO)) {
+-		newAdaptor = S3SetupImageVideoOverlay(pScreen);
+-		xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Using overlay video\n");
+-	} else
+-		return;
++	newAdaptor = S3SetupImageVideoOverlay(pScreen);
++	xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Using overlay video\n");
+ 
+ 	num_adaptors = xf86XVListGenericAdaptors(pScrn, &adaptors);
+ 
+@@ -92,7 +86,7 @@ void S3InitVideo(ScreenPtr pScreen)
+                 		newAdaptors[num_adaptors] = newAdaptor;
+                 		adaptors = newAdaptors;
+                 		num_adaptors++;
+-            		} 
++           		} 
+         	}
+     	}
+ 
+@@ -122,12 +116,42 @@ static XF86VideoEncodingRec DummyEncoding[2] =
+ };
+ 
+ 
+-
++static FBLinearPtr S3XVMemAlloc(ScrnInfoPtr pScrn, pointer pVideo, int size)
++{
++	FBLinearPtr pLinear = (FBLinearPtr)pVideo;
++	ScreenPtr pScreen = pScrn->pScreen;
++
++	if (pLinear) {
++		if ((pLinear->size >= size) ||
++		    xf86ResizeOffscreenLinear(pLinear, size)) {
++			pLinear->MoveLinearCallback = NULL;
++			pLinear->RemoveLinearCallback = NULL;
++			return pLinear;
++		}
++		xf86FreeOffscreenLinear(pLinear);
++	}
++	pLinear = xf86AllocateOffscreenLinear(pScreen, size, 16, 
++					      NULL, NULL, NULL);
++	
++	if (!pLinear) {
++		int maxSize;
++		
++		xf86QueryLargestOffscreenLinear(pScreen, &maxSize, 16,
++						PRIORITY_EXTREME);
++		if (maxSize < size)
++			return NULL;
++		
++		xf86PurgeUnlockedOffscreenAreas(pScreen);
++		pLinear = xf86AllocateOffscreenLinear(pScreen, size, 16, 
++						      NULL, NULL, NULL);
++	}
++	return pLinear;
++}
+ 
+ static XF86VideoFormatRec Formats[NUM_FORMATS_TEXTURE] =
+ {
+-  	/*{15, TrueColor},*/ {16, TrueColor}, {24, TrueColor} /* ,
+-    	{15, DirectColor}*/, {16, DirectColor}, {24, DirectColor}
++  	{16, TrueColor}, {24, TrueColor},
++	{16, DirectColor}, {24, DirectColor}
+ };
+ 
+ 
+@@ -188,7 +212,7 @@ static XF86VideoAdaptorPtr S3AllocAdaptor(ScrnInfoPtr pScrn)
+         	return NULL;
+    
+     	if(!(pPriv = xcalloc(1, sizeof(S3PortPrivRec)  +
+-        	                (sizeof(DevUnion) * S3_MAX_PORTS))))
++			     (sizeof(DevUnion) * S3_MAX_PORTS))))
+     	{
+         	xfree(adapt);
+         	return NULL;
+@@ -199,15 +223,16 @@ static XF86VideoAdaptorPtr S3AllocAdaptor(ScrnInfoPtr pScrn)
+     	for(i = 0; i < S3_MAX_PORTS; i++)
+         	adapt->pPortPrivates[i].val = i;
+ 
+-	pPriv->colorKey = (1 << pScrn->offset.red) | (1 << pScrn->offset.green) |
+-			  (((pScrn->mask.blue >> pScrn->offset.blue) - 1) << pScrn->offset.blue);
++	pPriv->colorKey = (1 << pScrn->offset.red) | 
++		(1 << pScrn->offset.green) |
++		(((pScrn->mask.blue >> pScrn->offset.blue) - 1) << pScrn->offset.blue);
+ 
+ 	pPriv->videoStatus = 0;
+ 	pPriv->lastPort = -1;
+ 
+ 	pS3->adaptor = adapt;
+ 	pS3->portPrivate = pPriv;
+-
++	
+ 	return adapt;
+ }
+ 
+@@ -262,11 +287,13 @@ static void S3StopVideo(ScrnInfoPtr pScrn, pointer data, Bool exit)
+ 	REGION_EMPTY(pScrn->pScreen, &pPriv->clip);
+ 
+ 	if (exit) {
++		SET_FIFO_CNTL(0x00080000 | FIFO_PS24_SS0);
++
+ 		if (pPriv->videoStatus & CLIENT_VIDEO_ON)
+ 			SET_BLEND_CNTL(0x01000000);
+-
++		
+ 		if (pPriv->area) {
+-			xf86FreeOffscreenArea(pPriv->area);
++			xf86FreeOffscreenLinear(pPriv->area);
+ 	        	pPriv->area = NULL;
+ 		}
+ 
+@@ -274,47 +301,6 @@ static void S3StopVideo(ScrnInfoPtr pScrn, pointer data, Bool exit)
+ 	}
+ }
+ 
+-
+-static FBAreaPtr S3AllocateMemory(ScrnInfoPtr pScrn, FBAreaPtr area,
+-				  int numlines)
+-{
+-	ScreenPtr pScreen;
+-	FBAreaPtr new_area;
+-
+-   if(area) {
+-        if((area->box.y2 - area->box.y1) >= numlines)
+-           return area;
+-            
+-        if(xf86ResizeOffscreenArea(area, pScrn->displayWidth, numlines))
+-           return area;
+-     
+-        xf86FreeOffscreenArea(area);
+-   }
+-      
+-   pScreen = screenInfo.screens[pScrn->scrnIndex];
+-  
+-   new_area = xf86AllocateOffscreenArea(pScreen, pScrn->displayWidth,
+-                                numlines, 0, NULL, NULL, NULL);
+-
+-   if(!new_area) {
+-        int max_w, max_h;
+-
+-        xf86QueryLargestOffscreenArea(pScreen, &max_w, &max_h, 0,
+-                        FAVOR_WIDTH_THEN_AREA, PRIORITY_EXTREME);
+-           
+-        if((max_w < pScrn->displayWidth) || (max_h < numlines))
+-           return NULL;
+-
+-        xf86PurgeUnlockedOffscreenAreas(pScreen);
+-        new_area = xf86AllocateOffscreenArea(pScreen, pScrn->displayWidth,
+-                                numlines, 0, NULL, NULL, NULL);
+-   }
+-  
+-   return new_area;  
+-}
+-
+-
+-
+ static void S3DisplayVideoOverlay(ScrnInfoPtr pScrn, int id, int offset,
+ 				  short width, short height, int pitch,
+ 				  int x1, int y1, int x2, int y2,
+@@ -330,139 +316,162 @@ static void S3DisplayVideoOverlay(ScrnInfoPtr pScrn, int id, int offset,
+ 	else
+ 		tmp = 2;
+ 
+-	SET_SSTREAM_CNTL(tmp << 28 | 0x01000000 |
+-			 ((((src_w-1)<<1)-(drw_w-1)) & 0xfff));
+-	SET_SSTRETCH(((src_w - 1) & 0x7ff) | (((src_w-drw_w) & 0x7ff) << 16));
++	SET_SSTREAM_CNTL((tmp << 28) | 0x01000000 |
++			 ((((src_w - 1) << 1) - (drw_w - 1)) & 0xfff));
++	SET_SSTRETCH(((src_w - 1) & 0x7ff) | 
++		     (((src_w - drw_w) & 0x7ff) << 16));
+ 	SET_BLEND_CNTL(0x05000000);
+-	SET_SSTREAM_FBADDR(offset & 0x3fffff);
++	SET_SSTREAM_FBADDR0(offset & 0x3fffff);
++	SET_SSTREAM_FBADDR1(offset & 0x3fffff);
+ 	SET_SSTREAM_STRIDE(pitch & 0xfff);
++	SET_SSTREAM_START(((dstBox->x1 + 1) << 16) | (dstBox->y1 + 1));
++	SET_SSTREAM_WIND((((drw_w - 1) << 16) | drw_h) & 0x7ff07ff);
+ 
+ 	SET_K1_VSCALE(src_h - 1);
+ 	SET_K2_VSCALE((src_h - drw_h) & 0x7ff);
+-
+-	SET_DDA_VERT((((~drw_h)-1)) & 0xfff);
+-
+-	SET_SSTREAM_START(((dstBox->x1 +1) << 16) | (dstBox->y1 +1));
+-	SET_SSTREAM_WIND(( ((drw_w-1) << 16) | (drw_h ) ) & 0x7ff07ff);
++	SET_DDA_VERT(((~drw_h - 1)) & 0xfff);
+ 
+ 	SET_CHROMA_KEY(0x10000000 |
+ 		       ((pScrn->weight.red-1) << 24) |
+ 		       ((pPriv->colorKey & pScrn->mask.red) >> pScrn->offset.red) <<
+-			(16 + 8-pScrn->weight.red) |
++		       (16 + 8-pScrn->weight.red) |
+ 		       ((pPriv->colorKey & pScrn->mask.green) >> pScrn->offset.green) <<
+-			(8 + 8-pScrn->weight.green) |
++		       (8 + 8-pScrn->weight.green) |
+ 		       ((pPriv->colorKey & pScrn->mask.blue) >> pScrn->offset.blue) <<
+-			(8-pScrn->weight.blue));
+-}
++		       (8-pScrn->weight.blue));
+ 
++	SET_FIFO_CNTL(0x00080000 | pS3->Streams_FIFO);
++}
+ 
+ static int S3PutImage(ScrnInfoPtr pScrn, short src_x, short src_y,
+-		  short drw_x, short drw_y, short src_w, short src_h,
+-		  short drw_w, short drw_h, int id, unsigned char *buf,
+-		  short width, short height, Bool sync, RegionPtr clipBoxes,
+-		  pointer data, DrawablePtr pDraw)
++		      short drw_x, short drw_y, short src_w, short src_h,
++		      short drw_w, short drw_h, int id, unsigned char *buf,
++		      short width, short height, Bool sync, 
++		      RegionPtr clipBoxes, pointer data, DrawablePtr pDraw)
+ {
+ 	S3Ptr pS3 = S3PTR(pScrn);
+ 	S3PortPrivPtr pPriv = pS3->portPrivate;
+    	INT32 x1, x2, y1, y2;
+-   	unsigned char *dst_start; 
+-   	int pitch, new_h, offset, offset2=0, offset3=0;
+-   	int srcPitch, srcPitch2=0, dstPitch;
+-   	int top, left, npixels, nlines;
++   	CARD8 *dst_start; 
++   	int pitch, new_h, offset, offsetV = 0, offsetU = 0;
++   	int srcPitch, srcPitchUV = 0, dstPitch, dstSize;
++   	int top, bottom, right, left, npixels, nlines;
+    	BoxRec dstBox;
+-   	CARD32 tmp;
+-
+-   /* Clip */
+-   x1 = src_x;
+-   x2 = src_x + src_w;
+-   y1 = src_y;
+-   y2 = src_y + src_h;
++	CARD32 tmp;
++	int cpp = (pScrn->bitsPerPixel + 7) >> 3;
++
++	/* Clip */
++	x1 = src_x;
++	x2 = src_x + src_w;
++	y1 = src_y;
++	y2 = src_y + src_h;
+    
+-   dstBox.x1 = drw_x;
+-   dstBox.x2 = drw_x + drw_w;
+-   dstBox.y1 = drw_y;
+-   dstBox.y2 = drw_y + drw_h;
++	dstBox.x1 = drw_x;
++	dstBox.x2 = drw_x + drw_w;
++	dstBox.y1 = drw_y;
++	dstBox.y2 = drw_y + drw_h;
+    
+-   if(!xf86XVClipVideoHelper(&dstBox, &x1, &x2, &y1, &y2,
+-			     clipBoxes, width, height))
+-        return Success;
+-        
+-   /*if(!pMga->TexturedVideo) {*/
+-        dstBox.x1 -= pScrn->frameX0;
+-        dstBox.x2 -= pScrn->frameX0;
+-        dstBox.y1 -= pScrn->frameY0;
+-        dstBox.y2 -= pScrn->frameY0;
+-        /*}*/
+-        
+-   pitch = pScrn->bitsPerPixel * pScrn->displayWidth >> 3;
+-   dstPitch = ((width << 1) + 15) & ~15;
+-   new_h = ((dstPitch * height) + pitch - 1) / pitch;
++	if(!xf86XVClipVideoHelper(&dstBox, &x1, &x2, &y1, &y2, clipBoxes, 
++				  width, height))
++		return Success;
+    
+-   switch(id) {
+-   case FOURCC_YV12:
+-   case FOURCC_I420:
+-        srcPitch = (width + 3) & ~3;
+-        offset2 = srcPitch * height;
+-        srcPitch2 = ((width >> 1) + 3) & ~3;
+-        offset3 = (srcPitch2 * (height >> 1)) + offset2;
+-        break;
+-   case FOURCC_UYVY:  
+-   case FOURCC_YUY2:
+-   default:
+-        srcPitch = (width << 1);
+-        break;
+-   }
++	dstBox.x1 -= pScrn->frameX0;
++	dstBox.x2 -= pScrn->frameX0;
++	dstBox.y1 -= pScrn->frameY0;
++	dstBox.y2 -= pScrn->frameY0;
++        
++	/* requested size in bytes */
++	dstPitch = ((width << 1) + 15) & ~15;
++	dstSize = dstPitch * height;
++
++	pPriv->area = S3XVMemAlloc(pScrn, pPriv->area,
++				   (dstSize + cpp - 1) / cpp);
++	if (!pPriv->area) 
++		return BadAlloc;
++
++	offset = pPriv->area->offset * cpp;
++	dst_start = pS3->FBBase + offset;
++
++	switch (id) {
++        case FOURCC_YV12:
++        case FOURCC_I420:
++		left = (x1 >> 16) & ~1;
++		right = ((x2 + 0x1ffff) >> 16) & ~1;
++		top = (y1 >> 16) & ~1;
++		bottom = ((y2 + 0x1ffff) >> 16) & ~1;
++
++		if ((right < width) && ((x1 & 0x1ffff) <= (x2 & 0x1ffff)))
++			right += 2;
++		if ((bottom < height) && ((y1 & 0x1ffff) <= (y2 & 0x1ffff)))
++			bottom += 2;
++
++		npixels = right - left;
++		nlines = bottom - top;
++
++		srcPitch = (width + 3) & ~3;
++		offsetV = srcPitch * height;
++		srcPitchUV = ((width >> 1) + 3) & ~3;
++		offsetU = ((height >> 1) * srcPitchUV) + offsetV;
++
++		tmp = ((top >> 1) * srcPitchUV) + (left >> 1);
++		offsetV += tmp;
++		offsetU += tmp;
++
++		if (id == FOURCC_I420)
++		{
++			tmp = offsetV;
++			offsetV = offsetU;
++			offsetU = tmp;
++		}
++
++		dst_start += top * dstPitch + (left << 1);
++
++		xf86XVCopyYUV12ToPacked(buf + (top * srcPitch) + left,
++					buf + offsetV, buf + offsetU, 
++					dst_start, srcPitch, srcPitchUV,
++					dstPitch, nlines, npixels);
++		break;
++
++        case FOURCC_UYVY:
++        case FOURCC_YUY2:
++        default:
++		left = (x1 >> 16) & ~1;
++		right = ((x2 + 0x1ffff) >> 16) & ~1;
++		top = y1 >> 16;
++		bottom = (y2 + 0x0ffff) >> 16;
++
++		if ((right < width) && ((x1 & 0x1ffff) <= (x2 & 0x1ffff)))
++			right += 2;
++		if ((bottom < height) && ((y1 & 0x0ffff) <= (y2 & 0x0ffff)))
++			bottom++;
++
++		npixels = right - left;
++		nlines = bottom - top;
++
++		srcPitch = width << 1;
++		buf += (top * srcPitch) + (left << 1);
++		dst_start += top * dstPitch + (left << 1);
++
++		xf86XVCopyPacked(buf, dst_start, srcPitch, dstPitch, 
++				 nlines, npixels);
++		break;
++	}
++
++	/* update cliplist */
++	if(!REGION_EQUAL(pScrn->pScreen, &pPriv->clip, clipBoxes)) {
++		REGION_COPY(pScrn->pScreen, &pPriv->clip, clipBoxes);
++		/* draw these */
++		xf86XVFillKeyHelper(pScrn->pScreen, pPriv->colorKey, 
++				    clipBoxes);
++	}
+    
+-   if(!(pPriv->area = S3AllocateMemory(pScrn, pPriv->area, new_h)))
+-        return BadAlloc;
++	offset += (left << 1) + (top * dstPitch);
++	S3DisplayVideoOverlay(pScrn, id, offset, width, height, dstPitch,
++			      x1, y1, x2, y2, &dstBox, 
++			      src_w, src_h, drw_w, drw_h);
+    
+-    /* copy data */
+-    top = y1 >> 16;
+-    left = (x1 >> 16) & ~1;
+-    npixels = ((((x2 + 0xffff) >> 16) + 1) & ~1) - left;
+-    left <<= 1;
+-        
+-    offset = pPriv->area->box.y1 * pitch;
+-    dst_start = pS3->FBBase + offset + left + (top * dstPitch);
+-    switch(id) {
+-    case FOURCC_YV12:
+-    case FOURCC_I420:
+-        top &= ~1;    
+-        tmp = ((top >> 1) * srcPitch2) + (left >> 2);
+-        offset2 += tmp;
+-        offset3 += tmp;
+-        if(id == FOURCC_I420) {
+-           tmp = offset2;
+-           offset2 = offset3;
+-           offset3 = tmp;
+-        }
+-        nlines = ((((y2 + 0xffff) >> 16) + 1) & ~1) - top;
+-        xf86XVCopyYUV12ToPacked(buf + (top * srcPitch) + (left >> 1),
+-                                buf + offset2, buf + offset3, dst_start,
+-                                srcPitch, srcPitch2, dstPitch, nlines, npixels);
+-        break; 
+-    case FOURCC_UYVY:
+-    case FOURCC_YUY2:
+-    default:
+-        buf += (top * srcPitch) + left;
+-        nlines = ((y2 + 0xffff) >> 16) - top;
+-        xf86XVCopyPacked(buf, dst_start, srcPitch, dstPitch, nlines, npixels);
+-        break;
+-    }
+-        
+-    /* update cliplist */
+-        if(!REGION_EQUAL(pScrn->pScreen, &pPriv->clip, clipBoxes)) {
+-            REGION_COPY(pScrn->pScreen, &pPriv->clip, clipBoxes);
+-            /* draw these */
+-	    xf86XVFillKeyHelper(pScrn->pScreen, pPriv->colorKey, clipBoxes);
+-        }
+-                          
+-        offset += left + (top * dstPitch);
+-        S3DisplayVideoOverlay(pScrn, id, offset, width, height, dstPitch,
+-             x1, y1, x2, y2, &dstBox, src_w, src_h, drw_w, drw_h);
+-    
+-        pPriv->videoStatus = CLIENT_VIDEO_ON;
+-    return Success;
++	pPriv->videoStatus = CLIENT_VIDEO_ON;
++	return Success;
+ }       
+ 
+ 
+@@ -472,54 +481,92 @@ static int S3QueryImageAttributes(ScrnInfoPtr pScrn, int id,
+ 				  int *pitches, int *offsets)
+ {
+ 	int size, tmp;
+-
+-    *w = (*w + 1) & ~1;
+-    if(offsets) offsets[0] = 0;
+-    
+-    switch(id) {
+-    case FOURCC_YV12:
+-    case FOURCC_I420:
+-        *h = (*h + 1) & ~1;
+-        size = (*w + 3) & ~3;
+-        if(pitches) pitches[0] = size;
+-        size *= *h;
+-        if(offsets) offsets[1] = size;
+-        tmp = ((*w >> 1) + 3) & ~3;
+-        if(pitches) pitches[1] = pitches[2] = tmp;
+-        tmp *= (*h >> 1);
+-        size += tmp;
+-        if(offsets) offsets[2] = size;
+-        size += tmp;
+-        break;
+-    case FOURCC_UYVY:
+-    case FOURCC_YUY2:
+-    default:
+-        size = *w << 1;
+-        if(pitches) pitches[0] = size;
+-        size *= *h;
+-        break;
+-    } 
++	
++	*w = (*w + 1) & ~1;
++	if(offsets) offsets[0] = 0;
++	
++	switch(id) {
++	case FOURCC_YV12:
++	case FOURCC_I420:
++		*h = (*h + 1) & ~1;
++		size = (*w + 3) & ~3;
++		if(pitches) pitches[0] = size;
++		size *= *h;
++		if(offsets) offsets[1] = size;
++		tmp = ((*w >> 1) + 3) & ~3;
++		if(pitches) pitches[1] = pitches[2] = tmp;
++		tmp *= (*h >> 1);
++		size += tmp;
++		if(offsets) offsets[2] = size;
++		size += tmp;
++		break;
++	case FOURCC_UYVY:
++	case FOURCC_YUY2:
++	default:
++		size = *w << 1;
++		if(pitches) pitches[0] = size;
++		size *= *h;
++		break;
++	} 
+         
+-    return size;
++	return size;
+ }
+ 
+ 
+-
+ void S3InitStreams(ScrnInfoPtr pScrn, DisplayModePtr mode)
+ {       
+         S3Ptr pS3 = S3PTR(pScrn);
+         unsigned int pst_wind = (mode->HDisplay-1) << 16 | (mode->VDisplay);
+         
+-        SET_PSTREAM_CNTL(0x05000000 & 0x77000000);
+-        SET_CHROMA_KEY(0x00);
+-        SET_SSTREAM_CNTL(0x03000000);
+-        SET_BLEND_CNTL(0x01000000);
+-        SET_PSTREAM_STRIDE((pScrn->displayWidth * 2) & 0x0fff);
+-        SET_SSTREAM_STRIDE(0x01);
+-        SET_OPAQUE_OVERLAY(0x40000000);
+-        SET_PSTREAM_START(0x00010001);
++	WaitVSync();
++
++	switch (pScrn->bitsPerPixel) {
++	case 8: 
++		SET_PSTREAM_CNTL(0x00000000);
++		break;
++	case 15:
++		SET_PSTREAM_CNTL(0x03000000);
++		break;
++	case 16: 
++		SET_PSTREAM_CNTL(0x05000000);
++		break;
++	case 24:
++		SET_PSTREAM_CNTL(0x06000000);
++		break;
++	case 32:
++		SET_PSTREAM_CNTL(0x07000000);
++		break;
++	}
++
++	SET_PSTREAM_FBADDR0(0x00000000);
++	SET_PSTREAM_FBADDR1(0x00000000);
++	
++	SET_PSTREAM_STRIDE(pS3->s3BppDisplayWidth & 0x0fff);
++
+         SET_PSTREAM_WIND(pst_wind & 0x07ff07ff);
++        SET_PSTREAM_START(0x00010001);
++
++        SET_CHROMA_KEY(0x00000000);
++	SET_SSTRETCH(0x00000000);
++        SET_BLEND_CNTL(0x01000000);
++	SET_DOUBLE_BUFFER(0x00000000);
++
++        SET_SSTREAM_CNTL(0x03000000);
++	SET_SSTREAM_FBADDR0(0x00000000);
++	SET_SSTREAM_FBADDR1(0x00000000);
++        SET_SSTREAM_STRIDE(0x00000001);
+         SET_SSTREAM_START(0x07ff07ff);
+         SET_SSTREAM_WIND(0x00010001);
++
++        SET_OPAQUE_OVERLAY(0x40000000);
++	SET_K1_VSCALE(0x00000000);
++	SET_K2_VSCALE(0x00000000);
++	SET_DDA_VERT(0x00000000);
++
++	/*
++	  ps thr | ss thr | ss fifo slots
++	  set primary stream FIFO to 24 slots and 12 slots for threshold 
++	*/
++	SET_FIFO_CNTL(0x00080000 | FIFO_PS24_SS0);
+ }       
+ 
+-- 
+1.5.6.5
+

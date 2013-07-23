@@ -1,0 +1,25 @@
+--- configure.ac	2007-11-25 05:27:52.000000000 +0200
++++ configure.ac	2007-12-26 15:44:15.000000000 +0200
+@@ -21,6 +21,7 @@
+ AM_CONFIG_HEADER([include/qd/qd_config.h])
+ 
+ AC_CANONICAL_HOST
++AC_PROG_LIBTOOL
+ 
+ # Checks for arguments
+ # --enable-inline
+--- src/Makefile.am	2007-11-25 03:04:14.000000000 +0200
++++ src/Makefile.am	2007-12-26 15:59:03.000000000 +0200
+@@ -1,9 +1,10 @@
+ SRC = c_dd.cpp c_qd.cpp dd_real.cpp dd_const.cpp \
+       fpu.cpp qd_real.cpp qd_const.cpp util.cpp bits.cpp util.h
+ 
+-lib_LIBRARIES = libqd.a
++lib_LTLIBRARIES = libqd.la
++libqd_la_SOURCES = $(SRC)
+ 
+-libqd_a_SOURCES = $(SRC)
++libqd_la_LDFLAGS = -no-undefined
+ 
+ AM_CPPFLAGS = -I$(top_builddir) -I$(top_builddir)/include -I$(top_srcdir)/include
+ 

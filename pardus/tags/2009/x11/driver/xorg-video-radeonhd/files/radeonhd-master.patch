@@ -1,0 +1,3912 @@
+diff --git a/README b/README
+index 6ca6b20..37ae8ab 100644
+--- a/README
++++ b/README
+@@ -72,12 +72,17 @@ BEGIN_DEVICE_LIST
+   * RS690:	Radeon X1200, X1250, X1270
+   * RS740:	RS740, RS740M
+   * RS780:	Radeon HD 3100/3200/3300 Series
+-  * RV770:	Radeon HD 4800 Series; Everest, K2, Denali ATI FirePro
+   * R700:	Radeon R700
+-  * M98:	Radeon M98 Mobility
+-  * RV730:	Radeon HD4670, HD4650
+-  * M96:	Radeon M96 Mobility
+   * RV710:	Radeon HD4570, HD4350
++  * RV730:	Radeon HD4670, HD4650
++  * RV740:	Radeon HD4770. EXPERIMENTAL AND UNTESTED
++  * RV770:	Radeon HD 4800 Series; Everest, K2, Denali ATI FirePro
++  * RV790:	Radeon HD 4890
++  * M92:	Mobility Radeon HD4330, HD4530, HD4570. EXPERIMENTAL
++  * M93:	Mobility Radeon M93. EXPERIMENTAL AND UNTESTED
++  * M96:	Mobility Radeon HD4600
++  * M97:	Mobility Radeon HD4860. EXPERIMENTAL AND UNTESTED
++  * M98:	Mobility Radeon HD4850, HD4870
+ END_DEVICE_LIST
+ 
+ 
+diff --git a/README.coding b/README.coding
+new file mode 100644
+index 0000000..cbc9be2
+--- /dev/null
++++ b/README.coding
+@@ -0,0 +1,122 @@
++Developer's Documentation
++=========================
++
++This is a stub only ATM. Please fill in stuff as you find something out that
++has been non-trivial (which means that you had to actually think about what
++that piece of cra^H^Hode is actually doing).
++
++There is no explicit style guide ATM. Please consider to code in a similar way
++as it is already done. Please add abstraction where it is useful, but don't
++overdesign. The AtomBIOS layer is probably a bit overdesigned, but that has
++only been understood when the code was already there and working fine. So we'll
++keep it that way.
++
++
++Source Code Layout
++==================
++
++All source code files - they still need a oneliner as description...
++
++
++General Stuff
++-------------
++
++rhd.h
++rhd_audio.[ch]
++rhd_card.h
++rhd_connector.[ch]
++rhd_crtc.[ch]
++rhd_cursor.[ch]
++rhd_driver.c
++rhd_edid.c
++rhd_hdmi.[ch]
++rhd_helper.c
++rhd_i2c.[ch]
++rhd_id.c
++rhd_lut.[ch]
++rhd_mc.[ch]
++rhd_modes.[ch]
++rhd_monitor.[ch]
++rhd_output.[ch]
++rhd_pll.[ch]
++rhd_pm.[ch]
++rhd_randr.[ch]
++rhd_vga.[ch]
++rhd_video.[ch]
++
++Register Definitions
++--------------------
++
++r5xx_3dregs.h
++r5xx_regs.h
++r600_reg.h
++r600_reg_auto_r6xx.h
++r600_reg_r6xx.h
++r600_reg_r7xx.h
++rhd_regs.h
++
++AtomBIOS related
++----------------
++
++AtomBios/
++rhd_atombios.[ch]
++rhd_atomcrtc.c
++rhd_atomout.[ch]
++rhd_atompll.c
++rhd_atomwrapper.[ch]
++rhd_biosscratch.[ch]
++
++Output Drivers
++--------------
++rhd_dac.c
++rhd_ddia.c
++rhd_dig.c
++rhd_lvtma.c
++rhd_tmds.c
++
++Acceleration
++------------
++
++r5xx_accel.[ch]
++r5xx_exa.c
++r5xx_xaa.c
++r600_exa.c
++r600_shader.[ch]
++r600_state.h
++r600_textured_videofuncs.c
++r6xx_accel.[ch]
++radeon_exa_render.c
++radeon_textured_videofuncs.c
++rhd_cs.[ch]
++rhd_shadow.[ch]
++
++3D Support
++----------
++
++radeon_3d.c
++radeon_dri.h
++radeon_drm.h
++rhd_dri.[ch]
++
++
++Digital blocks
++==============
++
++There are 4 known digital output blocks you can meet on cards:
++1) TMDSA (can transmit TMDS)
++2) LVTMA (can transmit TMDS or LVDS)
++3) DDIA (can transmit TMDS)
++4) UNIPHY (can transmit TMDS or LVDS or DisplayPort's signal)
++
++TMDS signal is used for DVI and HDMI
++LVDS signal is used for PANEL
++DisplayPort's signal is used for DisplayPort of course
++
++Generally:
++DDIA can be found on RS600, RS690 and RS740
++UNIPHY can be found on DCE 3+ devices (RV620+)
++TMDSA can be found on rest of R5xx, R6xx
++
++Note there are cards with external DisplayPort chip which uses DVO
++data protocol with an i2c control bus for communication with GPU
++
+diff --git a/acinclude.m4 b/acinclude.m4
+new file mode 100644
+index 0000000..0a3509e
+--- /dev/null
++++ b/acinclude.m4
+@@ -0,0 +1,77 @@
++dnl Make automake/libtool output more friendly to humans
++dnl  Damien Lespiau <damien.lespiau@gmail.com>
++dnl
++dnl SHAVE_INIT([shavedir],[default_mode])
++dnl
++dnl shavedir: the directory where the shave scripts are, it defaults to
++dnl           $(top_builddir)
++dnl default_mode: (enable|disable) default shave mode.  This parameter
++dnl               controls shave's behaviour when no option has been
++dnl               given to configure.  It defaults to disable.
++dnl
++dnl * SHAVE_INIT should be called late in your configure.(ac|in) file (just
++dnl   before AC_CONFIG_FILE/AC_OUTPUT is perfect.  This macro rewrites CC and
++dnl   LIBTOOL, you don't want the configure tests to have these variables
++dnl   re-defined.
++dnl * This macro requires GNU make's -s option.
++
++AC_DEFUN([_SHAVE_ARG_ENABLE],
++[
++  AC_ARG_ENABLE([shave],
++    AS_HELP_STRING(
++      [--enable-shave],
++      [use shave to make the build pretty [[default=$1]]]),,
++      [enable_shave=$1]
++    )
++])
++
++AC_DEFUN([SHAVE_INIT],
++[
++  dnl you can tweak the default value of enable_shave
++  m4_if([$2], [enable], [_SHAVE_ARG_ENABLE(yes)], [_SHAVE_ARG_ENABLE(no)])
++
++  if test x"$enable_shave" = xyes; then
++    dnl where can we find the shave scripts?
++    m4_if([$1],,
++      [shavedir="$ac_pwd"],
++      [shavedir="$ac_pwd/$1"])
++    AC_SUBST(shavedir)
++
++    dnl make is now quiet
++    AC_SUBST([MAKEFLAGS], [-s])
++    AC_SUBST([AM_MAKEFLAGS], ['`test -z $V && echo -s`'])
++
++    dnl we need sed
++    AC_CHECK_PROG(SED,sed,sed,false)
++
++    dnl substitute libtool
++    SHAVE_SAVED_LIBTOOL=$LIBTOOL
++    LIBTOOL="${SHELL} ${shavedir}/shave-libtool '${SHAVE_SAVED_LIBTOOL}'"
++    AC_SUBST(LIBTOOL)
++
++    dnl substitute cc/cxx
++    SHAVE_SAVED_CC=$CC
++    SHAVE_SAVED_CXX=$CXX
++    SHAVE_SAVED_FC=$FC
++    SHAVE_SAVED_F77=$F77
++    SHAVE_SAVED_OBJC=$OBJC
++    CC="${SHELL} ${shavedir}/shave cc ${SHAVE_SAVED_CC}"
++    CXX="${SHELL} ${shavedir}/shave cxx ${SHAVE_SAVED_CXX}"
++    FC="${SHELL} ${shavedir}/shave fc ${SHAVE_SAVED_FC}"
++    F77="${SHELL} ${shavedir}/shave f77 ${SHAVE_SAVED_F77}"
++    OBJC="${SHELL} ${shavedir}/shave objc ${SHAVE_SAVED_OBJC}"
++    AC_SUBST(CC)
++    AC_SUBST(CXX)
++    AC_SUBST(FC)
++    AC_SUBST(F77)
++    AC_SUBST(OBJC)
++
++    V=@
++  else
++    V=1
++  fi
++  Q='$(V:1=)'
++  AC_SUBST(V)
++  AC_SUBST(Q)
++])
++
+diff --git a/configure.ac b/configure.ac
+index c31f10a..7680a3d 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -14,6 +14,9 @@ AM_INIT_AUTOMAKE([dist-bzip2])
+ 
+ AM_MAINTAINER_MODE
+ 
++AC_CONFIG_FILES([shave shave-libtool])
++
++
+ # Program checks.
+ AC_DISABLE_STATIC
+ AC_PROG_CC
+@@ -220,6 +223,10 @@ AC_CHECK_DECL(xf86RotateFreeShadow,
+                #include <windowstr.h>
+                #include <xf86Crtc.h>])
+ 
++AC_CHECK_DECL(pci_device_enable,
++              [AC_DEFINE(HAVE_PCI_DEVICE_ENABLE, 1, [Have pci_device_enable prototype])],
++              [],
++              [#include <pciaccess.h>])
+ 
+ CFLAGS="$SAVED_CFLAGS"
+ 
+@@ -360,6 +367,8 @@ AC_DEFINE_UNQUOTED([PACKAGE_VERSION_PATCHLEVEL],
+ 		[Patchlevel Version])
+ fi
+ 
++SHAVE_INIT(.,enable)
++
+ AC_OUTPUT([
+ 	Makefile
+ 	man/Makefile
+diff --git a/man/radeonhd.man b/man/radeonhd.man
+index e7a4d99..0e27869 100644
+--- a/man/radeonhd.man
++++ b/man/radeonhd.man
+@@ -30,7 +30,8 @@ has the following limitations:
+ .\".TP "\w'\fB\(bu\fR'u+1n"
+ .TP 2
+ \(bu
+-Support for hardware-based 2D acceleration and Xvideo needs more testing on R6xx and R7xx based cards.
++Support for hardware-based 2D acceleration and Xvideo needs more testing on
++R6xx and R7xx based cards.
+ .TP
+ \(bu
+ No TV and Component connector support so far.
+@@ -166,23 +167,38 @@ RS740, RS740M
+ .B RS780
+ Radeon HD 3100/3200/3300 Series
+ .TP 8
+-.B RV770
+-Radeon HD 4800 Series; Everest, K2, Denali ATI FirePro
+-.TP 8
+ .B R700
+ Radeon R700
+ .TP 8
+-.B M98
+-Radeon M98 Mobility
++.B RV710
++Radeon HD4570, HD4350
+ .TP 8
+ .B RV730
+ Radeon HD4670, HD4650
+ .TP 8
++.B RV740
++Radeon HD4770. EXPERIMENTAL AND UNTESTED
++.TP 8
++.B RV770
++Radeon HD 4800 Series; Everest, K2, Denali ATI FirePro
++.TP 8
++.B RV790
++Radeon HD 4890
++.TP 8
++.B M92
++Mobility Radeon HD4330, HD4530, HD4570. EXPERIMENTAL
++.TP 8
++.B M93
++Mobility Radeon M93. EXPERIMENTAL AND UNTESTED
++.TP 8
+ .B M96
+-Radeon M96 Mobility
++Mobility Radeon HD4600
+ .TP 8
+-.B RV710
+-Radeon HD4570, HD4350
++.B M97
++Mobility Radeon HD4860. EXPERIMENTAL AND UNTESTED
++.TP 8
++.B M98
++Mobility Radeon HD4850, HD4870
+ .\" END_DEVICE_LIST marker - do not delete
+ .PD
+ .\"
+@@ -400,25 +416,26 @@ mailing list.
+ .TP
+ .BI "Option \*qAudio\*q \*q" boolean \*q
+ This option enables the audio hardware, which is responsible for delivering audio data
+-to the different HDMI capable conntectors and used to communicate with the audio
++to the different HDMI capable connectors and used to communicate with the audio
+ driver of the operation system. The default is
+ .BR off .
+ .TP
+ .BI "Option \*qHDMI\*q \*q" string \*q
+ Possible values are "DVI-I_0", "DVI-I_1"..,"DVI-D_0","DVI-I_1",.., "all".
+ This option enables HDMI-Audio and HDMI-Info packets on the specified connector.
+-This is the only way enabling HDMI at the moment, since decoding E-EDID data to check if monitor supports HDMI is not implemented (yet).
++This is the only way enabling HDMI at the moment, since decoding E-EDID data
++to check if monitor supports HDMI is not implemented (yet).
+ .TP
+ .BI "Option \*qCoherent\*q \*q" string \*q
+ There are two different ways to program the TMDS encoder in an output
+-for best signal quality for the transmitter chip used inside a digital 
+-monitor. This option may be used to set the programming for each output 
++for best signal quality for the transmitter chip used inside a digital
++monitor. This option may be used to set the programming for each output
+ individually. The string is a space separated list of
+-.B <output_transmitter>=on|off. 
+-Possible  values for 
+-.B <output_transmitter> 
+-are: 
+-.B TMDS_A, 
++.B <output_transmitter>=on|off.
++Possible  values for
++.B <output_transmitter>
++are:
++.B TMDS_A,
+ .B TMDS_B,
+ .B UNIPHY_A,
+ .B UNIPHY_B,
+@@ -426,14 +443,14 @@ are:
+ .B AtomOutputLVTMA,
+ .B AtomOutputKldskpLvtma,
+ .B AtomOutputUniphyA,
+-.B  AtomOutputUniphyB. 
+-The log file should be consulted 
++.B  AtomOutputUniphyB.
++The log file should be consulted
+ on which ones to use. The line:
+ .B "Option \*qCoherent\*q \*qTMDS_A=off TMDS_B=on\*q"
+-will set coherent mode to 
+-.B off 
+-for TMDS A and to 
+-.B on 
++will set coherent mode to
++.B off
++for TMDS A and to
++.B on
+ for TMDS B.
+ The default for all outputs is
+ .BR off .
+@@ -470,6 +487,15 @@ This option isn't implemented yet and has no effect.
+ .RE
+ .PP
+ .PD
++.TP
++.BI "Option \*qForceLowPowerMode\*q \*q" boolean \*q
++Enable to statically set GPU engine clock to a lower than default value. This
++can help reduce power consumption. The default is
++.B off.
++.TP
++.BI "Option \*qLowPowerModeEngineClock\*q \*q" integer \*q
++Engine clock frequency to use when ForceLowPowerMode is enabled, in Hz. If not
++set, half of default clock frequency is used.
+ .\"
+ .\"
+ .SH RANDR OUTPUT PROPERTIES
+@@ -604,7 +630,7 @@ int32
+ .RS
+ .PD
+ .PP
+-Specifies the backlight intensity on laptop panels, if controlable by the driver.
++Specifies the backlight intensity on laptop panels, if controllable by the driver.
+ .RE
+ .TP
+ .B _Coherent
+@@ -677,5 +703,6 @@ Query the bugtracker for radeonhd bugs
+ .\"
+ .\"
+ .SH AUTHORS
+-Egbert Eich, Luc Verhaegen, Matthias Hopf, Hans Ulrich Niedermann, Christian Koenig, Alexander Deucher, and others.
++Egbert Eich, Luc Verhaegen, Matthias Hopf, Hans Ulrich Niedermann,
++Christian Koenig, Alexander Deucher, and others.
+ .\" vim: syntax=nroff
+diff --git a/shave-libtool.in b/shave-libtool.in
+new file mode 100644
+index 0000000..1f3a720
+--- /dev/null
++++ b/shave-libtool.in
+@@ -0,0 +1,69 @@
++#!/bin/sh
++
++# we need sed
++SED=@SED@
++if test -z "$SED" ; then
++SED=sed
++fi
++
++lt_unmangle ()
++{
++   last_result=`echo $1 | $SED -e 's#.libs/##' -e 's#[0-9a-zA-Z_\-\.]*_la-##'`
++}
++
++# the real libtool to use
++LIBTOOL="$1"
++shift
++
++# if 1, don't print anything, the underlaying wrapper will do it
++pass_though=0
++
++# scan the arguments, keep the right ones for libtool, and discover the mode
++preserved_args=
++while test "$#" -gt 0; do
++    opt="$1"
++    shift
++
++    case $opt in
++    --mode=*)
++        mode=`echo $opt | $SED -e 's/[-_a-zA-Z0-9]*=//'`
++        preserved_args="$preserved_args $opt"
++        ;;
++    -o)
++        lt_output="$1"
++        preserved_args="$preserved_args $opt"
++	;;
++    *)
++        preserved_args="$preserved_args $opt"
++        ;;
++      esac
++done
++
++case "$mode" in
++compile)
++    # shave will be called and print the actual CC/CXX/LINK line
++    preserved_args="$preserved_args --shave-mode=$mode"
++    pass_though=1
++    ;;
++link)
++    preserved_args="$preserved_args --shave-mode=$mode"
++    Q="  LINK  "
++    ;;
++*)
++    # let's u
++    # echo "*** libtool: Unimplemented mode: $mode, fill a bug report"
++    ;;
++esac
++
++lt_unmangle "$lt_output"
++output=$last_result
++
++if test -z $V; then
++    if test $pass_though -eq 0; then
++        echo "$Q$output"
++    fi
++    $LIBTOOL --silent $preserved_args
++else
++    echo $LIBTOOL $preserved_args
++    $LIBTOOL $preserved_args
++fi
+diff --git a/shave.in b/shave.in
+new file mode 100644
+index 0000000..5c16f27
+--- /dev/null
++++ b/shave.in
+@@ -0,0 +1,79 @@
++#!/bin/sh
++
++# we need sed
++SED=@SED@
++if test -z "$SED" ; then
++SED=sed
++fi
++
++lt_unmangle ()
++{
++   last_result=`echo $1 | $SED -e 's#.libs/##' -e 's#[0-9a-zA-Z_\-\.]*_la-##'`
++}
++
++# the tool to wrap (cc, cxx, ar, ranlib, ..)
++tool="$1"
++shift
++
++# the reel tool (to call)
++REEL_TOOL="$1"
++shift
++
++pass_through=0
++preserved_args=
++while test "$#" -gt 0; do
++    opt="$1"
++    shift
++
++    case $opt in
++    --shave-mode=*)
++        mode=`echo $opt | $SED -e 's/[-_a-zA-Z0-9]*=//'`
++	;;
++    -o)
++        lt_output="$1"
++        preserved_args="$preserved_args $opt"
++	;;
++    *)
++        preserved_args="$preserved_args $opt"
++        ;;
++      esac
++done
++
++# mode=link is handled in the libtool wrapper
++case "$mode,$tool" in
++link,*)
++    pass_through=1
++    ;;
++*,cxx)
++    Q="  CXX   "
++    ;;
++*,cc)
++    Q="  CC    "
++    ;;
++*,fc)
++    Q="  FC    "
++    ;;
++*,f77)
++    Q="  F77   "
++    ;;
++*,objc)
++    Q="  OBJC   "
++    ;;
++*,*)
++    # should not happen
++    Q="  CC    "
++    ;;
++esac
++
++lt_unmangle "$lt_output"
++output=$last_result
++
++if test -z $V; then
++    if test $pass_through -eq 0; then
++        echo "$Q$output"
++    fi
++    $REEL_TOOL $preserved_args
++else
++    echo $REEL_TOOL $preserved_args
++    $REEL_TOOL $preserved_args
++fi
+diff --git a/src/Makefile.am b/src/Makefile.am
+index 7156d63..4c0ca86 100644
+--- a/src/Makefile.am
++++ b/src/Makefile.am
+@@ -76,6 +76,8 @@ radeonhd_drv_la_SOURCES = \
+ 	rhd_output.h \
+ 	rhd_pll.c \
+ 	rhd_pll.h \
++	rhd_pm.c \
++	rhd_pm.h \
+ 	rhd_randr.c \
+ 	rhd_randr.h \
+ 	rhd_regs.h \
+diff --git a/src/r600_reg_r6xx.h b/src/r600_reg_r6xx.h
+index 425bee4..5237ec1 100644
+--- a/src/r600_reg_r6xx.h
++++ b/src/r600_reg_r6xx.h
+@@ -34,7 +34,7 @@ enum {
+     MM_INDEX                                              = 0x0000,
+     MM_DATA                                               = 0x0004,
+ 
+-    /*SRBM_STATUS                                         = 0x0e50, */
++    SRBM_STATUS                                           = 0x0e50,
+ 	RLC_RQ_PENDING_bit                                = 1 << 3,
+ 	RCU_RQ_PENDING_bit                                = 1 << 4,
+ 	GRBM_RQ_PENDING_bit                               = 1 << 5,
+diff --git a/src/r6xx_accel.c b/src/r6xx_accel.c
+index ae9a15c..adf52f2 100644
+--- a/src/r6xx_accel.c
++++ b/src/r6xx_accel.c
+@@ -815,6 +815,7 @@ set_default_state(ScrnInfoPtr pScrn, drmBufPtr ib)
+ 	sq_conf.num_es_stack_entries = 16;
+ 	break;
+     case RHD_RV770:
++    case RHD_RV790:
+     case RHD_M98:
+ 	sq_conf.num_ps_gprs = 192;
+ 	sq_conf.num_vs_gprs = 56;
+@@ -831,6 +832,7 @@ set_default_state(ScrnInfoPtr pScrn, drmBufPtr ib)
+ 	sq_conf.num_es_stack_entries = 0;
+ 	break;
+     case RHD_RV730:
++    case RHD_RV740:
+     case RHD_M96:
+ 	sq_conf.num_ps_gprs = 84;
+ 	sq_conf.num_vs_gprs = 36;
+@@ -1021,7 +1023,7 @@ set_default_state(ScrnInfoPtr pScrn, drmBufPtr ib)
+     EREG(ib, PA_SU_POLY_OFFSET_FRONT_OFFSET,      0);
+ 
+     EREG(ib, PA_SU_LINE_CNTL,                     (8 << PA_SU_LINE_CNTL__WIDTH_shift)); /* Line width 1 pixel */
+-    EREG(ib, PA_SU_VTX_CNTL,                      ((2 << PA_SU_VTX_CNTL__ROUND_MODE_shift) |
++    EREG(ib, PA_SU_VTX_CNTL,                      ((2 << PA_SU_VTX_CNTL__ROUND_MODE_shift) | PIX_CENTER_bit |
+ 						   (5 << QUANT_MODE_shift))); /* Round to Even, fixed point 1/256 */
+     EREG(ib, PA_SU_POLY_OFFSET_CLAMP,             0);
+ 
+diff --git a/src/radeon_3d.c b/src/radeon_3d.c
+index 6f6dce5..d70052a 100644
+--- a/src/radeon_3d.c
++++ b/src/radeon_3d.c
+@@ -251,7 +251,7 @@ R5xx3DSetup(int scrnIndex)
+ 	if (IS_R500_3D)
+ 	    R5XXPowerPipes(pScrn);
+ 
+-	gb_tile_config = (R300_ENABLE_TILING | R300_TILE_SIZE_16 | R300_SUBPIXEL_1_16);
++	gb_tile_config = (R300_ENABLE_TILING | R300_TILE_SIZE_16);
+ 
+ 	switch(num_gb_pipes) {
+ 	case 2: gb_tile_config |= R300_PIPE_COUNT_R300; break;
+@@ -287,21 +287,21 @@ R5xx3DSetup(int scrnIndex)
+ 	OUT_ACCEL_REG(R300_GB_AA_CONFIG, 0);
+ 	OUT_ACCEL_REG(R300_RB3D_DSTCACHE_CTLSTAT, R300_DC_FLUSH_3D | R300_DC_FREE_3D);
+ 	OUT_ACCEL_REG(R300_RB3D_ZCACHE_CTLSTAT, R300_ZC_FLUSH | R300_ZC_FREE);
+-	OUT_ACCEL_REG(R300_GB_MSPOS0, ((8 << R300_MS_X0_SHIFT) |
+-				       (8 << R300_MS_Y0_SHIFT) |
+-				       (8 << R300_MS_X1_SHIFT) |
+-				       (8 << R300_MS_Y1_SHIFT) |
+-				       (8 << R300_MS_X2_SHIFT) |
+-				       (8 << R300_MS_Y2_SHIFT) |
+-				       (8 << R300_MSBD0_Y_SHIFT) |
+-				       (7 << R300_MSBD0_X_SHIFT)));
+-	OUT_ACCEL_REG(R300_GB_MSPOS1, ((8 << R300_MS_X3_SHIFT) |
+-				       (8 << R300_MS_Y3_SHIFT) |
+-				       (8 << R300_MS_X4_SHIFT) |
+-				       (8 << R300_MS_Y4_SHIFT) |
+-				       (8 << R300_MS_X5_SHIFT) |
+-				       (8 << R300_MS_Y5_SHIFT) |
+-				       (8 << R300_MSBD1_SHIFT)));
++	OUT_ACCEL_REG(R300_GB_MSPOS0, ((6 << R300_MS_X0_SHIFT) |
++				       (6 << R300_MS_Y0_SHIFT) |
++				       (6 << R300_MS_X1_SHIFT) |
++				       (6 << R300_MS_Y1_SHIFT) |
++				       (6 << R300_MS_X2_SHIFT) |
++				       (6 << R300_MS_Y2_SHIFT) |
++				       (6 << R300_MSBD0_Y_SHIFT) |
++				       (6 << R300_MSBD0_X_SHIFT)));
++	OUT_ACCEL_REG(R300_GB_MSPOS1, ((6 << R300_MS_X3_SHIFT) |
++				       (6 << R300_MS_Y3_SHIFT) |
++				       (6 << R300_MS_X4_SHIFT) |
++				       (6 << R300_MS_Y4_SHIFT) |
++				       (6 << R300_MS_X5_SHIFT) |
++				       (6 << R300_MS_Y5_SHIFT) |
++				       (6 << R300_MSBD1_SHIFT)));
+ 	FINISH_ACCEL();
+ 
+ 	BEGIN_ACCEL(5);
+@@ -756,18 +756,22 @@ R5xx3DSetup(int scrnIndex)
+ 
+ 	BEGIN_ACCEL(7);
+ 	OUT_ACCEL_REG(R300_SC_EDGERULE, 0xA5294A5);
+-	OUT_ACCEL_REG(R300_SC_SCISSOR0, ((0 << R300_SCISSOR_X_SHIFT) |
+-					 (0 << R300_SCISSOR_Y_SHIFT)));
+-	OUT_ACCEL_REG(R300_SC_SCISSOR1, ((8191 << R300_SCISSOR_X_SHIFT) |
+-					 (8191 << R300_SCISSOR_Y_SHIFT)));
+ 
+ 	if (IS_R300_3D) {
+ 	    /* clip has offset 1440 */
+-	    OUT_ACCEL_REG(R300_SC_CLIP_0_A, ((1088 << R300_CLIP_X_SHIFT) |
+-					     (1088 << R300_CLIP_Y_SHIFT)));
+-	    OUT_ACCEL_REG(R300_SC_CLIP_0_B, (((1080 + 2920) << R300_CLIP_X_SHIFT) |
+-					     ((1080 + 2920) << R300_CLIP_Y_SHIFT)));
++	    OUT_ACCEL_REG(R300_SC_SCISSOR0, ((1440 << R300_SCISSOR_X_SHIFT) |
++					     (1440 << R300_SCISSOR_Y_SHIFT)));
++	    OUT_ACCEL_REG(R300_SC_SCISSOR1, ((8191 << R300_SCISSOR_X_SHIFT) |
++					     (8191 << R300_SCISSOR_Y_SHIFT)));
++	    OUT_ACCEL_REG(R300_SC_CLIP_0_A, ((1440 << R300_CLIP_X_SHIFT) |
++					     (1440 << R300_CLIP_Y_SHIFT)));
++	    OUT_ACCEL_REG(R300_SC_CLIP_0_B, ((4080 << R300_CLIP_X_SHIFT) |
++					     (4080 << R300_CLIP_Y_SHIFT)));
+ 	} else {
++	    OUT_ACCEL_REG(R300_SC_SCISSOR0, ((0 << R300_SCISSOR_X_SHIFT) |
++					     (0 << R300_SCISSOR_Y_SHIFT)));
++	    OUT_ACCEL_REG(R300_SC_SCISSOR1, ((8191 << R300_SCISSOR_X_SHIFT) |
++					     (8191 << R300_SCISSOR_Y_SHIFT)));
+ 	    OUT_ACCEL_REG(R300_SC_CLIP_0_A, ((0 << R300_CLIP_X_SHIFT) |
+ 					     (0 << R300_CLIP_Y_SHIFT)));
+ 	    OUT_ACCEL_REG(R300_SC_CLIP_0_B, ((4080 << R300_CLIP_X_SHIFT) |
+diff --git a/src/radeon_exa_render.c b/src/radeon_exa_render.c
+index ef0f810..252e7b0 100644
+--- a/src/radeon_exa_render.c
++++ b/src/radeon_exa_render.c
+@@ -463,6 +463,11 @@ static Bool R100CheckCompositeTexture(PicturePtr pPict, int unit)
+ 	RADEON_FALLBACK(("Unsupported filter 0x%x\n", pPict->filter));
+     }
+ 
++    if (pPict->repeat && pPict->repeatType != RepeatNormal)
++    {
++	RADEON_FALLBACK(("Unsupported repeat type %d\n", pPict->repeat));
++    }
++
+     return TRUE;
+ }
+ # endif ONLY_ONCE
+@@ -767,6 +772,11 @@ static Bool R200CheckCompositeTexture(PicturePtr pPict, int unit)
+ 	pPict->filter != PictFilterBilinear)
+ 	RADEON_FALLBACK(("Unsupported filter 0x%x\n", pPict->filter));
+ 
++    if (pPict->repeat && pPict->repeatType != RepeatNormal)
++    {
++	RADEON_FALLBACK(("Unsupported repeat type %d\n", pPict->repeat));
++    }
++
+     return TRUE;
+ }
+ # endif /* ONLY_ONCE */
+@@ -1100,6 +1110,11 @@ static Bool R300CheckCompositeTexture(PicturePtr pPict,
+ 	    RADEON_FALLBACK(("REPEAT_NONE unsupported for transformed xRGB source\n"));
+     }
+ 
++    if (pPict->repeat && pPict->repeatType != RepeatNormal)
++    {
++	RADEON_FALLBACK(("Unsupported repeat type %d\n", pPict->repeat));
++    }
++
+     return TRUE;
+ }
+ 
+@@ -1539,7 +1554,7 @@ static Bool FUNC_NAME(R300PrepareComposite)(int op, PicturePtr pSrcPicture,
+ 			   R300_RS_COUNT_HIRES_EN));
+ 
+ 	    /* R300_INST_COUNT_RS - highest RS instruction used */
+-	    OUT_ACCEL_REG(R300_RS_INST_COUNT, R300_INST_COUNT_RS(1) | R300_TX_OFFSET_RS(6));
++	    OUT_ACCEL_REG(R300_RS_INST_COUNT, R300_INST_COUNT_RS(1));
+ 
+ 	    OUT_ACCEL_REG(R300_US_CODE_OFFSET, (R300_ALU_CODE_OFFSET(0) |
+ 						R300_ALU_CODE_SIZE(0) |
+@@ -1558,7 +1573,7 @@ static Bool FUNC_NAME(R300PrepareComposite)(int op, PicturePtr pSrcPicture,
+ 			  ((2 << R300_RS_COUNT_IT_COUNT_SHIFT) |
+ 			   R300_RS_COUNT_HIRES_EN));
+ 
+-	    OUT_ACCEL_REG(R300_RS_INST_COUNT, R300_INST_COUNT_RS(0) | R300_TX_OFFSET_RS(6));
++	    OUT_ACCEL_REG(R300_RS_INST_COUNT, R300_INST_COUNT_RS(0));
+ 
+ 	    OUT_ACCEL_REG(R300_US_CODE_OFFSET, (R300_ALU_CODE_OFFSET(0) |
+ 						R300_ALU_CODE_SIZE(0) |
+@@ -1753,7 +1768,7 @@ static Bool FUNC_NAME(R300PrepareComposite)(int op, PicturePtr pSrcPicture,
+ 			   R300_RS_COUNT_HIRES_EN));
+ 
+ 	    /* 2 RS instructions: 1 for tex0 (src), 1 for tex1 (mask) */
+-	    OUT_ACCEL_REG(R300_RS_INST_COUNT, R300_INST_COUNT_RS(1) | R300_TX_OFFSET_RS(6));
++	    OUT_ACCEL_REG(R300_RS_INST_COUNT, R300_INST_COUNT_RS(1));
+ 
+ 	    OUT_ACCEL_REG(R500_US_CODE_ADDR, (R500_US_CODE_START_ADDR(0) |
+ 					      R500_US_CODE_END_ADDR(2)));
+@@ -1765,7 +1780,7 @@ static Bool FUNC_NAME(R300PrepareComposite)(int op, PicturePtr pSrcPicture,
+ 			  ((2 << R300_RS_COUNT_IT_COUNT_SHIFT) |
+ 			   R300_RS_COUNT_HIRES_EN));
+ 
+-	    OUT_ACCEL_REG(R300_RS_INST_COUNT, R300_INST_COUNT_RS(0) | R300_TX_OFFSET_RS(6));
++	    OUT_ACCEL_REG(R300_RS_INST_COUNT, R300_INST_COUNT_RS(0));
+ 
+ 	    OUT_ACCEL_REG(R500_US_CODE_ADDR, (R500_US_CODE_START_ADDR(0) |
+ 					      R500_US_CODE_END_ADDR(1)));
+diff --git a/src/radeon_textured_videofuncs.c b/src/radeon_textured_videofuncs.c
+index 247f7c2..b51e145 100644
+--- a/src/radeon_textured_videofuncs.c
++++ b/src/radeon_textured_videofuncs.c
+@@ -391,7 +391,7 @@ FUNC_NAME(RADEONDisplayTexturedVideo)(ScrnInfoPtr pScrn, RADEONPortPrivPtr pPriv
+ 			  ((2 << R300_RS_COUNT_IT_COUNT_SHIFT) |
+ 			   R300_RS_COUNT_HIRES_EN));
+ 	    /* R300_INST_COUNT_RS - highest RS instruction used */
+-	    OUT_VIDEO_REG(R300_RS_INST_COUNT, R300_INST_COUNT_RS(0) | R300_TX_OFFSET_RS(6));
++	    OUT_VIDEO_REG(R300_RS_INST_COUNT, R300_INST_COUNT_RS(0));
+ 
+ 	    OUT_VIDEO_REG(R300_US_CODE_OFFSET,
+ 			  (R300_ALU_CODE_OFFSET(0) |
+@@ -457,7 +457,7 @@ FUNC_NAME(RADEONDisplayTexturedVideo)(ScrnInfoPtr pScrn, RADEONPortPrivPtr pPriv
+ 			   R300_RS_COUNT_HIRES_EN));
+ 
+ 	    /* R300_INST_COUNT_RS - highest RS instruction used */
+-	    OUT_VIDEO_REG(R300_RS_INST_COUNT, R300_INST_COUNT_RS(0) | R300_TX_OFFSET_RS(6));
++	    OUT_VIDEO_REG(R300_RS_INST_COUNT, R300_INST_COUNT_RS(0));
+ 
+ 	    OUT_VIDEO_REG(R500_US_CODE_ADDR, (R500_US_CODE_START_ADDR(0) |
+ 					      R500_US_CODE_END_ADDR(1)));
+diff --git a/src/rhd.h b/src/rhd.h
+index e58689c..6b08261 100644
+--- a/src/rhd.h
++++ b/src/rhd.h
+@@ -81,7 +81,7 @@ enum RHD_CHIPSETS {
+     RHD_M72,
+     RHD_M74,
+     RHD_M76,
+-    /* RV670 came into existence after RV6x0 and M7x */
++    /* R600 second batch - RV670 came into existence after RV6x0 and M7x */
+     RHD_RV670,
+     RHD_M88,
+     RHD_R680,
+@@ -92,11 +92,17 @@ enum RHD_CHIPSETS {
+     RHD_RS780,
+     RHD_RS880,
+     RHD_RV770,
++    /* R700 */
+     RHD_R700,
+     RHD_M98,
+     RHD_RV730,
+     RHD_M96,
+     RHD_RV710,
++    RHD_M92,
++    RHD_M93,
++    RHD_M97,
++    RHD_RV790,
++    RHD_RV740,
+     RHD_CHIP_END
+ };
+ 
+@@ -241,6 +247,8 @@ typedef struct RHDRec {
+     RHDOpt		audio;
+     RHDOpt		hdmi;
+     RHDOpt		coherent;
++    RHDOpt              lowPowerMode;
++    RHDOpt              lowPowerModeEngineClock;
+     enum RHD_HPD_USAGE	hpdUsage;
+     unsigned int        FbMapSize;
+     pointer             FbBase;   /* map base of fb   */
+@@ -336,6 +344,8 @@ typedef struct RHDRec {
+     RHDOpt		UseAtomBIOS;
+     CARD32		UseAtomFlags;
+ 
++    struct rhdPm       *Pm;
++
+     struct rhdOutput *DigEncoderOutput[2];
+ # define RHD_CHECKDEBUGFLAG(rhdPtr, FLAG) (rhdPtr->DebugFlags & (1 << FLAG))
+ #ifndef NO_ASSERT
+diff --git a/src/rhd_atombios.c b/src/rhd_atombios.c
+index a285e48..08b57cd 100644
+--- a/src/rhd_atombios.c
++++ b/src/rhd_atombios.c
+@@ -126,6 +126,13 @@ atomSetRegisterListLocation(atomBiosHandlePtr handle, AtomBiosRequestID func, At
+ static AtomBiosResult
+ atomRestoreRegisters(atomBiosHandlePtr handle, AtomBiosRequestID func, AtomBiosArgPtr data);
+ 
++static AtomBiosResult
++rhdAtomSetClock(atomBiosHandlePtr handle, AtomBiosRequestID func, AtomBiosArgPtr data);
++static AtomBiosResult
++rhdAtomGetClock(atomBiosHandlePtr handle, AtomBiosRequestID func, AtomBiosArgPtr data);
++static AtomBiosResult
++rhdAtomPmSetup(atomBiosHandlePtr handle, AtomBiosRequestID func, AtomBiosArgPtr data);
++
+ 
+ enum msgDataFormat {
+     MSG_FORMAT_NONE,
+@@ -270,6 +277,18 @@ struct atomBIOSRequests {
+      "Register List Location",			MSG_FORMAT_NONE},
+     {ATOM_RESTORE_REGISTERS, atomRestoreRegisters,
+      "Restore Registers",			MSG_FORMAT_NONE},
++    {GET_ENGINE_CLOCK, rhdAtomGetClock,
++     "Current Engine Clock",			MSG_FORMAT_DEC},
++    {GET_MEMORY_CLOCK, rhdAtomGetClock,
++     "Current Memory Clock",			MSG_FORMAT_DEC},
++    {SET_ENGINE_CLOCK, rhdAtomSetClock,
++     "Set Engine Clock",			MSG_FORMAT_NONE},
++    {SET_MEMORY_CLOCK, rhdAtomSetClock,
++     "Set Memory Clock",			MSG_FORMAT_NONE},
++    {ATOM_PM_SETUP, rhdAtomPmSetup,
++     "Set Power Management",			MSG_FORMAT_NONE},
++    {ATOM_PM_CLOCKGATING_SETUP, rhdAtomPmSetup,
++     "Set Dynamic Clock Gating",		MSG_FORMAT_NONE},
+     {FUNC_END,					NULL,
+      NULL,					MSG_FORMAT_NONE}
+ };
+@@ -423,6 +442,92 @@ CailDebug(int scrnIndex, const char *format, ...)
+ 
+ #  endif
+ 
++static int
++rhdAtomBIOSGetArg(CARD32 *val, char *ptr)
++{
++    int cnt = 0;
++    if (isspace(*ptr) || *ptr == '=') {
++	ptr++;
++	cnt++;
++    }
++    if (!strncasecmp("off",ptr,3)) {
++	*val = RHD_ATOMBIOS_OFF;
++	return cnt + 3;
++    } else if (!strncasecmp("on",ptr,2)) {
++	*val = RHD_ATOMBIOS_ON;
++	return cnt + 2;
++    } else if (!strncasecmp("force_off",ptr,9)) {
++	*val = RHD_ATOMBIOS_OFF | RHD_ATOMBIOS_FORCE;
++	return cnt + 9;
++    } else if (!strncasecmp("force_on",ptr,8)) {
++	*val = RHD_ATOMBIOS_ON | RHD_ATOMBIOS_FORCE;
++	return cnt + 8;
++    } else
++	return 0;
++}
++
++int
++rhdUpdateAtomBIOSUsage(RHDPtr rhdPtr, char *string)
++{
++    char *ptr = string;
++    CARD32 val;
++
++    while (*ptr != '\0') {
++	int c;
++	while (isspace(*ptr))
++	    ptr++;
++	if (*ptr == '\0')
++	    break;
++
++	if (!strncasecmp("crtc",ptr,4)) {
++	    ptr += 4;
++	    if (!(c = rhdAtomBIOSGetArg(&val,ptr)))
++		return FALSE;
++	    ptr += c;
++	    rhdPtr->UseAtomFlags &= ~((RHD_ATOMBIOS_FORCE | RHD_ATOMBIOS_ON | RHD_ATOMBIOS_OFF) << RHD_ATOMBIOS_CRTC);
++	    rhdPtr->UseAtomFlags |= (val << RHD_ATOMBIOS_CRTC);
++	}
++	else if (!strncasecmp("output",ptr,6)) {
++	    ptr += 6;
++	    if (!(c = rhdAtomBIOSGetArg(&val,ptr)))
++		return FALSE;
++	    ptr += c;
++	    rhdPtr->UseAtomFlags &= ~((RHD_ATOMBIOS_FORCE | RHD_ATOMBIOS_ON | RHD_ATOMBIOS_OFF) << RHD_ATOMBIOS_OUTPUT);
++	    rhdPtr->UseAtomFlags |= (val << RHD_ATOMBIOS_OUTPUT);
++	}
++	else if (!strncasecmp("pll",ptr,3)) {
++	    ptr += 3;
++	    if (!(c = rhdAtomBIOSGetArg(&val,ptr)))
++		return FALSE;
++	    ptr += c;
++	    rhdPtr->UseAtomFlags &= ~((RHD_ATOMBIOS_FORCE | RHD_ATOMBIOS_ON | RHD_ATOMBIOS_OFF) << RHD_ATOMBIOS_PLL);
++	    rhdPtr->UseAtomFlags |= (val << RHD_ATOMBIOS_PLL);
++	} else
++	    return FALSE;
++    }
++    return TRUE;
++}
++
++char *
++rhdReturnAtomBIOSUsage(RHDPtr rhdPtr)
++{
++    char *type[] = { "crtc", "output", "pll", NULL };
++    int  shift[] = { RHD_ATOMBIOS_CRTC, RHD_ATOMBIOS_OUTPUT, RHD_ATOMBIOS_PLL };
++    char *vals[] = { "", "on", "off", "unknown", "unknown", "force_on", "force_off", "unknown" };
++    int  i;
++    char buf[40];
++    char *p = buf;
++
++    for (i = 0; type[i]; i++) {
++	int val = (rhdPtr->UseAtomFlags >> shift[i]) & 0x07;
++	if (val)
++	    p += sprintf (p, "%s=%s ", type[i], vals[val]);
++    }
++    if (p != buf)
++	*--p = 0;
++    return strdup(buf);
++}
++
+ #  define DEBUG_VERSION(index, handle, version) \
+     xf86DrvMsgVerb(handle->scrnIndex, X_INFO, 3, "%s returned version %i for index 0x%x\n" ,__func__,version.cref,index)
+ #  define DEBUG_VERSION_NAME(index, handle, name, version)		\
+@@ -2433,13 +2538,14 @@ rhdAtomSetPixelClock(atomBiosHandlePtr handle, enum atomPxclk PCLKId, struct ato
+ 		ps.pclk_v2.ucMiscInfo |= (atomGetDevice(handle, Config->u.v2.Device)
+ 					  << MISC_DEVICE_INDEX_SHIFT);
+ 	    RHDDebug(handle->scrnIndex,"%s Device: %i PixelClock: %i RefDiv: 0x%x FbDiv: 0x%x PostDiv: 0x%x "
+-		     "PLL: %i Crtc: %i MiscInfo: 0x%x\n",
++		     "FracFbDiv: %i PLL: %i Crtc: %i MiscInfo: 0x%x\n",
+ 		   __func__,
+ 		   Config->u.v2.Device,
+ 		   ps.pclk_v2.usPixelClock,
+ 		   ps.pclk_v2.usRefDiv,
+ 		   ps.pclk_v2.usFbDiv,
+ 		   ps.pclk_v2.ucPostDiv,
++		   ps.pclk_v2.ucFracFbDiv,
+ 		   ps.pclk_v2.ucPpll,
+ 		   ps.pclk_v2.ucCRTC,
+ 		   ps.pclk_v2.ucMiscInfo
+@@ -2526,13 +2632,14 @@ rhdAtomSetPixelClock(atomBiosHandlePtr handle, enum atomPxclk PCLKId, struct ato
+ 		| (Config->u.v3.UsePpll ?  PIXEL_CLOCK_MISC_USE_ENGINE_FOR_DISPCLK : 0x0)
+ 		| ((Config->Crtc == atomCrtc2) ? PIXEL_CLOCK_MISC_CRTC_SEL_CRTC2 : PIXEL_CLOCK_MISC_CRTC_SEL_CRTC1);
+ 
+-	    RHDDebug(handle->scrnIndex,"%s PixelClock: %i RefDiv: 0x%x FbDiv: 0x%x PostDiv: 0x%x PLL: %i OutputType: %x "
+-		   "EncoderMode: %x MiscInfo: 0x%x\n",
++	    RHDDebug(handle->scrnIndex,"%s PixelClock: %i RefDiv: 0x%x FbDiv: 0x%x PostDiv: 0x%x FracFbDiv: %i PLL: %i "
++		   "OutputType: %x EncoderMode: %x MiscInfo: 0x%x\n",
+ 		   __func__,
+ 		   ps.pclk_v3.usPixelClock,
+ 		   ps.pclk_v3.usRefDiv,
+ 		   ps.pclk_v3.usFbDiv,
+ 		   ps.pclk_v3.ucPostDiv,
++		   ps.pclk_v3.ucFracFbDiv,
+ 		   ps.pclk_v3.ucPpll,
+ 		   ps.pclk_v3.ucTransmitterId,
+ 		   ps.pclk_v3.ucEncoderMode,
+@@ -4429,6 +4536,7 @@ rhdAtomConnectorInfoFromObjectHeader(atomBiosHandlePtr handle,
+ 	}
+ 	cp[ncon].Type = rhdAtomGetConnectorID(handle, rhd_connector_objs[obj_id].con, num);
+ 	cp[ncon].Name = RhdAppendString(cp[ncon].Name,name);
++	cp[ncon].DDC  = RHD_DDC_NONE;
+ 
+ 	for (j = 0; ((j < SrcDstTable->ucNumberOfSrc) &&
+ 		     (j < MAX_OUTPUTS_PER_CONNECTOR)); j++) {
+@@ -5099,6 +5207,105 @@ atomRestoreRegisters(atomBiosHandlePtr handle, AtomBiosRequestID func, AtomBiosA
+     return ATOM_SUCCESS;
+ }
+ 
++static AtomBiosResult
++rhdAtomGetClock(atomBiosHandlePtr handle, AtomBiosRequestID func, AtomBiosArgPtr data)
++{
++    AtomBiosArgRec idx;
++    GET_ENGINE_CLOCK_PARAMETERS eng_p;
++    GET_MEMORY_CLOCK_PARAMETERS mem_p;
++
++    RHDFUNC(handle);
++
++    idx.exec.dataSpace = NULL;
++
++    if (func == GET_ENGINE_CLOCK) {
++        idx.exec.index = GetIndexIntoMasterTable(COMMAND, GetEngineClock);
++        idx.exec.pspace = &eng_p;
++    } else if (func == GET_MEMORY_CLOCK) {
++        idx.exec.index = GetIndexIntoMasterTable(COMMAND, GetMemoryClock);
++        idx.exec.pspace = &mem_p;
++    } else
++	return ATOM_NOT_IMPLEMENTED;
++
++    if (RHDAtomBiosFunc(handle->scrnIndex, handle,
++	                ATOMBIOS_EXEC, &idx) == ATOM_SUCCESS) {
++        data->val = (func == GET_ENGINE_CLOCK) ?
++                        eng_p.ulReturnEngineClock :
++                        mem_p.ulReturnMemoryClock;
++        data->val *= 10;
++	return ATOM_SUCCESS;
++    }
++
++    return ATOM_FAILED;
++}
++
++static AtomBiosResult
++rhdAtomSetClock(atomBiosHandlePtr handle, AtomBiosRequestID func, AtomBiosArgPtr data)
++{
++    AtomBiosArgRec execData;
++    SET_ENGINE_CLOCK_PS_ALLOCATION eng_clock_ps;
++    SET_MEMORY_CLOCK_PS_ALLOCATION mem_clock_ps;
++
++    RHDFUNC(handle);
++    execData.exec.dataSpace = NULL;
++
++    if (func == SET_ENGINE_CLOCK) {
++	eng_clock_ps.ulTargetEngineClock = data->clockValue / 10;
++        execData.exec.index = GetIndexIntoMasterTable(COMMAND, SetEngineClock);
++	execData.exec.pspace = &eng_clock_ps;
++	xf86DrvMsg(handle->scrnIndex, X_INFO, "Attempting to set Engine Clock to %lu\n", data->clockValue);
++    } else if (func == SET_MEMORY_CLOCK) {
++	mem_clock_ps.ulTargetMemoryClock = data->clockValue / 10;
++        execData.exec.index = GetIndexIntoMasterTable(COMMAND, SetMemoryClock);
++	execData.exec.pspace = &mem_clock_ps;
++	xf86DrvMsg(handle->scrnIndex, X_INFO, "Attempting to set Memory Clock to %lu\n", data->clockValue);
++    } else
++	return ATOM_NOT_IMPLEMENTED;
++
++    if (RHDAtomBiosFunc(handle->scrnIndex, handle,
++	                ATOMBIOS_EXEC, &execData) == ATOM_SUCCESS) {
++	return ATOM_SUCCESS;
++    }
++
++    xf86DrvMsg(handle->scrnIndex, X_WARNING, "Failed to set %s Clock\n",
++                (func == SET_ENGINE_CLOCK) ? "Engine" : "Memory");
++    return ATOM_FAILED;
++}
++
++static AtomBiosResult
++rhdAtomPmSetup(atomBiosHandlePtr handle, AtomBiosRequestID func, AtomBiosArgPtr data)
++{
++    AtomBiosArgRec execData;
++    ENABLE_ASIC_STATIC_PWR_MGT_PS_ALLOCATION pwrmgt_ps;
++    DYNAMIC_CLOCK_GATING_PS_ALLOCATION dynclk_ps;
++
++    RHDFUNC(handle);
++    execData.exec.dataSpace = NULL;
++
++    if (func == ATOM_PM_SETUP) {
++	pwrmgt_ps.ucEnable = data->val;
++	execData.exec.index = GetIndexIntoMasterTable(COMMAND, EnableASIC_StaticPwrMgt);
++	execData.exec.pspace = &pwrmgt_ps;
++	xf86DrvMsg(handle->scrnIndex, X_INFO, "Attempting to %sable power management\n", data->val ? "en":"dis");
++    } else if (func == ATOM_PM_CLOCKGATING_SETUP) {
++	dynclk_ps.ucEnable = data->val;
++        execData.exec.index = GetIndexIntoMasterTable(COMMAND, DynamicClockGating);
++	execData.exec.pspace = &dynclk_ps;
++	xf86DrvMsg(handle->scrnIndex, X_INFO, "Attempting to %sable clock gating\n", data->val ? "en":"dis");
++    } else
++	return ATOM_NOT_IMPLEMENTED;
++
++    if (RHDAtomBiosFunc(handle->scrnIndex, handle,
++	                ATOMBIOS_EXEC, &execData) == ATOM_SUCCESS) {
++	return ATOM_SUCCESS;
++    }
++
++    xf86DrvMsg(handle->scrnIndex, X_WARNING, "Failed to set %s\n",
++                (func == ATOM_PM_SETUP) ? "power management" : "dynamic clock gating");
++    return ATOM_FAILED;
++}
++
++
+ # ifdef ATOM_BIOS_PARSER
+ 
+ #define ALLOC_CNT 25
+diff --git a/src/rhd_atombios.h b/src/rhd_atombios.h
+index 56e4a39..9fa631a 100644
+--- a/src/rhd_atombios.h
++++ b/src/rhd_atombios.h
+@@ -101,6 +101,12 @@ typedef enum _AtomBiosRequestID {
+     ATOM_GET_PCIE_LANES,
+     ATOM_SET_REGISTER_LIST_LOCATION,
+     ATOM_RESTORE_REGISTERS,
++    GET_ENGINE_CLOCK,
++    GET_MEMORY_CLOCK,
++    SET_ENGINE_CLOCK,
++    SET_MEMORY_CLOCK,
++    ATOM_PM_SETUP,
++    ATOM_PM_CLOCKGATING_SETUP,
+     FUNC_END
+ } AtomBiosRequestID;
+ 
+@@ -209,6 +215,7 @@ typedef union AtomBiosArg
+     AtomExecRec			exec;
+     AtomFbRec			fb;
+     enum RHD_TV_MODE		tvMode;
++    unsigned long		clockValue;
+ } AtomBiosArgRec, *AtomBiosArgPtr;
+ 
+ enum atomCrtc {
+@@ -485,6 +492,9 @@ struct atomCrtcBlank {
+     unsigned short r, g, b;
+ };
+ 
++extern int rhdUpdateAtomBIOSUsage(RHDPtr rhdPtr, char *string);
++extern char *rhdReturnAtomBIOSUsage(RHDPtr rhdPtr);
++
+ extern AtomBiosResult RHDAtomBiosFunc(int scrnIndex, atomBiosHandlePtr handle,
+ 		AtomBiosRequestID id, AtomBiosArgPtr data);
+ 
+diff --git a/src/rhd_audio.c b/src/rhd_audio.c
+index 8d8a7d1..de5f5ce 100644
+--- a/src/rhd_audio.c
++++ b/src/rhd_audio.c
+@@ -188,7 +188,7 @@ RHDAudioSetEnable(RHDPtr rhdPtr, Bool Enable)
+     if (!Audio)	return;
+     RHDFUNC(Audio);
+ 
+-    RHDRegMask(Audio, AUDIO_ENABLE, Enable ? 0x80000000 : 0x0, 0x80000000);
++    RHDRegMask(Audio, AUDIO_ENABLE, Enable ? 0x81000000 : 0x0, 0x81000000);
+     if(Enable) {
+ 	/* the hardware generates an interrupt if audio starts/stops playing,
+ 	 * but since drm doesn't support this interrupt, we check
+@@ -241,28 +241,22 @@ RHDAudioSetClock(RHDPtr rhdPtr, struct rhdOutput* Output, CARD32 Clock)
+ 	    break;
+ 
+ 	default:
++	    xf86DrvMsg(Audio->scrnIndex, X_ERROR, "%s: unsupported output type\n", __func__);
+ 	    break;
+     }
+ 
+-    switch(Output->Id) {
+-	case RHD_OUTPUT_TMDSA:
+-	case RHD_OUTPUT_UNIPHYA:
++    switch(RHDOutputTmdsIndex(Output)) {
++	case 0:
+ 	    RHDRegWrite(Audio, AUDIO_PLL1_MUL, Rate*50);
+ 	    RHDRegWrite(Audio, AUDIO_PLL1_DIV, Clock*100);
+ 	    RHDRegWrite(Audio, AUDIO_CLK_SRCSEL, 0);
+ 	    break;
+ 
+-	case RHD_OUTPUT_LVTMA:
+-	case RHD_OUTPUT_UNIPHYB:
+-	case RHD_OUTPUT_KLDSKP_LVTMA:
++	case 1:
+ 	    RHDRegWrite(Audio, AUDIO_PLL2_MUL, Rate*50);
+ 	    RHDRegWrite(Audio, AUDIO_PLL2_DIV, Clock*100);
+ 	    RHDRegWrite(Audio, AUDIO_CLK_SRCSEL, 1);
+ 	    break;
+-
+-	default:
+-	    xf86DrvMsg(Audio->scrnIndex, X_ERROR, "%s: unsupported output type\n", __func__);
+-	    break;
+     }
+ }
+ 
+@@ -375,7 +369,9 @@ RHDAudioRestore(RHDPtr rhdPtr)
+         return;
+     }
+ 
+-    /* shoutdown the audio engine before doing anything else */
++    /* 
++     * Shutdown the audio engine before doing anything else.
++     */
+     RHDAudioSetEnable(rhdPtr, FALSE);
+ 
+     RHDRegWrite(Audio, AUDIO_TIMING, Audio->StoreTiming);
+diff --git a/src/rhd_cs.c b/src/rhd_cs.c
+index 5e9fa02..14cbe68 100644
+--- a/src/rhd_cs.c
++++ b/src/rhd_cs.c
+@@ -643,7 +643,7 @@ RHDCSInit(ScrnInfoPtr pScrn)
+ 
+     if (rhdPtr->ChipSet >= RHD_R600) {
+ 	xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
+-		   "%s: No CS for R600 and up yet.\n", __func__);
++		   "%s: CS for R600 requires DRI.\n", __func__);
+ 	xfree(CS);
+ 	rhdPtr->CS = NULL;
+ 	return;
+diff --git a/src/rhd_cursor.c b/src/rhd_cursor.c
+index eff990b..af5c2ef 100644
+--- a/src/rhd_cursor.c
++++ b/src/rhd_cursor.c
+@@ -62,13 +62,16 @@
+ static void
+ lockCursor(struct rhdCursor *Cursor, Bool Lock)
+ {
+-    /* Double Buffering: Set _UPDATE_LOCK bit */
++    /* Locking disables double buffering of HW cursor registers.
++     * Set D*CURSOR_UPDATE_LOCK bit to 1 to lock.
++     * We want *_DISABLE_MULTIPLE_UPDATE to always be 0, and since all other
++     * meaningful bits are read-only for D*CUR_UPDATE registers, it is safe
++     * to use RHDRegWrite() instead of RHDRegMask(); the latter is slower.
++     */
+     if (Lock)
+-	RHDRegMask(Cursor, Cursor->RegOffset + D1CUR_UPDATE,
+-		   0x00010000, 0x00010000);
++	RHDRegWrite(Cursor, Cursor->RegOffset + D1CUR_UPDATE, 0x00010000);
+     else
+-	RHDRegMask(Cursor, Cursor->RegOffset + D1CUR_UPDATE,
+-		   0x00000000, 0x00010000);
++	RHDRegWrite(Cursor, Cursor->RegOffset + D1CUR_UPDATE, 0x00000000);
+ }
+ 
+ /* RadeonHD has hardware support for hotspots, but doesn't allow negative
+@@ -89,13 +92,23 @@ setCursorPos(struct rhdCursor *Cursor, CARD32 x, CARD32 y,
+ }
+ 
+ static void
++setCursorSize(struct rhdCursor *Cursor, CARD32 width, CARD32 height)
++{
++    ASSERT ((width  > 0) && (width  <= MAX_CURSOR_WIDTH));
++    ASSERT ((height > 0) && (height <= MAX_CURSOR_HEIGHT));
++    RHDRegWrite(Cursor, Cursor->RegOffset + D1CUR_SIZE,
++		(width - 1) << 16 | (height - 1));
++}
++
++static void
+ enableCursor(struct rhdCursor *Cursor, Bool Enable)
+ {
++    /* Make sure mode stays the same even when disabled; bug #13405 */
+     if (Enable)
+ 	/* pre-multiplied ARGB, Enable */
+ 	RHDRegWrite(Cursor, Cursor->RegOffset + D1CUR_CONTROL, 0x00000201);
+     else
+-	RHDRegWrite(Cursor, Cursor->RegOffset + D1CUR_CONTROL, 0);
++	RHDRegWrite(Cursor, Cursor->RegOffset + D1CUR_CONTROL, 0x00000200);
+ }
+ 
+ /* Activate already uploaded cursor image. */
+@@ -106,10 +119,6 @@ setCursorImage(struct rhdCursor *Cursor)
+ 
+     RHDRegWrite(Cursor, Cursor->RegOffset + D1CUR_SURFACE_ADDRESS,
+ 		rhdPtr->FbIntAddress + Cursor->Base);
+-    ASSERT ((Cursor->Width > 0) && (Cursor->Width  <= MAX_CURSOR_WIDTH));
+-    ASSERT ((Cursor->Height > 0) && (Cursor->Height <= MAX_CURSOR_HEIGHT));
+-    RHDRegWrite(Cursor, Cursor->RegOffset + D1CUR_SIZE,
+-		(Cursor->Width - 1) << 16 | (Cursor->Height - 1));
+ }
+ 
+ /* Upload image.
+@@ -121,7 +130,7 @@ uploadCursorImage(struct rhdCursor *Cursor, CARD32 *img)
+     RHDPtr rhdPtr = RHDPTRI(Cursor);
+ 
+     memcpy(((CARD8 *) rhdPtr->FbBase + Cursor->Base), img,
+-	   MAX_CURSOR_WIDTH * Cursor->Height * 4);
++	   MAX_CURSOR_WIDTH * MAX_CURSOR_HEIGHT * 4);
+ }
+ 
+ static void
+@@ -192,6 +201,8 @@ convertBitsToARGB(struct rhd_Cursor_Bits *bits, CARD32 *dest,
+     CARD8 *mask     = src + srcPitch * bits->height;
+     int x, y;
+ 
++    memset(dest, 0, MAX_CURSOR_WIDTH * MAX_CURSOR_HEIGHT * 4);
++
+     for (y = 0; y < bits->height; y++) {
+ 	CARD8  *s = src, *m = mask;
+ 	CARD32 *d = dest;
+@@ -210,45 +221,27 @@ convertBitsToARGB(struct rhd_Cursor_Bits *bits, CARD32 *dest,
+     }
+ }
+ 
+-/* Enable/disable cursor according to visibility, and set cursor pos */
+-static void
+-displayCursor(struct rhdCrtc *Crtc)
++/*
++ * Returns if CRTC has a visible cursor
++ */
++static Bool
++hasVisibleCursor(struct rhdCrtc *Crtc, int X, int Y)
+ {
+-    struct rhdCursor *Cursor = Crtc->Cursor;
++    if (((X + MAX_CURSOR_WIDTH) < Crtc->X) &&
++	((Y + MAX_CURSOR_HEIGHT) < Crtc->Y))
++	return FALSE;
+ 
+-    /* Hardware doesn't allow negative cursor pos. Use hardware
+-     * hotspot support for that. Cannot exceed width, but cursor is
+-     * not visible in this case. */
+-
+-    /* xorg bug#13405: Cursor corruptions
+-     * With both CRTC enabled but HW cursor active only on one, the reported
+-     * corruption is seen. If HW cursor for both CRTC is forced to stay on, then no
+-     * corruption occurs. */
+-#if 0
+-    if (Cursor->X >= Crtc->X - Cursor->Width  &&
+-	Cursor->X <  Crtc->X + Crtc->Width    &&
+-	Cursor->Y >= Crtc->Y - Cursor->Height &&
+-	Cursor->Y <  Crtc->Y + Crtc->Height) {
+-#endif
+-	int X, Y, HotX, HotY;
+-
+-	X = Cursor->X >= 0 ? Cursor->X : 0;
+-	Y = Cursor->Y >= 0 ? Cursor->Y : 0;
+-	HotX = Cursor->X >= 0 ? 0 : -Cursor->X;
+-	HotY = Cursor->Y >= 0 ? 0 : -Cursor->Y;
+-
+-	enableCursor(Cursor, TRUE);
+-	setCursorPos(Cursor, X, Y, HotX, HotY);
+-#if 0
+-    } else
+-	enableCursor(Cursor, FALSE);
+-#endif
++    if ((X >= (Crtc->X + Crtc->Width)) &&
++	(Y >= (Crtc->Y + Crtc->Height)))
++        return FALSE;
++
++    return TRUE;
+ }
+ 
++
+ /*
+  * Internal Driver + Xorg Interface
+  */
+-
+ void
+ rhdShowCursor(ScrnInfoPtr pScrn)
+ {
+@@ -258,13 +251,9 @@ rhdShowCursor(ScrnInfoPtr pScrn)
+     for (i = 0; i < 2; i++) {
+ 	struct rhdCrtc *Crtc = rhdPtr->Crtc[i];
+ 
+-	if (Crtc->Active && Crtc->scrnIndex == pScrn->scrnIndex) {
+-	    struct rhdCursor *Cursor = Crtc->Cursor;
+-
+-	    lockCursor   (Cursor, TRUE);
+-	    displayCursor(Crtc);
+-	    lockCursor   (Cursor, FALSE);
+-	}
++	if (Crtc->Active && (Crtc->scrnIndex == pScrn->scrnIndex) &&
++	    hasVisibleCursor(Crtc, Crtc->Cursor->X, Crtc->Cursor->Y))
++            rhdCrtcShowCursor(Crtc);
+     }
+ }
+ 
+@@ -278,11 +267,7 @@ rhdHideCursor(ScrnInfoPtr pScrn)
+ 	struct rhdCrtc *Crtc = rhdPtr->Crtc[i];
+ 
+ 	if (Crtc->Active && Crtc->scrnIndex == pScrn->scrnIndex) {
+-	    struct rhdCursor *Cursor = Crtc->Cursor;
+-
+-	    lockCursor  (Cursor, TRUE);
+-	    enableCursor(Cursor, FALSE);
+-	    lockCursor  (Cursor, FALSE);
++            rhdCrtcHideCursor(Crtc);
+ 	}
+     }
+ }
+@@ -339,14 +324,7 @@ rhdReloadCursor(ScrnInfoPtr pScrn)
+ 	struct rhdCrtc *Crtc = rhdPtr->Crtc[i];
+ 
+ 	if (Crtc->scrnIndex == pScrn->scrnIndex) {
+-	    struct rhdCursor *Cursor = Crtc->Cursor;
+-
+-	    lockCursor       (Cursor, TRUE);
+-	    uploadCursorImage(Cursor, rhdPtr->CursorImage);
+-	    setCursorImage   (Cursor);
+-	    if (Crtc->Active)
+-		displayCursor(Crtc);
+-	    lockCursor       (Cursor, FALSE);
++            rhdCrtcLoadCursorARGB(Crtc, rhdPtr->CursorImage);
+ 	}
+     }
+ }
+@@ -363,17 +341,10 @@ rhdSetCursorPosition(ScrnInfoPtr pScrn, int x, int y)
+     for (i = 0; i < 2; i++) {
+ 	struct rhdCrtc *Crtc = rhdPtr->Crtc[i];
+ 
+-	if (Crtc->Active && Crtc->scrnIndex == pScrn->scrnIndex) {
+-	    struct rhdCursor *Cursor = Crtc->Cursor;
+-
+-	    /* Given cursor pos is always relative to frame - make absolute */
+-	    Cursor->X = x + pScrn->frameX0;
+-	    Cursor->Y = y + pScrn->frameY0;
+-
+-	    lockCursor   (Cursor, TRUE);
+-	    displayCursor(Crtc);
+-	    lockCursor   (Cursor, FALSE);
+-	}
++	/* Cursor here is relative to frame. */
++	if (Crtc->Active && (Crtc->scrnIndex == pScrn->scrnIndex) &&
++	    hasVisibleCursor(Crtc, x + pScrn->frameX0, y + pScrn->frameY0))
++	    rhdCrtcSetCursorPosition(Crtc, x + pScrn->frameX0, y + pScrn->frameY0);
+     }
+ }
+ 
+@@ -397,12 +368,7 @@ rhdSetCursorColors(ScrnInfoPtr pScrn, int bg, int fg)
+ 	struct rhdCrtc *Crtc = rhdPtr->Crtc[i];
+ 
+ 	if (Crtc->scrnIndex == pScrn->scrnIndex) {
+-	    struct rhdCursor *Cursor = Crtc->Cursor;
+-
+-	    lockCursor       (Cursor, TRUE);
+-	    uploadCursorImage(Cursor, rhdPtr->CursorImage);
+-	    setCursorImage   (Cursor);
+-	    lockCursor       (Cursor, FALSE);
++            rhdCrtcLoadCursorARGB(Crtc, rhdPtr->CursorImage);
+ 	}
+     }
+ }
+@@ -422,15 +388,7 @@ rhdLoadCursorImage(ScrnInfoPtr pScrn, unsigned char *src)
+ 	struct rhdCrtc *Crtc = rhdPtr->Crtc[i];
+ 
+ 	if (Crtc->scrnIndex == pScrn->scrnIndex) {
+-	    struct rhdCursor *Cursor = Crtc->Cursor;
+-
+-	    Cursor->Width  = bits->width;
+-	    Cursor->Height = bits->height;
+-
+-	    lockCursor       (Cursor, TRUE);
+-	    uploadCursorImage(Cursor, rhdPtr->CursorImage);
+-	    setCursorImage   (Cursor);
+-	    lockCursor       (Cursor, FALSE);
++            rhdCrtcLoadCursorARGB(Crtc, rhdPtr->CursorImage);
+ 	}
+     }
+ }
+@@ -455,24 +413,19 @@ rhdLoadCursorARGB(ScrnInfoPtr pScrn, CursorPtr cur)
+     rhdPtr->CursorBits   = NULL;
+ 
+     /* Hardware only supports 64-wide cursor images. */
+-    for (i = 0; i < cur->bits->height; i++)
+-	memcpy(rhdPtr->CursorImage + MAX_CURSOR_WIDTH*i,
++    memset(rhdPtr->CursorImage, 0, MAX_CURSOR_WIDTH * MAX_CURSOR_HEIGHT * 4);
++    for (i = 0; i < cur->bits->height; i++) {
++	CARD32 *img = rhdPtr->CursorImage + MAX_CURSOR_WIDTH*i;
++	memcpy(img,
+ 	       cur->bits->argb + cur->bits->width*i,
+ 	       cur->bits->width*4);
++    }
+ 
+     for (i = 0; i < 2; i++) {
+ 	struct rhdCrtc *Crtc = rhdPtr->Crtc[i];
+ 
+ 	if (Crtc->scrnIndex == pScrn->scrnIndex) {
+-	    struct rhdCursor *Cursor = Crtc->Cursor;
+-
+-	    Cursor->Width = cur->bits->width;
+-	    Cursor->Height = cur->bits->height;
+-
+-	    lockCursor       (Cursor, TRUE);
+-	    uploadCursorImage(Cursor, rhdPtr->CursorImage);
+-	    setCursorImage   (Cursor);
+-	    lockCursor       (Cursor, FALSE);
++            rhdCrtcLoadCursorARGB(Crtc, rhdPtr->CursorImage);
+ 	}
+     }
+ }
+@@ -588,10 +541,9 @@ void
+ rhdCrtcShowCursor(struct rhdCrtc *Crtc)
+ {
+     struct rhdCursor *Cursor = Crtc->Cursor;
+-
+-    lockCursor   (Cursor, TRUE);
+-    displayCursor(Crtc);
+-    lockCursor   (Cursor, FALSE);
++    lockCursor  (Cursor, TRUE);
++    enableCursor(Cursor, TRUE);
++    lockCursor  (Cursor, FALSE);
+ }
+ 
+ /*
+@@ -613,12 +565,58 @@ rhdCrtcHideCursor(struct rhdCrtc *Crtc)
+ void
+ rhdCrtcSetCursorPosition(struct rhdCrtc *Crtc, int x, int y)
+ {
++    RHDPtr rhdPtr = RHDPTRI(Crtc);
+     struct rhdCursor *Cursor = Crtc->Cursor;
++    int hotx, hoty, width, cursor_end, frame_end;
++
+     Cursor->X = x;
+     Cursor->Y = y;
+ 
++    hotx = 0;
++    hoty = 0;
++
++    /* Hardware doesn't allow negative cursor pos; compensate using hotspot */
++    if (x < 0) {
++        hotx = -x;
++        x = 0;
++    }
++    if (y < 0) {
++        hoty = -y;
++        y = 0;
++    }
++
+     lockCursor   (Cursor, TRUE);
+-    displayCursor(Crtc);
++
++    /* Work around rare corruption cases by adjusting cursor size;
++     * related to bug #13405
++     * For dual-screen:
++     * - Cursor's right-edge must not end on multiples of 128px.
++     * - For panning, cursor image cannot horizontally extend past end of viewport.
++     */
++    if (rhdPtr->Crtc[0]->Active && rhdPtr->Crtc[1]->Active) {
++        width      = MAX_CURSOR_WIDTH;
++        cursor_end = x + width;
++        frame_end  = Crtc->X   + Crtc->Width;
++
++        if (cursor_end > frame_end) {
++            width     -= cursor_end - frame_end;
++            cursor_end = x + width;
++        }
++        if (! (cursor_end & 0x7f)) {
++            width--;
++        }
++        /* If the cursor is effectively invisible, move it out of visible area */
++        if (width <= 0) {
++            width = 1;
++            x = 0;
++            y = Crtc->Y + Crtc->Height;
++            hotx = 0;
++            hoty = 0;
++        }
++        setCursorSize(Cursor, width, MAX_CURSOR_HEIGHT);
++    }
++
++    setCursorPos (Cursor, x, y, hotx, hoty);
+     lockCursor   (Cursor, FALSE);
+ }
+ 
+@@ -642,12 +640,10 @@ rhdCrtcLoadCursorARGB(struct rhdCrtc *Crtc, CARD32 *Image)
+ {
+     struct rhdCursor *Cursor = Crtc->Cursor;
+ 
+-    Cursor->Width = MAX_CURSOR_WIDTH;
+-    Cursor->Height = MAX_CURSOR_HEIGHT;
+-
+     lockCursor       (Cursor, TRUE);
+     uploadCursorImage(Cursor, Image);
+     setCursorImage   (Cursor);
++    setCursorSize    (Cursor, MAX_CURSOR_WIDTH, MAX_CURSOR_HEIGHT);
+     lockCursor       (Cursor, FALSE);
+ }
+ 
+diff --git a/src/rhd_cursor.h b/src/rhd_cursor.h
+index a2347d7..d6970d8 100644
+--- a/src/rhd_cursor.h
++++ b/src/rhd_cursor.h
+@@ -38,8 +38,6 @@ struct rhdCursor
+ 
+     int RegOffset;
+ 
+-    int Width;
+-    int Height;
+     int Base;
+ 
+     int X;
+diff --git a/src/rhd_dig.c b/src/rhd_dig.c
+index 6cc5521..1c86ad0 100644
+--- a/src/rhd_dig.c
++++ b/src/rhd_dig.c
+@@ -308,7 +308,6 @@ LVTMATransmitterSet(struct rhdOutput *Output, struct rhdCrtc *Crtc, DisplayModeP
+ 	RHDRegMask(Output, RV620_LVTMA_TRANSMITTER_CONTROL,
+ 		   doCoherent ? 0 : RV62_LVTMA_BYPASS_PLL, RV62_LVTMA_BYPASS_PLL);
+ 
+-    Private->Mode = Mode;
+ #ifdef ATOM_BIOS
+     RHDDebug(Output->scrnIndex, "%s: SynthClock: %i Hex: %x EncoderMode: %x\n",__func__,
+ 	     (Mode->SynthClock),(Mode->SynthClock / 10), Private->EncoderMode);
+@@ -1459,8 +1458,7 @@ DigPropertyControl(struct rhdOutput *Output,
+ 	{
+ 	    if (!Private->Transmitter.Property)
+ 		return FALSE;
+-	    Private->Transmitter.Property(Output, Action, Property, val);
+-	    break;
++	    return Private->Transmitter.Property(Output, Action, Property, val);
+ 	}
+ 	default:
+ 	    return FALSE;
+@@ -1482,6 +1480,8 @@ DigMode(struct rhdOutput *Output, DisplayModePtr Mode)
+ 
+     RHDFUNC(Output);
+ 
++    Private->Mode = Mode;
++
+     /*
+      * For dual link capable DVI we need to decide from the pix clock if we are dual link.
+      * Do it here as it is convenient.
+diff --git a/src/rhd_dri.c b/src/rhd_dri.c
+index d06ba43..0b6fe3a 100644
+--- a/src/rhd_dri.c
++++ b/src/rhd_dri.c
+@@ -1118,13 +1118,15 @@ static Bool RHDDRISetVBlankInterrupt(ScrnInfoPtr pScrn, Bool on)
+ 
+     if (rhdDRI->irq) {
+         if (on) {
++	    value = DRM_RADEON_VBLANK_CRTC1;
++
+ #ifdef RANDR_12_SUPPORT		// FIXME check / move to rhd_randr.c
+-	    xf86CrtcConfigPtr   xf86_config = XF86_CRTC_CONFIG_PTR(pScrn);
+-  	    if (xf86_config->num_crtc > 1 && xf86_config->crtc[1]->enabled)
+-	        value = DRM_RADEON_VBLANK_CRTC1 | DRM_RADEON_VBLANK_CRTC2;
+-	    else
++	    if (RHDPTR(pScrn)->randr) {
++		xf86CrtcConfigPtr   xf86_config = XF86_CRTC_CONFIG_PTR(pScrn);
++		if (xf86_config->num_crtc > 1 && xf86_config->crtc[1]->enabled)
++		    value |= DRM_RADEON_VBLANK_CRTC2;
++	    }
+ #endif
+-	        value = DRM_RADEON_VBLANK_CRTC1;
+ 	}
+ 
+ 	if (RHDDRISetParam(pScrn, RADEON_SETPARAM_VBLANK_CRTC, value)) {
+diff --git a/src/rhd_driver.c b/src/rhd_driver.c
+index f849faa..ba60253 100644
+--- a/src/rhd_driver.c
++++ b/src/rhd_driver.c
+@@ -117,6 +117,7 @@
+ #include "rhd_randr.h"
+ #include "rhd_cs.h"
+ #include "rhd_audio.h"
++#include "rhd_pm.h"
+ #include "r5xx_accel.h"
+ #include "rhd_video.h"
+ 
+@@ -252,7 +253,9 @@ typedef enum {
+     OPTION_UNVERIFIED_FEAT,
+     OPTION_AUDIO,
+     OPTION_HDMI,
+-    OPTION_COHERENT
++    OPTION_COHERENT,
++    OPTION_FORCE_LOW_POWER,
++    OPTION_LOW_POWER_CLOCK
+ } RHDOpts;
+ 
+ static const OptionInfoRec RHDOptions[] = {
+@@ -282,6 +285,8 @@ static const OptionInfoRec RHDOptions[] = {
+     { OPTION_AUDIO,		   "Audio",	           OPTV_BOOLEAN, {0}, FALSE },
+     { OPTION_HDMI,		   "HDMI",	           OPTV_ANYSTR,  {0}, FALSE },
+     { OPTION_COHERENT,             "COHERENT",		   OPTV_ANYSTR,  {0}, FALSE },
++    { OPTION_FORCE_LOW_POWER,      "ForceLowPowerMode",    OPTV_BOOLEAN, {0}, FALSE },
++    { OPTION_LOW_POWER_CLOCK,      "LowPowerModeEngineClock", OPTV_INTEGER, {0}, FALSE },
+     { -1, NULL, OPTV_NONE,	{0}, FALSE }
+ };
+ 
+@@ -799,6 +804,7 @@ RHDPreInit(ScrnInfoPtr pScrn, int flags)
+     RHDAudioInit(rhdPtr);
+     RHDLUTsInit(rhdPtr);
+     RHDCursorsInit(rhdPtr); /* do this irrespective of hw/sw cursor setting */
++    RHDPmInit(rhdPtr);
+ 
+     if (!RHDConnectorsInit(rhdPtr, rhdPtr->Card)) {
+ 	xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
+@@ -983,8 +989,14 @@ RHDPreInit(ScrnInfoPtr pScrn, int flags)
+ 	    xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Failed to load XAA module."
+ 		       " Falling back to ShadowFB.\n");
+ 	    rhdPtr->AccelMethod = RHD_ACCEL_SHADOWFB;
+-	} else
++	}
++	/* This is functionally void since 7.0 (old version scheme,
++	 * and removed since 1.6.99.1 (new version scheme) */
++	/* Assume anything >= 6.* is old version scheme */
++#if XORG_VERSION_CURRENT >= 6 * 10000000
++	else
+ 	    xf86LoaderReqSymLists(xaaSymbols, NULL);
++#endif
+     }
+ 
+ #ifdef USE_EXA
+@@ -994,9 +1006,14 @@ RHDPreInit(ScrnInfoPtr pScrn, int flags)
+ 	    xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Failed to load EXA module."
+ 		       " Falling back to ShadowFB.\n");
+ 	    rhdPtr->AccelMethod = RHD_ACCEL_SHADOWFB;
+-	} else {
+-	    xf86LoaderReqSymLists(exaSymbols, NULL);
+ 	}
++	/* This is functionally void since 7.0 (old version scheme,
++	 * and removed since 1.6.99.1 (new version scheme) */
++	/* Assume anything >= 6.* is old version scheme */
++#if XORG_VERSION_CURRENT >= 6 * 10000000
++	else
++	    xf86LoaderReqSymLists(exaSymbols, NULL);
++#endif
+     }
+ #endif /* USE_EXA */
+ 
+@@ -1126,6 +1143,9 @@ RHDScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
+     fbPictureInit(pScreen, 0, 0);
+     xf86SetBlackWhitePixels(pScreen);
+ 
++    /* Static power management */
++    RHDPmSetClock(rhdPtr);
++
+ #ifdef USE_DRI
+     if (DriScreenInited)
+ 	rhdPtr->directRenderingEnabled = RHDDRIFinishScreenInit(pScreen);
+@@ -1145,19 +1165,31 @@ RHDScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
+ 	break;
+     case RHD_ACCEL_XAA:
+ 	if (rhdPtr->ChipSet < RHD_R600) {
+-	    if (!R5xxXAAInit(pScrn, pScreen))
++	    if (!R5xxXAAInit(pScrn, pScreen)) {
+ 		rhdPtr->AccelMethod = RHD_ACCEL_NONE;
+-	} else
++                xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
++                           "Failed to initalize XAA; disabling acceleration.\n");
++            }
++	} else {
+ 	    rhdPtr->AccelMethod = RHD_ACCEL_NONE;
++            xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
++                       "XAA is not supported on R600 and above; disabling acceleration.\n");
++        }
+ 	break;
+ #ifdef USE_DRI
+     case RHD_ACCEL_EXA:
+ 	if (rhdPtr->ChipSet < RHD_R600) {
+-	    if (!R5xxEXAInit(pScrn, pScreen))
++	    if (!R5xxEXAInit(pScrn, pScreen)) {
+ 		rhdPtr->AccelMethod = RHD_ACCEL_NONE;
++                xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
++                           "Failed to initalize EXA; disabling acceleration.\n");
++            }
+ 	} else {
+-	    if (!R6xxEXAInit(pScrn, pScreen))
++	    if (!R6xxEXAInit(pScrn, pScreen)) {
+ 		rhdPtr->AccelMethod = RHD_ACCEL_NONE;
++                xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
++                           "Failed to initalize EXA; disabling acceleration.\n");
++            }
+ 	}
+ 	break;
+ #endif /* USE_DRI */
+@@ -1410,6 +1442,9 @@ RHDEnterVT(int scrnIndex, int flags)
+     /* enable/disable audio */
+     RHDAudioSetEnable(rhdPtr, rhdPtr->audio.val.bool);
+ 
++    /* Static power management */
++    RHDPmSetClock(rhdPtr);
++
+ #ifdef USE_DRI
+     if (rhdPtr->dri)
+ 	RHDDRIEnterVT(pScrn->pScreen);
+@@ -1899,21 +1934,13 @@ rhdUnmapFB(RHDPtr rhdPtr)
+     if (!rhdPtr->FbBase)
+ 	return;
+ 
+-    switch (rhdPtr->ChipSet) {
+-   	case RHD_RS690:
+-	case RHD_RS740:
+-	    xf86UnMapVidMem(rhdPtr->scrnIndex, (pointer)rhdPtr->FbBase,
+-			    rhdPtr->FbMapSize);
+-	    break;
+-	default:
+ #ifdef XSERVER_LIBPCIACCESS
+-	    pci_device_unmap_range(rhdPtr->PciInfo, (pointer)rhdPtr->FbBase,
+-				   rhdPtr->FbMapSize);
++    pci_device_unmap_range(rhdPtr->PciInfo, (pointer)rhdPtr->FbBase,
++			   rhdPtr->FbMapSize);
+ #else
+-	    xf86UnMapVidMem(rhdPtr->scrnIndex, (pointer)rhdPtr->FbBase,
+-			    rhdPtr->FbMapSize);
++    xf86UnMapVidMem(rhdPtr->scrnIndex, (pointer)rhdPtr->FbBase,
++		    rhdPtr->FbMapSize);
+ #endif
+-    }
+ 
+     rhdPtr->FbBase = NULL;
+ }
+@@ -2446,6 +2473,8 @@ rhdSave(RHDPtr rhdPtr)
+     RHDCrtcSave(rhdPtr->Crtc[0]);
+     RHDCrtcSave(rhdPtr->Crtc[1]);
+     rhdSaveCursor(pScrn);
++
++    RHDPmSave(rhdPtr);
+ }
+ 
+ /*
+@@ -2472,6 +2501,8 @@ rhdRestore(RHDPtr rhdPtr)
+     RHDCrtcRestore(rhdPtr->Crtc[0]);
+     RHDCrtcRestore(rhdPtr->Crtc[1]);
+ 
++    RHDPmRestore(rhdPtr);
++
+     RHDOutputsRestore(rhdPtr);
+ #ifdef ATOM_BIOS
+     RHDRestoreBiosScratchRegisters(rhdPtr, rhdPtr->BIOSScratch);
+@@ -2609,94 +2640,6 @@ _RHDWritePLL(int scrnIndex, CARD16 offset, CARD32 data)
+     RHDRegWrite(rhdPtr, CLOCK_CNTL_DATA, data);
+ }
+ 
+-#ifdef ATOM_BIOS
+-
+-/*
+- *
+- */
+-static int
+-rhdGetArg(ScrnInfoPtr pScrn, CARD32 *val, char *ptr)
+-{
+-    int cnt = 0;
+-    if (isspace(*ptr) || *ptr == '=') {
+-	ptr++;
+-	cnt++;
+-    }
+-    if (!strncasecmp("off",ptr,3)) {
+-	*val = RHD_ATOMBIOS_OFF;
+-	return cnt + 3;
+-    } else if (!strncasecmp("on",ptr,2)) {
+-	*val = RHD_ATOMBIOS_ON;
+-	return cnt + 2;
+-    } else if (!strncasecmp("force_off",ptr,9)) {
+-	*val = RHD_ATOMBIOS_OFF | RHD_ATOMBIOS_FORCE;
+-	return cnt + 9;
+-    } else if (!strncasecmp("force_on",ptr,8)) {
+-	*val = RHD_ATOMBIOS_ON | RHD_ATOMBIOS_FORCE;
+-	return cnt + 8;
+-    } else
+-	return 0;
+-}
+-
+-/*
+- *
+- */
+-static void
+-rhdParseAtomBIOSUsage(ScrnInfoPtr pScrn)
+-{
+-    RHDPtr rhdPtr = RHDPTR(pScrn);
+-    RHDOpt atombios;
+-
+-    RhdGetOptValString(rhdPtr->Options, OPTION_ATOMBIOS,
+-		       &atombios, NULL);
+-    if (atombios.set) {
+-	if (atombios.val.string) {
+-	    char *ptr = atombios.val.string;
+-	    CARD32 val;
+-
+-	    while (*ptr != '\0') {
+-		int c;
+-		while (isspace(*ptr))
+-		    ptr++;
+-		if (*ptr == '\0')
+-		    break;
+-
+-		if (!strncasecmp("crtc",ptr,4)) {
+-		    ptr += 4;
+-		    if (!(c = rhdGetArg(pScrn,&val,ptr)))
+-			goto parse_error;
+-		    ptr += c;
+-		    rhdPtr->UseAtomFlags &= ~((RHD_ATOMBIOS_FORCE | RHD_ATOMBIOS_ON | RHD_ATOMBIOS_OFF) << RHD_ATOMBIOS_CRTC);
+-		    rhdPtr->UseAtomFlags |= (val << RHD_ATOMBIOS_CRTC);
+-		}
+-		else if (!strncasecmp("output",ptr,6)) {
+-		    ptr += 6;
+-		    if (!(c = rhdGetArg(pScrn,&val,ptr)))
+-			goto parse_error;
+-		    ptr += c;
+-		    rhdPtr->UseAtomFlags &= ~((RHD_ATOMBIOS_FORCE | RHD_ATOMBIOS_ON | RHD_ATOMBIOS_OFF) << RHD_ATOMBIOS_OUTPUT);
+-		    rhdPtr->UseAtomFlags |= (val << RHD_ATOMBIOS_OUTPUT);
+-		}
+-		else if (!strncasecmp("pll",ptr,3)) {
+-		    ptr += 3;
+-		    if (!(c = rhdGetArg(pScrn,&val,ptr)))
+-			goto parse_error;
+-		    ptr += c;
+-		    rhdPtr->UseAtomFlags &= ~((RHD_ATOMBIOS_FORCE | RHD_ATOMBIOS_ON | RHD_ATOMBIOS_OFF) << RHD_ATOMBIOS_PLL);
+-		    rhdPtr->UseAtomFlags |= (val << RHD_ATOMBIOS_PLL);
+-		} else goto parse_error;
+-	    }
+-	}
+-    }
+-    return;
+-
+-parse_error:
+-    xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Cannot parse AtomBIOS usage string: %s\n",atombios.val.string);
+-    rhdPtr->UseAtomFlags = 0;
+-}
+-
+-#endif /* ATOM_BIOS */
+-
+ /*
+  * Apart from handling the respective option, this also tries to map out
+  * what method is supported on which chips.
+@@ -2790,6 +2733,10 @@ rhdProcessOptions(ScrnInfoPtr pScrn)
+ {
+     RHDPtr rhdPtr = RHDPTR(pScrn);
+     RHDOpt hpd;
++#ifdef ATOM_BIOS
++    RHDOpt atombios;
++#endif
++
+     /* Collect all of the relevant option flags (fill in pScrn->options) */
+     xf86CollectOptions(pScrn, NULL);
+     rhdPtr->Options = xnfcalloc(sizeof(RHDOptions), 1);
+@@ -2818,19 +2765,29 @@ rhdProcessOptions(ScrnInfoPtr pScrn)
+ 		       &rhdPtr->scaleTypeOpt, "default");
+     RhdGetOptValBool   (rhdPtr->Options, OPTION_UNVERIFIED_FEAT,
+ 			&rhdPtr->unverifiedFeatures, FALSE);
+-#ifdef ATOM_BIOS
+-    RhdGetOptValBool   (rhdPtr->Options, OPTION_USE_ATOMBIOS,
+-			&rhdPtr->UseAtomBIOS, FALSE);
+-#endif
+     RhdGetOptValBool   (rhdPtr->Options, OPTION_AUDIO,
+ 			&rhdPtr->audio, TRUE);
+     RhdGetOptValString (rhdPtr->Options, OPTION_HDMI,
+ 			&rhdPtr->hdmi, "none");
+     RhdGetOptValString(rhdPtr->Options, OPTION_COHERENT,
+ 		       &rhdPtr->coherent, NULL);
++    RhdGetOptValBool   (rhdPtr->Options, OPTION_FORCE_LOW_POWER,
++                        &rhdPtr->lowPowerMode, FALSE);
++    RhdGetOptValInteger(rhdPtr->Options, OPTION_LOW_POWER_CLOCK,
++                        &rhdPtr->lowPowerModeEngineClock, 0);
++
+ #ifdef ATOM_BIOS
+-    rhdParseAtomBIOSUsage(pScrn);
++    RhdGetOptValBool   (rhdPtr->Options, OPTION_USE_ATOMBIOS,
++			&rhdPtr->UseAtomBIOS, FALSE);
++    RhdGetOptValString (rhdPtr->Options, OPTION_ATOMBIOS,
++			&atombios, NULL);
++    if (atombios.set && atombios.val.string) {
++	if (! rhdUpdateAtomBIOSUsage (rhdPtr, atombios.val.string))
++	    xf86DrvMsg(rhdPtr->scrnIndex, X_ERROR, "Cannot parse AtomBIOS usage string: %s\n",
++		       atombios.val.string);
++    }
+ #endif
++
+     rhdAccelOptionsHandle(pScrn);
+ 
+     rhdPtr->hpdUsage = RHD_HPD_USAGE_AUTO;
+diff --git a/src/rhd_hdmi.c b/src/rhd_hdmi.c
+index 9a52536..cf3e8b1 100644
+--- a/src/rhd_hdmi.c
++++ b/src/rhd_hdmi.c
+@@ -234,9 +234,13 @@ HdmiAudioInfoFrame(
+ static void
+ HdmiAudioDebugWorkaround(struct rhdHdmi* hdmi, Bool Enable)
+ {
++    RHDRegWrite(hdmi, hdmi->Offset+HDMI_AUDIO_DEBUG_0, 0x00FFFFFF);
++    RHDRegWrite(hdmi, hdmi->Offset+HDMI_AUDIO_DEBUG_1, 0x007FFFFF);
++    RHDRegWrite(hdmi, hdmi->Offset+HDMI_AUDIO_DEBUG_2, 0x00000001);
++    RHDRegWrite(hdmi, hdmi->Offset+HDMI_AUDIO_DEBUG_3, 0x00000001);
++
+     if(Enable) {
+ 	RHDRegMask(hdmi, hdmi->Offset+HDMI_CNTL, 0x1000, 0x1000);
+-	RHDRegWrite(hdmi, hdmi->Offset+HDMI_AUDIO_DEBUG, 0xffffff);
+     } else {
+ 	RHDRegMask(hdmi, hdmi->Offset+HDMI_CNTL, 0, 0x1000);
+     }
+@@ -253,17 +257,21 @@ RHDHdmiInit(RHDPtr rhdPtr, struct rhdOutput* Output)
+     struct rhdHdmi *hdmi;
+     RHDFUNC(rhdPtr);
+ 
+-    if(rhdPtr->ChipSet >= RHD_R600) {
++    if(rhdPtr->ChipSet >= RHD_RS600) {
+ 	hdmi = (struct rhdHdmi *) xnfcalloc(sizeof(struct rhdHdmi), 1);
+ 	hdmi->scrnIndex = rhdPtr->scrnIndex;
+ 	hdmi->Output = Output;
++
+ 	switch(Output->Id) {
+ 	    case RHD_OUTPUT_TMDSA:
+ 		hdmi->Offset = HDMI_TMDS;
+ 		break;
+ 
+ 	    case RHD_OUTPUT_LVTMA:
+-		hdmi->Offset = HDMI_LVTMA;
++		if(RHDOutputTmdsIndex(Output) == 0)
++		    hdmi->Offset = HDMI_TMDS;
++		else
++		    hdmi->Offset = HDMI_LVTMA;
+ 		break;
+ 
+ 	    case RHD_OUTPUT_UNIPHYA:
+@@ -309,6 +317,7 @@ RHDHdmiSetMode(struct rhdHdmi *hdmi, DisplayModePtr Mode)
+     HdmiAudioClockRegeneration(hdmi, Mode->Clock);
+ 
+     RHDRegWrite(hdmi, hdmi->Offset+HDMI_VIDEOCNTL, 0x13);
++
+     RHDRegWrite(hdmi, hdmi->Offset+HDMI_VERSION, 0x202);
+ 
+     HdmiVideoInfoFrame(hdmi, RGB, FALSE, 0, 0, 0,
+@@ -322,7 +331,7 @@ RHDHdmiSetMode(struct rhdHdmi *hdmi, DisplayModePtr Mode)
+ }
+ 
+ /*
+- * update settings whith current parameters from audio engine
++ * update settings with current parameters from audio engine
+  */
+ void
+ RHDHdmiUpdateAudioSettings(
+@@ -382,9 +391,11 @@ RHDHdmiUpdateAudioSettings(
+ 
+     RHDRegMask(hdmi, hdmi->Offset+HDMI_IEC60958_2, iec, 0x5000f);
+ 
++    /* 0x021 or 0x031 sets the audio frame length */
+     RHDRegWrite(hdmi, hdmi->Offset+HDMI_AUDIOCNTL, 0x31);
+     HdmiAudioInfoFrame(hdmi, channels-1, 0, 0, 0, 0, 0, 0, FALSE);
+ 
++    /* RHDRegMask(hdmi, hdmi->Offset+HDMI_CNTL, 0x4000000, 0x4000000); */
+     RHDRegMask(hdmi, hdmi->Offset+HDMI_CNTL, 0x400000, 0x400000);
+ }
+ 
+@@ -401,18 +412,19 @@ RHDHdmiEnable(struct rhdHdmi *hdmi, Bool Enable)
+      * so enabling/disabling HDMI was moved here for TMDSA and LVTMA */
+     switch(hdmi->Output->Id) {
+ 	case RHD_OUTPUT_TMDSA:
+-	     RHDRegMask(hdmi, TMDSA_CNTL, Enable ? 0x4 : 0x0, 0x4);
+-	     RHDRegWrite(hdmi, hdmi->Offset+HDMI_ENABLE, Enable ? 0x101 : 0x0);
+-	     break;
++	    RHDRegMask(hdmi, TMDSA_CNTL, Enable ? 0x4 : 0x0, 0x4);
++	    RHDRegWrite(hdmi, hdmi->Offset+HDMI_ENABLE, Enable ? 0x101 : 0x0);
++	    break;
+ 
+ 	case RHD_OUTPUT_LVTMA:
+-	     RHDRegMask(hdmi, LVTMA_CNTL, Enable ? 0x4 : 0x0, 0x4);
+-	     RHDRegWrite(hdmi, hdmi->Offset+HDMI_ENABLE, Enable ? 0x105 : 0x0);
+-	     break;
++	    RHDRegMask(hdmi, LVTMA_CNTL, Enable ? 0x4 : 0x0, 0x4);
++	    RHDRegWrite(hdmi, hdmi->Offset+HDMI_ENABLE, Enable ? 0x105 : 0x0);
++	    break;
+ 
+ 	case RHD_OUTPUT_UNIPHYA:
+ 	case RHD_OUTPUT_UNIPHYB:
+ 	case RHD_OUTPUT_KLDSKP_LVTMA:
++	    /* This part is doubtfull in my opinion */
+ 	    RHDRegWrite(hdmi, hdmi->Offset+HDMI_ENABLE, Enable ? 0x110 : 0x0);
+ 	    break;
+ 
+@@ -433,7 +445,10 @@ RHDHdmiSave(struct rhdHdmi *hdmi)
+ 
+     hdmi->StoreEnable = RHDRegRead(hdmi, hdmi->Offset+HDMI_ENABLE);
+     hdmi->StoreControl = RHDRegRead(hdmi, hdmi->Offset+HDMI_CNTL);
+-    hdmi->StoredAudioDebugWorkaround = RHDRegRead(hdmi, hdmi->Offset+HDMI_AUDIO_DEBUG);
++    hdmi->StoredAudioDebugWorkaround[0x0] = RHDRegRead(hdmi, hdmi->Offset+HDMI_AUDIO_DEBUG_0);
++    hdmi->StoredAudioDebugWorkaround[0x1] = RHDRegRead(hdmi, hdmi->Offset+HDMI_AUDIO_DEBUG_1);
++    hdmi->StoredAudioDebugWorkaround[0x2] = RHDRegRead(hdmi, hdmi->Offset+HDMI_AUDIO_DEBUG_2);
++    hdmi->StoredAudioDebugWorkaround[0x3] = RHDRegRead(hdmi, hdmi->Offset+HDMI_AUDIO_DEBUG_3);
+ 
+     hdmi->StoredFrameVersion = RHDRegRead(hdmi, hdmi->Offset+HDMI_VERSION);
+ 
+@@ -483,7 +498,10 @@ RHDHdmiRestore(struct rhdHdmi *hdmi)
+ 
+     RHDRegWrite(hdmi, hdmi->Offset+HDMI_ENABLE, hdmi->StoreEnable);
+     RHDRegWrite(hdmi, hdmi->Offset+HDMI_CNTL, hdmi->StoreControl);
+-    RHDRegWrite(hdmi, hdmi->Offset+HDMI_AUDIO_DEBUG, hdmi->StoredAudioDebugWorkaround);
++    RHDRegWrite(hdmi, hdmi->Offset+HDMI_AUDIO_DEBUG_0, hdmi->StoredAudioDebugWorkaround[0x0]);
++    RHDRegWrite(hdmi, hdmi->Offset+HDMI_AUDIO_DEBUG_1, hdmi->StoredAudioDebugWorkaround[0x1]);
++    RHDRegWrite(hdmi, hdmi->Offset+HDMI_AUDIO_DEBUG_2, hdmi->StoredAudioDebugWorkaround[0x2]);
++    RHDRegWrite(hdmi, hdmi->Offset+HDMI_AUDIO_DEBUG_3, hdmi->StoredAudioDebugWorkaround[0x3]);
+ 
+     RHDRegWrite(hdmi, hdmi->Offset+HDMI_VERSION, hdmi->StoredFrameVersion);
+ 
+diff --git a/src/rhd_hdmi.h b/src/rhd_hdmi.h
+index 4229417..5b1e8f0 100644
+--- a/src/rhd_hdmi.h
++++ b/src/rhd_hdmi.h
+@@ -39,7 +39,7 @@ struct rhdHdmi {
+ 	CARD32 StoreEnable;
+ 	CARD32 StoreControl;
+ 	CARD32 StoreUnknown[0x3];
+-	CARD32 StoredAudioDebugWorkaround;
++	CARD32 StoredAudioDebugWorkaround[0x4];
+ 
+ 	CARD32 StoredFrameVersion;
+ 	CARD32 StoredVideoControl;
+diff --git a/src/rhd_id.c b/src/rhd_id.c
+index 4a162c3..a95e9e9 100644
+--- a/src/rhd_id.c
++++ b/src/rhd_id.c
+@@ -73,19 +73,31 @@ SymTabRec RHDChipsets[] = {
+     { RHD_M72,   "M72" },
+     { RHD_M74,   "M74" },
+     { RHD_M76,   "M76" },
+-    /* RV670 came into existence after RV6x0 and M7x */
+-    { RHD_RV670, "RV670" },
+-    { RHD_M88,   "M88" },
+-    { RHD_R680,  "R680"  },
++    /* R600 second batch */
+     { RHD_RV620, "RV620" },
+-    { RHD_M82,   "M82"   },
+     { RHD_RV635, "RV635" },
+-    { RHD_M86,   "M86"   },
++    { RHD_RV670, "RV670" },
++    { RHD_R680,  "R680"  },
++    /* R700 Mobility */
++    { RHD_M82,   "M82" },
++    { RHD_M88,   "M88" },
++    { RHD_M86,   "M86" },
++    /* R600 integrated */
+     { RHD_RS780, "RS780" },
+     { RHD_RS880, "RS880" },
+-    { RHD_RV770, "RV770" },
+-    { RHD_RV730, "RV730" },
++    /* R700 */
++    { RHD_R700,  "R700" },
+     { RHD_RV710, "RV710" },
++    { RHD_RV730, "RV730" },
++    { RHD_RV740, "RV740" },
++    { RHD_RV770, "RV770" },
++    { RHD_RV790, "RV790" },
++    /* R700 Mobility */
++    { RHD_M92,   "M92" },
++    { RHD_M93,   "M93" },
++    { RHD_M96,   "M96" },
++    { RHD_M97,   "M97" },
++    { RHD_M98,   "M98" },
+     { -1,      NULL }
+ };
+ 
+@@ -225,34 +237,42 @@ const PCI_ID_LIST = {
+     RHD_DEVICE_MATCH(  0x9440, RHD_RV770 ), /* ATI Radeon 4800 Series  */
+     RHD_DEVICE_MATCH(  0x9441, RHD_RV770 ), /* ATI Radeon 4870 X2  */
+     RHD_DEVICE_MATCH(  0x9442, RHD_RV770 ), /* ATI Radeon 4800 Series  */
+-//    RHD_DEVICE_MATCH(  0x9443, RHD_R700  ), /* ATI Radeon 4800 Series  */
++    RHD_DEVICE_MATCH(  0x9443, RHD_RV770 ), /* ATI Radeon 4850 X2  */
+     RHD_DEVICE_MATCH(  0x9444, RHD_RV770 ), /* Everest ATI FirePro Graphics Accelerator  */
+     RHD_DEVICE_MATCH(  0x9446, RHD_RV770 ), /* K2 ATI FirePro Graphics Accelerator  */
+-//    RHD_DEVICE_MATCH(  0x9447, RHD_R700 ), /* K2 ATI FirePro Graphics Accelerator  */
+-    RHD_DEVICE_MATCH(  0x944A, RHD_M98 ), /* M98  */
+-    RHD_DEVICE_MATCH(  0x944B, RHD_M98 ), /* M98  */
+-    RHD_DEVICE_MATCH(  0x944C, RHD_RV770 ), /* RV770  */
++    RHD_DEVICE_MATCH(  0x9447, RHD_R700  ), /* ATI FirePro V8700 Duo */
++    RHD_DEVICE_MATCH(  0x944A, RHD_M98   ), /* ATI MOBILITY  RADEON HD 4850 */
++    RHD_DEVICE_MATCH(  0x944B, RHD_M98   ), /* ATI MOBILITY  RADEON HD 4850 X2 */
++    RHD_DEVICE_MATCH(  0x944C, RHD_RV770 ), /* ATI RADEON HD 4800 Series */
+     RHD_DEVICE_MATCH(  0x944E, RHD_RV770 ), /* RV770  */
+ //    RHD_DEVICE_MATCH(  0x944F, RHD_R700 ), /* R700  */
++    RHD_DEVICE_MATCH(  0x9450, RHD_RV770 ), /* AMD FireStream 9270 */
++    RHD_DEVICE_MATCH(  0x9452, RHD_RV770 ), /* AMD FireStream 9250 */
+     RHD_DEVICE_MATCH(  0x9456, RHD_RV770 ), /* Denali ATI FirePro Graphics Accelerator  */
+-    RHD_DEVICE_MATCH(  0x945A, RHD_M98 ), /* M98 */
+-    RHD_DEVICE_MATCH(  0x945B, RHD_M98 ), /* M98 */
+-    RHD_DEVICE_MATCH(  0x9460, RHD_RV770 ), /* RV790 */
+-    RHD_DEVICE_MATCH(  0x9462, RHD_RV770 ), /* RV790 */
+-    RHD_DEVICE_MATCH(  0x946A, RHD_M98 ), /* M98 */
+-    RHD_DEVICE_MATCH(  0x946B, RHD_M98 ), /* M98 */
+-    RHD_DEVICE_MATCH(  0x947A, RHD_M98 ), /* M98 */
+-    RHD_DEVICE_MATCH(  0x947B, RHD_M98 ), /* M96 */
+-    RHD_DEVICE_MATCH(  0x9480, RHD_M96 ), /* M98 */
++    RHD_DEVICE_MATCH(  0x945A, RHD_M98   ), /* ATI MOBILITY  RADEON HD 4870 */
++    RHD_DEVICE_MATCH(  0x945B, RHD_M98   ), /* M98 */
++    RHD_DEVICE_MATCH(  0x9460, RHD_RV790 ), /* RV790 */
++    RHD_DEVICE_MATCH(  0x9462, RHD_RV790 ), /* RV790 */
++    RHD_DEVICE_MATCH(  0x946A, RHD_M98   ), /* M98 */
++    RHD_DEVICE_MATCH(  0x946B, RHD_M98   ), /* M98 */
++    RHD_DEVICE_MATCH(  0x947A, RHD_M98   ), /* M98 */
++    RHD_DEVICE_MATCH(  0x947B, RHD_M98   ), /* M98 */
++    RHD_DEVICE_MATCH(  0x9480, RHD_M96   ), /* ATI MOBILITY  RADEON HD 4650 */
+     RHD_DEVICE_MATCH(  0x9487, RHD_RV730 ), /* RV730 */
+-    RHD_DEVICE_MATCH(  0x9488, RHD_M96 ), /* M96 */
+-    RHD_DEVICE_MATCH(  0x9489, RHD_M96 ), /* M96M GL */
++    RHD_DEVICE_MATCH(  0x9488, RHD_M96   ), /* ATI MOBILITY  RADEON HD 4670 */
++    RHD_DEVICE_MATCH(  0x9489, RHD_M96   ), /* M96M GL */
+     RHD_DEVICE_MATCH(  0x948F, RHD_RV730 ), /* RV730 */
+-    RHD_DEVICE_MATCH(  0x9487, RHD_RV730 ), /* RV730 */
+-    RHD_DEVICE_MATCH(  0x9490, RHD_RV730 ), /* RV730 */
+-    RHD_DEVICE_MATCH(  0x9498, RHD_RV730 ), /* RV730 */
+-    RHD_DEVICE_MATCH(  0x949E, RHD_RV730 ), /* RV730 */
+-    RHD_DEVICE_MATCH(  0x949F, RHD_RV730 ), /* RV730 */
++    RHD_DEVICE_MATCH(  0x9490, RHD_RV730 ), /* ATI RADEON HD 4670 */
++    RHD_DEVICE_MATCH(  0x9491, RHD_RV730 ), /* ATI RADEON E4600 */
++    RHD_DEVICE_MATCH(  0x9498, RHD_RV730 ), /* ATI RADEON HD 4650 */
++    RHD_DEVICE_MATCH(  0x949C, RHD_RV730 ), /* ATI FirePro V7750 */
++    RHD_DEVICE_MATCH(  0x949E, RHD_RV730 ), /* ATI FirePro V5700 */
++    RHD_DEVICE_MATCH(  0x949F, RHD_RV730 ), /* ATI FirePro V3750 */
++    RHD_DEVICE_MATCH(  0x94A0, RHD_M97 ),   /* Mobility Radeon HD 4830 */
++    RHD_DEVICE_MATCH(  0x94A1, RHD_M97 ),   /* Mobility Radeon HD 4850 */
++    RHD_DEVICE_MATCH(  0x94B1, RHD_RV740 ), /* RV740 */
++    RHD_DEVICE_MATCH(  0x94B3, RHD_RV740 ), /* Radeon HD 4770 */
++    RHD_DEVICE_MATCH(  0x94B5, RHD_RV740 ), /* Radeon HD 4770 */
+     RHD_DEVICE_MATCH(  0x94C0, RHD_RV610 ), /* RV610 */
+     RHD_DEVICE_MATCH(  0x94C1, RHD_RV610 ), /* Radeon HD 2400 XT */
+     RHD_DEVICE_MATCH(  0x94C3, RHD_RV610 ), /* Radeon HD 2400 Pro */
+@@ -264,24 +284,29 @@ const PCI_ID_LIST = {
+     RHD_DEVICE_MATCH(  0x94C9, RHD_M72   ), /* Mobility Radeon HD 2400 */
+     RHD_DEVICE_MATCH(  0x94CB, RHD_M72   ), /* ATI RADEON E2400 */
+     RHD_DEVICE_MATCH(  0x94CC, RHD_RV610 ), /* ATI Radeon HD 2400 */
++    RHD_DEVICE_MATCH(  0x94CD, RHD_RV610 ), /* ATI FireMV 2260 */
+     RHD_DEVICE_MATCH(  0x9500, RHD_RV670 ), /* RV670 */
+     RHD_DEVICE_MATCH(  0x9501, RHD_RV670 ), /* ATI Radeon HD3870 */
+-    RHD_DEVICE_MATCH(  0x9504, RHD_M88   ), /*  ATI Mobility Radeon HD 3850 */
++    RHD_DEVICE_MATCH(  0x9504, RHD_M88   ), /* ATI Mobility Radeon HD 3850 */
+     RHD_DEVICE_MATCH(  0x9505, RHD_RV670 ), /* ATI Radeon HD3850 */
+-    RHD_DEVICE_MATCH(  0x9506, RHD_M88   ), /*  ATI Mobility Radeon HD 3850 X2 */
+-    RHD_DEVICE_MATCH(  0x9507, RHD_RV670 ), /* RV670 */
+-    RHD_DEVICE_MATCH(  0x9508, RHD_M88   ), /*  ATI Mobility Radeon HD 3870 */
+-    RHD_DEVICE_MATCH(  0x9509, RHD_M88   ), /*  ATI Mobility Radeon HD 3870 X2 */
++    RHD_DEVICE_MATCH(  0x9506, RHD_M88   ), /* ATI Mobility Radeon HD 3850 X2 */
++    RHD_DEVICE_MATCH(  0x9507, RHD_RV670 ), /* ATI RADEON HD 3830 */
++    RHD_DEVICE_MATCH(  0x9508, RHD_M88   ), /* ATI Mobility Radeon HD 3870 */
++    RHD_DEVICE_MATCH(  0x9509, RHD_M88   ), /* ATI Mobility Radeon HD 3870 X2 */
+     RHD_DEVICE_MATCH(  0x950F, RHD_R680  ), /* ATI Radeon HD3870 X2 */
+     RHD_DEVICE_MATCH(  0x9511, RHD_RV670 ), /* ATI FireGL V7700 */
++    RHD_DEVICE_MATCH(  0x9513, RHD_R680  ), /* ATI RADEON HD 3850 X2 */
+     RHD_DEVICE_MATCH(  0x9515, RHD_RV670 ), /* ATI Radeon HD 3850 AGP */
+     RHD_DEVICE_MATCH(  0x9517, RHD_RV670 ), /* ATI Radeon HD 3960 */
+     RHD_DEVICE_MATCH(  0x9519, RHD_RV670 ), /* FireStream 9170 */
+-    RHD_DEVICE_MATCH(  0x9540, RHD_RV710 ), /*   */
++    RHD_DEVICE_MATCH(  0x9540, RHD_RV710 ), /* ATI RADEON HD 4550 */
+     RHD_DEVICE_MATCH(  0x9541, RHD_RV710 ), /*   */
+     RHD_DEVICE_MATCH(  0x9542, RHD_RV710 ), /*   */
+     RHD_DEVICE_MATCH(  0x954E, RHD_RV710 ), /*   */
+-    RHD_DEVICE_MATCH(  0x954f, RHD_RV710 ), /*   */
++    RHD_DEVICE_MATCH(  0x954F, RHD_RV710 ), /* ATI RADEON HD 4350 */
++    RHD_DEVICE_MATCH(  0x9552, RHD_M92 ),   /* Mobility Radeon HD 4300 Series */
++    RHD_DEVICE_MATCH(  0x9553, RHD_M92 ),   /* Mobility Radeon HD 4500 Series */
++    RHD_DEVICE_MATCH(  0x9555, RHD_M93 ),   /* Mobility Radeon M93 */
+     RHD_DEVICE_MATCH(  0x9580, RHD_RV630 ), /* RV630 */
+     RHD_DEVICE_MATCH(  0x9581, RHD_M76   ), /* Mobility Radeon HD 2600 */
+     RHD_DEVICE_MATCH(  0x9583, RHD_M76   ), /* Mobility Radeon HD 2600 XT */
+@@ -297,26 +322,28 @@ const PCI_ID_LIST = {
+     RHD_DEVICE_MATCH(  0x958F, RHD_M76   ), /* ATI Mobility FireGL Graphics Processor */
+     RHD_DEVICE_MATCH(  0x9590, RHD_RV635 ), /* ATI Radeon HD 3600 Series */
+     RHD_DEVICE_MATCH(  0x9591, RHD_M86   ), /* Mobility Radeon HD 3650 */
++    RHD_DEVICE_MATCH(  0x9592, RHD_RV710 ), /* */
+     RHD_DEVICE_MATCH(  0x9593, RHD_M86   ), /* Mobility Radeon HD 3670 */
+     RHD_DEVICE_MATCH(  0x9595, RHD_M86   ), /* Mobility FireGL V5700 */
+     RHD_DEVICE_MATCH(  0x9596, RHD_RV635 ), /* ATI Radeon HD 3650 AGP */
+     RHD_DEVICE_MATCH(  0x9597, RHD_RV635 ), /* ATI Radeon HD 3600 Series */
+     RHD_DEVICE_MATCH(  0x9598, RHD_RV635 ), /* ATI Radeon HD 3670 */
+     RHD_DEVICE_MATCH(  0x9599, RHD_RV635 ), /* ATI Radeon HD 3600 Series */
+-    RHD_DEVICE_MATCH(  0x959B, RHD_M86   ), /* Mobility FireGL Graphics Processor */
++    RHD_DEVICE_MATCH(  0x959B, RHD_M86   ), /* ATI Mobility FireGL V5725 */
+     RHD_DEVICE_MATCH(  0x95C0, RHD_RV620 ), /* ATI Radeon HD 3470 */
+     RHD_DEVICE_MATCH(  0x95C2, RHD_M82   ), /* ATI Mobility Radeon HD 3430 (M82) */
+     RHD_DEVICE_MATCH(  0x95C4, RHD_M82   ), /* Mobility Radeon HD 3400 Series (M82)  */
+     RHD_DEVICE_MATCH(  0x95C5, RHD_RV620 ), /* ATI Radeon HD 3450 */
+     RHD_DEVICE_MATCH(  0x95C6, RHD_RV620 ), /* ATI Radeon HD 3450 */
+     RHD_DEVICE_MATCH(  0x95C7, RHD_RV620 ), /* ATI Radeon HD 3430 */
++    RHD_DEVICE_MATCH(  0x95C9, RHD_RV620 ), /* ATI Radeon HD 3450 */
+     RHD_DEVICE_MATCH(  0x95CC, RHD_RV620 ), /* Fire PRO Professional Graphics ASIC  */
+     RHD_DEVICE_MATCH(  0x95CD, RHD_RV620 ), /* ATI FireMV 2450  */
+     RHD_DEVICE_MATCH(  0x95CE, RHD_RV620 ), /* ATI FireMV 2260  */
+     RHD_DEVICE_MATCH(  0x95CF, RHD_RV620 ), /* ATI FireMV 2260  */
+     RHD_DEVICE_MATCH(  0x9610, RHD_RS780 ), /* ATI Radeon HD 3200 Graphics */
+     RHD_DEVICE_MATCH(  0x9611, RHD_RS780 ), /* ATI Radeon 3100 Graphics */
+-    RHD_DEVICE_MATCH(  0x9612, RHD_RS780 ), /*  ATI Radeon HD 3200 Graphics  */
++    RHD_DEVICE_MATCH(  0x9612, RHD_RS780 ), /* ATI Radeon HD 3200 Graphics  */
+     RHD_DEVICE_MATCH(  0x9613, RHD_RS780 ), /* ATI Radeon 3100 Graphics   */
+     RHD_DEVICE_MATCH(  0x9614, RHD_RS780 ), /* ATI Radeon HD 3300 Graphics  */
+     RHD_DEVICE_MATCH(  0x9615, RHD_RS780 ), /* ATI Radeon HD 3200 Graphics  */
+@@ -380,22 +407,29 @@ RHDIdentify(int flags)
+ 	    "\tM72   : Mobility Radeon HD 2400; Radeon E2400.\n"
+ 	    "\tM74   : Mobility Radeon HD 2400 XT.\n"
+ 	    "\tM76   : Mobility Radeon HD 2600;\n"
+-	    "\t\t(Gemini ATI) Mobility Radeon HD 2600 XT.\n"
+-	    "\tM82   : Mobility Radeon HD 3400.\n");
++	    "\t\t(Gemini ATI) Mobility Radeon HD 2600 XT.\n");
+     xf86Msg(X_NONE,
++	    "\tM82   : Mobility Radeon HD 3400.\n"
+ 	    "\tM86   : Mobility Radeon HD 3650, HD 3670, Mobility FireGL V5700.\n"
+-	    "\tM88   : Mobility Radeon HD 3850, HD 3850 X2, HD 3870, HD3870 X2.\n"
++	    "\tM88   : Mobility Radeon HD 3850, HD 3850 X2, HD 3870, HD3870 X2.\n");
++    xf86Msg(X_NONE,
+ 	    "\tRS600 : Radeon Xpress 1200, Xpress 1250.\n"
+ 	    "\tRS690 : Radeon X1200, X1250, X1270.\n"
+  	    "\tRS740 : RS740, RS740M.\n"
+- 	    "\tRS780 : Radeon HD 3100/3200/3300 Series.\n"
+- 	    "\tRV770 : Radeon HD 4800 Series; Everest, K2, Denali ATI FirePro.\n");
++ 	    "\tRS780 : Radeon HD 3100/3200/3300 Series.\n");
+     xf86Msg(X_NONE,
+ 	    "\tR700  : Radeon R700.\n"
+-            "\tM98   : Radeon M98 Mobility.\n"
++	    "\tRV710 : Radeon HD4570, HD4350.\n"
+ 	    "\tRV730 : Radeon HD4670, HD4650.\n"
+-	    "\tM96   : Radeon M96 Mobility.\n"
+-	    "\tRV710 : Radeon HD4570, HD4350.\n");
++	    "\tRV740 : Radeon HD4770. EXPERIMENTAL AND UNTESTED.\n"
++ 	    "\tRV770 : Radeon HD 4800 Series; Everest, K2, Denali ATI FirePro.\n"
++ 	    "\tRV790 : Radeon HD 4890.\n");
++    xf86Msg(X_NONE,
++	    "\tM92   : Mobility Radeon HD4330, HD4530, HD4570. EXPERIMENTAL.\n"
++	    "\tM93   : Mobility Radeon M93. EXPERIMENTAL AND UNTESTED.\n"
++	    "\tM96   : Mobility Radeon HD4600.\n"
++	    "\tM97   : Mobility Radeon HD4860. EXPERIMENTAL AND UNTESTED.\n"
++            "\tM98   : Mobility Radeon HD4850, HD4870.\n");
+     /* END_DEVICE_LIST marker - do not delete */
+     xf86Msg(X_NONE, "\n");
+ 
+@@ -686,6 +720,7 @@ rhdCards[] =
+     /* 0x7146 : RV515 : Radeon X1300/X1550 */
+     { 0x7146, 0x174B, 0x0470, "Sapphire X1300", RHD_CARD_FLAG_NONE, VGA_B1_DVI_AB01, DEVINFO_EMPTY },
+     { 0x7146, 0x174B, 0x0920, "Sapphire X1300", RHD_CARD_FLAG_HPDSWAP, ID_CONNECTORINFO_EMPTY, DEVINFO_EMPTY },
++    { 0x7146, 0x174B, 0x0940, "X1300 HM", RHD_CARD_FLAG_HPDSWAP, ID_CONNECTORINFO_EMPTY, DEVINFO_EMPTY },
+     { 0x7146, 0x1545, 0x2350, "Visiontek C1550", RHD_CARD_FLAG_NONE, VGA_A0_TV_B_DVI_BB10, DEVINFO_EMPTY },
+     /* 0x7147 : RV505 : Radeon X1550 64-bit */
+     { 0x7147, 0x174B, 0x0840, "Sapphire X1550", RHD_CARD_FLAG_HPDSWAP, ID_CONNECTORINFO_EMPTY, DEVINFO_EMPTY },
+@@ -716,6 +751,7 @@ rhdCards[] =
+     { 0x7187, 0x1545, 0x1930, "RV516 : Radeon X1300", RHD_CARD_FLAG_NONE, VGA_A0_TV_B_DVI_XB11, DEVINFO_EMPTY },
+     /* 0x7188 : M64 : Mobility Radeon X2300 */
+     /* 0x718A : M64 : Mobility Radeon X2300 */
++    { 0x718A, 0x1043, 0x1449, "Asus F3JR", RHD_CARD_FLAG_HPDOFF, ID_CONNECTORINFO_EMPTY, DEVINFO_EMPTY },
+     /* 0x718B : M62 : Mobility Radeon X1350 */
+     /* 0x718C : M62 : Mobility Radeon X1350 */
+     /* 0x718D : M64 : Mobility Radeon X1450 */
+@@ -851,7 +887,8 @@ rhdCards[] =
+     /* 0x958C : RV630 : ATI FireGL V5600  */
+     /* 0x958D : RV630 : ATI FireGL V3600  */
+     /* 0x958E : RV630 : ATI Radeon HD 2600 LE  */
+-    { 0x95c5, 0x1787, 0x2252, "PowerColor HD 3450", RHD_CARD_FLAG_HPDOFF, ID_CONNECTORINFO_EMPTY, DEVINFO_EMPTY },
++    { 0x95C5, 0x1043, 0x01F4, "ASUS EAH3450", RHD_CARD_FLAG_HPDOFF, ID_CONNECTORINFO_EMPTY, DEVINFO_EMPTY },
++    { 0x95C5, 0x1787, 0x2252, "PowerColor HD 3450", RHD_CARD_FLAG_HPDOFF, ID_CONNECTORINFO_EMPTY, DEVINFO_EMPTY },
+     { 0x9610, 0x105B, 0x0E0F, "Foxconn A7GM-S (RS780)", RHD_CARD_FLAG_HPDOFF, ID_CONNECTORINFO_EMPTY, DEVINFO_EMPTY },
+     { 0, 0, 0, NULL, 0, ID_CONNECTORINFO_EMPTY, DEVINFO_EMPTY } /* KEEP THIS: End marker. */
+ };
+diff --git a/src/rhd_lvtma.c b/src/rhd_lvtma.c
+index 6603b05..b24bf5f 100644
+--- a/src/rhd_lvtma.c
++++ b/src/rhd_lvtma.c
+@@ -240,9 +240,9 @@ LVDSPropertyControl(struct rhdOutput *Output, enum rhdPropertyAction Action,
+     switch (Action) {
+ 	case rhdPropertyCheck:
+ 	    switch (Property) {
+-		if (Private->BlLevel < 0)
+-		    return FALSE;
+ 		case RHD_OUTPUT_BACKLIGHT:
++		    if (Private->BlLevel < 0)
++			return FALSE;
+ 		    return TRUE;
+ 		default:
+ 		    return FALSE;
+diff --git a/src/rhd_mc.c b/src/rhd_mc.c
+index 5405945..d09be1e 100644
+--- a/src/rhd_mc.c
++++ b/src/rhd_mc.c
+@@ -61,9 +61,13 @@
+ #include "xf86.h"
+ 
+ #include "rhd.h"
++#include "rhd_mc.h"
+ #include "rhd_regs.h"
+ #include "rhd_crtc.h" /* for definition of Crtc->Id */
+ 
++#include "r600_reg_auto_r6xx.h"
++#include "r600_reg_r6xx.h"
++
+ struct rhdMC {
+     int scrnIndex;
+ 
+@@ -391,7 +395,9 @@ R600MCRestore(struct rhdMC *MC)
+ static Bool
+ R600MCWaitIdle(struct rhdMC *MC)
+ {
+-    if (!(RHDRegRead(MC, SRBM_STATUS) & 0x3f00))
++    if (!(RHDRegRead(MC, SRBM_STATUS) &
++            (VMC_BUSY_bit | MCB_BUSY_bit |
++             MCDZ_BUSY_bit | MCDY_BUSY_bit | MCDX_BUSY_bit | MCDW_BUSY_bit)))
+ 	return TRUE;
+     return FALSE;
+ }
+diff --git a/src/rhd_mc.h b/src/rhd_mc.h
+index 2d2bd18..b66aa4a 100644
+--- a/src/rhd_mc.h
++++ b/src/rhd_mc.h
+@@ -25,6 +25,10 @@
+ #ifndef RHD_MC_H
+ # define RHD_MC_H
+ 
++/* to be fixed for good !@#$ */
++#include <stdint.h>
++#define CARD64 uint64_t
++
+ extern void RHDMCInit(RHDPtr rhdPtr);
+ extern void RHDMCDestroy(RHDPtr rhdPtr);
+ extern void RHDMCSave(RHDPtr rhdPtr);
+diff --git a/src/rhd_monitor.c b/src/rhd_monitor.c
+index 5234c7b..8c15391 100644
+--- a/src/rhd_monitor.c
++++ b/src/rhd_monitor.c
+@@ -382,6 +382,21 @@ rhdMonitorPanel(struct rhdConnector *Connector)
+ 	return NULL;
+     }
+ 
++    /* Fixup some broken modes - if we can do so, otherwise we might have no
++     * chance of driving the panel at all */
++    if (Monitor->NativeMode) {
++
++	/* Some Panels have H or VSyncEnd values greater than H or VTotal. */
++	if (Monitor->NativeMode->HTotal <= Monitor->NativeMode->HSyncEnd)
++	    Monitor->NativeMode->HTotal =  Monitor->NativeMode->CrtcHTotal = Monitor->NativeMode->HSyncEnd + 1;
++	if (Monitor->NativeMode->VTotal <= Monitor->NativeMode->VSyncEnd)
++	    Monitor->NativeMode->VTotal =  Monitor->NativeMode->CrtcVTotal = Monitor->NativeMode->VSyncEnd + 1;
++	if (Monitor->NativeMode->CrtcHBlankEnd <= Monitor->NativeMode->CrtcHSyncEnd)
++	    Monitor->NativeMode->CrtcHBlankEnd  = Monitor->NativeMode->CrtcHSyncEnd + 1;
++	if (Monitor->NativeMode->CrtcVBlankEnd <= Monitor->NativeMode->CrtcVSyncEnd)
++	    Monitor->NativeMode->CrtcVBlankEnd =  Monitor->NativeMode->CrtcVSyncEnd + 1;
++    }
++
+     /* panel should be driven at native resolution only. */
+     Monitor->UseFixedModes = TRUE;
+     Monitor->ReducedAllowed = TRUE;
+diff --git a/src/rhd_output.c b/src/rhd_output.c
+index 7fe2ee9..d1fbde4 100644
+--- a/src/rhd_output.c
++++ b/src/rhd_output.c
+@@ -261,3 +261,41 @@ RHDOutputAttachConnector(struct rhdOutput *Output, struct rhdConnector *Connecto
+ 	    xf86DrvMsg(rhdPtr->scrnIndex, X_WARNING, "Failed to %s HDMI on %s\n", val.Bool ? "disable" : "enable", Output->Name);
+     }
+ }
++
++/*
++ * Returns the TMDS index of the given output, important for HDMI/Audio setup
++ */
++int
++RHDOutputTmdsIndex(struct rhdOutput *Output)
++{
++    struct rhdOutput *i = RHDPTRI(Output)->Outputs;
++    int index;
++
++    switch(Output->Id) {
++	case RHD_OUTPUT_TMDSA:
++	case RHD_OUTPUT_UNIPHYA:
++	    index=0;
++	    break;
++
++	case RHD_OUTPUT_LVTMA:
++	    /* special case check if an TMDSA is present */
++	    index=0;
++	    while(i) {
++		if(i->Id==RHD_OUTPUT_TMDSA)
++		    index++;
++		i = i->Next;
++	    }
++	    break;
++
++	case RHD_OUTPUT_UNIPHYB:
++	case RHD_OUTPUT_KLDSKP_LVTMA:
++	    index=1;
++	    break;
++
++	default:
++	    xf86DrvMsg(Output->scrnIndex, X_ERROR, "%s: unsupported output type\n", __func__);
++            index=-1;
++	    break;
++    }
++    return index;
++}
+diff --git a/src/rhd_output.h b/src/rhd_output.h
+index 22edfe9..21a49d2 100644
+--- a/src/rhd_output.h
++++ b/src/rhd_output.h
+@@ -115,6 +115,7 @@ void RHDOutputsRestore(RHDPtr rhdPtr);
+ void RHDOutputsDestroy(RHDPtr rhdPtr);
+ void RHDOutputPrintSensedType(struct rhdOutput *Output);
+ void RHDOutputAttachConnector(struct rhdOutput *Output, struct rhdConnector *Connector);
++int RHDOutputTmdsIndex(struct rhdOutput *Output);
+ 
+ /* output local functions. */
+ struct rhdOutput *RHDDACAInit(RHDPtr rhdPtr);
+diff --git a/src/rhd_pll.c b/src/rhd_pll.c
+index 45ab03a..c9efd9a 100644
+--- a/src/rhd_pll.c
++++ b/src/rhd_pll.c
+@@ -732,9 +732,13 @@ RV620PLL1Power(struct rhdPLL *PLL, int Power)
+ 	RHDRegMask(PLL, P1PLL_CNTL, 0x01, 0x01); /* Reset */
+ 	usleep(2);
+ 
+-	RHDRegMask(PLL, P1PLL_CNTL, 0x02, 0x02); /* Power down */
++	/* Sometimes we have to keep unused PLL running, see bug #18016 */
++	if ((RHDRegRead(PLL, RV620_EXT1_DIFF_POST_DIV_CNTL) & 0x0100) == 0)
++	    RHDRegMask(PLL, P1PLL_CNTL, 0x02, 0x02); /* Power down */
+ 	usleep(200);
+ 
++	RHDRegMask(PLL, P1PLL_CNTL, 0x2000, 0x2000); /* reset anti-glitch */
++
+ 	return;
+     }
+ }
+@@ -781,9 +785,13 @@ RV620PLL2Power(struct rhdPLL *PLL, int Power)
+ 	RHDRegMask(PLL, P2PLL_CNTL, 0x01, 0x01); /* Reset */
+ 	usleep(2);
+ 
+-	RHDRegMask(PLL, P2PLL_CNTL, 0x02, 0x02); /* Power down */
++	/* Sometimes we have to keep unused PLL running, see bug #18016 */
++	if ((RHDRegRead(PLL, RV620_EXT2_DIFF_POST_DIV_CNTL) & 0x0100) == 0)
++	    RHDRegMask(PLL, P2PLL_CNTL, 0x02, 0x02); /* Power down */
+ 	usleep(200);
+ 
++	RHDRegMask(PLL, P2PLL_CNTL, 0x2000, 0x2000); /* reset anti-glitch */
++
+ 	return;
+     }
+ }
+diff --git a/src/rhd_pm.c b/src/rhd_pm.c
+new file mode 100644
+index 0000000..c5d30b4
+--- /dev/null
++++ b/src/rhd_pm.c
+@@ -0,0 +1,278 @@
++/*
++ * Permission is hereby granted, free of charge, to any person obtaining
++ * a copy of this software and associated documentation files (the
++ * "Software"), to deal in the Software without restriction, including
++ * without limitation on the rights to use, copy, modify, merge,
++ * publish, distribute, sublicense, and/or sell copies of the Software,
++ * and to permit persons to whom the Software is furnished to do so,
++ * subject to the following conditions:
++ *
++ * The above copyright notice and this permission notice (including the
++ * next paragraph) shall be included in all copies or substantial
++ * portions of the Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
++ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ * NON-INFRINGEMENT.  IN NO EVENT SHALL ATI, VA LINUX SYSTEMS AND/OR
++ * THEIR SUPPLIERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
++ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
++ * DEALINGS IN THE SOFTWARE.
++ */
++
++/*
++ * Authors:
++ *   Yang Zhao <yang@yangman.ca>
++ */
++
++#ifdef HAVE_CONFIG_H
++#include "config.h"
++#endif
++
++#include "xf86.h"
++
++#include "rhd.h"
++#include "rhd_pm.h"
++
++#include "rhd_atombios.h"
++
++void
++RHDPmInit(RHDPtr rhdPtr)
++{
++#ifdef ATOM_BIOS
++    struct rhdPm *Pm = (struct rhdPm *) xnfcalloc(sizeof(struct rhdPm), 1);
++    RHDFUNC(rhdPtr);
++
++    Pm->scrnIndex = rhdPtr->scrnIndex;
++
++    Pm->ForcedEngineClock = 0;
++    Pm->ForcedMemoryClock = 0;
++
++    Pm->Stored = FALSE;
++
++    if (rhdPtr->lowPowerMode.val.bool) {
++        if (!rhdPtr->lowPowerModeEngineClock.val.integer) {
++            unsigned long defaultEngine = RHDGetDefaultEngineClock(rhdPtr);
++            if (defaultEngine) {
++                Pm->ForcedEngineClock = defaultEngine / 2;
++                xf86DrvMsg(rhdPtr->scrnIndex, X_INFO, "ForceLowPowerMode: "
++                           "calculated engine clock at %ldkHz\n", 
++                           Pm->ForcedEngineClock);
++            }
++            else {
++                xf86DrvMsg(rhdPtr->scrnIndex, X_WARNING, "ForceLowPowerMode: "
++                           "downclocking engine disabled: could not determine "
++                           "default engine clock\n");
++            }
++        }
++        else {
++            Pm->ForcedEngineClock = rhdPtr->lowPowerModeEngineClock.val.integer;
++            xf86DrvMsg(rhdPtr->scrnIndex, X_INFO, "ForceLowPowerMode: forced "
++                       "engine clock at %ldkHz\n", Pm->ForcedEngineClock);
++        }
++
++        #if 0
++        unsigned long defaultMemory = RHDGetDefaultMemoryClock(rhdPtr);
++        if (defaultMemory) {
++            Pm->ForcedMemoryClock = defaultMemory / 2;
++            xf86DrvMsg(rhdPtr->scrnIndex, X_INFO, "ForceLowPowerMode: "
++                        "calculated memory clock at %ldkHz\n", 
++                        Pm->ForcedMemoryClock);
++        }
++        else {
++            xf86DrvMsg(rhdPtr->scrnIndex, X_WARNING, "ForceLowPowerMode: "
++                        "downclocking memory disabled: could not determine "
++                        "default memory clock\n");
++        }
++        #endif
++    }
++
++    rhdPtr->Pm = Pm;
++#else
++    rhdPtr->Pm = NULL;
++#endif
++}
++
++/*
++ * set engine and memory clocks
++ */
++void
++RHDPmSetClock(RHDPtr rhdPtr)
++{
++    struct rhdPm *Pm = rhdPtr->Pm;
++    if (!Pm) return;
++
++    RHDFUNC(Pm);
++
++#ifdef ATOM_BIOS
++    /* ATM unconditionally enable power management features
++     * if low power mode requested */
++    if (rhdPtr->atomBIOS) {
++	union AtomBiosArg data;
++
++	data.val = 1;
++	RHDAtomBiosFunc(rhdPtr->scrnIndex, rhdPtr->atomBIOS,
++			ATOM_PM_SETUP, &data);
++	if (rhdPtr->ChipSet < RHD_R600) {
++	    data.val = 1;
++	    RHDAtomBiosFunc(rhdPtr->scrnIndex, rhdPtr->atomBIOS,
++			    ATOM_PM_CLOCKGATING_SETUP, &data);
++	}
++    }
++#endif
++
++    if (Pm->ForcedEngineClock) {
++        RHDSetEngineClock(rhdPtr, Pm->ForcedEngineClock);
++
++        /* Induce logging of new engine clock */
++        RHDGetEngineClock(rhdPtr);
++    }
++
++    if (Pm->ForcedMemoryClock) {
++        RHDSetMemoryClock(rhdPtr, Pm->ForcedMemoryClock);
++
++        /* Induce logging of new memory clock */
++        RHDGetMemoryClock(rhdPtr);
++    }
++}
++
++/*
++ * save current engine clock
++ */
++void
++RHDPmSave(RHDPtr rhdPtr)
++{
++    struct rhdPm *Pm = rhdPtr->Pm;
++    if (!Pm) return;
++
++    RHDFUNC(Pm);
++
++    Pm->StoredEngineClock = RHDGetEngineClock(rhdPtr);
++    #if 0
++    Pm->StoredMemoryClock = RHDGetMemoryClock(rhdPtr);
++    #endif
++    Pm->Stored = TRUE;
++}
++
++/*
++ * restore saved engine clock
++ */
++void
++RHDPmRestore(RHDPtr rhdPtr)
++{
++    struct rhdPm *Pm = rhdPtr->Pm;
++    if (!Pm) return;
++
++    RHDFUNC(Pm);
++
++    if (!Pm->Stored) {
++        xf86DrvMsg(Pm->scrnIndex, X_ERROR, "%s: trying to restore "
++                   "uninitialized values.\n", __func__);
++        return;
++    }
++
++    RHDSetEngineClock(rhdPtr, Pm->StoredEngineClock);
++
++    /* Induce logging of new engine clock */
++    RHDGetEngineClock(rhdPtr);
++
++    #if 0
++    RHDSetMemoryClock(rhdPtr, Pm->StoredMemoryClock);
++
++    /* Induce logging of new memory clock */
++    RHDGetMemoryClock(rhdPtr);
++    #endif
++
++#ifdef ATOM_BIOS
++    /* Don't know how to save state yet - unconditionally disable */
++    if (rhdPtr->atomBIOS) {
++	union AtomBiosArg data;
++
++	data.val = 0;
++	RHDAtomBiosFunc(rhdPtr->scrnIndex, rhdPtr->atomBIOS,
++			ATOM_PM_SETUP, &data);
++	if (rhdPtr->ChipSet < RHD_R600) {
++	    data.val = 0;
++	    RHDAtomBiosFunc(rhdPtr->scrnIndex, rhdPtr->atomBIOS,
++			    ATOM_PM_CLOCKGATING_SETUP, &data);
++	}
++    }
++#endif
++}
++
++unsigned long
++RHDGetEngineClock(RHDPtr rhdPtr) {
++#ifdef ATOM_BIOS
++    union AtomBiosArg data;
++    if (RHDAtomBiosFunc(rhdPtr->scrnIndex, rhdPtr->atomBIOS,
++                        GET_ENGINE_CLOCK, &data) == ATOM_SUCCESS) {
++        return data.clockValue;
++    } else
++#endif
++        return 0;
++}
++
++unsigned long
++RHDGetDefaultEngineClock(RHDPtr rhdPtr) {
++#ifdef ATOM_BIOS
++    union AtomBiosArg data;
++    if (RHDAtomBiosFunc(rhdPtr->scrnIndex, rhdPtr->atomBIOS,
++                        GET_DEFAULT_ENGINE_CLOCK, &data) == ATOM_SUCCESS) {
++        return data.clockValue;
++    } else
++#endif
++        return 0;
++}
++
++unsigned long
++RHDGetMemoryClock(RHDPtr rhdPtr) {
++#ifdef ATOM_BIOS
++    union AtomBiosArg data;
++    if (RHDAtomBiosFunc(rhdPtr->scrnIndex, rhdPtr->atomBIOS,
++                        GET_MEMORY_CLOCK, &data) == ATOM_SUCCESS) {
++        return data.clockValue;
++    } else
++#endif
++        return 0;
++}
++
++unsigned long
++RHDGetDefaultMemoryClock(RHDPtr rhdPtr) {
++#ifdef ATOM_BIOS
++    union AtomBiosArg data;
++    if (RHDAtomBiosFunc(rhdPtr->scrnIndex, rhdPtr->atomBIOS,
++                        GET_DEFAULT_MEMORY_CLOCK, &data) == ATOM_SUCCESS) {
++        return data.clockValue;
++    } else
++#endif
++        return 0;
++}
++
++Bool
++RHDSetEngineClock(RHDPtr rhdPtr, unsigned long clk) {
++#ifdef ATOM_BIOS
++    union AtomBiosArg data;
++
++    /* TODO: Idle first; find which idles are needed and expose them */
++    data.clockValue = clk;
++    return RHDAtomBiosFunc(rhdPtr->scrnIndex, rhdPtr->atomBIOS,
++                           SET_ENGINE_CLOCK, &data) == ATOM_SUCCESS;
++#else
++    xf86DrvMsg(rhdPtr->scrnIndex, X_WARNING, "AtomBIOS required to set engine clock\n");
++#endif
++}
++
++Bool
++RHDSetMemoryClock(RHDPtr rhdPtr, unsigned long clk) {
++#ifdef ATOM_BIOS
++    union AtomBiosArg data;
++
++    /* TODO: Idle first; find which idles are needed and expose them */
++    data.clockValue = clk;
++    return RHDAtomBiosFunc(rhdPtr->scrnIndex, rhdPtr->atomBIOS,
++                           SET_MEMORY_CLOCK, &data) == ATOM_SUCCESS;
++#else
++    xf86DrvMsg(rhdPtr->scrnIndex, X_WARNING, "AtomBIOS required to set engine clock\n");
++#endif
++}
+diff --git a/src/rhd_pm.h b/src/rhd_pm.h
+new file mode 100644
+index 0000000..4398b1b
+--- /dev/null
++++ b/src/rhd_pm.h
+@@ -0,0 +1,51 @@
++/*
++ * Permission is hereby granted, free of charge, to any person obtaining
++ * a copy of this software and associated documentation files (the
++ * "Software"), to deal in the Software without restriction, including
++ * without limitation on the rights to use, copy, modify, merge,
++ * publish, distribute, sublicense, and/or sell copies of the Software,
++ * and to permit persons to whom the Software is furnished to do so,
++ * subject to the following conditions:
++ *
++ * The above copyright notice and this permission notice (including the
++ * next paragraph) shall be included in all copies or substantial
++ * portions of the Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
++ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ * NON-INFRINGEMENT.  IN NO EVENT SHALL ATI, VA LINUX SYSTEMS AND/OR
++ * THEIR SUPPLIERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
++ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
++ * DEALINGS IN THE SOFTWARE.
++ */
++
++#ifndef _RHD_PM_H
++# define _RHD_PM_H
++
++struct rhdPm {
++	int scrnIndex;
++
++	unsigned long ForcedEngineClock;
++	unsigned long ForcedMemoryClock;
++
++	unsigned long StoredEngineClock;
++	unsigned long StoredMemoryClock;
++	Bool Stored;
++};
++
++void RHDPmInit(RHDPtr rhdPtr);
++void RHDPmSetClock(RHDPtr rhdPtr);
++void RHDPmSave(RHDPtr rhdPtr);
++void RHDPmRestore(RHDPtr rhdPtr);
++
++unsigned long RHDGetEngineClock(RHDPtr rhdPtr);
++unsigned long RHDGetDefaultEngineClock(RHDPtr rhdPtr);
++unsigned long RHDGetMemoryClock(RHDPtr rhdPtr);
++unsigned long RHDGetDefaultMemoryClock(RHDPtr rhdPtr);
++
++Bool RHDSetEngineClock(RHDPtr rhdPtr, unsigned long clk);
++Bool RHDSetMemoryClock(RHDPtr rhdPtr, unsigned long clk);
++
++#endif /* _RHD_PM_H */
+diff --git a/src/rhd_randr.c b/src/rhd_randr.c
+index 8794f1c..1ed9562 100644
+--- a/src/rhd_randr.c
++++ b/src/rhd_randr.c
+@@ -33,6 +33,10 @@
+ # include "config.h"
+ #endif
+ 
++/* The _AtomBIOS property is experimental for now - only enable if needed.
++ * Beware - there be dragons and crashes */
++#define ENABLE_PROPERTY_ATOMBIOS 0
++
+ /* Xserver interface */
+ #include "xf86.h"
+ 
+@@ -111,6 +115,8 @@ struct rhdRandrCrtc {
+     } u;
+ };
+ 
++#define ATOM_EDID             "EDID"
++#define ATOM_EDID2            "EDID_DATA"
+ #define ATOM_SIGNAL_FORMAT    "SignalFormat"
+ #define ATOM_CONNECTOR_TYPE   "ConnectorType"
+ #define ATOM_CONNECTOR_NUMBER "ConnectorNumber"
+@@ -119,12 +125,14 @@ struct rhdRandrCrtc {
+ #define ATOM_BACKLIGHT        "_Backlight"
+ #define ATOM_COHERENT         "_Coherent"
+ #define ATOM_HDMI             "_HDMI"
++#define ATOM_ATOMBIOS         "_AtomBIOS"
+ 
+ static Atom atom_SignalFormat, atom_ConnectorType, atom_ConnectorNumber,
+     atom_OutputNumber, atom_PanningArea, atom_Backlight, atom_Coherent,
+     atom_HdmiProperty;
+ static Atom atom_unknown, atom_VGA, atom_TMDS, atom_LVDS, atom_DisplayPort, atom_TV;
+ static Atom atom_DVI, atom_DVII, atom_DVID, atom_DVIA, atom_HDMI, atom_Panel;
++static Atom atom_EDID, atom_EDID2, atom_AtomBIOS;
+ 
+ 
+ /* Get RandR property values */
+@@ -538,10 +546,17 @@ rhdRROutputCreateResources(xf86OutputPtr out)
+     CARD32            num;
+     int               err;
+     INT32             range[2];
++    static xf86OutputPtr first_output = NULL;
+ 
+     RHDFUNC(rhdPtr);
++    if (! first_output)
++	first_output = out;
+ 
+     /* Create atoms for RandR 1.3 properties */
++    atom_EDID            = MakeAtom(ATOM_EDID,
++				    sizeof(ATOM_EDID)-1, TRUE);
++    atom_EDID2           = MakeAtom(ATOM_EDID2,
++				    sizeof(ATOM_EDID2)-1, TRUE);
+     atom_SignalFormat    = MakeAtom(ATOM_SIGNAL_FORMAT,
+ 				    sizeof(ATOM_SIGNAL_FORMAT)-1, TRUE);
+     atom_ConnectorType   = MakeAtom(ATOM_CONNECTOR_TYPE,
+@@ -552,6 +567,8 @@ rhdRROutputCreateResources(xf86OutputPtr out)
+ 				    sizeof(ATOM_OUTPUT_NUMBER)-1, TRUE);
+     atom_PanningArea     = MakeAtom(ATOM_PANNING_AREA,
+ 				    sizeof(ATOM_PANNING_AREA)-1, TRUE);
++    atom_AtomBIOS        = MakeAtom(ATOM_ATOMBIOS,
++				    sizeof(ATOM_ATOMBIOS)-1, TRUE);
+ 
+     /* Create atoms for RandR 1.3 property values */
+     atom_unknown         = MakeAtom("unknown", 7, TRUE);
+@@ -610,6 +627,22 @@ rhdRROutputCreateResources(xf86OutputPtr out)
+ 			   XA_STRING, 8, PropModeReplace,
+ 			   0, NULL, FALSE, FALSE);
+ 
++#if ENABLE_PROPERTY_ATOMBIOS
++    /* AtomBIOS usage */
++    /* We don't have per-CRTC or even per-GPU properties;
++     * so fake this by only applying to first output */
++    if (out == first_output) {
++	char *string;
++	RRConfigureOutputProperty(out->randr_output, atom_AtomBIOS,
++				  FALSE, FALSE, FALSE, 0, NULL);
++	string = rhdReturnAtomBIOSUsage(rhdPtr);
++	RRChangeOutputProperty(out->randr_output, atom_AtomBIOS,
++			       XA_STRING, 8, PropModeReplace,
++			       strlen(string), string, FALSE, FALSE);
++	free (string);
++    }
++#endif
++
+     if (rout->Output->Property) {
+ 	if (rout->Output->Property(rout->Output, rhdPropertyCheck, RHD_OUTPUT_BACKLIGHT, NULL)) {
+ 	    atom_Backlight = MakeAtom(ATOM_BACKLIGHT,
+@@ -1292,9 +1325,16 @@ rhdRROutputSetProperty(xf86OutputPtr out, Atom property,
+ {
+     RHDPtr            rhdPtr = RHDPTR(out->scrn);
+     rhdRandrOutputPtr rout   = (rhdRandrOutputPtr) out->driver_private;
++    char              buf[256];
+ 
+     RHDFUNC(rhdPtr);
+ 
++    /* Unfortunately, strings are not necessarily 0 terminated */
++    if (value->type == XA_STRING && value->format == 8) {
++	int len = value->size < 255 ? value->size : 255;
++	memcpy (buf, value->data, len);
++	buf[len] = 0;
++    }
+     if (property == atom_PanningArea) {
+ 	int w = 0, h = 0, x = 0, y = 0;
+ 	struct rhdCrtc *Crtc = rout->Output->Crtc;
+@@ -1314,7 +1354,7 @@ rhdRROutputSetProperty(xf86OutputPtr out, Atom property,
+ 	}
+ 	if (value->type != XA_STRING || value->format != 8)
+ 	    return FALSE;
+-	switch (sscanf(value->data, "%dx%d+%d+%d", &w, &h, &x, &y)) {
++	switch (sscanf(buf, "%dx%d+%d+%d", &w, &h, &x, &y)) {
+ 	case 0:
+ 	case 2:
+ 	case 4:
+@@ -1374,6 +1414,21 @@ rhdRROutputSetProperty(xf86OutputPtr out, Atom property,
+ 					  RHD_OUTPUT_HDMI, NULL);
+ 	}
+ 	return FALSE;
++#if ENABLE_PROPERTY_ATOMBIOS
++    } else if (property == atom_AtomBIOS) {
++	if (value->type != XA_STRING || value->format != 8)
++	    return FALSE;
++	if (rhdUpdateAtomBIOSUsage(rhdPtr, buf)) {
++	    free (value->data);
++	    value->data = rhdReturnAtomBIOSUsage(rhdPtr);
++	    value->size = strlen(value->data);
++	    return TRUE;
++	}
++	return FALSE;
++#endif
++    } else if (property == atom_EDID || property == atom_EDID2) {
++	/* Don't do anything, but allow change */
++	return TRUE;
+     }
+ 
+     return FALSE;	/* Others are not mutable */
+@@ -1411,8 +1466,8 @@ rhdRRCrtcShadowAllocate(xf86CrtcPtr crtc, int Width, int Height)
+ 	return ((char *)rhdPtr->FbBase
+ 		+ rhdRRCrtc->u.MemEXA->offset);
+     }
+-
+ #endif /* USE_EXA */
++
+     if (rhdPtr->AccelMethod == RHD_ACCEL_XAA) {
+ 	int Align = (4096 + OctPerPixel - 1) / OctPerPixel;
+ 	Size = (Size + OctPerPixel - 1) / OctPerPixel;
+@@ -1501,7 +1556,7 @@ rhdRROutputGetProperty(xf86OutputPtr out, Atom property)
+     int err = BadValue;
+     union rhdPropertyData val;
+ 
+-    xf86DrvMsg(rhdPtr->scrnIndex, X_INFO, "In %s\n", __func__);
++    RHDFUNC(rhdPtr);
+ 
+     if (property == atom_Backlight) {
+ 	if (rout->Output->Property == NULL)
+@@ -1525,12 +1580,23 @@ rhdRROutputGetProperty(xf86OutputPtr out, Atom property)
+ 	err = RRChangeOutputProperty(out->randr_output, atom_Coherent,
+ 				     XA_INTEGER, 32, PropModeReplace,
+ 				     1, &val.Bool, FALSE, FALSE);
++    } else if (property == atom_HdmiProperty) {
++	if (rout->Output->Property == NULL)
++	    return FALSE;
++
++	if (!rout->Output->Property(rout->Output, rhdPropertyGet,
++				    RHD_OUTPUT_HDMI, &val))
++	    return FALSE;
++
++	err = RRChangeOutputProperty(out->randr_output, atom_HdmiProperty,
++				     XA_INTEGER, 32, PropModeReplace,
++				     1, &val.Bool, FALSE, FALSE);
+     }
+ 
+-    if (err != 0) {
+-	xf86DrvMsg(rhdPtr->scrnIndex, X_ERROR, "In %s RRChangeOutputProperty error: %d\n", __func__, err);
++    RHDDebug(rhdPtr->scrnIndex, "%s 0x%x returns %d\n", __func__, property, err);
++
++    if (err != 0)
+ 	return FALSE;
+-    }
+     return TRUE;
+ }
+ 
+diff --git a/src/rhd_regs.h b/src/rhd_regs.h
+index bf74dd3..fd59bcd 100644
+--- a/src/rhd_regs.h
++++ b/src/rhd_regs.h
+@@ -107,8 +107,6 @@ enum {
+ 
+     DCCG_DISP_CLK_SRCSEL           = 0x0538, /* rv620+ */
+ 
+-    SRBM_STATUS                    = 0x0E50,
+-
+     AGP_STATUS                     = 0x0F5C,
+ 
+     R7XX_MC_VM_FB_LOCATION	   = 0x2024,
+@@ -1113,7 +1111,10 @@ enum {
+     HDMI_IEC60958_1       = 0xd4,
+     HDMI_IEC60958_2       = 0xd8,
+     HDMI_UNKNOWN_2        = 0xdc,
+-    HDMI_AUDIO_DEBUG      = 0xe0
++    HDMI_AUDIO_DEBUG_0    = 0xe0,
++    HDMI_AUDIO_DEBUG_1    = 0xe4,
++    HDMI_AUDIO_DEBUG_2    = 0xe8,
++    HDMI_AUDIO_DEBUG_3    = 0xec
+ };
+ 
+ #endif /* _RHD_REGS_H */
+diff --git a/utils/conntest/Makefile.am b/utils/conntest/Makefile.am
+index b7cc322..48fafbe 100644
+--- a/utils/conntest/Makefile.am
++++ b/utils/conntest/Makefile.am
+@@ -5,6 +5,11 @@ include $(top_srcdir)/RadeonHD.am
+ EXTRA_DIST = README Imakefile
+ 
+ EXTRA_PROGRAMS = rhd_conntest rhd_dump
++
++if XSERVER_LIBPCIACCESS
++noinst_PROGRAMS = rhd_conntest rhd_dump
++endif
++
+ if HAVE_PCI_PCI_H
+ if HAVE_ZLIB
+ noinst_PROGRAMS = rhd_conntest rhd_dump
+@@ -24,8 +29,16 @@ AM_CPPFLAGS = -I$(top_srcdir)/src/AtomBios/includes
+ 
+ rhd_conntest_SOURCES = rhd_conntest.c
+ nodist_rhd_conntest_SOURCES = git_version.h
++if XSERVER_LIBPCIACCESS
++rhd_conntest_LDADD   = @PCIACCESS_LIBS@
++else
+ rhd_conntest_LDADD   = @PCIUTILS_LIBS@
++endif
+ 
+ rhd_dump_SOURCES = rhd_dump.c
+ nodist_rhd_dump_SOURCES = git_version.h
+-rhd_dump_LDADD = @PCIUTILS_LIBS@
+\ No newline at end of file
++if XSERVER_LIBPCIACCESS
++rhd_dump_LDADD   = @PCIACCESS_LIBS@
++else
++rhd_dump_LDADD   = @PCIUTILS_LIBS@
++endif
+diff --git a/utils/conntest/rhd_conntest.c b/utils/conntest/rhd_conntest.c
+index 9e9a595..cd47635 100644
+--- a/utils/conntest/rhd_conntest.c
++++ b/utils/conntest/rhd_conntest.c
+@@ -35,7 +35,6 @@
+ #include <errno.h>
+ #include <string.h>
+ #include <sys/mman.h>
+-#include <pci/pci.h>
+ #include <unistd.h>
+ #include <stdlib.h>
+ 
+@@ -44,6 +43,12 @@
+ #endif
+ #include "git_version.h"
+ 
++#ifdef XSERVER_LIBPCIACCESS
++#include <pciaccess.h>
++#else
++#include <pci/pci.h>
++#endif
++
+ #ifndef ULONG
+ typedef unsigned int ULONG;
+ # define ULONG ULONG
+@@ -79,6 +84,26 @@ typedef unsigned int CARD32;
+ 
+ /* Some register names */
+ enum {
++    /* Needed for enable PCI ROM read */
++    BUS_CNTL              =       0x4C, /* (RW) */
++    GPIOPAD_MASK          =       0x198,  /* (RW) */
++    GPIOPAD_A             =       0x19C,  /* (RW) */
++    GPIOPAD_EN            =       0x1A0,  /* (RW) */
++    VIPH_CONTROL          =       0xC40,  /* (RW) */
++    SEPROM_CNTL1          =       0x1C0,  /* (RW) */
++
++    ROM_CNTL                       = 0x1600,
++    GENERAL_PWRMGT                 = 0x0618,
++    LOW_VID_LOWER_GPIO_CNTL        = 0x0724,
++    MEDIUM_VID_LOWER_GPIO_CNTL     = 0x0720,
++    HIGH_VID_LOWER_GPIO_CNTL       = 0x071C,
++    CTXSW_VID_LOWER_GPIO_CNTL      = 0x0718,
++    LOWER_GPIO_ENABLE              = 0x0710,
++
++    VGA_RENDER_CONTROL             = 0x0300,
++    D1VGA_CONTROL                  = 0x0330,
++    D2VGA_CONTROL                  = 0x0338,
++
+     /* DAC A */
+     DACA_ENABLE                    = 0x7800,
+     DACA_SOURCE_SELECT             = 0x7804,
+@@ -256,6 +281,21 @@ typedef enum dacOutput {
+     DAC_COMPONENT
+ } dacOutput;
+ 
++/* Some defines needed for getting access to unposted BIOS */
++
++#define SCK_PRESCALE (0xff << 24)
++#define VIPH_EN              (1 << 21)
++#define BIOS_ROM_DIS         (1 << 2)
++#define D1VGA_MODE_ENABLE    (1 << 0)
++#define D1VGA_TIMING_SELECT  (1 << 8)
++#define D2VGA_MODE_ENABLE    (1 << 0)
++#define D2VGA_TIMING_SELECT  (1 << 8)
++#define VGA_VSTATUS_CNTL     (0x3 << 16)
++#define SCK_OVERWRITE        (1 << 1)
++#define SCK_PRESCALE_CRYSTAL_CLK_SHIFT 28
++#define OPEN_DRAIN_PADS      (1 << 11)
++
++
+ /* for RHD_R500/R600/RS690/RV620 */
+ chipType ChipType;
+ 
+@@ -509,6 +549,8 @@ dprint(unsigned char *start, unsigned long size)
+ /*
+  *
+  */
++#ifndef XSERVER_LIBPCIACCESS
++/* Only for libpci use */
+ static struct pci_dev *
+ DeviceLocate(struct pci_dev *devices, int bus, int dev, int func)
+ {
+@@ -520,12 +562,17 @@ DeviceLocate(struct pci_dev *devices, int bus, int dev, int func)
+ 	    return device;
+     return NULL;
+ }
++#endif
+ 
+ /*
+  *
+  */
+ static struct RHDDevice *
++#ifdef XSERVER_LIBPCIACCESS
++DeviceMatch(struct pci_device *device)
++#else
+ DeviceMatch(struct pci_dev *device)
++#endif
+ {
+     int i;
+ 
+@@ -540,6 +587,8 @@ DeviceMatch(struct pci_dev *device)
+ /*
+  *
+  */
++#ifndef XSERVER_LIBPCIACCESS
++/* Only for libpci use */
+ static void *
+ MapBar(struct pci_dev *device, int ioBar, int devMem)
+ {
+@@ -561,6 +610,7 @@ MapBar(struct pci_dev *device, int ioBar, int devMem)
+ 
+     return map;
+ }
++#endif
+ 
+ /*
+  *
+@@ -2375,6 +2425,129 @@ FreeVBIOS(unsigned char *rombase, int size)
+     munmap(rombase,size);
+ }
+ 
++
++#ifdef XSERVER_LIBPCIACCESS
++
++/* Copy BIOS from PCI ROM into memory buffer */
++unsigned char *
++GetBIOS_from_PCI(struct RHDDevice *rhdDevice, struct pci_device *dev, void *io, int *size)
++{
++    unsigned char *rombase = NULL;
++    int errnum;
++
++    CARD32 save_seprom_cntl1 = 0,
++        save_gpiopad_a, save_gpiopad_en, save_gpiopad_mask,
++        save_viph_cntl,
++        save_bus_cntl,
++        save_d1vga_control, save_d2vga_control, save_vga_render_control,
++        save_rom_cntl = 0,
++        save_gen_pwrmgt = 0,
++        save_low_vid_lower_gpio_cntl = 0, save_med_vid_lower_gpio_cntl = 0,
++        save_high_vid_lower_gpio_cntl = 0, save_ctxsw_vid_lower_gpio_cntl = 0,
++        save_lower_gpio_en = 0;
++
++    /* We have to enable BIOS on an unposted card.  But first we save the
++       state. Much of this code pinched from RHDReadPCIBios() in
++       rhd_driver.c */
++
++    if (rhdDevice->type < RHD_R600)
++        save_seprom_cntl1 = RegRead(io, SEPROM_CNTL1);
++    save_gpiopad_en = RegRead(io, GPIOPAD_EN);
++    save_gpiopad_a = RegRead(io, GPIOPAD_A);
++    save_gpiopad_mask = RegRead(io, GPIOPAD_MASK);
++    save_viph_cntl = RegRead(io, VIPH_CONTROL);
++    save_bus_cntl = RegRead(io, BUS_CNTL);
++    save_d1vga_control = RegRead(io, D1VGA_CONTROL);
++    save_d2vga_control = RegRead(io, D2VGA_CONTROL);
++    save_vga_render_control = RegRead(io, VGA_RENDER_CONTROL);
++    if (rhdDevice->type >= RHD_R600) {
++        save_rom_cntl                  = RegRead(io, ROM_CNTL);
++        save_gen_pwrmgt                = RegRead(io, GENERAL_PWRMGT);
++        save_low_vid_lower_gpio_cntl   = RegRead(io, LOW_VID_LOWER_GPIO_CNTL);
++        save_med_vid_lower_gpio_cntl   = RegRead(io, MEDIUM_VID_LOWER_GPIO_CNTL);
++        save_high_vid_lower_gpio_cntl  = RegRead(io, HIGH_VID_LOWER_GPIO_CNTL);
++        save_ctxsw_vid_lower_gpio_cntl = RegRead(io, CTXSW_VID_LOWER_GPIO_CNTL);
++        save_lower_gpio_en             = RegRead(io, LOWER_GPIO_ENABLE);
++    }
++
++    /* Set SPI ROM prescale value to change the SCK period */
++    if (rhdDevice->type < RHD_R600)
++        RegMask(io, SEPROM_CNTL1, 0x0C << 24, SCK_PRESCALE);
++    /* Let chip control GPIO pads - this is the default state after power up */
++    RegWrite(io, GPIOPAD_EN, 0);
++    RegWrite(io, GPIOPAD_A, 0);
++    /* Put GPIO pads in read mode */
++    RegWrite(io, GPIOPAD_MASK, 0);
++    /* Disable VIP Host port */
++    RegMask(io, VIPH_CONTROL, 0, VIPH_EN);
++    /* Enable BIOS ROM */
++    RegMask(io, BUS_CNTL, 0, BIOS_ROM_DIS);
++    /* Disable VGA and select extended timings */
++    RegMask(io, D1VGA_CONTROL, 0,
++               D1VGA_MODE_ENABLE | D1VGA_TIMING_SELECT);
++    RegMask(io, D2VGA_CONTROL, 0,
++               D2VGA_MODE_ENABLE | D2VGA_TIMING_SELECT);
++    RegMask(io, VGA_RENDER_CONTROL, 0, VGA_VSTATUS_CNTL);
++    if (rhdDevice->type >= RHD_R600) {
++        RegMask(io, ROM_CNTL, SCK_OVERWRITE
++                   | 1 << SCK_PRESCALE_CRYSTAL_CLK_SHIFT,
++                   SCK_OVERWRITE
++                   | 1 << SCK_PRESCALE_CRYSTAL_CLK_SHIFT);
++        RegMask(io, GENERAL_PWRMGT, 0, OPEN_DRAIN_PADS);
++        RegMask(io, LOW_VID_LOWER_GPIO_CNTL, 0, 0x400);
++        RegMask(io, MEDIUM_VID_LOWER_GPIO_CNTL, 0, 0x400);
++        RegMask(io, HIGH_VID_LOWER_GPIO_CNTL, 0, 0x400);
++        RegMask(io, CTXSW_VID_LOWER_GPIO_CNTL, 0, 0x400);
++        RegMask(io, LOWER_GPIO_ENABLE, 0x400, 0x400);
++    }
++
++    /* Read the ROM */
++
++    *size = (dev->rom_size > 0) ? dev->rom_size : 0x20000;
++
++    rombase =  malloc((size_t)*size);
++
++    if ((errnum = pci_device_read_rom(dev, rombase))) {
++	fprintf(stderr,"Attempt to read ROM from PCI failed: %s.\n",
++		strerror(errnum));
++	free(rombase);
++	rombase = NULL;
++    }
++
++    /* Restore the state prior to being called */
++
++    if (rhdDevice->type < RHD_R600)
++        RegWrite(io, SEPROM_CNTL1, save_seprom_cntl1);
++    RegWrite(io, GPIOPAD_EN, save_gpiopad_en);
++    RegWrite(io, GPIOPAD_A, save_gpiopad_a);
++    RegWrite(io, GPIOPAD_MASK, save_gpiopad_mask);
++    RegWrite(io, VIPH_CONTROL, save_viph_cntl);
++    RegWrite(io, BUS_CNTL, save_bus_cntl);
++    RegWrite(io, D1VGA_CONTROL, save_d1vga_control);
++    RegWrite(io, D2VGA_CONTROL, save_d2vga_control);
++    RegWrite(io, VGA_RENDER_CONTROL, save_vga_render_control);
++    if (rhdDevice->type >= RHD_R600) {
++        RegWrite(io, ROM_CNTL, save_rom_cntl);
++        RegWrite(io, GENERAL_PWRMGT, save_gen_pwrmgt);
++        RegWrite(io, LOW_VID_LOWER_GPIO_CNTL, save_low_vid_lower_gpio_cntl);
++        RegWrite(io, MEDIUM_VID_LOWER_GPIO_CNTL, save_med_vid_lower_gpio_cntl);
++        RegWrite(io, HIGH_VID_LOWER_GPIO_CNTL, save_high_vid_lower_gpio_cntl);
++        RegWrite(io, CTXSW_VID_LOWER_GPIO_CNTL, save_ctxsw_vid_lower_gpio_cntl);
++        RegWrite(io, LOWER_GPIO_ENABLE, save_lower_gpio_en);
++    }
++
++    return rombase;
++}
++
++
++
++void FreeBIOS_from_PCI(unsigned char *rombase)
++{
++    if (rombase) free(rombase);
++}
++#endif
++
++
+ /*
+  *
+  */
+@@ -2478,8 +2651,14 @@ print_help(const char* progname, const char* message, const char* msgarg)
+ 	    fprintf(stderr, "%s %s\n", message, msgarg);
+ 	fprintf(stderr, "Usage: %s [options] PCI-tag\n"
+ 			"       Options: -d: dumpBios\n"
++#ifdef XSERVER_LIBPCIACCESS
++# if HAVE_PCI_DEVICE_ENABLE
++		        "                -e: enable pci card (not normally needed)\n"
++# endif
++		        "                -r: only attempt BIOS read via PCI ROM\n"
++#endif
+ 			"                -s: scanDDCBus\n"
+-			"		 -x num: dump num bytes from available i2c channels\n"
++			"                -x num: dump num bytes from available i2c channels\n"
+ 			"       PCI-tag: bus:dev.func\n\n",
+ 		progname);
+ }
+@@ -2615,28 +2794,52 @@ InterpretATOMBIOS(unsigned char *base)
+ int
+ main(int argc, char *argv[])
+ {
++#ifdef XSERVER_LIBPCIACCESS
++    struct pci_device *device = NULL;
++# if HAVE_PCI_DEVICE_ENABLE
++    int enable_device;
++# endif
++#else
+     struct pci_dev *device = NULL;
+     struct pci_access *pciAccess;
+-    struct RHDDevice *rhdDevice = NULL;
+     int devMem;
++    int saved_errno;
++#endif
++    struct RHDDevice *rhdDevice = NULL;
+     void *io;
+     int bus, dev, func;
+     int ret;
+-    int saved_errno;
+     Bool deviceSet = FALSE;
+     Bool dumpBios = FALSE, scanDDCBus = FALSE;
+     unsigned long DumpI2CData = 0;
+     int i;
+     unsigned char *rombase;
+     int size;
++    int using_vbios;
+ 
+     printf("%s: v%s, %s\n",
+ 	   "rhd_conntest", PACKAGE_VERSION, GIT_MESSAGE);
+ 
++#ifdef XSERVER_LIBPCIACCESS
++    /* Initialise pciaccess */
++    if ((i = pci_system_init())) {
++	fprintf(stderr, "ERROR: pciaccess failed to initialise PCI bus"
++		        " (error %d)\n", i);
++	return 1;
++    }
++    /* Default actions */
++# if HAVE_PCI_DEVICE_ENABLE
++    enable_device = FALSE;
++# endif
++    using_vbios = TRUE;
++#else
+     /* init libpci */
+     pciAccess = pci_alloc();
+     pci_init(pciAccess);
+     pci_scan_bus(pciAccess);
++    /* Default action */
++    using_vbios = TRUE;
++#endif
+ 
+     if (argc < 2) {
+ 	print_help(argv[0], "Missing argument: please provide a PCI tag\n",
+@@ -2645,6 +2848,16 @@ main(int argc, char *argv[])
+     }
+ 
+     for (i = 1; i < argc; i++) {
++#ifdef XSERVER_LIBPCIACCESS
++# if HAVE_PCI_DEVICE_ENABLE
++	if (!strncmp("-e", argv[i], 3)) {
++	    enable_device = TRUE;
++	}else
++# endif
++	if (!strncmp("-r", argv[i], 3)) {
++	    using_vbios = FALSE;
++	}else
++#endif
+ 	if (!strncmp("-d",argv[i],3)) {
+ 	    dumpBios = TRUE;
+ 	} else if (!strncmp("-s",argv[i],3)) {
+@@ -2681,14 +2894,35 @@ main(int argc, char *argv[])
+ 	}
+     }
+ 
++    if (!using_vbios & !deviceSet) {
++	/* Not technically an error, but only a right plonker would specify
++	   this combination of command line options. */
++	printf("What?!! You want me to do nothing!\n"
++	       "Specify a PCI tag and/or don't specify '-r' for some action.\n");
++	return 0;
++    }
++
+     if (deviceSet) {
+-	/* find our toy */
++#ifdef XSERVER_LIBPCIACCESS
++	/* Find the toy using pciaccess */
++	if ((device = pci_device_find_by_slot(0, bus, dev, func)) == NULL) {
++	    fprintf(stderr, "ERROR: Unable to find PCI device at %02X:%02X.%02X.\n",
++		    bus, dev, func);
++	    return 1;
++	}
++# if HAVE_PCI_DEVICE_ENABLE
++	if (enable_device)
++	    pci_device_enable(device);
++# endif
++#else
++	/* find our toy using pci */
+ 	device = DeviceLocate(pciAccess->devices, bus, dev, func);
+ 	if (!device) {
+ 	    fprintf(stderr, "Unable to find PCI device at %02X:%02X.%02X.\n",
+ 		    bus, dev, func);
+ 	    return 1;
+ 	}
++#endif
+ 
+ 	rhdDevice = DeviceMatch(device);
+ 	if (!rhdDevice) {
+@@ -2697,43 +2931,82 @@ main(int argc, char *argv[])
+ 		    device->vendor_id, device->device_id, bus, dev, func);
+ 	    return 1;
+ 	}
+-    }
+ 
+-    rombase = GetVBIOS(&size);
+-    if (!rombase) {
+-	fprintf(stderr, "Cannot get VBIOS. Are we root?\n");
+-    } else
+-    if (!InterpretATOMBIOS(rombase)) {
+-	fprintf(stderr, "Cannot analyze AtomBIOS\n");
+-	return 1;
++#ifdef XSERVER_LIBPCIACCESS
++	printf("Found card: %s - %s\n",
++	       pci_device_get_vendor_name(device),
++	       pci_device_get_device_name(device));
++#endif
+     }
+ 
+-    if (dumpBios && rombase) {
+-	char name[1024] = "posted.vga.rom";
+-
+-	if (deviceSet) {
+-	    snprintf(name, 1023, "%04X.%04X.%04X.vga.rom",
+-		     device->device_id,
+-		     pci_read_word(device, PCI_SUBSYSTEM_VENDOR_ID),
+-		     pci_read_word(device, PCI_SUBSYSTEM_ID));
++    if (using_vbios) {
++	/* Attempt to read BIOS from legacy VBIOS. */
++	rombase = GetVBIOS(&size);
++	if (!rombase) {
++	    printf("Cannot get VBIOS. Are we root?\n");
++	}else{
++	    if (!InterpretATOMBIOS(rombase)) {
++		printf("Cannot analyze AtomBIOS from VBIOS\n");
++		rombase = NULL;
++	    }
+ 	}
+-	WriteToFile(name, rombase, size);
+ 
++	if (dumpBios && rombase) {
++	    char name[1024] = "posted.vga.rom";
++
++	    if (deviceSet) {
++#ifdef XSERVER_LIBPCIACCESS
++		snprintf(name, 1023, "%04X.%04X.%04X.vga.rom",
++			 device->device_id, device->subvendor_id, device->subdevice_id);
++#else
++		snprintf(name, 1023, "%04X.%04X.%04X.vga.rom",
++			 device->device_id,
++			 pci_read_word(device, PCI_SUBSYSTEM_VENDOR_ID),
++			 pci_read_word(device, PCI_SUBSYSTEM_ID));
++#endif
++	    }
++	    WriteToFile(name, rombase, size);
++	}
++    }else{
++	/* We ain't goin' to read VBIOS - flag that */
++	rombase = NULL;
+     }
+ 
+-    if (!deviceSet)
++    /* We reuse the flag using_vbios now to indicate whether we successfully
++       read the VBIOS (rombase is not suitable for the purpose) */
++    using_vbios = rombase ? 1 : 0;
++
++    if (!deviceSet) {
++	if (! using_vbios) {
++	    fprintf(stderr, "ERROR: Failed to read VBIOS.\n");
++	    return 1;
++	}
+ 	return 0;
++    }
+ 
+     if (rhdDevice->bar > 5) {
+-	fprintf(stderr, "Program error: No acceptable BAR defined for this device.\n");
++	fprintf(stderr, "ERROR: No acceptable PCI BAR defined for this device.\n");
+ 	return 1;
+     }
+ 
+-    printf("Checking connectors on 0x%04X, 0x%04X, 0x%04X  (@%02X:%02X:%02X):\n",
+-	   device->device_id, pci_read_word(device, PCI_SUBSYSTEM_VENDOR_ID),
+-	   pci_read_word(device, PCI_SUBSYSTEM_ID),
+-	   device->bus, device->dev, device->func);
++    /* Map into CPU memory space the required PCI memory */
++
++#ifdef XSERVER_LIBPCIACCESS
++    pci_device_probe(device);
+ 
++    if (device->regions[rhdDevice->bar].base_addr == 0) {
++	fprintf(stderr, "ERROR: Failed to find required resource on PCI card.\n");
++	return 1;
++    }
++
++    if ((i = pci_device_map_range(device,device->regions[rhdDevice->bar].base_addr,
++					 device->regions[rhdDevice->bar].size,
++					 PCI_DEV_MAP_FLAG_WRITABLE, &io))) {
++	fprintf(stderr, "ERROR: Couldn't map IO memory: %s.\n", strerror(i));
++	return i;
++    }
++
++#else
+     /* make sure we can actually read DEV_MEM before we do anything else */
+     devMem = open(DEV_MEM, O_RDWR);
+     if (devMem < 0) {
+@@ -2744,11 +3017,50 @@ main(int argc, char *argv[])
+     io = MapBar(device, rhdDevice->bar, devMem);
+     saved_errno = errno;
+     close (devMem);
+-    if (!io) {
++    if (io == (void *) -1) {
+ 	fprintf(stderr, "Unable to map IO memory: %s.\n",
+ 		strerror(saved_errno));
+ 	return 1;
+     }
++#endif
++
++#ifdef XSERVER_LIBPCIACCESS
++    /* Attempt to get unposted BIOS if failed before */
++
++    if (! using_vbios) {
++	printf("Trying to get BIOS from PCI ROM...\n");
++
++	if ((rombase = GetBIOS_from_PCI(rhdDevice, device, io, &size)) == NULL) {
++	    fprintf(stderr,"ERROR: Fat lot of use that was -- can't read BIOS image\n");
++	    return 1;
++	}
++
++	if (!InterpretATOMBIOS(rombase)) {
++	    fprintf(stderr, "ERROR: Cannot analyze AtomBIOS from PCI ROM\n");
++	    return 1;
++	}
++
++	if (dumpBios && rombase) {
++	    char name[1024];
++
++	    snprintf(name, 1023, "%04X.%04X.%04X.vga.rom",
++		     device->device_id, device->subvendor_id, device->subdevice_id);
++	    WriteToFile(name, rombase, size);
++	}
++    }
++#endif
++
++
++#ifdef XSERVER_LIBPCIACCESS
++    printf("Checking connectors on 0x%04X, 0x%04X, 0x%04X  (@%02X:%02X:%02X):\n",
++	   device->device_id, device->subvendor_id, device->subdevice_id,
++	   device->bus, device->dev, device->func);
++#else
++    printf("Checking connectors on 0x%04X, 0x%04X, 0x%04X  (@%02X:%02X:%02X):\n",
++	   device->device_id, pci_read_word(device, PCI_SUBSYSTEM_VENDOR_ID),
++	   pci_read_word(device, PCI_SUBSYSTEM_ID),
++	   device->bus, device->dev, device->func);
++#endif
+ 
+     ChipType = rhdDevice->type;
+ 
+@@ -2760,7 +3072,18 @@ main(int argc, char *argv[])
+     if (scanDDCBus || DumpI2CData)
+ 	DDCScanBus(io, DumpI2CData);
+ 
++#ifdef XSERVER_LIBPCIACCESS
++    if (using_vbios) {
++	FreeVBIOS(rombase, size);
++    }else{
++	FreeBIOS_from_PCI(rombase);
++    }
++
++    pci_device_unmap_range(device, io, device->regions[rhdDevice->bar].size);
++    pci_system_cleanup();
++#else
+     FreeVBIOS(rombase, size);
++#endif
+ 
+     return 0;
+ }
+diff --git a/utils/conntest/rhd_dump.c b/utils/conntest/rhd_dump.c
+index 7a39026..c85ed2e 100644
+--- a/utils/conntest/rhd_dump.c
++++ b/utils/conntest/rhd_dump.c
+@@ -30,16 +30,23 @@
+ #include <errno.h>
+ #include <string.h>
+ #include <sys/mman.h>
++
++#ifdef HAVE_CONFIG_H
++# include "config.h"
++#endif
++
++#ifdef XSERVER_LIBPCIACCESS
++#include <pciaccess.h>
++#else
+ #include <pci/pci.h>
++#endif
++
+ #include <unistd.h>
+ #include <stdlib.h>
+ 
+ #define DEFAULT_START 0x7200
+ #define DEFAULT_END   0x7300
+ 
+-#ifdef HAVE_CONFIG_H
+-# include "config.h"
+-#endif
+ #include "git_version.h"
+ 
+ #ifndef ULONG
+@@ -272,6 +279,8 @@ struct RHDDevice {
+ /*
+  *
+  */
++#ifndef XSERVER_LIBPCIACCESS
++/* Only for libpci use */
+ static struct pci_dev *
+ DeviceLocate(struct pci_dev *devices, int bus, int dev, int func)
+ {
+@@ -283,12 +292,17 @@ DeviceLocate(struct pci_dev *devices, int bus, int dev, int func)
+ 	    return device;
+     return NULL;
+ }
++#endif
+ 
+ /*
+  *
+  */
+ static struct RHDDevice *
++#ifdef XSERVER_LIBPCIACCESS
++DeviceMatch(struct pci_device *device)
++#else
+ DeviceMatch(struct pci_dev *device)
++#endif
+ {
+     int i;
+ 
+@@ -303,6 +317,8 @@ DeviceMatch(struct pci_dev *device)
+ /*
+  *
+  */
++#ifndef XSERVER_LIBPCIACCESS
++/* Only used by pci */
+ static void *
+ MapBar(struct pci_dev *device, int ioBar, int devMem)
+ {
+@@ -318,6 +334,7 @@ MapBar(struct pci_dev *device, int ioBar, int devMem)
+ 
+     return map;
+ }
++#endif
+ 
+ /*
+  *
+@@ -363,7 +380,14 @@ print_help(const char* progname, const char* message, const char* msgarg)
+ {
+ 	if (message != NULL)
+ 	    fprintf(stderr, "%s %s\n", message, msgarg);
+-	fprintf(stderr, "Usage: %s [-r start,end | -w addr val | -l {0|1}] PCI-tag\n"
++	fprintf(stderr, "Usage: %s "
++#if defined(XSERVER_LIBPCIACCESS) && defined (HAVE_PCI_DEVICE_ENABLE)
++			"[-e] "
++#endif
++			"[-r start,end | -w addr val | -l {0|1}] PCI-tag\n"
++#if defined(XSERVER_LIBPCIACCESS) && defined (HAVE_PCI_DEVICE_ENABLE)
++		        "       -e: enable PCI card (not normally needed)\n"
++#endif
+ 			"       PCI-tag: bus:dev.func\n\n",
+ 		progname);
+ }
+@@ -375,14 +399,21 @@ print_help(const char* progname, const char* message, const char* msgarg)
+ int
+ main(int argc, char *argv[])
+ {
++#ifdef XSERVER_LIBPCIACCESS
++    struct pci_device *device = NULL;
++# if HAVE_PCI_DEVICE_ENABLE
++    int enable_device = FALSE;
++# endif
++#else
+     struct pci_dev *device = NULL;
+     struct pci_access *pciAccess;
+-    struct RHDDevice *rhdDevice = NULL;
+     int devMem;
++    int saved_errno;
++#endif
++    struct RHDDevice *rhdDevice = NULL;
+     void *io;
+     int bus, dev, func;
+     int ret;
+-    int saved_errno;
+     Bool deviceSet = FALSE;
+     CARD32 start = DEFAULT_START, end = DEFAULT_END;
+     CARD32 addr, val;
+@@ -400,10 +431,20 @@ main(int argc, char *argv[])
+     printf("%s: v%s, %s\n",
+ 	   "rhd_dump", PACKAGE_VERSION, GIT_MESSAGE);
+ 
++
++#ifdef XSERVER_LIBPCIACCESS
++    /* Initialise pciaccess */
++    if ((i = pci_system_init())) {
++	fprintf(stderr, "ERROR: pciaccess failed to initialise PCI bus"
++		        " (error %d)\n", i);
++	return 1;
++    }
++#else
+     /* init libpci */
+     pciAccess = pci_alloc();
+     pci_init(pciAccess);
+     pci_scan_bus(pciAccess);
++#endif
+ 
+     if (argc < 2) {
+ 	print_help(argv[0], "Missing argument: please provide a PCI tag\n",
+@@ -412,6 +453,13 @@ main(int argc, char *argv[])
+     }
+ 
+     for (i = 1; i < argc; i++) {
++#ifdef XSERVER_LIBPCIACCESS
++# if HAVE_PCI_DEVICE_ENABLE
++	if (!strncmp("-e", argv[i], 3)) {
++	    enable_device = TRUE;
++	}else
++# endif
++#endif
+ 	if (!strncmp("-r",argv[i],3)) {
+ 	    action = READ;
+ 
+@@ -461,7 +509,7 @@ main(int argc, char *argv[])
+ 		i--;
+ 		ret = 0;
+ 	    }
+-	    
++
+ 	    if (addr > 1) ret = 0;
+ 	    if (ret != 1) {
+ 		print_help(argv[0], "Invalid LUT id:", argv[i]);
+@@ -490,13 +538,26 @@ main(int argc, char *argv[])
+     }
+ 
+     if (deviceSet) {
+-	/* find our toy */
++#ifdef XSERVER_LIBPCIACCESS
++	/* Find the toy using pciaccess */
++	if ((device = pci_device_find_by_slot(0, bus, dev, func)) == NULL) {
++	    fprintf(stderr, "ERROR: Unable to find PCI device at %02X:%02X.%02X.\n",
++		    bus, dev, func);
++	    return 1;
++	}
++# if HAVE_PCI_DEVICE_ENABLE
++	if (enable_device)
++	    pci_device_enable(device);
++# endif
++#else
++	/* find our toy using pci */
+ 	device = DeviceLocate(pciAccess->devices, bus, dev, func);
+ 	if (!device) {
+ 	    fprintf(stderr, "Unable to find PCI device at %02X:%02X.%02X.\n",
+ 		    bus, dev, func);
+ 	    return 1;
+ 	}
++#endif
+ 
+ 	rhdDevice = DeviceMatch(device);
+ 	if (!rhdDevice) {
+@@ -511,6 +572,24 @@ main(int argc, char *argv[])
+ 	return 1;
+     }
+ 
++    /* Map into CPU memory space the required PCI memory */
++
++#ifdef XSERVER_LIBPCIACCESS
++    pci_device_probe(device);
++
++    if (device->regions[rhdDevice->bar].base_addr == 0) {
++	fprintf(stderr, "ERROR: Failed to find required resource on PCI card.\n");
++	return 1;
++    }
++
++    if ((i = pci_device_map_range(device,device->regions[rhdDevice->bar].base_addr,
++					 device->regions[rhdDevice->bar].size,
++					 PCI_DEV_MAP_FLAG_WRITABLE, &io))) {
++	fprintf(stderr, "ERROR: Couldn't map IO memory: %s.\n", strerror(i));
++	return i;
++    }
++
++#else
+ 
+     /* make sure we can actually read DEV_MEM before we do anything else */
+     devMem = open(DEV_MEM, O_RDWR);
+@@ -522,11 +601,12 @@ main(int argc, char *argv[])
+     io = MapBar(device, rhdDevice->bar, devMem);
+     saved_errno = errno;
+     close (devMem);
+-    if (!io) {
++    if (io == (void *) -1) {
+ 	fprintf(stderr, "Unable to map IO memory: %s.\n",
+ 		strerror(saved_errno));
+ 	return 1;
+     }
++#endif
+ 
+     ChipType = rhdDevice->type;
+     if (action == READ) {
+@@ -557,5 +637,10 @@ main(int argc, char *argv[])
+ 	}
+     }
+ 
++#ifdef XSERVER_LIBPCIACCESS
++    pci_device_unmap_range(device, io, device->regions[rhdDevice->bar].size);
++    pci_system_cleanup();
++#endif
++
+     return 0;
+ }

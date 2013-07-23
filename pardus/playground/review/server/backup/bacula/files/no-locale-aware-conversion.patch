@@ -1,0 +1,1634 @@
+diff -u -Nuar bacula-5.0.3.orig/src/bacula.h bacula-5.0.3/src/bacula.h
+--- bacula-5.0.3.orig/src/bacula.h	2011-10-20 16:29:23.581001228 +0300
++++ bacula-5.0.3/src/bacula.h	2011-10-20 16:29:55.676001291 +0300
+@@ -197,4 +197,36 @@
+ #undef HAVE_LIBZ                      /* no good without headers */
+ #endif
+ 
++/* Non locale-aware tolower function */
++inline int __attribute__((always_inline))
++ascii_tolower (int c) {
++    if (c >= 'A' && c <= 'Z')
++        c |= 0x20;
++    return c;
++}
++
++inline int __attribute__((always_inline))
++ascii_strcasecmp (const char *a, const char *b) {
++    const unsigned char *p1 = (const unsigned char *)a;
++    const unsigned char *p2 = (const unsigned char *)b;
++    unsigned char c1, c2; 
++
++    if (p1 == p2) 
++        return 0;
++
++    do {
++        c1 = ascii_tolower (*p1);
++        c2 = ascii_tolower (*p2);
++
++        if (c1 == '\0')
++            break;
++
++        ++p1;
++        ++p2;
++
++    } while (c1 == c2);
++
++    return c1 - c2; 
++}
++
+ #endif
+diff -u -Nuar bacula-5.0.3.orig/src/cats/dbi.c bacula-5.0.3/src/cats/dbi.c
+--- bacula-5.0.3.orig/src/cats/dbi.c	2011-10-20 16:29:23.582001228 +0300
++++ bacula-5.0.3/src/cats/dbi.c	2011-10-20 16:29:26.897000957 +0300
+@@ -1247,7 +1247,7 @@
+ 
+    if (mdb->db_type == SQL_TYPE_POSTGRESQL) {
+ 
+-      if (strcasecmp(table_name, "basefiles") == 0) {
++      if (ascii_strcasecmp(table_name, "basefiles") == 0) {
+          bstrncpy(sequence, "basefiles_baseid", sizeof(sequence));
+       } else {
+          bstrncpy(sequence, table_name, sizeof(sequence));
+diff -u -Nuar bacula-5.0.3.orig/src/cats/postgresql.c bacula-5.0.3/src/cats/postgresql.c
+--- bacula-5.0.3.orig/src/cats/postgresql.c	2011-10-20 16:29:23.582001228 +0300
++++ bacula-5.0.3/src/cats/postgresql.c	2011-10-20 16:29:26.897000957 +0300
+@@ -610,7 +610,7 @@
+    PGresult *result;
+    int       id = 0;
+ 
+-   if (strcasecmp(table_name, "basefiles") == 0) {
++   if (ascii_strcasecmp(table_name, "basefiles") == 0) {
+       bstrncpy(sequence, "basefiles_baseid", sizeof(sequence));
+    } else {
+       bstrncpy(sequence, table_name, sizeof(sequence));
+diff -u -Nuar bacula-5.0.3.orig/src/cats/sql.c bacula-5.0.3/src/cats/sql.c
+--- bacula-5.0.3.orig/src/cats/sql.c	2011-10-20 16:29:23.582001228 +0300
++++ bacula-5.0.3/src/cats/sql.c	2011-10-20 16:29:26.898000990 +0300
+@@ -69,13 +69,13 @@
+       Jmsg0(jcr, M_ABORT, 0, _("Invalid driver type, must be \"dbi:<type>\"\n"));
+    }
+    p = (char *)(db_driver + 4);
+-   if (strcasecmp(p, "mysql") == 0) {
++   if (ascii_strcasecmp(p, "mysql") == 0) {
+       db_type = SQL_TYPE_MYSQL;
+-   } else if (strcasecmp(p, "postgresql") == 0) {
++   } else if (ascii_strcasecmp(p, "postgresql") == 0) {
+       db_type = SQL_TYPE_POSTGRESQL;
+-   } else if (strcasecmp(p, "sqlite") == 0) {
++   } else if (ascii_strcasecmp(p, "sqlite") == 0) {
+       db_type = SQL_TYPE_SQLITE;
+-   } else if (strcasecmp(p, "sqlite3") == 0) {
++   } else if (ascii_strcasecmp(p, "sqlite3") == 0) {
+       db_type = SQL_TYPE_SQLITE3;
+    } else {
+       Jmsg1(jcr, M_ABORT, 0, _("Unknown database type: %s\n"), p);
+diff -u -Nuar bacula-5.0.3.orig/src/console/console.c bacula-5.0.3/src/console/console.c
+--- bacula-5.0.3.orig/src/console/console.c	2011-10-20 16:29:23.572001230 +0300
++++ bacula-5.0.3/src/console/console.c	2011-10-20 16:29:26.899001022 +0300
+@@ -634,7 +634,7 @@
+    cmd = get_first_keyword();
+    if (s) {
+       for (int i=0; i < key_size; i++) {
+-         if (!strcasecmp(s, cpl_keywords[i].key)) {
++         if (!ascii_strcasecmp(s, cpl_keywords[i].key)) {
+             cpl_item = cpl_keywords[i].cmd;
+             cpl_type = ITEM_ARG;
+             matches = rl_completion_matches(text, cpl_generator);
+diff -u -Nuar bacula-5.0.3.orig/src/dird/dird_conf.c bacula-5.0.3/src/dird/dird_conf.c
+--- bacula-5.0.3.orig/src/dird/dird_conf.c	2011-10-20 16:29:23.584001228 +0300
++++ bacula-5.0.3/src/dird/dird_conf.c	2011-10-20 16:29:26.900001050 +0300
+@@ -1620,7 +1620,7 @@
+ {
+    uint32_t *destination = (uint32_t*)item->value;
+    lex_get_token(lc, T_NAME);
+-   if (strcasecmp(lc->str, "truncate") == 0) {
++   if (ascii_strcasecmp(lc->str, "truncate") == 0) {
+       *destination = (*destination) | ON_PURGE_TRUNCATE;
+    } else {
+       scan_err2(lc, _("Expected one of: %s, got: %s"), "Truncate", lc->str);
+@@ -1689,7 +1689,7 @@
+    token = lex_get_token(lc, T_NAME);
+    /* Store the type both pass 1 and pass 2 */
+    for (i=0; migtypes[i].type_name; i++) {
+-      if (strcasecmp(lc->str, migtypes[i].type_name) == 0) {
++      if (ascii_strcasecmp(lc->str, migtypes[i].type_name) == 0) {
+          *(uint32_t *)(item->value) = migtypes[i].job_type;
+          i = 0;
+          break;
+@@ -1715,7 +1715,7 @@
+    token = lex_get_token(lc, T_NAME);
+    /* Store the type both pass 1 and pass 2 */
+    for (i=0; jobtypes[i].type_name; i++) {
+-      if (strcasecmp(lc->str, jobtypes[i].type_name) == 0) {
++      if (ascii_strcasecmp(lc->str, jobtypes[i].type_name) == 0) {
+          *(uint32_t *)(item->value) = jobtypes[i].job_type;
+          i = 0;
+          break;
+@@ -1739,7 +1739,7 @@
+    token = lex_get_token(lc, T_NAME);
+    /* Store the level pass 2 so that type is defined */
+    for (i=0; joblevels[i].level_name; i++) {
+-      if (strcasecmp(lc->str, joblevels[i].level_name) == 0) {
++      if (ascii_strcasecmp(lc->str, joblevels[i].level_name) == 0) {
+          *(uint32_t *)(item->value) = joblevels[i].level;
+          i = 0;
+          break;
+@@ -1759,7 +1759,7 @@
+    token = lex_get_token(lc, T_NAME);
+    /* Scan Replacement options */
+    for (i=0; ReplaceOptions[i].name; i++) {
+-      if (strcasecmp(lc->str, ReplaceOptions[i].name) == 0) {
++      if (ascii_strcasecmp(lc->str, ReplaceOptions[i].name) == 0) {
+          *(uint32_t *)(item->value) = ReplaceOptions[i].token;
+          i = 0;
+          break;
+@@ -1807,13 +1807,13 @@
+ {
+    lex_get_token(lc, T_NAME);
+ 
+-   if (strcasecmp(lc->str, "before") == 0) {
++   if (ascii_strcasecmp(lc->str, "before") == 0) {
+       *(uint32_t *)(item->value) = SCRIPT_Before ;
+-   } else if (strcasecmp(lc->str, "after") == 0) {
++   } else if (ascii_strcasecmp(lc->str, "after") == 0) {
+       *(uint32_t *)(item->value) = SCRIPT_After;
+-   } else if (strcasecmp(lc->str, "aftervss") == 0) {
++   } else if (ascii_strcasecmp(lc->str, "aftervss") == 0) {
+       *(uint32_t *)(item->value) = SCRIPT_AfterVSS;
+-   } else if (strcasecmp(lc->str, "always") == 0) {
++   } else if (ascii_strcasecmp(lc->str, "always") == 0) {
+       *(uint32_t *)(item->value) = SCRIPT_Any;
+    } else {
+       scan_err2(lc, _("Expect %s, got: %s"), "Before, After, AfterVSS or Always", lc->str);
+@@ -1831,9 +1831,9 @@
+    if (pass == 2) {
+       if (strcmp(lc->str, "%c") == 0) {
+          ((RUNSCRIPT*) item->value)->set_target(lc->str);
+-      } else if (strcasecmp(lc->str, "yes") == 0) {
++      } else if (ascii_strcasecmp(lc->str, "yes") == 0) {
+          ((RUNSCRIPT*) item->value)->set_target("%c");
+-      } else if (strcasecmp(lc->str, "no") == 0) {
++      } else if (ascii_strcasecmp(lc->str, "no") == 0) {
+          ((RUNSCRIPT*) item->value)->set_target("");
+       } else {
+          RES *res = GetResWithName(R_CLIENT, lc->str);
+@@ -1927,9 +1927,9 @@
+ void store_runscript_bool(LEX *lc, RES_ITEM *item, int index, int pass)
+ {
+    lex_get_token(lc, T_NAME);
+-   if (strcasecmp(lc->str, "yes") == 0 || strcasecmp(lc->str, "true") == 0) {
++   if (ascii_strcasecmp(lc->str, "yes") == 0 || ascii_strcasecmp(lc->str, "true") == 0) {
+       *(bool *)(item->value) = true;
+-   } else if (strcasecmp(lc->str, "no") == 0 || strcasecmp(lc->str, "false") == 0) {
++   } else if (ascii_strcasecmp(lc->str, "no") == 0 || ascii_strcasecmp(lc->str, "false") == 0) {
+       *(bool *)(item->value) = false;
+    } else {
+       scan_err2(lc, _("Expect %s, got: %s"), "YES, NO, TRUE, or FALSE", lc->str); /* YES and NO must not be translated */
+@@ -1989,7 +1989,7 @@
+         scan_err1(lc, _("Expecting keyword, got: %s\n"), lc->str);
+       }
+       for (i=0; runscript_items[i].name; i++) {
+-        if (strcasecmp(runscript_items[i].name, lc->str) == 0) {
++        if (ascii_strcasecmp(runscript_items[i].name, lc->str) == 0) {
+            token = lex_get_token(lc, T_SKIP_EOL);
+            if (token != T_EQUALS) {
+               scan_err1(lc, _("expected an equals, got: %s"), lc->str);
+diff -u -Nuar bacula-5.0.3.orig/src/dird/dir_plugins.c bacula-5.0.3/src/dird/dir_plugins.c
+--- bacula-5.0.3.orig/src/dird/dir_plugins.c	2011-10-20 16:29:23.583001228 +0300
++++ bacula-5.0.3/src/dird/dir_plugins.c	2011-10-20 16:29:26.901001075 +0300
+@@ -369,7 +369,7 @@
+       ok=true;
+       if (jcr->eventType == bEventJobInit) {
+          for (int i=0; ok && joblevels[i].level_name; i++) {
+-            if (strcasecmp(strval, joblevels[i].level_name) == 0) {
++            if (ascii_strcasecmp(strval, joblevels[i].level_name) == 0) {
+                if (joblevels[i].job_type == jcr->getJobType()) {
+                   jcr->set_JobLevel(joblevels[i].level);
+                   jcr->jr.JobLevel = jcr->getJobLevel();
+diff -u -Nuar bacula-5.0.3.orig/src/dird/inc_conf.c bacula-5.0.3/src/dird/inc_conf.c
+--- bacula-5.0.3.orig/src/dird/inc_conf.c	2011-10-20 16:29:23.584001228 +0300
++++ bacula-5.0.3/src/dird/inc_conf.c	2011-10-20 16:29:26.902001096 +0300
+@@ -319,7 +319,7 @@
+     */
+    } else {
+       for (i=0; FS_options[i].name; i++) {
+-         if (FS_options[i].keyword == keyword && strcasecmp(lc->str, FS_options[i].name) == 0) {
++         if (FS_options[i].keyword == keyword && ascii_strcasecmp(lc->str, FS_options[i].name) == 0) {
+             /* NOTE! maximum 2 letters here or increase option[3] */
+             option[0] = FS_options[i].option[0];
+             option[1] = FS_options[i].option[1];
+@@ -392,8 +392,8 @@
+          scan_err1(lc, _("Expecting keyword, got: %s\n"), lc->str);
+       }
+       for (i=0; newinc_items[i].name; i++) {
+-         options = strcasecmp(lc->str, "options") == 0;
+-         if (strcasecmp(newinc_items[i].name, lc->str) == 0) {
++         options = ascii_strcasecmp(lc->str, "options") == 0;
++         if (ascii_strcasecmp(newinc_items[i].name, lc->str) == 0) {
+             if (!options) {
+                token = lex_get_token(lc, T_SKIP_EOL);
+                if (token != T_EQUALS) {
+@@ -741,7 +741,7 @@
+          scan_err1(lc, _("Expecting keyword, got: %s\n"), lc->str);
+       }
+       for (i=0; options_items[i].name; i++) {
+-         if (strcasecmp(options_items[i].name, lc->str) == 0) {
++         if (ascii_strcasecmp(options_items[i].name, lc->str) == 0) {
+             token = lex_get_token(lc, T_SKIP_EOL);
+             if (token != T_EQUALS) {
+                scan_err1(lc, _("expected an equals, got: %s"), lc->str);
+@@ -772,7 +772,7 @@
+    keyword = INC_KW_NONE;
+    /* Look up the keyword */
+    for (i=0; FS_option_kw[i].name; i++) {
+-      if (strcasecmp(item->name, FS_option_kw[i].name) == 0) {
++      if (ascii_strcasecmp(item->name, FS_option_kw[i].name) == 0) {
+          keyword = FS_option_kw[i].token;
+          break;
+       }
+diff -u -Nuar bacula-5.0.3.orig/src/dird/restore.c bacula-5.0.3/src/dird/restore.c
+--- bacula-5.0.3.orig/src/dird/restore.c	2011-10-20 16:29:23.585001228 +0300
++++ bacula-5.0.3/src/dird/restore.c	2011-10-20 16:29:26.902001096 +0300
+@@ -146,7 +146,7 @@
+       if (ua->argc != 1) {
+          continue;
+       }
+-      if (!strcasecmp(ua->argk[0], "Storage")) {
++      if (!ascii_strcasecmp(ua->argk[0], "Storage")) {
+          strncpy(info.storage, ua->argv[0], MAX_NAME_LENGTH);
+          break;
+       }
+@@ -211,7 +211,7 @@
+    if (ua->argc != 1) {
+       return false;
+    }
+-   if (!strcasecmp(ua->argk[0], "Storage")) {
++   if (!ascii_strcasecmp(ua->argk[0], "Storage")) {
+       /* Continue if this is a volume from the same storage. */
+       if (is_on_same_storage(jcr, ua->argv[0])) {
+          return false;
+diff -u -Nuar bacula-5.0.3.orig/src/dird/run_conf.c bacula-5.0.3/src/dird/run_conf.c
+--- bacula-5.0.3.orig/src/dird/run_conf.c	2011-10-20 16:29:23.583001228 +0300
++++ bacula-5.0.3/src/dird/run_conf.c	2011-10-20 16:29:26.903001116 +0300
+@@ -200,7 +200,7 @@
+       found = false;
+       token = lex_get_token(lc, T_NAME);
+       for (i=0; RunFields[i].name; i++) {
+-         if (strcasecmp(lc->str, RunFields[i].name) == 0) {
++         if (ascii_strcasecmp(lc->str, RunFields[i].name) == 0) {
+             found = true;
+             if (lex_get_token(lc, T_ALL) != T_EQUALS) {
+                scan_err1(lc, _("Expected an equals, got: %s"), lc->str);
+@@ -209,10 +209,10 @@
+             switch (RunFields[i].token) {
+             case 's':                 /* Data spooling */
+                token = lex_get_token(lc, T_NAME);
+-               if (strcasecmp(lc->str, "yes") == 0 || strcasecmp(lc->str, "true") == 0) {
++               if (ascii_strcasecmp(lc->str, "yes") == 0 || ascii_strcasecmp(lc->str, "true") == 0) {
+                   lrun.spool_data = true;
+                   lrun.spool_data_set = true;
+-               } else if (strcasecmp(lc->str, "no") == 0 || strcasecmp(lc->str, "false") == 0) {
++               } else if (ascii_strcasecmp(lc->str, "no") == 0 || ascii_strcasecmp(lc->str, "false") == 0) {
+                   lrun.spool_data = false;
+                   lrun.spool_data_set = true;
+                } else {
+@@ -221,10 +221,10 @@
+                break;
+             case 'W':                 /* Write part after job */
+                token = lex_get_token(lc, T_NAME);
+-               if (strcasecmp(lc->str, "yes") == 0 || strcasecmp(lc->str, "true") == 0) {
++               if (ascii_strcasecmp(lc->str, "yes") == 0 || ascii_strcasecmp(lc->str, "true") == 0) {
+                   lrun.write_part_after_job = true;
+                   lrun.write_part_after_job_set = true;
+-               } else if (strcasecmp(lc->str, "no") == 0 || strcasecmp(lc->str, "false") == 0) {
++               } else if (ascii_strcasecmp(lc->str, "no") == 0 || ascii_strcasecmp(lc->str, "false") == 0) {
+                   lrun.write_part_after_job = false;
+                   lrun.write_part_after_job_set = true;
+                } else {
+@@ -234,7 +234,7 @@
+             case 'L':                 /* level */
+                token = lex_get_token(lc, T_NAME);
+                for (j=0; joblevels[j].level_name; j++) {
+-                  if (strcasecmp(lc->str, joblevels[j].level_name) == 0) {
++                  if (ascii_strcasecmp(lc->str, joblevels[j].level_name) == 0) {
+                      lrun.level = joblevels[j].level;
+                      lrun.job_type = joblevels[j].job_type;
+                      j = 0;
+@@ -309,7 +309,7 @@
+                /* NOT REACHED */
+                break;
+             } /* end switch */
+-         } /* end if strcasecmp */
++         } /* end if ascii_strcasecmp */
+       } /* end for RunFields */
+ 
+       /* At this point, it is not a keyword. Check for old syle
+@@ -317,7 +317,7 @@
+        */
+       if (!found) {
+          for (j=0; joblevels[j].level_name; j++) {
+-            if (strcasecmp(lc->str, joblevels[j].level_name) == 0) {
++            if (ascii_strcasecmp(lc->str, joblevels[j].level_name) == 0) {
+                lrun.level = joblevels[j].level;
+                lrun.job_type = joblevels[j].job_type;
+                found = true;
+@@ -369,7 +369,7 @@
+          }
+          /* everything else must be a keyword */
+          for (i=0; keyw[i].name; i++) {
+-            if (strcasecmp(lc->str, keyw[i].name) == 0) {
++            if (ascii_strcasecmp(lc->str, keyw[i].name) == 0) {
+                state = keyw[i].state;
+                code   = keyw[i].code;
+                i = 0;
+@@ -447,9 +447,9 @@
+          if (len >= 2) {
+             p += 2;
+          }
+-         if (strcasecmp(p, "pm") == 0) {
++         if (ascii_strcasecmp(p, "pm") == 0) {
+             pm = true;
+-         } else if (strcasecmp(p, "am") == 0) {
++         } else if (ascii_strcasecmp(p, "am") == 0) {
+             am = true;
+          } else if (len != 2) {
+             scan_err0(lc, _("Bad time specification."));
+diff -u -Nuar bacula-5.0.3.orig/src/dird/ua_acl.c bacula-5.0.3/src/dird/ua_acl.c
+--- bacula-5.0.3.orig/src/dird/ua_acl.c	2011-10-20 16:29:23.584001228 +0300
++++ bacula-5.0.3/src/dird/ua_acl.c	2011-10-20 16:29:26.903001116 +0300
+@@ -65,13 +65,13 @@
+    }
+ 
+    /* Special case *all* gives full access */
+-   if (list->size() == 1 && strcasecmp("*all*", (char *)list->get(0)) == 0) {
++   if (list->size() == 1 && ascii_strcasecmp("*all*", (char *)list->get(0)) == 0) {
+       return true;
+    }
+ 
+    /* Search list for item */
+    for (int i=0; i<list->size(); i++) {
+-      if (strcasecmp(item, (char *)list->get(i)) == 0) {
++      if (ascii_strcasecmp(item, (char *)list->get(i)) == 0) {
+          Dmsg3(1400, "ACL found %s in %d %s\n", item, acl, (char *)list->get(i));
+          return true;
+       }
+diff -u -Nuar bacula-5.0.3.orig/src/dird/ua_cmds.c bacula-5.0.3/src/dird/ua_cmds.c
+--- bacula-5.0.3.orig/src/dird/ua_cmds.c	2011-10-20 16:29:23.584001228 +0300
++++ bacula-5.0.3/src/dird/ua_cmds.c	2011-10-20 16:29:26.905001146 +0300
+@@ -440,7 +440,7 @@
+       onoff = ua->argk[1];
+    }
+ 
+-   ua->automount = (strcasecmp(onoff, NT_("off")) == 0) ? 0 : 1;
++   ua->automount = (ascii_strcasecmp(onoff, NT_("off")) == 0) ? 0 : 1;
+    return 1;
+ }
+ 
+@@ -456,7 +456,7 @@
+    char JobName[MAX_NAME_LENGTH];
+ 
+    for (i=1; i<ua->argc; i++) {
+-      if (strcasecmp(ua->argk[i], NT_("jobid")) == 0) {
++      if (ascii_strcasecmp(ua->argk[i], NT_("jobid")) == 0) {
+          uint32_t JobId;
+          JobId = str_to_int64(ua->argv[i]);
+          if (!JobId) {
+@@ -467,7 +467,7 @@
+             return 1;
+          }
+          break;
+-      } else if (strcasecmp(ua->argk[i], NT_("job")) == 0) {
++      } else if (ascii_strcasecmp(ua->argk[i], NT_("job")) == 0) {
+          if (!ua->argv[i]) {
+             break;
+          }
+@@ -477,7 +477,7 @@
+             bstrncpy(jcr->Job, ua->argv[i], sizeof(jcr->Job));
+          }
+          break;
+-      } else if (strcasecmp(ua->argk[i], NT_("ujobid")) == 0) {
++      } else if (ascii_strcasecmp(ua->argk[i], NT_("ujobid")) == 0) {
+          if (!ua->argv[i]) {
+             break;
+          }
+@@ -771,7 +771,7 @@
+ #ifdef HAVE_PYTHON
+    init_python_interpreter_args python_args;
+ 
+-   if (ua->argc >= 2 && strcasecmp(ua->argk[1], NT_("restart")) == 0) {
++   if (ua->argc >= 2 && ascii_strcasecmp(ua->argk[1], NT_("restart")) == 0) {
+       term_python_interpreter();
+ 
+       python_args.progname = director->name();
+@@ -1041,18 +1041,18 @@
+ 
+    /* General debug? */
+    for (i=1; i<ua->argc; i++) {
+-      if (strcasecmp(ua->argk[i], "all") == 0) {
++      if (ascii_strcasecmp(ua->argk[i], "all") == 0) {
+          do_all_setdebug(ua, level, trace_flag);
+          return 1;
+       }
+-      if (strcasecmp(ua->argk[i], "dir") == 0 ||
+-          strcasecmp(ua->argk[i], "director") == 0) {
++      if (ascii_strcasecmp(ua->argk[i], "dir") == 0 ||
++          ascii_strcasecmp(ua->argk[i], "director") == 0) {
+          debug_level = level;
+          set_trace(trace_flag);
+          return 1;
+       }
+-      if (strcasecmp(ua->argk[i], "client") == 0 ||
+-          strcasecmp(ua->argk[i], "fd") == 0) {
++      if (ascii_strcasecmp(ua->argk[i], "client") == 0 ||
++          ascii_strcasecmp(ua->argk[i], "fd") == 0) {
+          client = NULL;
+          if (ua->argv[i]) {
+             client = GetClientResWithName(ua->argv[i]);
+@@ -1068,9 +1068,9 @@
+          }
+       }
+ 
+-      if (strcasecmp(ua->argk[i], NT_("store")) == 0 ||
+-          strcasecmp(ua->argk[i], NT_("storage")) == 0 ||
+-          strcasecmp(ua->argk[i], NT_("sd")) == 0) {
++      if (ascii_strcasecmp(ua->argk[i], NT_("store")) == 0 ||
++          ascii_strcasecmp(ua->argk[i], NT_("storage")) == 0 ||
++          ascii_strcasecmp(ua->argk[i], NT_("sd")) == 0) {
+          store = NULL;
+          if (ua->argv[i]) {
+             store = GetStoreResWithName(ua->argv[i]);
+@@ -1137,7 +1137,7 @@
+       onoff = ua->argk[1];
+    }
+ 
+-   set_trace((strcasecmp(onoff, NT_("off")) == 0) ? false : true);
++   set_trace((ascii_strcasecmp(onoff, NT_("off")) == 0) ? false : true);
+    return 1;
+ 
+ }
+@@ -1175,8 +1175,8 @@
+ 
+    jcr->set_JobLevel(L_FULL);
+    for (int i=1; i<ua->argc; i++) {
+-      if (strcasecmp(ua->argk[i], NT_("client")) == 0 ||
+-          strcasecmp(ua->argk[i], NT_("fd")) == 0) {
++      if (ascii_strcasecmp(ua->argk[i], NT_("client")) == 0 ||
++          ascii_strcasecmp(ua->argk[i], NT_("fd")) == 0) {
+          if (ua->argv[i]) {
+             client = GetClientResWithName(ua->argv[i]);
+             if (!client) {
+@@ -1193,7 +1193,7 @@
+             return 1;
+          }
+       }
+-      if (strcasecmp(ua->argk[i], NT_("job")) == 0) {
++      if (ascii_strcasecmp(ua->argk[i], NT_("job")) == 0) {
+          if (ua->argv[i]) {
+             job = GetJobResWithName(ua->argv[i]);
+             if (!job) {
+@@ -1211,7 +1211,7 @@
+          }
+ 
+       }
+-      if (strcasecmp(ua->argk[i], NT_("fileset")) == 0) {
++      if (ascii_strcasecmp(ua->argk[i], NT_("fileset")) == 0) {
+          if (ua->argv[i]) {
+             fileset = GetFileSetResWithName(ua->argv[i]);
+             if (!fileset) {
+@@ -1228,11 +1228,11 @@
+             return 1;
+          }
+       }
+-      if (strcasecmp(ua->argk[i], NT_("listing")) == 0) {
++      if (ascii_strcasecmp(ua->argk[i], NT_("listing")) == 0) {
+          listing = 1;
+          continue;
+       }
+-      if (strcasecmp(ua->argk[i], NT_("level")) == 0) {
++      if (ascii_strcasecmp(ua->argk[i], NT_("level")) == 0) {
+          if (ua->argv[i]) {
+             if (!get_level_from_name(ua->jcr, ua->argv[i])) {
+                ua->error_msg(_("Level \"%s\" not valid.\n"), ua->argv[i]);
+@@ -1243,7 +1243,7 @@
+            return 1;
+          }
+       }
+-      if (strcasecmp(ua->argk[i], NT_("accurate")) == 0) {
++      if (ascii_strcasecmp(ua->argk[i], NT_("accurate")) == 0) {
+          if (!is_yesno(ua->argv[i], &accurate)) {
+             ua->error_msg(_("Invalid value for accurate. " 
+                             "It must be yes or no.\n"));
+@@ -1752,14 +1752,14 @@
+    }
+ 
+    for (int i=1; i<ua->argc; i++) {
+-      if (strcasecmp(ua->argk[i], "jobid") == 0) {
++      if (ascii_strcasecmp(ua->argk[i], "jobid") == 0) {
+          if (!ua->argv[i]) {
+             break;
+          }
+          jobid = str_to_int64(ua->argv[i]);
+          break;
+-      } else if (strcasecmp(ua->argk[i], "jobname") == 0 ||
+-                 strcasecmp(ua->argk[i], "job") == 0) {
++      } else if (ascii_strcasecmp(ua->argk[i], "jobname") == 0 ||
++                 ascii_strcasecmp(ua->argk[i], "job") == 0) {
+          if (!ua->argv[i]) {
+             break;
+          }
+@@ -1769,7 +1769,7 @@
+             free_jcr(jcr);
+          }
+          break;
+-      } else if (strcasecmp(ua->argk[i], "ujobid") == 0) {
++      } else if (ascii_strcasecmp(ua->argk[i], "ujobid") == 0) {
+          if (!ua->argv[i]) {
+             break;
+          }
+@@ -1780,7 +1780,7 @@
+          }
+          break;
+       /* Wait for a mount request */
+-      } else if (strcasecmp(ua->argk[i], "mount") == 0) {
++      } else if (ascii_strcasecmp(ua->argk[i], "mount") == 0) {
+          for (bool waiting=false; !waiting; ) {
+             foreach_jcr(jcr) {
+                if (jcr->JobId != 0 && 
+@@ -1883,7 +1883,7 @@
+    ua->send_msg(_("  Command       Description\n  =======       ===========\n"));
+    for (i=0; i<comsize; i++) {
+       if (ua->argc == 2) {
+-         if (!strcasecmp(ua->argk[1], commands[i].key)) {
++         if (!ascii_strcasecmp(ua->argk[1], commands[i].key)) {
+             ua->send_msg(_("  %-13s %s\n\nArguments:\n\t%s\n"), commands[i].key, 
+                          commands[i].help, commands[i].usage);
+             break;
+diff -u -Nuar bacula-5.0.3.orig/src/dird/ua_dotcmds.c bacula-5.0.3/src/dird/ua_dotcmds.c
+--- bacula-5.0.3.orig/src/dird/ua_dotcmds.c	2011-10-20 16:29:23.583001228 +0300
++++ bacula-5.0.3/src/dird/ua_dotcmds.c	2011-10-20 16:29:26.906001156 +0300
+@@ -232,28 +232,28 @@
+    *jobid=NULL;
+ 
+    for (int i=1; i<ua->argc; i++) {
+-      if (strcasecmp(ua->argk[i], NT_("pathid")) == 0) {
++      if (ascii_strcasecmp(ua->argk[i], NT_("pathid")) == 0) {
+          if (is_a_number(ua->argv[i])) {
+             *pathid = str_to_int64(ua->argv[i]);
+          }
+       }
+-      if (strcasecmp(ua->argk[i], NT_("path")) == 0) {
++      if (ascii_strcasecmp(ua->argk[i], NT_("path")) == 0) {
+          *path = ua->argv[i];
+       }
+       
+-      if (strcasecmp(ua->argk[i], NT_("jobid")) == 0) {
++      if (ascii_strcasecmp(ua->argk[i], NT_("jobid")) == 0) {
+          if (is_a_number_list(ua->argv[i])) {
+             *jobid = ua->argv[i];
+          }
+       }
+ 
+-      if (strcasecmp(ua->argk[i], NT_("limit")) == 0) {
++      if (ascii_strcasecmp(ua->argk[i], NT_("limit")) == 0) {
+          if (is_a_number(ua->argv[i])) {
+             *limit = str_to_int64(ua->argv[i]);
+          }
+       }
+ 
+-      if (strcasecmp(ua->argk[i], NT_("offset")) == 0) {
++      if (ascii_strcasecmp(ua->argk[i], NT_("offset")) == 0) {
+          if (is_a_number(ua->argv[i])) {
+             *offset = str_to_int64(ua->argv[i]);
+          }
+@@ -451,12 +451,12 @@
+    }
+    /* General debug? */
+    for (i=1; i<ua->argc; i++) {
+-      if (strcasecmp(ua->argk[i], "dir") == 0 ||
+-          strcasecmp(ua->argk[i], "director") == 0) {
++      if (ascii_strcasecmp(ua->argk[i], "dir") == 0 ||
++          ascii_strcasecmp(ua->argk[i], "director") == 0) {
+          dir = true;
+       }
+-      if (strcasecmp(ua->argk[i], "client") == 0 ||
+-          strcasecmp(ua->argk[i], "fd") == 0) {
++      if (ascii_strcasecmp(ua->argk[i], "client") == 0 ||
++          ascii_strcasecmp(ua->argk[i], "fd") == 0) {
+          client = NULL;
+          if (ua->argv[i]) {
+             client = (CLIENT *)GetResWithName(R_CLIENT, ua->argv[i]);
+@@ -466,9 +466,9 @@
+          }
+       }
+    
+-      if (strcasecmp(ua->argk[i], NT_("store")) == 0 ||
+-          strcasecmp(ua->argk[i], NT_("storage")) == 0 ||
+-          strcasecmp(ua->argk[i], NT_("sd")) == 0) {
++      if (ascii_strcasecmp(ua->argk[i], NT_("store")) == 0 ||
++          ascii_strcasecmp(ua->argk[i], NT_("storage")) == 0 ||
++          ascii_strcasecmp(ua->argk[i], NT_("sd")) == 0) {
+          store = NULL;
+          if (ua->argv[i]) {
+             store = (STORE *)GetResWithName(R_STORAGE, ua->argv[i]);
+diff -u -Nuar bacula-5.0.3.orig/src/dird/ua_input.c bacula-5.0.3/src/dird/ua_input.c
+--- bacula-5.0.3.orig/src/dird/ua_input.c	2011-10-20 16:29:23.583001228 +0300
++++ bacula-5.0.3/src/dird/ua_input.c	2011-10-20 16:29:26.906001156 +0300
+@@ -120,12 +120,12 @@
+ bool is_yesno(char *val, int *ret)
+ {
+    *ret = 0;
+-   if ((strcasecmp(val,   _("yes")) == 0) ||
+-       (strcasecmp(val, NT_("yes")) == 0))
++   if ((ascii_strcasecmp(val,   _("yes")) == 0) ||
++       (ascii_strcasecmp(val, NT_("yes")) == 0))
+    {
+       *ret = 1;
+-   } else if ((strcasecmp(val,   _("no")) == 0) ||
+-              (strcasecmp(val, NT_("no")) == 0))
++   } else if ((ascii_strcasecmp(val,   _("no")) == 0) ||
++              (ascii_strcasecmp(val, NT_("no")) == 0))
+    {
+       *ret = 0;
+    } else {
+@@ -172,11 +172,11 @@
+ {
+    int Enabled = -1;
+ 
+-   if (strcasecmp(val, "yes") == 0 || strcasecmp(val, "true") == 0) {
++   if (ascii_strcasecmp(val, "yes") == 0 || ascii_strcasecmp(val, "true") == 0) {
+      Enabled = 1;
+-   } else if (strcasecmp(val, "no") == 0 || strcasecmp(val, "false") == 0) {
++   } else if (ascii_strcasecmp(val, "no") == 0 || ascii_strcasecmp(val, "false") == 0) {
+       Enabled = 0;
+-   } else if (strcasecmp(val, "archived") == 0) { 
++   } else if (ascii_strcasecmp(val, "archived") == 0) { 
+       Enabled = 2;
+    } else {
+       Enabled = atoi(val);
+diff -u -Nuar bacula-5.0.3.orig/src/dird/ua_output.c bacula-5.0.3/src/dird/ua_output.c
+--- bacula-5.0.3.orig/src/dird/ua_output.c	2011-10-20 16:29:23.584001228 +0300
++++ bacula-5.0.3/src/dird/ua_output.c	2011-10-20 16:29:26.907001171 +0300
+@@ -160,7 +160,7 @@
+ 
+    LockRes();
+    for (i=1; i<ua->argc; i++) {
+-      if (strcasecmp(ua->argk[i], _("disabled")) == 0) {
++      if (ascii_strcasecmp(ua->argk[i], _("disabled")) == 0) {
+          show_disabled_jobs(ua);
+          goto bail_out;
+       }
+@@ -291,7 +291,7 @@
+    /* Scan arguments looking for things to do */
+    for (i=1; i<ua->argc; i++) {
+       /* List JOBS */
+-      if (strcasecmp(ua->argk[i], NT_("jobs")) == 0) {
++      if (ascii_strcasecmp(ua->argk[i], NT_("jobs")) == 0) {
+          /* Apply any limit */
+          j = find_arg_with_value(ua, NT_("limit"));
+          if (j >= 0) {
+@@ -300,11 +300,11 @@
+          db_list_job_records(ua->jcr, ua->db, &jr, prtit, ua, llist);
+ 
+          /* List JOBTOTALS */
+-      } else if (strcasecmp(ua->argk[i], NT_("jobtotals")) == 0) {
++      } else if (ascii_strcasecmp(ua->argk[i], NT_("jobtotals")) == 0) {
+          db_list_job_totals(ua->jcr, ua->db, &jr, prtit, ua);
+ 
+       /* List JOBID=nn */
+-      } else if (strcasecmp(ua->argk[i], NT_("jobid")) == 0) {
++      } else if (ascii_strcasecmp(ua->argk[i], NT_("jobid")) == 0) {
+          if (ua->argv[i]) {
+             jobid = str_to_int64(ua->argv[i]);
+             if (jobid > 0) {
+@@ -314,28 +314,28 @@
+          }
+ 
+       /* List JOB=xxx */
+-      } else if ((strcasecmp(ua->argk[i], NT_("job")) == 0 ||
+-                  strcasecmp(ua->argk[i], NT_("jobname")) == 0) && ua->argv[i]) {
++      } else if ((ascii_strcasecmp(ua->argk[i], NT_("job")) == 0 ||
++                  ascii_strcasecmp(ua->argk[i], NT_("jobname")) == 0) && ua->argv[i]) {
+          bstrncpy(jr.Name, ua->argv[i], MAX_NAME_LENGTH);
+          jr.JobId = 0;
+          db_list_job_records(ua->jcr, ua->db, &jr, prtit, ua, llist);
+ 
+       /* List UJOBID=xxx */
+-      } else if (strcasecmp(ua->argk[i], NT_("ujobid")) == 0 && ua->argv[i]) {
++      } else if (ascii_strcasecmp(ua->argk[i], NT_("ujobid")) == 0 && ua->argv[i]) {
+          bstrncpy(jr.Job, ua->argv[i], MAX_NAME_LENGTH);
+          jr.JobId = 0;
+          db_list_job_records(ua->jcr, ua->db, &jr, prtit, ua, llist);
+ 
+       /* List Base files */
+-      } else if (strcasecmp(ua->argk[i], NT_("basefiles")) == 0) {
++      } else if (ascii_strcasecmp(ua->argk[i], NT_("basefiles")) == 0) {
+          /* TODO: cleanup this block */
+          for (j=i+1; j<ua->argc; j++) {
+-            if (strcasecmp(ua->argk[j], NT_("ujobid")) == 0 && ua->argv[j]) {
++            if (ascii_strcasecmp(ua->argk[j], NT_("ujobid")) == 0 && ua->argv[j]) {
+                bstrncpy(jr.Job, ua->argv[j], MAX_NAME_LENGTH);
+                jr.JobId = 0;
+                db_get_job_record(ua->jcr, ua->db, &jr);
+                jobid = jr.JobId;
+-            } else if (strcasecmp(ua->argk[j], NT_("jobid")) == 0 && ua->argv[j]) {
++            } else if (ascii_strcasecmp(ua->argk[j], NT_("jobid")) == 0 && ua->argv[j]) {
+                jobid = str_to_int64(ua->argv[j]);
+             } else {
+                continue;
+@@ -346,15 +346,15 @@
+          }
+       
+       /* List FILES */
+-      } else if (strcasecmp(ua->argk[i], NT_("files")) == 0) {
++      } else if (ascii_strcasecmp(ua->argk[i], NT_("files")) == 0) {
+ 
+          for (j=i+1; j<ua->argc; j++) {
+-            if (strcasecmp(ua->argk[j], NT_("ujobid")) == 0 && ua->argv[j]) {
++            if (ascii_strcasecmp(ua->argk[j], NT_("ujobid")) == 0 && ua->argv[j]) {
+                bstrncpy(jr.Job, ua->argv[j], MAX_NAME_LENGTH);
+                jr.JobId = 0;
+                db_get_job_record(ua->jcr, ua->db, &jr);
+                jobid = jr.JobId;
+-            } else if (strcasecmp(ua->argk[j], NT_("jobid")) == 0 && ua->argv[j]) {
++            } else if (ascii_strcasecmp(ua->argk[j], NT_("jobid")) == 0 && ua->argv[j]) {
+                jobid = str_to_int64(ua->argv[j]);
+             } else {
+                continue;
+@@ -365,15 +365,15 @@
+          }
+ 
+       /* List JOBMEDIA */
+-      } else if (strcasecmp(ua->argk[i], NT_("jobmedia")) == 0) {
++      } else if (ascii_strcasecmp(ua->argk[i], NT_("jobmedia")) == 0) {
+          bool done = false;
+          for (j=i+1; j<ua->argc; j++) {
+-            if (strcasecmp(ua->argk[j], NT_("ujobid")) == 0 && ua->argv[j]) {
++            if (ascii_strcasecmp(ua->argk[j], NT_("ujobid")) == 0 && ua->argv[j]) {
+                bstrncpy(jr.Job, ua->argv[j], MAX_NAME_LENGTH);
+                jr.JobId = 0;
+                db_get_job_record(ua->jcr, ua->db, &jr);
+                jobid = jr.JobId;
+-            } else if (strcasecmp(ua->argk[j], NT_("jobid")) == 0 && ua->argv[j]) {
++            } else if (ascii_strcasecmp(ua->argk[j], NT_("jobid")) == 0 && ua->argv[j]) {
+                jobid = str_to_int64(ua->argv[j]);
+             } else {
+                continue;
+@@ -387,15 +387,15 @@
+          }
+ 
+       /* List JOBLOG */
+-      } else if (strcasecmp(ua->argk[i], NT_("joblog")) == 0) {
++      } else if (ascii_strcasecmp(ua->argk[i], NT_("joblog")) == 0) {
+          bool done = false;
+          for (j=i+1; j<ua->argc; j++) {
+-            if (strcasecmp(ua->argk[j], NT_("ujobid")) == 0 && ua->argv[j]) {
++            if (ascii_strcasecmp(ua->argk[j], NT_("ujobid")) == 0 && ua->argv[j]) {
+                bstrncpy(jr.Job, ua->argv[j], MAX_NAME_LENGTH);
+                jr.JobId = 0;
+                db_get_job_record(ua->jcr, ua->db, &jr);
+                jobid = jr.JobId;
+-            } else if (strcasecmp(ua->argk[j], NT_("jobid")) == 0 && ua->argv[j]) {
++            } else if (ascii_strcasecmp(ua->argk[j], NT_("jobid")) == 0 && ua->argv[j]) {
+                jobid = str_to_int64(ua->argv[j]);
+             } else {
+                continue;
+@@ -410,8 +410,8 @@
+ 
+ 
+       /* List POOLS */
+-      } else if (strcasecmp(ua->argk[i], NT_("pool")) == 0 ||
+-                 strcasecmp(ua->argk[i], NT_("pools")) == 0) {
++      } else if (ascii_strcasecmp(ua->argk[i], NT_("pool")) == 0 ||
++                 ascii_strcasecmp(ua->argk[i], NT_("pools")) == 0) {
+          POOL_DBR pr;
+          memset(&pr, 0, sizeof(pr));
+          if (ua->argv[i]) {
+@@ -419,22 +419,22 @@
+          }
+          db_list_pool_records(ua->jcr, ua->db, &pr, prtit, ua, llist);
+ 
+-      } else if (strcasecmp(ua->argk[i], NT_("clients")) == 0) {
++      } else if (ascii_strcasecmp(ua->argk[i], NT_("clients")) == 0) {
+          db_list_client_records(ua->jcr, ua->db, prtit, ua, llist);
+ 
+ 
+       /* List MEDIA or VOLUMES */
+-      } else if (strcasecmp(ua->argk[i], NT_("media")) == 0 ||
+-                 strcasecmp(ua->argk[i], NT_("volume")) == 0 ||
+-                 strcasecmp(ua->argk[i], NT_("volumes")) == 0) {
++      } else if (ascii_strcasecmp(ua->argk[i], NT_("media")) == 0 ||
++                 ascii_strcasecmp(ua->argk[i], NT_("volume")) == 0 ||
++                 ascii_strcasecmp(ua->argk[i], NT_("volumes")) == 0) {
+          bool done = false;
+          for (j=i+1; j<ua->argc; j++) {
+-            if (strcasecmp(ua->argk[j], NT_("ujobid")) == 0 && ua->argv[j]) {
++            if (ascii_strcasecmp(ua->argk[j], NT_("ujobid")) == 0 && ua->argv[j]) {
+                bstrncpy(jr.Job, ua->argv[j], MAX_NAME_LENGTH);
+                jr.JobId = 0;
+                db_get_job_record(ua->jcr, ua->db, &jr);
+                jobid = jr.JobId;
+-            } else if (strcasecmp(ua->argk[j], NT_("jobid")) == 0 && ua->argv[j]) {
++            } else if (ascii_strcasecmp(ua->argk[j], NT_("jobid")) == 0 && ua->argv[j]) {
+                jobid = str_to_int64(ua->argv[j]);
+             } else {
+                continue;
+@@ -457,7 +457,7 @@
+             }
+             /* Is a specific pool wanted? */
+             for (i=1; i<ua->argc; i++) {
+-               if (strcasecmp(ua->argk[i], NT_("pool")) == 0) {
++               if (ascii_strcasecmp(ua->argk[i], NT_("pool")) == 0) {
+                   if (!get_pool_dbr(ua, &pr)) {
+                      ua->error_msg(_("No Pool specified.\n"));
+                      return 1;
+@@ -489,8 +489,8 @@
+             return 1;
+          }
+       /* List next volume */
+-      } else if (strcasecmp(ua->argk[i], NT_("nextvol")) == 0 ||
+-                 strcasecmp(ua->argk[i], NT_("nextvolume")) == 0) {
++      } else if (ascii_strcasecmp(ua->argk[i], NT_("nextvol")) == 0 ||
++                 ascii_strcasecmp(ua->argk[i], NT_("nextvolume")) == 0) {
+          n = 1;
+          j = find_arg_with_value(ua, NT_("days"));
+          if (j >= 0) {
+@@ -501,21 +501,21 @@
+             }
+          }
+          list_nextvol(ua, n);
+-      } else if (strcasecmp(ua->argk[i], NT_("copies")) == 0) {
++      } else if (ascii_strcasecmp(ua->argk[i], NT_("copies")) == 0) {
+          char *jobids = NULL;
+          uint32_t limit=0;
+          for (j=i+1; j<ua->argc; j++) {
+-            if (strcasecmp(ua->argk[j], NT_("jobid")) == 0 && ua->argv[j]) {
++            if (ascii_strcasecmp(ua->argk[j], NT_("jobid")) == 0 && ua->argv[j]) {
+                if (is_a_number_list(ua->argv[j])) {
+                   jobids = ua->argv[j];
+                }
+-            } else if (strcasecmp(ua->argk[j], NT_("limit")) == 0 && ua->argv[j]) {
++            } else if (ascii_strcasecmp(ua->argk[j], NT_("limit")) == 0 && ua->argv[j]) {
+                limit = atoi(ua->argv[j]);
+             } 
+          }
+          db_list_copies_records(ua->jcr,ua->db,limit,jobids,prtit,ua,llist);
+-      } else if (strcasecmp(ua->argk[i], NT_("limit")) == 0
+-                 || strcasecmp(ua->argk[i], NT_("days")) == 0) {
++      } else if (ascii_strcasecmp(ua->argk[i], NT_("limit")) == 0
++                 || ascii_strcasecmp(ua->argk[i], NT_("days")) == 0) {
+          /* Ignore it */
+       } else {
+          ua->error_msg(_("Unknown list keyword: %s\n"), NPRT(ua->argk[i]));
+diff -u -Nuar bacula-5.0.3.orig/src/dird/ua_purge.c bacula-5.0.3/src/dird/ua_purge.c
+--- bacula-5.0.3.orig/src/dird/ua_purge.c	2011-10-20 16:29:23.583001228 +0300
++++ bacula-5.0.3/src/dird/ua_purge.c	2011-10-20 16:29:26.908001186 +0300
+@@ -654,19 +654,19 @@
+ 
+    /* Look arguments */
+    for (int i=1; i<ua->argc; i++) {
+-      if (strcasecmp(ua->argk[i], NT_("allpools")) == 0) {
++      if (ascii_strcasecmp(ua->argk[i], NT_("allpools")) == 0) {
+          allpools = true;
+             
+-      } else if (strcasecmp(ua->argk[i], NT_("volume")) == 0 && ua->argv[i]) {
++      } else if (ascii_strcasecmp(ua->argk[i], NT_("volume")) == 0 && ua->argv[i]) {
+          bstrncpy(mr.VolumeName, ua->argv[i], sizeof(mr.VolumeName));
+ 
+-      } else if (strcasecmp(ua->argk[i], NT_("devicetype")) == 0 && ua->argv[i]) {
++      } else if (ascii_strcasecmp(ua->argk[i], NT_("devicetype")) == 0 && ua->argv[i]) {
+          bstrncpy(mr.MediaType, ua->argv[i], sizeof(mr.MediaType));
+          
+-      } else if (strcasecmp(ua->argk[i], NT_("drive")) == 0 && ua->argv[i]) {
++      } else if (ascii_strcasecmp(ua->argk[i], NT_("drive")) == 0 && ua->argv[i]) {
+          drive = atoi(ua->argv[i]);
+ 
+-      } else if (strcasecmp(ua->argk[i], NT_("action")) == 0 && ua->argv[i]) {
++      } else if (ascii_strcasecmp(ua->argk[i], NT_("action")) == 0 && ua->argv[i]) {
+          action=ua->argv[i];
+       }
+    }
+@@ -723,7 +723,7 @@
+       mr.MediaId = results[i];
+       if (db_get_media_record(ua->jcr, ua->db, &mr)) {         
+          /* TODO: ask for drive and change Pool */
+-         if (!strcasecmp("truncate", action) || !strcasecmp("all", action)) {
++         if (!ascii_strcasecmp("truncate", action) || !ascii_strcasecmp("all", action)) {
+             do_truncate_on_purge(ua, &mr, pr.Name, store->dev_name(), drive, sd);
+          }
+       } else {
+diff -u -Nuar bacula-5.0.3.orig/src/dird/ua_restore.c bacula-5.0.3/src/dird/ua_restore.c
+--- bacula-5.0.3.orig/src/dird/ua_restore.c	2011-10-20 16:29:23.583001228 +0300
++++ bacula-5.0.3/src/dird/ua_restore.c	2011-10-20 16:29:26.909001197 +0300
+@@ -460,7 +460,7 @@
+    for (i=1; i<ua->argc; i++) {       /* loop through arguments */
+       bool found_kw = false;
+       for (j=0; kw[j]; j++) {         /* loop through keywords */
+-         if (strcasecmp(kw[j], ua->argk[i]) == 0) {
++         if (ascii_strcasecmp(kw[j], ua->argk[i]) == 0) {
+             found_kw = true;
+             break;
+          }
+diff -u -Nuar bacula-5.0.3.orig/src/dird/ua_run.c bacula-5.0.3/src/dird/ua_run.c
+--- bacula-5.0.3.orig/src/dird/ua_run.c	2011-10-20 16:29:23.584001228 +0300
++++ bacula-5.0.3/src/dird/ua_run.c	2011-10-20 16:29:26.910001211 +0300
+@@ -483,7 +483,7 @@
+    if (rc.replace) {
+       jcr->replace = 0;
+       for (i=0; ReplaceOptions[i].name; i++) {
+-         if (strcasecmp(rc.replace, ReplaceOptions[i].name) == 0) {
++         if (ascii_strcasecmp(rc.replace, ReplaceOptions[i].name) == 0) {
+             jcr->replace = ReplaceOptions[i].token;
+          }
+       }
+@@ -1033,7 +1033,7 @@
+       kw_ok = false;
+       /* Keep looking until we find a good keyword */
+       for (j=0; !kw_ok && kw[j]; j++) {
+-         if (strcasecmp(ua->argk[i], kw[j]) == 0) {
++         if (ascii_strcasecmp(ua->argk[i], kw[j]) == 0) {
+             /* Note, yes and run have no value, so do not fail */
+             if (!ua->argv[i] && j != YES_POS /*yes*/) {
+                ua->send_msg(_("Value missing for keyword %s\n"), ua->argk[i]);
+diff -u -Nuar bacula-5.0.3.orig/src/dird/ua_select.c bacula-5.0.3/src/dird/ua_select.c
+--- bacula-5.0.3.orig/src/dird/ua_select.c	2011-10-20 16:29:23.584001228 +0300
++++ bacula-5.0.3/src/dird/ua_select.c	2011-10-20 16:29:26.910001211 +0300
+@@ -59,7 +59,7 @@
+        if (!get_cmd(ua, _("Continue? (yes/mod/no): "))) {
+           return 0;
+        }
+-       if (strcasecmp(ua->cmd, _("mod")) == 0) {
++       if (ascii_strcasecmp(ua->cmd, _("mod")) == 0) {
+           if (!get_cmd(ua, _("Enter new retention period: "))) {
+              return 0;
+           }
+@@ -86,7 +86,7 @@
+ {
+    for (int i=1; i<ua->argc; i++) {
+       for(int j=0; list[j]; j++) {
+-         if (strcasecmp(list[j], ua->argk[i]) == 0) {
++         if (ascii_strcasecmp(list[j], ua->argk[i]) == 0) {
+             return j;
+          }
+       }
+@@ -103,7 +103,7 @@
+ int find_arg(UAContext *ua, const char *keyword)
+ {
+    for (int i=1; i<ua->argc; i++) {
+-      if (strcasecmp(keyword, ua->argk[i]) == 0) {
++      if (ascii_strcasecmp(keyword, ua->argk[i]) == 0) {
+          return i;
+       }
+    }
+@@ -119,7 +119,7 @@
+ int find_arg_with_value(UAContext *ua, const char *keyword)
+ {
+    for (int i=1; i<ua->argc; i++) {
+-      if (strcasecmp(keyword, ua->argk[i]) == 0) {
++      if (ascii_strcasecmp(keyword, ua->argk[i]) == 0) {
+          if (ua->argv[i]) {
+             return i;
+          } else {
+@@ -205,7 +205,7 @@
+    int i;
+ 
+    for (i=1; i<ua->argc; i++) {
+-      if (strcasecmp(ua->argk[i], NT_("catalog")) == 0 && ua->argv[i]) {
++      if (ascii_strcasecmp(ua->argk[i], NT_("catalog")) == 0 && ua->argv[i]) {
+          if (acl_access_ok(ua, Catalog_ACL, ua->argv[i])) {
+             catalog = (CAT *)GetResWithName(R_CATALOG, ua->argv[i]);
+             break;
+@@ -352,8 +352,8 @@
+    int i;
+ 
+    for (i=1; i<ua->argc; i++) {
+-      if ((strcasecmp(ua->argk[i], NT_("client")) == 0 ||
+-           strcasecmp(ua->argk[i], NT_("fd")) == 0) && ua->argv[i]) {
++      if ((ascii_strcasecmp(ua->argk[i], NT_("client")) == 0 ||
++           ascii_strcasecmp(ua->argk[i], NT_("fd")) == 0) && ua->argv[i]) {
+          if (!acl_access_ok(ua, Client_ACL, ua->argv[i])) {
+             break;
+          }
+@@ -389,8 +389,8 @@
+       ua->error_msg(_("Could not find Client %s: ERR=%s"), cr->Name, db_strerror(ua->db));
+    }
+    for (i=1; i<ua->argc; i++) {
+-      if ((strcasecmp(ua->argk[i], NT_("client")) == 0 ||
+-           strcasecmp(ua->argk[i], NT_("fd")) == 0) && ua->argv[i]) {
++      if ((ascii_strcasecmp(ua->argk[i], NT_("client")) == 0 ||
++           ascii_strcasecmp(ua->argk[i], NT_("fd")) == 0) && ua->argv[i]) {
+          if (!acl_access_ok(ua, Client_ACL, ua->argv[i])) {
+             break;
+          }
+@@ -496,7 +496,7 @@
+    uint32_t *ids;
+ 
+    for (i=1; i<ua->argc; i++) {
+-      if (strcasecmp(ua->argk[i], argk) == 0 && ua->argv[i] &&
++      if (ascii_strcasecmp(ua->argk[i], argk) == 0 && ua->argv[i] &&
+           acl_access_ok(ua, Pool_ACL, ua->argv[i])) {
+          bstrncpy(pr->Name, ua->argv[i], sizeof(pr->Name));
+          if (!db_get_pool_record(ua->jcr, ua->db, pr)) {
+@@ -693,10 +693,10 @@
+    int i;
+ 
+    for (i=1; i<ua->argc; i++) {
+-      if (strcasecmp(ua->argk[i], NT_("ujobid")) == 0 && ua->argv[i]) {
++      if (ascii_strcasecmp(ua->argk[i], NT_("ujobid")) == 0 && ua->argv[i]) {
+          jr->JobId = 0;
+          bstrncpy(jr->Job, ua->argv[i], sizeof(jr->Job));
+-      } else if (strcasecmp(ua->argk[i], NT_("jobid")) == 0 && ua->argv[i]) {
++      } else if (ascii_strcasecmp(ua->argk[i], NT_("jobid")) == 0 && ua->argv[i]) {
+          jr->JobId = str_to_int64(ua->argv[i]);
+          jr->Job[0] = 0;
+       } else {
+@@ -715,8 +715,8 @@
+    jr->Job[0] = 0;
+ 
+    for (i=1; i<ua->argc; i++) {
+-      if ((strcasecmp(ua->argk[i], NT_("jobname")) == 0 ||
+-           strcasecmp(ua->argk[i], NT_("job")) == 0) && ua->argv[i]) {
++      if ((ascii_strcasecmp(ua->argk[i], NT_("jobname")) == 0 ||
++           ascii_strcasecmp(ua->argk[i], NT_("job")) == 0) && ua->argv[i]) {
+          jr->JobId = 0;
+          bstrncpy(jr->Name, ua->argv[i], sizeof(jr->Name));
+          break;
+@@ -876,10 +876,10 @@
+    for (i=1; i<ua->argc; i++) {
+       if (use_default && !ua->argv[i]) {
+          /* Ignore slots, scan and barcode(s) keywords */
+-         if (strcasecmp("scan", ua->argk[i]) == 0 ||
+-             strcasecmp("barcode", ua->argk[i]) == 0 ||
+-             strcasecmp("barcodes", ua->argk[i]) == 0 ||
+-             strcasecmp("slots", ua->argk[i]) == 0) {
++         if (ascii_strcasecmp("scan", ua->argk[i]) == 0 ||
++             ascii_strcasecmp("barcode", ua->argk[i]) == 0 ||
++             ascii_strcasecmp("barcodes", ua->argk[i]) == 0 ||
++             ascii_strcasecmp("slots", ua->argk[i]) == 0) {
+             continue;
+          }
+          /* Default argument is storage */
+@@ -893,12 +893,12 @@
+             break;
+          }
+       } else {
+-         if (strcasecmp(ua->argk[i], NT_("storage")) == 0 ||
+-             strcasecmp(ua->argk[i], NT_("sd")) == 0) {
++         if (ascii_strcasecmp(ua->argk[i], NT_("storage")) == 0 ||
++             ascii_strcasecmp(ua->argk[i], NT_("sd")) == 0) {
+             store_name = ua->argv[i];
+             break;
+ 
+-         } else if (strcasecmp(ua->argk[i], NT_("jobid")) == 0) {
++         } else if (ascii_strcasecmp(ua->argk[i], NT_("jobid")) == 0) {
+             jobid = str_to_int64(ua->argv[i]);
+             if (jobid <= 0) {
+                ua->error_msg(_("Expecting jobid=nn command, got: %s\n"), ua->argk[i]);
+@@ -912,8 +912,8 @@
+             free_jcr(jcr);
+             break;
+ 
+-         } else if (strcasecmp(ua->argk[i], NT_("job")) == 0 ||
+-                    strcasecmp(ua->argk[i], NT_("jobname")) == 0) {
++         } else if (ascii_strcasecmp(ua->argk[i], NT_("job")) == 0 ||
++                    ascii_strcasecmp(ua->argk[i], NT_("jobname")) == 0) {
+             if (!ua->argv[i]) {
+                ua->error_msg(_("Expecting job=xxx, got: %s.\n"), ua->argk[i]);
+                return NULL;
+@@ -925,7 +925,7 @@
+             store = jcr->wstore;
+             free_jcr(jcr);
+             break;
+-         } else if (strcasecmp(ua->argk[i], NT_("ujobid")) == 0) {
++         } else if (ascii_strcasecmp(ua->argk[i], NT_("ujobid")) == 0) {
+             if (!ua->argv[i]) {
+                ua->error_msg(_("Expecting ujobid=xxx, got: %s.\n"), ua->argk[i]);
+                return NULL;
+@@ -1044,7 +1044,7 @@
+    /* Look up level name and pull code */
+    bool found = false;
+    for (int i=0; joblevels[i].level_name; i++) {
+-      if (strcasecmp(level_name, joblevels[i].level_name) == 0) {
++      if (ascii_strcasecmp(level_name, joblevels[i].level_name) == 0) {
+          jcr->set_JobLevel(joblevels[i].level);
+          found = true;
+          break;
+diff -u -Nuar bacula-5.0.3.orig/src/dird/ua_status.c bacula-5.0.3/src/dird/ua_status.c
+--- bacula-5.0.3.orig/src/dird/ua_status.c	2011-10-20 16:29:23.584001228 +0300
++++ bacula-5.0.3/src/dird/ua_status.c	2011-10-20 16:29:26.910001211 +0300
+@@ -72,8 +72,8 @@
+       return false;
+    }
+ 
+-   if (strcasecmp(ua->argk[1], "dir") == 0) {
+-      if (strcasecmp(ua->argk[2], "current") == 0) {
++   if (ascii_strcasecmp(ua->argk[1], "dir") == 0) {
++      if (ascii_strcasecmp(ua->argk[2], "current") == 0) {
+          ua->send_msg(OKqstatus, ua->argk[2]);
+          foreach_jcr(njcr) {
+             if (njcr->JobId != 0 && acl_access_ok(ua, Job_ACL, njcr->job->name())) {
+@@ -82,7 +82,7 @@
+             }
+          }
+          endeach_jcr(njcr);
+-      } else if (strcasecmp(ua->argk[2], "last") == 0) {
++      } else if (ascii_strcasecmp(ua->argk[2], "last") == 0) {
+          ua->send_msg(OKqstatus, ua->argk[2]);
+          if ((last_jobs) && (last_jobs->size() > 0)) {
+             job = (s_last_job*)last_jobs->last();
+@@ -91,25 +91,25 @@
+                      job->JobStatus, job->Errors);
+             }
+          }
+-      } else if (strcasecmp(ua->argk[2], "header") == 0) {
++      } else if (ascii_strcasecmp(ua->argk[2], "header") == 0) {
+           list_dir_status_header(ua);
+-      } else if (strcasecmp(ua->argk[2], "scheduled") == 0) {
++      } else if (ascii_strcasecmp(ua->argk[2], "scheduled") == 0) {
+           list_scheduled_jobs(ua);
+-      } else if (strcasecmp(ua->argk[2], "running") == 0) {
++      } else if (ascii_strcasecmp(ua->argk[2], "running") == 0) {
+           list_running_jobs(ua);
+-      } else if (strcasecmp(ua->argk[2], "terminated") == 0) {
++      } else if (ascii_strcasecmp(ua->argk[2], "terminated") == 0) {
+           list_terminated_jobs(ua);
+       } else {
+          ua->send_msg("1900 Bad .status command, wrong argument.\n");
+          return false;
+       }
+-   } else if (strcasecmp(ua->argk[1], "client") == 0) {
++   } else if (ascii_strcasecmp(ua->argk[1], "client") == 0) {
+       client = get_client_resource(ua);
+       if (client) {
+          Dmsg2(200, "Client=%s arg=%s\n", client->name(), NPRT(ua->argk[2]));
+          do_client_status(ua, client, ua->argk[2]);
+       }
+-   } else if (strcasecmp(ua->argk[1], "storage") == 0) {
++   } else if (ascii_strcasecmp(ua->argk[1], "storage") == 0) {
+       store = get_storage_resource(ua, false /*no default*/);
+       if (store) {
+          do_storage_status(ua, store, ua->argk[2]);
+@@ -143,14 +143,14 @@
+    Dmsg1(20, "status:%s:\n", cmd);
+ 
+    for (i=1; i<ua->argc; i++) {
+-      if (strcasecmp(ua->argk[i], NT_("all")) == 0) {
++      if (ascii_strcasecmp(ua->argk[i], NT_("all")) == 0) {
+          do_all_status(ua);
+          return 1;
+-      } else if (strcasecmp(ua->argk[i], NT_("dir")) == 0 ||
+-                 strcasecmp(ua->argk[i], NT_("director")) == 0) {
++      } else if (ascii_strcasecmp(ua->argk[i], NT_("dir")) == 0 ||
++                 ascii_strcasecmp(ua->argk[i], NT_("director")) == 0) {
+          do_director_status(ua);
+          return 1;
+-      } else if (strcasecmp(ua->argk[i], NT_("client")) == 0) {
++      } else if (ascii_strcasecmp(ua->argk[i], NT_("client")) == 0) {
+          client = get_client_resource(ua);
+          if (client) {
+             do_client_status(ua, client, NULL);
+diff -u -Nuar bacula-5.0.3.orig/src/dird/ua_update.c bacula-5.0.3/src/dird/ua_update.c
+--- bacula-5.0.3.orig/src/dird/ua_update.c	2011-10-20 16:29:23.585001228 +0300
++++ bacula-5.0.3/src/dird/ua_update.c	2011-10-20 16:29:26.911001232 +0300
+@@ -137,7 +137,7 @@
+    int i;
+ 
+    for (i=0; kw[i]; i++) {
+-      if (strcasecmp(val, kw[i]) == 0) {
++      if (ascii_strcasecmp(val, kw[i]) == 0) {
+          found = true;
+          break;
+       }
+@@ -478,7 +478,7 @@
+ static void update_vol_actiononpurge(UAContext *ua, char *val, MEDIA_DBR *mr)
+ {
+    POOL_MEM ret;
+-   if (strcasecmp(val, "truncate") == 0) {
++   if (ascii_strcasecmp(val, "truncate") == 0) {
+       mr->ActionOnPurge = AOP_TRUNCATE;
+    } else {
+       mr->ActionOnPurge = 0;
+@@ -791,11 +791,11 @@
+          if (!get_cmd(ua, _("Enter new Enabled: "))) {
+             return 0;
+          }
+-         if (strcasecmp(ua->cmd, "yes") == 0 || strcasecmp(ua->cmd, "true") == 0) {
++         if (ascii_strcasecmp(ua->cmd, "yes") == 0 || ascii_strcasecmp(ua->cmd, "true") == 0) {
+             mr.Enabled = 1;
+-         } else if (strcasecmp(ua->cmd, "no") == 0 || strcasecmp(ua->cmd, "false") == 0) {
++         } else if (ascii_strcasecmp(ua->cmd, "no") == 0 || ascii_strcasecmp(ua->cmd, "false") == 0) {
+             mr.Enabled = 0;
+-         } else if (strcasecmp(ua->cmd, "archived") == 0) { 
++         } else if (ascii_strcasecmp(ua->cmd, "archived") == 0) { 
+             mr.Enabled = 2;
+          } else {
+             mr.Enabled = atoi(ua->cmd);
+diff -u -Nuar bacula-5.0.3.orig/src/filed/job.c bacula-5.0.3/src/filed/job.c
+--- bacula-5.0.3.orig/src/filed/job.c	2011-10-20 16:29:23.585001228 +0300
++++ bacula-5.0.3/src/filed/job.c	2011-10-20 16:29:26.911001232 +0300
+@@ -1744,15 +1744,15 @@
+       return 0;
+    }
+ 
+-   if (strcasecmp(level, "init") == 0) {
++   if (ascii_strcasecmp(level, "init") == 0) {
+       jcr->set_JobLevel(L_VERIFY_INIT);
+-   } else if (strcasecmp(level, "catalog") == 0){
++   } else if (ascii_strcasecmp(level, "catalog") == 0){
+       jcr->set_JobLevel(L_VERIFY_CATALOG);
+-   } else if (strcasecmp(level, "volume") == 0){
++   } else if (ascii_strcasecmp(level, "volume") == 0){
+       jcr->set_JobLevel(L_VERIFY_VOLUME_TO_CATALOG);
+-   } else if (strcasecmp(level, "data") == 0){
++   } else if (ascii_strcasecmp(level, "data") == 0){
+       jcr->set_JobLevel(L_VERIFY_DATA);
+-   } else if (strcasecmp(level, "disk_to_catalog") == 0) {
++   } else if (ascii_strcasecmp(level, "disk_to_catalog") == 0) {
+       jcr->set_JobLevel(L_VERIFY_DISK_TO_CATALOG);
+    } else {
+       dir->fsend(_("2994 Bad verify level: %s\n"), dir->msg);
+diff -u -Nuar bacula-5.0.3.orig/src/filed/status.c bacula-5.0.3/src/filed/status.c
+--- bacula-5.0.3.orig/src/filed/status.c	2011-10-20 16:29:23.585001228 +0300
++++ bacula-5.0.3/src/filed/status.c	2011-10-20 16:29:26.911001232 +0300
+@@ -403,13 +403,13 @@
+          job = (s_last_job*)last_jobs->last();
+          dir->fsend(DotStatusJob, job->JobId, job->JobStatus, job->Errors);
+       }
+-   } else if (strcasecmp(cmd, "header") == 0) {
++   } else if (ascii_strcasecmp(cmd, "header") == 0) {
+        sp.api = true;
+        list_status_header(&sp);
+-   } else if (strcasecmp(cmd, "running") == 0) {
++   } else if (ascii_strcasecmp(cmd, "running") == 0) {
+        sp.api = true;
+        list_running_jobs(&sp);
+-   } else if (strcasecmp(cmd, "terminated") == 0) {
++   } else if (ascii_strcasecmp(cmd, "terminated") == 0) {
+        sp.api = true;
+        list_terminated_jobs(&sp);
+    } else {
+diff -u -Nuar bacula-5.0.3.orig/src/lib/address_conf.c bacula-5.0.3/src/lib/address_conf.c
+--- bacula-5.0.3.orig/src/lib/address_conf.c	2011-10-20 16:29:23.570001221 +0300
++++ bacula-5.0.3/src/lib/address_conf.c	2011-10-20 16:29:26.911001232 +0300
+@@ -421,11 +421,11 @@
+       if (!(token == T_UNQUOTED_STRING || token == T_IDENTIFIER)) {
+          scan_err1(lc, _("Expected a string, got: %s"), lc->str);
+       }
+-      if (strcasecmp("ip", lc->str) == 0 || strcasecmp("ipv4", lc->str) == 0) {
++      if (ascii_strcasecmp("ip", lc->str) == 0 || ascii_strcasecmp("ipv4", lc->str) == 0) {
+          family = AF_INET;
+       }
+ #ifdef HAVE_IPV6
+-      else if (strcasecmp("ipv6", lc->str) == 0) {
++      else if (ascii_strcasecmp("ipv6", lc->str) == 0) {
+          family = AF_INET6;
+       } else {
+          scan_err1(lc, _("Expected a string [ip|ipv4|ipv6], got: %s"), lc->str);
+@@ -450,13 +450,13 @@
+          if (token != T_IDENTIFIER) {
+             scan_err1(lc, _("Expected a identifier [addr|port], got: %s"), lc->str);
+          }
+-         if (strcasecmp("port", lc->str) == 0) {
++         if (ascii_strcasecmp("port", lc->str) == 0) {
+             next_line = PORTLINE;
+             if (exist & PORTLINE) {
+                scan_err0(lc, _("Only one port per address block"));
+             }
+             exist |= PORTLINE;
+-         } else if (strcasecmp("addr", lc->str) == 0) {
++         } else if (ascii_strcasecmp("addr", lc->str) == 0) {
+             next_line = ADDRLINE;
+             if (exist & ADDRLINE) {
+                scan_err0(lc, _("Only one addr per address block"));
+diff -u -Nuar bacula-5.0.3.orig/src/lib/bregex.c bacula-5.0.3/src/lib/bregex.c
+--- bacula-5.0.3.orig/src/lib/bregex.c	2011-10-20 16:29:23.571001228 +0300
++++ bacula-5.0.3/src/lib/bregex.c	2011-10-20 16:29:26.912001235 +0300
+@@ -1464,7 +1464,7 @@
+    if (bufp->cflags & REG_ICASE) {
+       char *p, *lcase = bstrdup(regex);
+       for( p = lcase; *p ; p++) {
+-         *p = tolower(*p);
++         *p = ascii_tolower(*p);
+       } 
+       re_compile_pattern(bufp, (unsigned char *)lcase);
+       bfree(lcase);
+@@ -1944,7 +1944,7 @@
+       bufp->lcase = check_pool_memory_size(bufp->lcase, len+1);
+       unsigned char *dst = (unsigned char *)bufp->lcase;
+       while (*string) {
+-         *dst++ = tolower(*string++);
++         *dst++ = ascii_tolower(*string++);
+       }
+       *dst = '\0';
+       string = (unsigned char *)bufp->lcase;
+diff -u -Nuar bacula-5.0.3.orig/src/lib/fnmatch.c bacula-5.0.3/src/lib/fnmatch.c
+--- bacula-5.0.3.orig/src/lib/fnmatch.c	2011-10-20 16:29:23.569001219 +0300
++++ bacula-5.0.3/src/lib/fnmatch.c	2011-10-20 16:29:26.912001235 +0300
+@@ -57,7 +57,7 @@
+ #define RANGE_ERROR     (-1)
+ 
+ #define ISSET(x, y) ((x) & (y))
+-#define FOLD(c) ((flags & FNM_CASEFOLD) && B_ISUPPER(c) ? tolower(c) : (c))
++#define FOLD(c) ((flags & FNM_CASEFOLD) && B_ISUPPER(c) ? ascii_tolower(c) : (c))
+ 
+ static int rangematch(const char *, char, int, char **);
+ 
+diff -u -Nuar bacula-5.0.3.orig/src/lib/fnmatch.h bacula-5.0.3/src/lib/fnmatch.h
+--- bacula-5.0.3.orig/src/lib/fnmatch.h	2011-10-20 16:29:23.570001221 +0300
++++ bacula-5.0.3/src/lib/fnmatch.h	2011-10-20 16:29:26.912001235 +0300
+@@ -52,5 +52,6 @@
+ #define FNM_FILE_NAME   FNM_PATHNAME
+ 
+ extern "C" int fnmatch(const char *, const char *, int);
++int ascii_tolower (int c);
+ 
+ #endif                          /* !_FNMATCH_H_ */
+diff -u -Nuar bacula-5.0.3.orig/src/lib/parse_conf.c bacula-5.0.3/src/lib/parse_conf.c
+--- bacula-5.0.3.orig/src/lib/parse_conf.c	2011-10-20 16:29:23.571001228 +0300
++++ bacula-5.0.3/src/lib/parse_conf.c	2011-10-20 16:29:26.912001235 +0300
+@@ -337,7 +337,7 @@
+          str = &lc->str[0];
+       }
+       for (i=0; msg_types[i].name; i++) {
+-         if (strcasecmp(str, msg_types[i].name) == 0) {
++         if (ascii_strcasecmp(str, msg_types[i].name) == 0) {
+             msg_type = msg_types[i].token;
+             found = true;
+             break;
+@@ -733,9 +733,9 @@
+ void store_bit(LEX *lc, RES_ITEM *item, int index, int pass)
+ {
+    lex_get_token(lc, T_NAME);
+-   if (strcasecmp(lc->str, "yes") == 0 || strcasecmp(lc->str, "true") == 0) {
++   if (ascii_strcasecmp(lc->str, "yes") == 0 || ascii_strcasecmp(lc->str, "true") == 0) {
+       *(uint32_t *)(item->value) |= item->code;
+-   } else if (strcasecmp(lc->str, "no") == 0 || strcasecmp(lc->str, "false") == 0) {
++   } else if (ascii_strcasecmp(lc->str, "no") == 0 || ascii_strcasecmp(lc->str, "false") == 0) {
+       *(uint32_t *)(item->value) &= ~(item->code);
+    } else {
+       scan_err2(lc, _("Expect %s, got: %s"), "YES, NO, TRUE, or FALSE", lc->str); /* YES and NO must not be translated */
+@@ -749,9 +749,9 @@
+ void store_bool(LEX *lc, RES_ITEM *item, int index, int pass)
+ {
+    lex_get_token(lc, T_NAME);
+-   if (strcasecmp(lc->str, "yes") == 0 || strcasecmp(lc->str, "true") == 0) {
++   if (ascii_strcasecmp(lc->str, "yes") == 0 || ascii_strcasecmp(lc->str, "true") == 0) {
+       *(bool *)(item->value) = true;
+-   } else if (strcasecmp(lc->str, "no") == 0 || strcasecmp(lc->str, "false") == 0) {
++   } else if (ascii_strcasecmp(lc->str, "no") == 0 || ascii_strcasecmp(lc->str, "false") == 0) {
+       *(bool *)(item->value) = false;
+    } else {
+       scan_err2(lc, _("Expect %s, got: %s"), "YES, NO, TRUE, or FALSE", lc->str); /* YES and NO must not be translated */
+@@ -773,7 +773,7 @@
+    token = lex_get_token(lc, T_NAME);
+    /* Store the label pass 2 so that type is defined */
+    for (i=0; tapelabels[i].name; i++) {
+-      if (strcasecmp(lc->str, tapelabels[i].name) == 0) {
++      if (ascii_strcasecmp(lc->str, tapelabels[i].name) == 0) {
+          *(uint32_t *)(item->value) = tapelabels[i].token;
+          i = 0;
+          break;
+@@ -919,7 +919,7 @@
+                goto bail_out;
+             }
+             for (i=0; resources[i].name; i++) {
+-               if (strcasecmp(resources[i].name, lc->str) == 0) {
++               if (ascii_strcasecmp(resources[i].name, lc->str) == 0) {
+                   items = resources[i].items;
+                   if (!items) {
+                      break;
+@@ -946,7 +946,7 @@
+                   goto bail_out;
+                }
+                for (i=0; items[i].name; i++) {
+-                  if (strcasecmp(items[i].name, lc->str) == 0) {
++                  if (ascii_strcasecmp(items[i].name, lc->str) == 0) {
+                      /* If the ITEM_NO_EQUALS flag is set we do NOT
+                       *   scan for = after the keyword  */
+                      if (!(items[i].flags & ITEM_NO_EQUALS)) {
+diff -u -Nuar bacula-5.0.3.orig/src/lib/scan.c bacula-5.0.3/src/lib/scan.c
+--- bacula-5.0.3.orig/src/lib/scan.c	2011-10-20 16:29:23.572001230 +0300
++++ bacula-5.0.3/src/lib/scan.c	2011-10-20 16:29:26.913001233 +0300
+@@ -137,10 +137,10 @@
+    }
+    while (*a) {                       /* do it over the correct slow way */
+       if (B_ISUPPER(c1 = *a)) {
+-         c1 = tolower((int)c1);
++         c1 = ascii_tolower((int)c1);
+       }
+       if (B_ISUPPER(c2 = *b)) {
+-         c2 = tolower((int)c2);
++         c2 = ascii_tolower((int)c2);
+       }
+       if (c1 != c2) {
+          return 0;
+diff -u -Nuar bacula-5.0.3.orig/src/lib/tcpd.h bacula-5.0.3/src/lib/tcpd.h
+--- bacula-5.0.3.orig/src/lib/tcpd.h	2011-10-20 16:29:23.570001221 +0300
++++ bacula-5.0.3/src/lib/tcpd.h	2011-10-20 16:29:26.913001233 +0300
+@@ -42,8 +42,8 @@
+ 
+ #define STRN_EQ(x,y,l)  (strncasecmp((x),(y),(l)) == 0)
+ #define STRN_NE(x,y,l)  (strncasecmp((x),(y),(l)) != 0)
+-#define STR_EQ(x,y)     (strcasecmp((x),(y)) == 0)
+-#define STR_NE(x,y)     (strcasecmp((x),(y)) != 0)
++#define STR_EQ(x,y)     (ascii_strcasecmp((x),(y)) == 0)
++#define STR_NE(x,y)     (ascii_strcasecmp((x),(y)) != 0)
+ 
+  /*
+   * Initially, all above strings have the empty value. Information that
+diff -u -Nuar bacula-5.0.3.orig/src/lib/tls.c bacula-5.0.3/src/lib/tls.c
+--- bacula-5.0.3.orig/src/lib/tls.c	2011-10-20 16:29:23.570001221 +0300
++++ bacula-5.0.3/src/lib/tls.c	2011-10-20 16:29:26.913001233 +0300
+@@ -268,7 +268,7 @@
+ 
+          /* Try all the CNs in the list */
+          foreach_alist(cn, verify_list) {
+-            if (strcasecmp(data, cn) == 0) {
++            if (ascii_strcasecmp(data, cn) == 0) {
+                auth_success = true;
+             }
+          }
+@@ -361,7 +361,7 @@
+             for (j = 0; j < sk_CONF_VALUE_num(val); j++) {
+                nval = sk_CONF_VALUE_value(val, j);
+                if (strcmp(nval->name, "DNS") == 0) {
+-                  if (strcasecmp(nval->value, host) == 0) {
++                  if (ascii_strcasecmp(nval->value, host) == 0) {
+                      auth_success = true;
+                      goto success;
+                   }
+@@ -382,7 +382,7 @@
+             }
+             neCN = X509_NAME_get_entry(subject, cnLastPos);
+             asn1CN = X509_NAME_ENTRY_get_data(neCN);
+-            if (strcasecmp((const char*)asn1CN->data, host) == 0) {
++            if (ascii_strcasecmp((const char*)asn1CN->data, host) == 0) {
+                auth_success = true;
+                break;
+             }
+diff -u -Nuar bacula-5.0.3.orig/src/lib/util.c bacula-5.0.3/src/lib/util.c
+--- bacula-5.0.3.orig/src/lib/util.c	2011-10-20 16:29:23.570001221 +0300
++++ bacula-5.0.3/src/lib/util.c	2011-10-20 16:29:26.913001233 +0300
+@@ -71,13 +71,12 @@
+    return true;
+ }
+ 
+-
+ /* Convert a string in place to lower case */
+ void lcase(char *str)
+ {
+    while (*str) {
+       if (B_ISUPPER(*str)) {
+-         *str = tolower((int)(*str));
++         *str = ascii_tolower((int)(*str));
+        }
+        str++;
+    }
+diff -u -Nuar bacula-5.0.3.orig/src/lib/var.c bacula-5.0.3/src/lib/var.c
+--- bacula-5.0.3.orig/src/lib/var.c	2011-10-20 16:29:23.571001228 +0300
++++ bacula-5.0.3/src/lib/var.c	2011-10-20 16:29:26.914001230 +0300
+@@ -973,7 +973,7 @@
+         return VAR_ERR_EMPTY_SEARCH_STRING;
+ 
+     for (p = flags->begin; p != flags->end; p++) {
+-        switch (tolower(*p)) {
++        switch (ascii_tolower(*p)) {
+             case 'm':
+                 multiline = 1;
+                 break;
+@@ -1327,7 +1327,7 @@
+         return 0;
+ 
+     /* dispatch through the first operation character */
+-    switch (tolower(*p)) {
++    switch (ascii_tolower(*p)) {
+         case 'l': {
+             /* turn value to lowercase. */
+             if (data->begin != NULL) {
+@@ -1341,7 +1341,7 @@
+                 }
+                 /* convert value */
+                 for (ptr = (char *)data->begin; ptr != data->end; ptr++)
+-                    *ptr = (char)tolower((int)(*ptr));
++                    *ptr = (char)ascii_tolower((int)(*ptr));
+             }
+             p++;
+             break;
+diff -u -Nuar bacula-5.0.3.orig/src/stored/btape.c bacula-5.0.3/src/stored/btape.c
+--- bacula-5.0.3.orig/src/stored/btape.c	2011-10-20 16:29:23.587001228 +0300
++++ bacula-5.0.3/src/stored/btape.c	2011-10-20 16:29:26.914001230 +0300
+@@ -999,7 +999,7 @@
+ static int btape_find_arg(const char *keyword)
+ {
+    for (int i=1; i<argc; i++) {
+-      if (strcasecmp(keyword, argk[i]) == 0) {
++      if (ascii_strcasecmp(keyword, argk[i]) == 0) {
+          return i;
+       }
+    }
+diff -u -Nuar bacula-5.0.3.orig/src/stored/parse_bsr.c bacula-5.0.3/src/stored/parse_bsr.c
+--- bacula-5.0.3.orig/src/stored/parse_bsr.c	2011-10-20 16:29:23.587001228 +0300
++++ bacula-5.0.3/src/stored/parse_bsr.c	2011-10-20 16:29:26.914001230 +0300
+@@ -156,7 +156,7 @@
+          continue;
+       }
+       for (i=0; items[i].name; i++) {
+-         if (strcasecmp(items[i].name, lc->str) == 0) {
++         if (ascii_strcasecmp(items[i].name, lc->str) == 0) {
+             token = lex_get_token(lc, T_ALL);
+             Dmsg1 (300, "in T_IDENT got token=%s\n", lex_tok_to_str(token));
+             if (token != T_EQUALS) {
+diff -u -Nuar bacula-5.0.3.orig/src/stored/status.c bacula-5.0.3/src/stored/status.c
+--- bacula-5.0.3.orig/src/stored/status.c	2011-10-20 16:29:23.587001228 +0300
++++ bacula-5.0.3/src/stored/status.c	2011-10-20 16:29:26.915001226 +0300
+@@ -718,25 +718,25 @@
+          job = (s_last_job*)last_jobs->last();
+          dir->fsend(DotStatusJob, job->JobId, job->JobStatus, job->Errors);
+       }
+-   } else if (strcasecmp(cmd.c_str(), "header") == 0) {
++   } else if (ascii_strcasecmp(cmd.c_str(), "header") == 0) {
+        sp.api = true;
+        list_status_header(&sp);
+-   } else if (strcasecmp(cmd.c_str(), "running") == 0) {
++   } else if (ascii_strcasecmp(cmd.c_str(), "running") == 0) {
+        sp.api = true;
+        list_running_jobs(&sp);
+-   } else if (strcasecmp(cmd.c_str(), "waitreservation") == 0) {
++   } else if (ascii_strcasecmp(cmd.c_str(), "waitreservation") == 0) {
+        sp.api = true;
+        list_jobs_waiting_on_reservation(&sp);
+-   } else if (strcasecmp(cmd.c_str(), "devices") == 0) {
++   } else if (ascii_strcasecmp(cmd.c_str(), "devices") == 0) {
+        sp.api = true;
+        list_devices(&sp);
+-   } else if (strcasecmp(cmd.c_str(), "volumes") == 0) {
++   } else if (ascii_strcasecmp(cmd.c_str(), "volumes") == 0) {
+        sp.api = true;
+        list_volumes(sendit, &sp);
+-   } else if (strcasecmp(cmd.c_str(), "spooling") == 0) {
++   } else if (ascii_strcasecmp(cmd.c_str(), "spooling") == 0) {
+        sp.api = true;
+        list_spool_stats(sendit, &sp);
+-   } else if (strcasecmp(cmd.c_str(), "terminated") == 0) {
++   } else if (ascii_strcasecmp(cmd.c_str(), "terminated") == 0) {
+        sp.api = true;
+        list_terminated_jobs(&sp);
+    } else {
+diff -u -Nuar bacula-5.0.3.orig/src/stored/stored_conf.c bacula-5.0.3/src/stored/stored_conf.c
+--- bacula-5.0.3.orig/src/stored/stored_conf.c	2011-10-20 16:29:23.587001228 +0300
++++ bacula-5.0.3/src/stored/stored_conf.c	2011-10-20 16:29:26.915001226 +0300
+@@ -231,7 +231,7 @@
+    token = lex_get_token(lc, T_NAME);
+    /* Store the label pass 2 so that type is defined */
+    for (i=0; dev_types[i].name; i++) {
+-      if (strcasecmp(lc->str, dev_types[i].name) == 0) {
++      if (ascii_strcasecmp(lc->str, dev_types[i].name) == 0) {
+          *(uint32_t *)(item->value) = dev_types[i].token;
+          i = 0;
+          break;
+diff -u -Nuar bacula-5.0.3.orig/src/tools/bsmtp.c bacula-5.0.3/src/tools/bsmtp.c
+--- bacula-5.0.3.orig/src/tools/bsmtp.c	2011-10-20 16:29:23.568001219 +0300
++++ bacula-5.0.3/src/tools/bsmtp.c	2011-10-20 16:29:26.915001226 +0300
+@@ -411,7 +411,7 @@
+    if ((hp = gethostbyname(mailhost)) == NULL) {
+       Pmsg2(0, _("Error unknown mail host \"%s\": ERR=%s\n"), mailhost,
+          strerror(errno));
+-      if (strcasecmp(mailhost, "localhost") != 0) {
++      if (ascii_strcasecmp(mailhost, "localhost") != 0) {
+          Pmsg0(0, _("Retrying connection using \"localhost\".\n"));
+          mailhost = "localhost";
+          goto hp;
+diff -u -Nuar bacula-5.0.3.orig/src/tools/dbcheck.c bacula-5.0.3/src/tools/dbcheck.c
+--- bacula-5.0.3.orig/src/tools/dbcheck.c	2011-10-20 16:29:23.568001219 +0300
++++ bacula-5.0.3/src/tools/dbcheck.c	2011-10-20 16:29:26.915001226 +0300
+@@ -1289,7 +1289,7 @@
+       quit = true;
+       return false;
+    }
+-   return (strcasecmp(cmd, "yes") == 0) || (strcasecmp(cmd, _("yes")) == 0);
++   return (ascii_strcasecmp(cmd, "yes") == 0) || (ascii_strcasecmp(cmd, _("yes")) == 0);
+ }
+ 
+ bool python_set_prog(JCR*, char const*) { return false; }
+@@ -1325,10 +1325,10 @@
+    key_name = row[2];
+    col_name = row[4];
+    for(i = 0; (idx_list[i].key_name != NULL) && (i < MAXIDX); i++) {
+-      if (strcasecmp(idx_list[i].key_name, key_name) == 0 ) {
++      if (ascii_strcasecmp(idx_list[i].key_name, key_name) == 0 ) {
+          idx_list[i].count_key++;
+          found = true;
+-         if (strcasecmp(col_name, name) == 0) {
++         if (ascii_strcasecmp(col_name, name) == 0) {
+             idx_list[i].count_col++;
+          }
+          break;
+@@ -1340,7 +1340,7 @@
+       idx_list[i].key_name = (char *)malloc(len);
+       bstrncpy(idx_list[i].key_name, key_name, len);
+       idx_list[i].count_key = 1;
+-      if (strcasecmp(col_name, name) == 0) {
++      if (ascii_strcasecmp(col_name, name) == 0) {
+          idx_list[i].count_col = 1;
+       } else {
+          idx_list[i].count_col = 0;

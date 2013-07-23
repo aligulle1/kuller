@@ -1,0 +1,195 @@
+--- nas-1.8/server/os/connection.c.sec_fixes	2005-04-07 13:08:14.000000000 -0600
++++ nas-1.8/server/os/connection.c	2007-03-20 10:37:41.000000000 -0600
+@@ -899,13 +899,19 @@ open_att_svr4_local ()
+ }
+ #endif /* SVR4 */
+ 
++/* JET 3/17/2007 - Luigi Auriemma's nasbugs, attack #1, simple buffer
++   overflow.  Now we limit to _MAX_SALVENM.
++ */
++
++#define _MAX_SLAVENM    (256)
++
+ static int
+ accept_att_local()
+ {
+   int newconn;
+   int read_in;
+-  char length;
+-  char path[64];
++  unsigned char length;
++  char path[_MAX_SLAVENM];
+ 
+   /*
+    * first get device-name
+@@ -914,7 +920,10 @@ accept_att_local()
+     Error("audio server: Can't read slave name length from USL client connection");
+     return(-1);
+   }
+-
++  
++  if (length >= _MAX_SLAVENM)
++    length = _MAX_SLAVENM - 1;
++    
+   if( (read_in = read(ptsFd, path, length)) <= 0 ) {
+     Error("audio server: Can't read slave name from USL client connection");
+     return(-1);
+@@ -1506,8 +1515,15 @@ EstablishNewConnections(clientUnused, cl
+ 			      (struct sockaddr *) NULL, 
+ 			      (socklen_t *)NULL)) < 0) 
+ 	    continue;
+-	if (newconn > lastfdesc)
++	if (newconn >= lastfdesc - 1)
+ 	{
++	    /* JET 3/17/2007 - Luigi Auriemma's nasbugs, attack #8.  
++	       shut down the client if the max is exceeded.  Note,
++               if the client does not send any data or disconnect,
++	       ErrorConnMax() has been modified to return if a
++	       timeout occurs.  If this happens the client will simply
++	       be disconnected.
++	    */
+ 	    ErrorConnMax(newconn);
+ 	    close(newconn);
+ 	    continue;
+@@ -1596,6 +1612,7 @@ ErrorConnMax(fd)
+     char byteOrder = 0;
+     int whichbyte = 1;
+     struct timeval waittime;
++    int rv = 0;
+ #ifndef _MINIX
+     long mask[mskcnt];
+ #endif /* !_MINIX */
+@@ -1608,12 +1625,16 @@ ErrorConnMax(fd)
+     CLEARBITS(mask);
+     BITSET(mask, fd);
+ #ifdef hpux
+-    (void)select(fd + 1, (int *) mask, (int *) NULL, (int *) NULL, 
+-	&waittime);
++    rv = select(fd + 1, (int *) mask, (int *) NULL, (int *) NULL,
++                &waittime);
+ #else
+-    (void)select(fd + 1, (fd_set *) mask, (fd_set *) NULL, (fd_set *) NULL, 
+-	&waittime);
++    rv = select(fd + 1, (fd_set *) mask, (fd_set *) NULL,
++                (fd_set *) NULL, &waittime);    
+ #endif
++    /* JET 3/17/2007, if we timed out, simply return */
++    if (rv == 0)
++        return;
++        
+     /* try to read the byte-order of the connection */
+     (void)read(fd, &byteOrder, 1);
+ #else
+--- nas-1.8/server/dia/auutil.c.sec_fixes	2005-11-02 20:06:14.000000000 -0700
++++ nas-1.8/server/dia/auutil.c	2007-03-20 10:41:46.000000000 -0600
+@@ -240,6 +240,20 @@ AuBool          discard;
+     dataSize = numSamples * sizeofFormat(format) * numTracks;
+     minibufSize = auNativeBytesPerSample * auMinibufSamples * numTracks;
+ 
++    /* JET 3/17/2007 - Luigi Auriemma's nasbugs, attack #3, triggers
++       this. After the overflow the malloc will succeed, since it
++       becomes a small number when dataSize is very large.  dataSize,
++       however will remain large, and attempts to copy data into the
++       buffer from the client will eventually core (like in
++       ProcAuWriteElement) as the buffer is overrun */
++
++    /* check for a possible integer overflow first, before possibly
++       allocating a much smaller buffer than is really required. */
++    if (dataSize > (PAD4(sizeof(ComponentRec)) +
++                    PAD4(dataSize) +
++                    PAD4(minibufSize) * 2))
++      return NULL;
++
+     /* the minibuf needs to be twice as large for output range checking */
+     if (!(port = (ComponentPtr) aualloc(PAD4(sizeof(ComponentRec)) +
+ 					PAD4(dataSize) +
+@@ -714,6 +728,14 @@ FlowPtr         flow;
+ 
+ 		/* compile the inputs for this output */
+ 		inputCnt = 0;
++		
++		/* JET 3/17/2007 - Luigi Auriemma's nasbugs, attack #6.
++                   Make sure an invalid element number isn't going to be
++                   used for output->firstInput.
++                */
++                if (output->firstInput > flow->numElements)
++                  return AuBadElement;
++                  
+ 		status = compileInputs(client, flow->elements, output,
+ 				       output->firstInput,
+ 				       AuFixedPointFromSum(1, 0),
+--- nas-1.8/server/dia/audispatch.c.sec_fixes	1999-09-04 20:43:11.000000000 -0600
++++ nas-1.8/server/dia/audispatch.c	2007-03-20 10:53:36.000000000 -0600
+@@ -590,10 +590,15 @@ static int      numDefaultActions[] =
+     ADD_VAR((num) * sizeof(auElementAction));				       \
+ }
+ 
++/* JET 3/17/2007 - Luigi Auriemma's nasbugs, attack #5.  Let's not be
++   stupid and free a flow, then deref data within the freed flow in
++   AU_ERROR().  
++*/
+ #define FREE_FLOW_ERROR(e, v)						       \
+ {									       \
++    CARD8 val = (v);							       \
+     AuFreeFlowElements(flow);						       \
+-    AU_ERROR(e, v);							       \
++    AU_ERROR(e, val);							       \
+ }
+ 
+ int
+@@ -621,6 +626,19 @@ ClientPtr       client;
+ 
+     /* compute length of variable data and do some error checking */
+     for (i = varLen = numActions = 0; i < stuff->numElements; i++, el++)
++      {
++      
++        /* JET 3/17/2007 - Luigi Auriemma's nasbugs, attack #4,
++           triggers this.  while counting actions, make sure we do not
++           stray beyond the stuff buffer.  If we do, then there wasn't
++           enough data supplied in the request.
++        */
++
++        if (el >= ((auElement *)&stuff[1] +  
++                   ((stuff->length << 2) - sizeof(auSetElementsReq))) ) 
++          { 
++            AU_ERROR(AuBadLength, 0);
++          } 
+ 	switch (el->type)
+ 	{
+ 	    case AuElementTypeImportClient:
+@@ -659,6 +677,7 @@ ClientPtr       client;
+ 	    default:
+ 		AU_ERROR(AuBadElement, el->type);
+ 	}
++      }
+ 
+     /* size of element list */
+     len = (stuff->length << 2) - sizeof(auSetElementsReq);
+--- nas-1.8/server/dia/resource.c.sec_fixes	1999-05-08 12:47:38.000000000 -0600
++++ nas-1.8/server/dia/resource.c	2007-03-20 11:00:37.000000000 -0600
+@@ -301,11 +301,23 @@ AddResource(id, type, value)
+     	
+     client = CLIENT_ID(id);
+     rrec = &clientTable[client];
++    
++    /* JET 3/17/2007 - Luigi Auriemma's nasbugs, attack #2.  can
++       force nasd to terminate by specifying a non-existant clientid
++       to this request.  Normally all proto requests are made via
++       libaudio, in which case this situation should never happen.
++       However, if you talk protocol to the server directly... Well,
++       we will log the condition when it occurs, but will not
++       terminate the server.
++
++       It occurs to me that X servers should be vulnerable to this
++       DOS, since this code is present in X11 too. :) */
++       
+     if (!rrec->buckets)
+     {
+-	ErrorF("AddResource(%x, %x, %x), client=%d \n",
++	ErrorF("AddResource(%x, %x, %x), client=%d (client not in use)\n",
+ 		id, type, (unsigned long)value, client);
+-        FatalError("client not in use\n");
++        return FALSE;
+     }
+     if ((rrec->elements >= 4*rrec->buckets) &&
+ 	(rrec->hashsize < MAXHASHSIZE))

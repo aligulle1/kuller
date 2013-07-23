@@ -1,0 +1,30 @@
+The memset hack is probably right.  The cursor hack probably needs to be
+replicated in the kernel.
+
+diff -up xf86-video-ati-6.12.2/src/radeon_cursor.c.jx xf86-video-ati-6.12.2/src/radeon_cursor.c
+--- xf86-video-ati-6.12.2/src/radeon_cursor.c.jx	2009-05-21 13:56:38.000000000 -0400
++++ xf86-video-ati-6.12.2/src/radeon_cursor.c	2009-05-21 13:56:39.000000000 -0400
+@@ -372,7 +372,7 @@ Bool RADEONCursorInit(ScreenPtr pScreen)
+ 		       (unsigned int)radeon_crtc->cursor_offset);
+ 	}
+ 	/* set the cursor mode the same on both crtcs to avoid corruption */
+-	if (IS_AVIVO_VARIANT)
++	if (IS_AVIVO_VARIANT && !info->drm_mode_setting)
+ 	    OUTREG(AVIVO_D1CUR_CONTROL + radeon_crtc->crtc_offset,
+ 		   (AVIVO_D1CURSOR_MODE_24BPP << AVIVO_D1CURSOR_MODE_SHIFT));
+     }
+diff -up xf86-video-ati-6.12.2/src/radeon_driver.c.jx xf86-video-ati-6.12.2/src/radeon_driver.c
+--- xf86-video-ati-6.12.2/src/radeon_driver.c.jx	2009-05-21 13:56:38.000000000 -0400
++++ xf86-video-ati-6.12.2/src/radeon_driver.c	2009-05-21 13:59:08.000000000 -0400
+@@ -3911,8 +3911,9 @@ Bool RADEONScreenInit(int scrnIndex, Scr
+     }
+ 
+     /* Clear the framebuffer */
+-    memset(info->FB + pScrn->fbOffset, 0,
+-           pScrn->virtualY * pScrn->displayWidth * info->CurrentLayout.pixel_bytes);
++    if (!info->drm_mode_setting)
++	memset(info->FB + pScrn->fbOffset, 0,
++	       pScrn->virtualY * pScrn->displayWidth * info->CurrentLayout.pixel_bytes);
+ 
+     /* set the modes with desired rotation, etc. */
+     pScrn->pScreen = pScreen;

@@ -1,0 +1,43 @@
+# HG changeset patch
+# User Ville Skyttä <ville.skytta@iki.fi>
+# Date 1202576062 0
+# Node ID e51f41780aa1ad988d36964f33571b00944b035d
+# Parent  61272c880192422a52b3a54274ca309ec721fd6d
+Make xine-config --version parsing more robust
+I think there's quite a bit more room for improvement in the sed expression:
+
+1) The expression is not bound to start/end of line, and will thus pass
+possible leading/trailing garbage through.
+
+2) It uses plain "." (== any character as far as sed is concerned) where it
+appears to search for the literal ".".
+
+3) The whole "xine-config --version" output is assigned to all
+xine_config_*_version vars if there's no match. I think more intuitive would
+be them to be empty if parsing fails.
+
+4) It uses * (0 or more) for matching digit sequences, where I think + (1 or
+more) would be desirable.
+
+This patch should fix issues 1 to 3. I suppose for 4) it would additionally
+take only replacing the first three "*" with "\+" but IIRC there are some
+portability issues related to "+" between different sed versions.
+
+diff -r 61272c880192 -r e51f41780aa1 m4/xine.m4
+--- a/m4/xine.m4	Sat Feb 09 16:51:19 2008 +0000
++++ b/m4/xine.m4	Sat Feb 09 16:54:22 2008 +0000
+@@ -69,11 +69,11 @@ AC_ARG_ENABLE(xinetest,
+       XINE_LIBS=`$XINE_CONFIG $xine_config_args --libs`
+       XINE_ACFLAGS=`$XINE_CONFIG $xine_config_args --acflags`
+       xine_config_major_version=`$XINE_CONFIG $xine_config_args --version | \
+-             sed 's/\([[0-9]]*\).\([[0-9]]*\).\([[0-9]]*\)/\1/'`
++             sed -n 's/^\([[0-9]]*\)\.\([[0-9]]*\)\.\([[0-9]]*\).*$/\1/p'`
+       xine_config_minor_version=`$XINE_CONFIG $xine_config_args --version | \
+-             sed 's/\([[0-9]]*\).\([[0-9]]*\).\([[0-9]]*\)/\2/'`
++             sed -n 's/^\([[0-9]]*\)\.\([[0-9]]*\)\.\([[0-9]]*\).*$/\2/p'`
+       xine_config_sub_version=`$XINE_CONFIG $xine_config_args --version | \
+-             sed 's/\([[0-9]]*\).\([[0-9]]*\).\([[0-9]]*\)/\3/'`
++             sed -n 's/^\([[0-9]]*\)\.\([[0-9]]*\)\.\([[0-9]]*\).*$/\3/p'`
+       xine_data_dir=`$XINE_CONFIG $xine_config_args --datadir`
+       xine_script_dir=`$XINE_CONFIG $xine_config_args --scriptdir`
+       xine_plugin_dir=`$XINE_CONFIG $xine_config_args --plugindir`

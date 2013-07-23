@@ -1,0 +1,24 @@
+--- source/common/uidna.cpp (revision 19384)
++++ source/common/uidna.cpp (revision 20988)
+@@ -224,4 +224,13 @@
+     }
+     
++    if(srcLength > b1Capacity){
++        b1 = (UChar*) uprv_malloc(srcLength * U_SIZEOF_UCHAR);
++        if(b1==NULL){
++            *status = U_MEMORY_ALLOCATION_ERROR;
++            goto CLEANUP;
++        }
++        b1Capacity = srcLength;
++    }
++
+     // step 1 
+     for( j=0;j<srcLength;j++){
+@@ -241,4 +250,7 @@
+             // redo processing of string
+             // we do not have enough room so grow the buffer
++            if(b1 != b1Stack){
++                uprv_free(b1);
++            }
+             b1 = (UChar*) uprv_malloc(b1Len * U_SIZEOF_UCHAR);
+             if(b1==NULL){

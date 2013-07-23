@@ -1,0 +1,55 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>hostapd</Name>
+        <Homepage>http://hostap.epitest.fi/hostapd</Homepage>
+        <Packager>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Packager>
+        <License>BSD</License>
+        <IsA>service</IsA>
+        <Summary>IEEE 802.11 AP, IEEE 802.1X/WPA/WPA2/EAP/RADIUS Authenticator</Summary>
+        <Description>hostapd is a user space daemon for access point and authentication servers. It implements IEEE 802.11 access point management, IEEE 802.1X/WPA/WPA2/EAP Authenticators and RADIUS authentication server.</Description>
+        <Archive sha1sum="7a8853fe41ee5a2b9f03f608cf7a61c7ccea4f4c" type="targz">http://hostap.epitest.fi/releases/hostapd-0.7.3.tar.gz</Archive>
+        <AdditionalFiles>
+            <AdditionalFile target="hostapd/.config">config</AdditionalFile>
+        </AdditionalFiles>
+        <BuildDependencies>
+            <Dependency>libnl</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <Patch level="1">hostapd-RPM_OPT_FLAGS.patch</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>hostapd</Name>
+        <RuntimeDependencies>
+            <Dependency>libnl</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="executable">/usr/sbin</Path>
+            <Path fileType="man">/usr/share/man</Path>
+            <Path fileType="doc">/usr/share/doc</Path>
+            <Path fileType="config">/etc</Path>
+        </Files>
+        <AdditionalFiles>
+            <AdditionalFile owner="root" permission="0644" target="/etc/hostapd/hostapd.conf">hostapd.conf</AdditionalFile>
+        </AdditionalFiles>
+        <Provides>
+            <COMAR script="service.py">System.Service</COMAR>
+        </Provides>
+    </Package>
+
+    <History>
+        <Update release="1">
+            <Date>2011-11-03</Date>
+            <Version>0.7.3</Version>
+            <Comment>Initial release.</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+    </History>
+</PISI>

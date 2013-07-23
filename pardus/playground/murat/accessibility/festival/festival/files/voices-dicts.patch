@@ -1,0 +1,46 @@
+diff -ur festival.orig/examples/benchmark festival/examples/benchmark
+--- festival.orig/examples/benchmark	2007-10-29 02:24:25.000000000 +0200
++++ festival/examples/benchmark	2007-10-29 02:03:43.000000000 +0200
+@@ -54,8 +54,8 @@
+ cat > $script <<__END__
+ 
+ (set! libdir "$libdir/")
+-(set! lexdir "$default_libdir/dicts/")
+-(set! voiced_dir "$default_libdir/voices/")
++(set! lexdir "/usr/share/festival/dicts/")
++(set! voiced_dir "/usr/share/festival/voices/")
+ 
+ (load (string-append libdir "init.scm"))
+ (if (probe_file (format nil "%s/.festivalrc" (getenv "HOME")))
+diff -ur festival.orig/lib/lexicons.scm festival/lib/lexicons.scm
+--- festival.orig/lib/lexicons.scm	2007-10-29 02:24:25.000000000 +0200
++++ festival/lib/lexicons.scm	2007-10-29 02:33:02.000000000 +0200
+@@ -42,8 +42,8 @@
+ ;;;  you should set lexdir in sitevars.scm
+ 
+ (defvar lexdir 
+-  (if (probe_file (path-append libdir "dicts"))
+-      (path-append libdir "dicts/")
++  (if (probe_file (path-append libdir "/usr/share/festival/dicts/"))
++      (path-append libdir "/usr/share/festival/dicts/")
+       ;; else we'll guess we're in the CSTR filespace
+       (path-as-directory "/projects/festival/lib/dicts/"))
+   "lexdir
+diff -ur festival.orig/lib/voices.scm festival/lib/voices.scm
+--- festival.orig/lib/voices.scm	2007-10-29 02:24:25.000000000 +0200
++++ festival/lib/voices.scm	2007-10-29 02:23:24.000000000 +0200
+@@ -42,12 +42,12 @@
+ ;; The path to search for voices is created from the load-path with
+ ;; an extra list of directories appended.
+ 
+-(defvar system-voice-path '( )
++(defvar system-voice-path '("/usr/share/festival/voices/")
+   "system-voice-path
+    Additional directory not near the load path where voices can be
+    found, this can be redefined in /etc/festival/sitevars.scm if desired.")
+ 
+-(defvar system-voice-path-multisyn '( )
++(defvar system-voice-path-multisyn '("/usr/share/festival/voices-multisyn/" )
+   "system-voice-path-multisyn
+    Additional directory not near the load path where multisyn voices can be
+    found, this can be redefined in /etc/festival/sitevars.scm if desired.")

@@ -1,0 +1,5253 @@
+commit d2b690714cd7d328561bfb9bf941edd6a3316a85
+Author: Ivo van Doorn <ivdoorn@gmail.com>
+Date:   Sun Jul 27 15:06:05 2008 +0200
+
+    rt2x00: Fix access permissions on debugfs files
+    
+    Although most rt2x00 debugfs files don't contain
+    information which could compromise network security,
+    it is better to set the access permissions to root only.
+    
+    This will be required when HW crypto is implemented,
+    because it could be possible to read the HW key from
+    the registers.
+    
+    Signed-off-by: Ivo van Doorn <IvDoorn@gmail.com>
+    Signed-off-by: John W. Linville <linville@tuxdriver.com>
+
+diff --git a/drivers/net/wireless/rt2x00/rt2x00debug.c b/drivers/net/wireless/rt2x00/rt2x00debug.c
+index 300cf06..6bee1d6 100644
+--- a/drivers/net/wireless/rt2x00/rt2x00debug.c
++++ b/drivers/net/wireless/rt2x00/rt2x00debug.c
+@@ -372,9 +372,6 @@ static ssize_t rt2x00debug_write_##__name(struct file *file,	\
+ 	if (*offset)						\
+ 		return 0;					\
+ 								\
+-	if (!capable(CAP_NET_ADMIN))				\
+-		return -EPERM;					\
+-								\
+ 	if (intf->offset_##__name >= debug->__name.word_count)	\
+ 		return -EINVAL;					\
+ 								\
+@@ -454,7 +451,7 @@ static struct dentry *rt2x00debug_create_file_driver(const char *name,
+ 	data += sprintf(data, "compiled: %s %s\n", __DATE__, __TIME__);
+ 	blob->size = strlen(blob->data);
+ 
+-	return debugfs_create_blob(name, S_IRUGO, intf->driver_folder, blob);
++	return debugfs_create_blob(name, S_IRUSR, intf->driver_folder, blob);
+ }
+ 
+ static struct dentry *rt2x00debug_create_file_chipset(const char *name,
+@@ -482,7 +479,7 @@ static struct dentry *rt2x00debug_create_file_chipset(const char *name,
+ 	data += sprintf(data, "rf length: %d\n", debug->rf.word_count);
+ 	blob->size = strlen(blob->data);
+ 
+-	return debugfs_create_blob(name, S_IRUGO, intf->driver_folder, blob);
++	return debugfs_create_blob(name, S_IRUSR, intf->driver_folder, blob);
+ }
+ 
+ void rt2x00debug_register(struct rt2x00_dev *rt2x00dev)
+@@ -517,7 +514,7 @@ void rt2x00debug_register(struct rt2x00_dev *rt2x00dev)
+ 	if (IS_ERR(intf->chipset_entry))
+ 		goto exit;
+ 
+-	intf->dev_flags = debugfs_create_file("dev_flags", S_IRUGO,
++	intf->dev_flags = debugfs_create_file("dev_flags", S_IRUSR,
+ 					      intf->driver_folder, intf,
+ 					      &rt2x00debug_fop_dev_flags);
+ 	if (IS_ERR(intf->dev_flags))
+@@ -532,7 +529,7 @@ void rt2x00debug_register(struct rt2x00_dev *rt2x00dev)
+ ({								\
+ 	(__intf)->__name##_off_entry =				\
+ 	    debugfs_create_u32(__stringify(__name) "_offset",	\
+-			       S_IRUGO | S_IWUSR,		\
++			       S_IRUSR | S_IWUSR,		\
+ 			       (__intf)->register_folder,	\
+ 			       &(__intf)->offset_##__name);	\
+ 	if (IS_ERR((__intf)->__name##_off_entry))		\
+@@ -540,7 +537,7 @@ void rt2x00debug_register(struct rt2x00_dev *rt2x00dev)
+ 								\
+ 	(__intf)->__name##_val_entry =				\
+ 	    debugfs_create_file(__stringify(__name) "_value",	\
+-				S_IRUGO | S_IWUSR,		\
++				S_IRUSR | S_IWUSR,		\
+ 				(__intf)->register_folder,	\
+ 				(__intf), &rt2x00debug_fop_##__name);\
+ 	if (IS_ERR((__intf)->__name##_val_entry))		\
+@@ -560,7 +557,7 @@ void rt2x00debug_register(struct rt2x00_dev *rt2x00dev)
+ 		goto exit;
+ 
+ 	intf->queue_frame_dump_entry =
+-	    debugfs_create_file("dump", S_IRUGO, intf->queue_folder,
++	    debugfs_create_file("dump", S_IRUSR, intf->queue_folder,
+ 				intf, &rt2x00debug_fop_queue_dump);
+ 	if (IS_ERR(intf->queue_frame_dump_entry))
+ 		goto exit;
+@@ -569,7 +566,7 @@ void rt2x00debug_register(struct rt2x00_dev *rt2x00dev)
+ 	init_waitqueue_head(&intf->frame_dump_waitqueue);
+ 
+ 	intf->queue_stats_entry =
+-	    debugfs_create_file("queue", S_IRUGO, intf->queue_folder,
++	    debugfs_create_file("queue", S_IRUSR, intf->queue_folder,
+ 				intf, &rt2x00debug_fop_queue_stats);
+ 
+ 	return;
+
+commit ada662f3eb6231ab27f5e6366d4e5c395d25edd3
+Author: Ivo van Doorn <ivdoorn@gmail.com>
+Date:   Sun Jul 27 15:06:21 2008 +0200
+
+    rt2x00: Fix partial antenna configuration
+    
+    The if-statement to determine the new TX/RX antenna
+    configuration was incomplete. It lacks the general
+    else-clause when the antenna wasn't changed.
+    
+    This is a correct event, since it can occur when only
+    one of the antenna's has been changed or when the new
+    configuration is being forced (like when the interface
+    has just been added).
+    
+    Signed-off-by: Ivo van Doorn <IvDoorn@gmail.com>
+    Signed-off-by: John W. Linville <linville@tuxdriver.com>
+
+diff --git a/drivers/net/wireless/rt2x00/rt2x00config.c b/drivers/net/wireless/rt2x00/rt2x00config.c
+index 3f89516..d134c3b 100644
+--- a/drivers/net/wireless/rt2x00/rt2x00config.c
++++ b/drivers/net/wireless/rt2x00/rt2x00config.c
+@@ -254,6 +254,8 @@ config:
+ 			libconf.ant.rx = default_ant->rx;
+ 		else if (active_ant->rx == ANTENNA_SW_DIVERSITY)
+ 			libconf.ant.rx = ANTENNA_B;
++		else
++			libconf.ant.rx = active_ant->rx;
+ 
+ 		if (conf->antenna_sel_tx)
+ 			libconf.ant.tx = conf->antenna_sel_tx;
+@@ -261,6 +263,8 @@ config:
+ 			libconf.ant.tx = default_ant->tx;
+ 		else if (active_ant->tx == ANTENNA_SW_DIVERSITY)
+ 			libconf.ant.tx = ANTENNA_B;
++		else
++			libconf.ant.tx = active_ant->tx;
+ 	}
+ 
+ 	if (flags & CONFIG_UPDATE_SLOT_TIME) {
+
+commit e6d3e902088ac5da77b074f513e3cb80422ff471
+Author: Ivo van Doorn <ivdoorn@gmail.com>
+Date:   Sun Jul 27 15:06:50 2008 +0200
+
+    rt2x00: rt61pci needs another millisecond after firmware upload
+    
+    After the hardware has indicated the firmware upload has completed
+    and the device is ready, we should wait another millisecond to
+    make sure the device is really ready to continue.
+    
+    Without this timout, bringing the interface down and up again will
+    fail due to incorrect register initialization.
+    
+    Signed-off-by: Ivo van Doorn <IvDoorn@gmail.com>
+    Signed-off-by: John W. Linville <linville@tuxdriver.com>
+
+diff --git a/drivers/net/wireless/rt2x00/rt61pci.c b/drivers/net/wireless/rt2x00/rt61pci.c
+index fbe2a65..087e90b 100644
+--- a/drivers/net/wireless/rt2x00/rt61pci.c
++++ b/drivers/net/wireless/rt2x00/rt61pci.c
+@@ -1004,6 +1004,11 @@ static int rt61pci_load_firmware(struct rt2x00_dev *rt2x00dev, const void *data,
+ 	}
+ 
+ 	/*
++	 * Hardware needs another millisecond before it is ready.
++	 */
++	msleep(1);
++
++	/*
+ 	 * Reset MAC and BBP registers.
+ 	 */
+ 	reg = 0;
+
+commit 8d8acd46fb7e962ac04baef5a118d431fae6b0f6
+Author: Ivo van Doorn <ivdoorn@gmail.com>
+Date:   Mon Jul 28 10:20:12 2008 +0200
+
+    rt2x00: Fix VGC lower bound initialization
+    
+    When the EEPROM_BBPTUNE_VGC word is valid, we should
+    override EEPROM_BBPTUNE_VGCLOWER field with the BBP
+    value.
+    
+    And we should _not_ do that when EEPROM_BBPTUNE_R17 is valid.
+    
+    Signed-off-by: Ivo van Doorn <IvDoorn@gmail.com>
+    Signed-off-by: John W. Linville <linville@tuxdriver.com>
+
+diff --git a/drivers/net/wireless/rt2x00/rt2500usb.c b/drivers/net/wireless/rt2x00/rt2500usb.c
+index 3078417..c6f6eb6 100644
+--- a/drivers/net/wireless/rt2x00/rt2500usb.c
++++ b/drivers/net/wireless/rt2x00/rt2500usb.c
+@@ -1376,6 +1376,9 @@ static int rt2500usb_validate_eeprom(struct rt2x00_dev *rt2x00dev)
+ 		rt2x00_set_field16(&word, EEPROM_BBPTUNE_VGCLOWER, bbp);
+ 		rt2x00_eeprom_write(rt2x00dev, EEPROM_BBPTUNE_VGC, word);
+ 		EEPROM(rt2x00dev, "BBPtune vgc: 0x%04x\n", word);
++	} else {
++		rt2x00_set_field16(&word, EEPROM_BBPTUNE_VGCLOWER, bbp);
++		rt2x00_eeprom_write(rt2x00dev, EEPROM_BBPTUNE_VGC, word);
+ 	}
+ 
+ 	rt2x00_eeprom_read(rt2x00dev, EEPROM_BBPTUNE_R17, &word);
+@@ -1384,9 +1387,6 @@ static int rt2500usb_validate_eeprom(struct rt2x00_dev *rt2x00dev)
+ 		rt2x00_set_field16(&word, EEPROM_BBPTUNE_R17_HIGH, 0x41);
+ 		rt2x00_eeprom_write(rt2x00dev, EEPROM_BBPTUNE_R17, word);
+ 		EEPROM(rt2x00dev, "BBPtune r17: 0x%04x\n", word);
+-	} else {
+-		rt2x00_set_field16(&word, EEPROM_BBPTUNE_VGCLOWER, bbp);
+-		rt2x00_eeprom_write(rt2x00dev, EEPROM_BBPTUNE_VGC, word);
+ 	}
+ 
+ 	rt2x00_eeprom_read(rt2x00dev, EEPROM_BBPTUNE_R24, &word);
+
+commit d4764b29b6e0f1608e397930677928e5a3f62bba
+Author: Ivo van Doorn <ivdoorn@gmail.com>
+Date:   Mon Jul 28 10:21:16 2008 +0200
+
+    rt2x00: Sequence counter should be protected in irqsave
+    
+    The sequence counter can be accessed in IRQ context,
+    which means the lock protecting the counter should
+    be irqsave. To prevent making the entire intf->lock irqsave
+    without reason, create a new lock which only protects
+    the sequence counter.
+    
+    Signed-off-by: Ivo van Doorn <IvDoorn@gmail.com>
+    Signed-off-by: John W. Linville <linville@tuxdriver.com>
+
+diff --git a/drivers/net/wireless/rt2x00/rt2x00.h b/drivers/net/wireless/rt2x00/rt2x00.h
+index db2dc97..8b10ea4 100644
+--- a/drivers/net/wireless/rt2x00/rt2x00.h
++++ b/drivers/net/wireless/rt2x00/rt2x00.h
+@@ -368,6 +368,12 @@ struct rt2x00_intf {
+ #define DELAYED_CONFIG_ERP		0x00000002
+ #define DELAYED_LED_ASSOC		0x00000004
+ 
++	/*
++	 * Software sequence counter, this is only required
++	 * for hardware which doesn't support hardware
++	 * sequence counting.
++	 */
++	spinlock_t seqlock;
+ 	u16 seqno;
+ };
+ 
+diff --git a/drivers/net/wireless/rt2x00/rt2x00mac.c b/drivers/net/wireless/rt2x00/rt2x00mac.c
+index c3ee4ec..bd422fd 100644
+--- a/drivers/net/wireless/rt2x00/rt2x00mac.c
++++ b/drivers/net/wireless/rt2x00/rt2x00mac.c
+@@ -247,6 +247,7 @@ int rt2x00mac_add_interface(struct ieee80211_hw *hw,
+ 		rt2x00dev->intf_sta_count++;
+ 
+ 	spin_lock_init(&intf->lock);
++	spin_lock_init(&intf->seqlock);
+ 	intf->beacon = entry;
+ 
+ 	if (conf->type == IEEE80211_IF_TYPE_AP)
+diff --git a/drivers/net/wireless/rt2x00/rt2x00queue.c b/drivers/net/wireless/rt2x00/rt2x00queue.c
+index 3b27f6a..898cdd7 100644
+--- a/drivers/net/wireless/rt2x00/rt2x00queue.c
++++ b/drivers/net/wireless/rt2x00/rt2x00queue.c
+@@ -128,6 +128,7 @@ static void rt2x00queue_create_tx_descriptor(struct queue_entry *entry,
+ 	unsigned int data_length;
+ 	unsigned int duration;
+ 	unsigned int residual;
++	unsigned long irqflags;
+ 
+ 	memset(txdesc, 0, sizeof(*txdesc));
+ 
+@@ -213,14 +214,14 @@ static void rt2x00queue_create_tx_descriptor(struct queue_entry *entry,
+ 	 * sequence counter given by mac80211.
+ 	 */
+ 	if (tx_info->flags & IEEE80211_TX_CTL_ASSIGN_SEQ) {
+-		spin_lock(&intf->lock);
++		spin_lock_irqsave(&intf->seqlock, irqflags);
+ 
+ 		if (test_bit(ENTRY_TXD_FIRST_FRAGMENT, &txdesc->flags))
+ 			intf->seqno += 0x10;
+ 		hdr->seq_ctrl &= cpu_to_le16(IEEE80211_SCTL_FRAG);
+ 		hdr->seq_ctrl |= cpu_to_le16(intf->seqno);
+ 
+-		spin_unlock(&intf->lock);
++		spin_unlock_irqrestore(&intf->seqlock, irqflags);
+ 
+ 		__set_bit(ENTRY_TXD_GENERATE_SEQ, &txdesc->flags);
+ 	}
+
+commit bf4634afd8bb72936d2d56425ec792ca1bfa92a2
+Author: Peter Chubb <peterc@gelato.unsw.edu.au>
+Date:   Thu Jul 31 10:56:34 2008 +1000
+
+    rt2500pci: restoring missing line
+    
+    In kernel version 2.6.26-rc9 my wireless LAN card worked; but in the
+    released 2.6.26, my RaLink rt2500 card wouldn't associate.
+    
+    Git-bisect led me to this patch:
+    
+    	61486e0f68d1f8966c09b734566a187d42d65c54
+    	rt2x00: Remove ieee80211_tx_control argument from write_tx_desc()
+    
+    I believe that there is a problem with that patch --- it
+    (inadvertantly) removes an extra line of code, that used to set the
+    DATABYTE_COUNT field.
+    
+    This patch reinstates that line, and with it my card works again.
+    
+    Signed-off-by: Peter Chubb <peterc@gelato.unsw.edu.au>
+    Acked-by: Ivo van Doorn <IvDoorn@gmail.com>
+    Signed-off-by: John W. Linville <linville@tuxdriver.com>
+
+diff --git a/drivers/net/wireless/rt2x00/rt2500pci.c b/drivers/net/wireless/rt2x00/rt2500pci.c
+index aa6dfb8..181a146 100644
+--- a/drivers/net/wireless/rt2x00/rt2500pci.c
++++ b/drivers/net/wireless/rt2x00/rt2500pci.c
+@@ -1220,6 +1220,7 @@ static void rt2500pci_write_tx_desc(struct rt2x00_dev *rt2x00dev,
+ 	rt2x00_set_field32(&word, TXD_W0_IFS, txdesc->ifs);
+ 	rt2x00_set_field32(&word, TXD_W0_RETRY_MODE,
+ 			   test_bit(ENTRY_TXD_RETRY_MODE, &txdesc->flags));
++	rt2x00_set_field32(&word, TXD_W0_DATABYTE_COUNT, skb->len);
+ 	rt2x00_set_field32(&word, TXD_W0_CIPHER_ALG, CIPHER_NONE);
+ 	rt2x00_desc_write(txd, 0, word);
+ }
+
+commit 82f97b8d3cb3982ec97e081598c671fab2c321b0
+Author: Ivo van Doorn <IvDoorn@gmail.com>
+Date:   Sat Aug 2 01:31:09 2008 -0700
+
+    rt2x00: Fix compile warning
+    
+    rt2x00usb_vendor_request_large_buff is write-only, so it is
+    safe to make the argument a const.
+    
+    Fixes compile warning:
+    drivers/net/wireless/rt2x00/rt73usb.c: In function 'rt73usb_load_firmware':
+    drivers/net/wireless/rt2x00/rt73usb.c:916: warning: passing argument 5 of 'rt2x00usb_vendor_request_large_buff' discards qualifiers from pointer target typ
+    
+    Signed-off-by: Ivo van Doorn <IvDoorn@gmail.com>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
+
+diff --git a/drivers/net/wireless/rt2x00/rt2x00usb.c b/drivers/net/wireless/rt2x00/rt2x00usb.c
+index 933e6cc..8d76bb2 100644
+--- a/drivers/net/wireless/rt2x00/rt2x00usb.c
++++ b/drivers/net/wireless/rt2x00/rt2x00usb.c
+@@ -124,7 +124,7 @@ EXPORT_SYMBOL_GPL(rt2x00usb_vendor_request_buff);
+ 
+ int rt2x00usb_vendor_request_large_buff(struct rt2x00_dev *rt2x00dev,
+ 					const u8 request, const u8 requesttype,
+-					const u16 offset, void *buffer,
++					const u16 offset, const void *buffer,
+ 					const u16 buffer_length,
+ 					const int timeout)
+ {
+@@ -134,7 +134,7 @@ int rt2x00usb_vendor_request_large_buff(struct rt2x00_dev *rt2x00dev,
+ 
+ 	mutex_lock(&rt2x00dev->usb_cache_mutex);
+ 
+-	tb  = buffer;
++	tb  = (char *)buffer;
+ 	off = offset;
+ 	len = buffer_length;
+ 	while (len && !status) {
+diff --git a/drivers/net/wireless/rt2x00/rt2x00usb.h b/drivers/net/wireless/rt2x00/rt2x00usb.h
+index ee3875f..3b4a674 100644
+--- a/drivers/net/wireless/rt2x00/rt2x00usb.h
++++ b/drivers/net/wireless/rt2x00/rt2x00usb.h
+@@ -185,7 +185,7 @@ int rt2x00usb_vendor_req_buff_lock(struct rt2x00_dev *rt2x00dev,
+  */
+ int rt2x00usb_vendor_request_large_buff(struct rt2x00_dev *rt2x00dev,
+ 					const u8 request, const u8 requesttype,
+-					const u16 offset, void *buffer,
++					const u16 offset, const void *buffer,
+ 					const u16 buffer_length,
+ 					const int timeout);
+ 
+
+commit d06193f311102b2c990ec5f66b470ea49ecc73a4
+Author: Ivo van Doorn <IvDoorn@gmail.com>
+Date:   Sun Aug 3 23:36:01 2008 +0200
+
+    rt2x00: Disable link tuning in rt2500usb
+    
+    In the legacy rt2570 driver the link tuner was never
+    really called. And now the reason has finally become
+    apparent: It breaks TX capabilities
+    
+    As soon as the device has been associated all following
+    TX frames will be queued in the hardware and never transmitted
+    to the air. Disabling sections of the link tuner did not
+    have the expected result, but completely disabling the
+    link tuner did have the right result (Both of my rt2570 devices
+    came back to life).
+    
+    This should fix Fedora bug: 411481
+    
+    v2: Fix typos
+    
+    Signed-off-by: Ivo van Doorn <IvDoorn@gmail.com>
+    Signed-off-by: John W. Linville <linville@tuxdriver.com>
+
+diff --git a/drivers/net/wireless/rt2x00/rt2500usb.c b/drivers/net/wireless/rt2x00/rt2500usb.c
+index c6f6eb6..cd5af65 100644
+--- a/drivers/net/wireless/rt2x00/rt2500usb.c
++++ b/drivers/net/wireless/rt2x00/rt2500usb.c
+@@ -633,6 +633,16 @@ static void rt2500usb_reset_tuner(struct rt2x00_dev *rt2x00dev)
+ 	rt2x00dev->link.vgc_level = value;
+ }
+ 
++/*
++ * NOTE: This function is directly ported from legacy driver, but
++ * despite it being declared it was never called. Although link tuning
++ * sounds like a good idea, and usually works well for the other drivers,
++ * it does _not_ work with rt2500usb. Enabling this function will result
++ * in TX capabilities only until association kicks in. Immediately
++ * after the successful association all TX frames will be kept in the
++ * hardware queue and never transmitted.
++ */
++#if 0
+ static void rt2500usb_link_tuner(struct rt2x00_dev *rt2x00dev)
+ {
+ 	int rssi = rt2x00_get_link_rssi(&rt2x00dev->link);
+@@ -752,6 +762,9 @@ dynamic_cca_tune:
+ 		rt2x00dev->link.vgc_level = r17;
+ 	}
+ }
++#else
++#define rt2500usb_link_tuner	NULL
++#endif
+ 
+ /*
+  * Initialization functions.
+@@ -1737,6 +1750,7 @@ static int rt2500usb_probe_hw(struct rt2x00_dev *rt2x00dev)
+ 	__set_bit(DRIVER_REQUIRE_ATIM_QUEUE, &rt2x00dev->flags);
+ 	__set_bit(DRIVER_REQUIRE_BEACON_GUARD, &rt2x00dev->flags);
+ 	__set_bit(DRIVER_REQUIRE_SCHEDULED, &rt2x00dev->flags);
++	__set_bit(CONFIG_DISABLE_LINK_TUNING, &rt2x00dev->flags);
+ 
+ 	/*
+ 	 * Set the rssi offset.
+
+commit 0fc980392e5a06cff34ca7acaac5790bb59528d1
+Author: Ivo van Doorn <ivdoorn@gmail.com>
+Date:   Wed Aug 6 16:18:31 2008 +0200
+
+    rt2x00: Block all unsupported modes
+    
+    It was possible for unsupported operating modes
+    to be accepted by the add_interface callback function.
+    This patch will block those modes until proper support
+    has been implemented for them.
+    
+    Signed-off-by: Ivo van Doorn <IvDoorn@gmail.com>
+    Signed-off-by: John W. Linville <linville@tuxdriver.com>
+
+diff --git a/drivers/net/wireless/rt2x00/rt2x00mac.c b/drivers/net/wireless/rt2x00/rt2x00mac.c
+index bd422fd..d065073 100644
+--- a/drivers/net/wireless/rt2x00/rt2x00mac.c
++++ b/drivers/net/wireless/rt2x00/rt2x00mac.c
+@@ -203,23 +203,43 @@ int rt2x00mac_add_interface(struct ieee80211_hw *hw,
+ 	    !test_bit(DEVICE_STARTED, &rt2x00dev->flags))
+ 		return -ENODEV;
+ 
+-	/*
+-	 * We don't support mixed combinations of sta and ap virtual
+-	 * interfaces. We can only add this interface when the rival
+-	 * interface count is 0.
+-	 */
+-	if ((conf->type == IEEE80211_IF_TYPE_AP && rt2x00dev->intf_sta_count) ||
+-	    (conf->type != IEEE80211_IF_TYPE_AP && rt2x00dev->intf_ap_count))
+-		return -ENOBUFS;
+-
+-	/*
+-	 * Check if we exceeded the maximum amount of supported interfaces.
+-	 */
+-	if ((conf->type == IEEE80211_IF_TYPE_AP &&
+-	     rt2x00dev->intf_ap_count >= rt2x00dev->ops->max_ap_intf) ||
+-	    (conf->type != IEEE80211_IF_TYPE_AP &&
+-	     rt2x00dev->intf_sta_count >= rt2x00dev->ops->max_sta_intf))
+-		return -ENOBUFS;
++	switch (conf->type) {
++	case IEEE80211_IF_TYPE_AP:
++		/*
++		 * We don't support mixed combinations of
++		 * sta and ap interfaces.
++		 */
++		if (rt2x00dev->intf_sta_count)
++			return -ENOBUFS;
++
++		/*
++		 * Check if we exceeded the maximum amount
++		 * of supported interfaces.
++		 */
++		if (rt2x00dev->intf_ap_count >= rt2x00dev->ops->max_ap_intf)
++			return -ENOBUFS;
++
++		break;
++	case IEEE80211_IF_TYPE_STA:
++	case IEEE80211_IF_TYPE_IBSS:
++		/*
++		 * We don't support mixed combinations of
++		 * sta and ap interfaces.
++		 */
++		if (rt2x00dev->intf_ap_count)
++			return -ENOBUFS;
++
++		/*
++		 * Check if we exceeded the maximum amount
++		 * of supported interfaces.
++		 */
++		if (rt2x00dev->intf_sta_count >= rt2x00dev->ops->max_sta_intf)
++			return -ENOBUFS;
++
++		break;
++	default:
++		return -EINVAL;
++	}
+ 
+ 	/*
+ 	 * Loop through all beacon queues to find a free
+
+commit f126cba427170eac9e37311b2ab7afc0e2261906
+Author: Jochen Friedrich <jochen@scram.de>
+Date:   Fri Aug 15 14:47:46 2008 +0200
+
+    rt2x00: Fix txdone_entry_desc_flags
+    
+    txdone_entry_desc_flags is used with __set_bit and test_bit which
+    bit-shift the values, so don't bit-shift the flags in the enum.
+    Also make sure flags are initialized before being used.
+    
+    Signed-off-by: Jochen Friedrich <jochen@scram.de>
+    Signed-off-by: Ivo van Doorn <IvDoorn@gmail.com>
+    Signed-off-by: John W. Linville <linville@tuxdriver.com>
+
+diff --git a/drivers/net/wireless/rt2x00/rt2x00queue.h b/drivers/net/wireless/rt2x00/rt2x00queue.h
+index a4a8c57..ff78e52 100644
+--- a/drivers/net/wireless/rt2x00/rt2x00queue.h
++++ b/drivers/net/wireless/rt2x00/rt2x00queue.h
+@@ -173,10 +173,10 @@ struct rxdone_entry_desc {
+  *	frame transmission failed due to excessive retries.
+  */
+ enum txdone_entry_desc_flags {
+-	TXDONE_UNKNOWN = 1 << 0,
+-	TXDONE_SUCCESS = 1 << 1,
+-	TXDONE_FAILURE = 1 << 2,
+-	TXDONE_EXCESSIVE_RETRY = 1 << 3,
++	TXDONE_UNKNOWN,
++	TXDONE_SUCCESS,
++	TXDONE_FAILURE,
++	TXDONE_EXCESSIVE_RETRY,
+ };
+ 
+ /**
+diff --git a/drivers/net/wireless/rt2x00/rt2x00usb.c b/drivers/net/wireless/rt2x00/rt2x00usb.c
+index 8d76bb2..2050227 100644
+--- a/drivers/net/wireless/rt2x00/rt2x00usb.c
++++ b/drivers/net/wireless/rt2x00/rt2x00usb.c
+@@ -181,6 +181,7 @@ static void rt2x00usb_interrupt_txdone(struct urb *urb)
+ 	 * (Only indirectly by looking at the failed TX counters
+ 	 * in the register).
+ 	 */
++	txdesc.flags = 0;
+ 	if (!urb->status)
+ 		__set_bit(TXDONE_UNKNOWN, &txdesc.flags);
+ 	else
+
+commit b9740c2396851178b99c03c2260a0adfe7f52e36
+Author: Daniel Wagner <wagi@monom.org>
+Date:   Wed Jul 23 19:17:01 2008 +0200
+
+    rt2x00mac: In error case stop netdev queue, free skb and return NETDEV_TX_OK
+    
+    It is not allowed to use NETDEV_TX_BUSY in tx path anymore.
+    
+    Signed-off-by: Daniel Wagner <wagi@monom.org>
+    Acked-by: Ivo van Doorn <IvDoorn@gmail.com>
+    Signed-off-by: John W. Linville <linville@tuxdriver.com>
+
+diff --git a/drivers/net/wireless/rt2x00/rt2x00mac.c b/drivers/net/wireless/rt2x00/rt2x00mac.c
+index d065073..4b9fde9 100644
+--- a/drivers/net/wireless/rt2x00/rt2x00mac.c
++++ b/drivers/net/wireless/rt2x00/rt2x00mac.c
+@@ -37,6 +37,7 @@ static int rt2x00mac_tx_rts_cts(struct rt2x00_dev *rt2x00dev,
+ 	struct ieee80211_tx_info *rts_info;
+ 	struct sk_buff *skb;
+ 	int size;
++	int retval = 0;
+ 
+ 	if (tx_info->flags & IEEE80211_TX_CTL_USE_CTS_PROTECT)
+ 		size = sizeof(struct ieee80211_cts);
+@@ -44,9 +45,9 @@ static int rt2x00mac_tx_rts_cts(struct rt2x00_dev *rt2x00dev,
+ 		size = sizeof(struct ieee80211_rts);
+ 
+ 	skb = dev_alloc_skb(size + rt2x00dev->hw->extra_tx_headroom);
+-	if (!skb) {
++	if (unlikely(!skb)) {
+ 		WARNING(rt2x00dev, "Failed to create RTS/CTS frame.\n");
+-		return NETDEV_TX_BUSY;
++		return -ENOMEM;
+ 	}
+ 
+ 	skb_reserve(skb, rt2x00dev->hw->extra_tx_headroom);
+@@ -82,13 +83,13 @@ static int rt2x00mac_tx_rts_cts(struct rt2x00_dev *rt2x00dev,
+ 				  frag_skb->data, size, tx_info,
+ 				  (struct ieee80211_rts *)(skb->data));
+ 
+-	if (rt2x00queue_write_tx_frame(queue, skb)) {
++	retval = rt2x00queue_write_tx_frame(queue, skb);
++	if (retval) {
+ 		dev_kfree_skb_any(skb);
+ 		WARNING(rt2x00dev, "Failed to send RTS/CTS frame.\n");
+-		return NETDEV_TX_BUSY;
+ 	}
+ 
+-	return NETDEV_TX_OK;
++	return retval;
+ }
+ 
+ int rt2x00mac_tx(struct ieee80211_hw *hw, struct sk_buff *skb)
+@@ -106,11 +107,8 @@ int rt2x00mac_tx(struct ieee80211_hw *hw, struct sk_buff *skb)
+ 	 * Note that we can only stop the TX queues inside the TX path
+ 	 * due to possible race conditions in mac80211.
+ 	 */
+-	if (!test_bit(DEVICE_PRESENT, &rt2x00dev->flags)) {
+-		ieee80211_stop_queues(hw);
+-		dev_kfree_skb_any(skb);
+-		return NETDEV_TX_OK;
+-	}
++	if (!test_bit(DEVICE_PRESENT, &rt2x00dev->flags))
++		goto exit_fail;
+ 
+ 	/*
+ 	 * Determine which queue to put packet on.
+@@ -141,26 +139,25 @@ int rt2x00mac_tx(struct ieee80211_hw *hw, struct sk_buff *skb)
+ 	if ((tx_info->flags & (IEEE80211_TX_CTL_USE_RTS_CTS |
+ 			       IEEE80211_TX_CTL_USE_CTS_PROTECT)) &&
+ 	    !rt2x00dev->ops->hw->set_rts_threshold) {
+-		if (rt2x00queue_available(queue) <= 1) {
+-			ieee80211_stop_queue(rt2x00dev->hw, qid);
+-			return NETDEV_TX_BUSY;
+-		}
+-
+-		if (rt2x00mac_tx_rts_cts(rt2x00dev, queue, skb)) {
+-			ieee80211_stop_queue(rt2x00dev->hw, qid);
+-			return NETDEV_TX_BUSY;
+-		}
+-	}
++		if (rt2x00queue_available(queue) <= 1)
++			goto exit_fail;
+ 
+-	if (rt2x00queue_write_tx_frame(queue, skb)) {
+-		ieee80211_stop_queue(rt2x00dev->hw, qid);
+-		return NETDEV_TX_BUSY;
++		if (rt2x00mac_tx_rts_cts(rt2x00dev, queue, skb))
++			goto exit_fail;
+ 	}
+ 
++	if (rt2x00queue_write_tx_frame(queue, skb))
++		goto exit_fail;
++
+ 	if (rt2x00queue_threshold(queue))
+ 		ieee80211_stop_queue(rt2x00dev->hw, qid);
+ 
+ 	return NETDEV_TX_OK;
++
++ exit_fail:
++	ieee80211_stop_queue(rt2x00dev->hw, qid);
++	dev_kfree_skb_any(skb);
++	return NETDEV_TX_OK;
+ }
+ EXPORT_SYMBOL_GPL(rt2x00mac_tx);
+ 
+
+commit c94c93da90a9e46a73a5733ff8454fb4b14733fb
+Author: Harvey Harrison <harvey.harrison@gmail.com>
+Date:   Mon Jul 28 23:01:34 2008 -0700
+
+    wireless: replace __FUNCTION__ with __func__
+    
+    __FUNCTION__ is gcc-specific, use __func__
+    
+    Signed-off-by: Harvey Harrison <harvey.harrison@gmail.com>
+    Signed-off-by: John W. Linville <linville@tuxdriver.com>
+
+diff --git a/drivers/net/wireless/rt2x00/rt2x00.h b/drivers/net/wireless/rt2x00/rt2x00.h
+index 8b10ea4..82c28dc 100644
+--- a/drivers/net/wireless/rt2x00/rt2x00.h
++++ b/drivers/net/wireless/rt2x00/rt2x00.h
+@@ -53,11 +53,11 @@
+  */
+ #define DEBUG_PRINTK_MSG(__dev, __kernlvl, __lvl, __msg, __args...)	\
+ 	printk(__kernlvl "%s -> %s: %s - " __msg,			\
+-	       wiphy_name((__dev)->hw->wiphy), __FUNCTION__, __lvl, ##__args)
++	       wiphy_name((__dev)->hw->wiphy), __func__, __lvl, ##__args)
+ 
+ #define DEBUG_PRINTK_PROBE(__kernlvl, __lvl, __msg, __args...)	\
+ 	printk(__kernlvl "%s -> %s: %s - " __msg,		\
+-	       KBUILD_MODNAME, __FUNCTION__, __lvl, ##__args)
++	       KBUILD_MODNAME, __func__, __lvl, ##__args)
+ 
+ #ifdef CONFIG_RT2X00_DEBUG
+ #define DEBUG_PRINTK(__dev, __kernlvl, __lvl, __msg, __args...)	\
+
+commit 2bb057d07a0bc17475a7bf897fc41667ab08b73f
+Author: Ivo van Doorn <ivdoorn@gmail.com>
+Date:   Mon Aug 4 16:37:44 2008 +0200
+
+    rt2x00: Implement HW encryption
+    
+    Various rt2x00 devices support hardware encryption.
+    
+    Most of them require the IV/EIV to be generated by mac80211,
+    but require it to be provided seperately instead of within
+    the frame itself. This means that rt2x00lib should extract
+    the data from the frame and place it in the frame descriptor.
+    During RX the IV/EIV is provided in the descriptor by the
+    hardware which means that it should be inserted into the
+    frame by rt2x00lib.
+    
+    Signed-off-by: Ivo van Doorn <IvDoorn@gmail.com>
+    Signed-off-by: John W. Linville <linville@tuxdriver.com>
+
+diff --git a/drivers/net/wireless/rt2x00/Kconfig b/drivers/net/wireless/rt2x00/Kconfig
+index d485a86..2f60e17 100644
+--- a/drivers/net/wireless/rt2x00/Kconfig
++++ b/drivers/net/wireless/rt2x00/Kconfig
+@@ -33,6 +33,10 @@ config RT2X00_LIB_FIRMWARE
+ 	depends on RT2X00_LIB
+ 	select FW_LOADER
+ 
++config RT2X00_LIB_CRYPTO
++	boolean
++	depends on RT2X00_LIB
++
+ config RT2X00_LIB_RFKILL
+ 	boolean
+ 	depends on RT2X00_LIB
+diff --git a/drivers/net/wireless/rt2x00/Makefile b/drivers/net/wireless/rt2x00/Makefile
+index 1087dbc..917cb4f 100644
+--- a/drivers/net/wireless/rt2x00/Makefile
++++ b/drivers/net/wireless/rt2x00/Makefile
+@@ -3,6 +3,7 @@ rt2x00lib-y				+= rt2x00mac.o
+ rt2x00lib-y				+= rt2x00config.o
+ rt2x00lib-y				+= rt2x00queue.o
+ rt2x00lib-$(CONFIG_RT2X00_LIB_DEBUGFS)	+= rt2x00debug.o
++rt2x00lib-$(CONFIG_RT2X00_LIB_CRYPTO)	+= rt2x00crypto.o
+ rt2x00lib-$(CONFIG_RT2X00_LIB_RFKILL)	+= rt2x00rfkill.o
+ rt2x00lib-$(CONFIG_RT2X00_LIB_FIRMWARE)	+= rt2x00firmware.o
+ rt2x00lib-$(CONFIG_RT2X00_LIB_LEDS)	+= rt2x00leds.o
+diff --git a/drivers/net/wireless/rt2x00/rt2x00.h b/drivers/net/wireless/rt2x00/rt2x00.h
+index 82c28dc..0ffd972 100644
+--- a/drivers/net/wireless/rt2x00/rt2x00.h
++++ b/drivers/net/wireless/rt2x00/rt2x00.h
+@@ -452,6 +452,23 @@ struct rt2x00lib_erp {
+ };
+ 
+ /*
++ * Configuration structure for hardware encryption.
++ */
++struct rt2x00lib_crypto {
++	enum cipher cipher;
++
++	enum set_key_cmd cmd;
++	const u8 *address;
++
++	u32 bssidx;
++	u32 aid;
++
++	u8 key[16];
++	u8 tx_mic[8];
++	u8 rx_mic[8];
++};
++
++/*
+  * Configuration structure wrapper around the
+  * rt2x00 interface configuration handler.
+  */
+@@ -547,6 +564,12 @@ struct rt2x00lib_ops {
+ 	/*
+ 	 * Configuration handlers.
+ 	 */
++	int (*config_shared_key) (struct rt2x00_dev *rt2x00dev,
++				  struct rt2x00lib_crypto *crypto,
++				  struct ieee80211_key_conf *key);
++	int (*config_pairwise_key) (struct rt2x00_dev *rt2x00dev,
++				    struct rt2x00lib_crypto *crypto,
++				    struct ieee80211_key_conf *key);
+ 	void (*config_filter) (struct rt2x00_dev *rt2x00dev,
+ 			       const unsigned int filter_flags);
+ 	void (*config_intf) (struct rt2x00_dev *rt2x00dev,
+@@ -609,7 +632,7 @@ enum rt2x00_flags {
+ 	DEVICE_DIRTY_CONFIG,
+ 
+ 	/*
+-	 * Driver features
++	 * Driver requirements
+ 	 */
+ 	DRIVER_REQUIRE_FIRMWARE,
+ 	DRIVER_REQUIRE_BEACON_GUARD,
+@@ -618,9 +641,14 @@ enum rt2x00_flags {
+ 	DRIVER_REQUIRE_DMA,
+ 
+ 	/*
+-	 * Driver configuration
++	 * Driver features
+ 	 */
+ 	CONFIG_SUPPORT_HW_BUTTON,
++	CONFIG_SUPPORT_HW_CRYPTO,
++
++	/*
++	 * Driver configuration
++	 */
+ 	CONFIG_FRAME_TYPE,
+ 	CONFIG_RF_SEQUENCE,
+ 	CONFIG_EXTERNAL_LNA_A,
+@@ -966,6 +994,13 @@ void rt2x00mac_configure_filter(struct ieee80211_hw *hw,
+ 				unsigned int changed_flags,
+ 				unsigned int *total_flags,
+ 				int mc_count, struct dev_addr_list *mc_list);
++#ifdef CONFIG_RT2X00_LIB_CRYPTO
++int rt2x00mac_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
++		      const u8 *local_address, const u8 *address,
++		      struct ieee80211_key_conf *key);
++#else
++#define rt2x00mac_set_key	NULL
++#endif /* CONFIG_RT2X00_LIB_CRYPTO */
+ int rt2x00mac_get_stats(struct ieee80211_hw *hw,
+ 			struct ieee80211_low_level_stats *stats);
+ int rt2x00mac_get_tx_stats(struct ieee80211_hw *hw,
+diff --git a/drivers/net/wireless/rt2x00/rt2x00crypto.c b/drivers/net/wireless/rt2x00/rt2x00crypto.c
+new file mode 100644
+index 0000000..e1448cf
+--- /dev/null
++++ b/drivers/net/wireless/rt2x00/rt2x00crypto.c
+@@ -0,0 +1,215 @@
++/*
++	Copyright (C) 2004 - 2008 rt2x00 SourceForge Project
++	<http://rt2x00.serialmonkey.com>
++
++	This program is free software; you can redistribute it and/or modify
++	it under the terms of the GNU General Public License as published by
++	the Free Software Foundation; either version 2 of the License, or
++	(at your option) any later version.
++
++	This program is distributed in the hope that it will be useful,
++	but WITHOUT ANY WARRANTY; without even the implied warranty of
++	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++	GNU General Public License for more details.
++
++	You should have received a copy of the GNU General Public License
++	along with this program; if not, write to the
++	Free Software Foundation, Inc.,
++	59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
++ */
++
++/*
++	Module: rt2x00lib
++	Abstract: rt2x00 crypto specific routines.
++ */
++
++#include <linux/kernel.h>
++#include <linux/module.h>
++
++#include "rt2x00.h"
++#include "rt2x00lib.h"
++
++enum cipher rt2x00crypto_key_to_cipher(struct ieee80211_key_conf *key)
++{
++	switch (key->alg) {
++	case ALG_WEP:
++		if (key->keylen == LEN_WEP40)
++			return CIPHER_WEP64;
++		else
++			return CIPHER_WEP128;
++	case ALG_TKIP:
++		return CIPHER_TKIP;
++	case ALG_CCMP:
++		return CIPHER_AES;
++	default:
++		return CIPHER_NONE;
++	}
++}
++
++unsigned int rt2x00crypto_tx_overhead(struct ieee80211_tx_info *tx_info)
++{
++	struct ieee80211_key_conf *key = tx_info->control.hw_key;
++	unsigned int overhead = 0;
++
++	/*
++	 * Extend frame length to include IV/EIV/ICV/MMIC,
++	 * note that these lengths should only be added when
++	 * mac80211 does not generate it.
++	 */
++	overhead += tx_info->control.icv_len;
++
++	if (!(key->flags & IEEE80211_KEY_FLAG_GENERATE_IV))
++		overhead += tx_info->control.iv_len;
++
++	if (!(key->flags & IEEE80211_KEY_FLAG_GENERATE_MMIC)) {
++		if (key->alg == ALG_TKIP)
++			overhead += 8;
++	}
++
++	return overhead;
++}
++
++void rt2x00crypto_tx_remove_iv(struct sk_buff *skb, unsigned int iv_len)
++{
++	struct skb_frame_desc *skbdesc = get_skb_frame_desc(skb);
++	unsigned int header_length = ieee80211_get_hdrlen_from_skb(skb);
++
++	if (unlikely(!iv_len))
++		return;
++
++	/* Copy IV/EIV data */
++	if (iv_len >= 4)
++		memcpy(&skbdesc->iv, skb->data + header_length, 4);
++	if (iv_len >= 8)
++		memcpy(&skbdesc->eiv, skb->data + header_length + 4, 4);
++
++	/* Move ieee80211 header */
++	memmove(skb->data + iv_len, skb->data, header_length);
++
++	/* Pull buffer to correct size */
++	skb_pull(skb, iv_len);
++
++	/* IV/EIV data has officially be stripped */
++	skbdesc->flags |= FRAME_DESC_IV_STRIPPED;
++}
++
++void rt2x00crypto_tx_insert_iv(struct sk_buff *skb)
++{
++	struct skb_frame_desc *skbdesc = get_skb_frame_desc(skb);
++	unsigned int header_length = ieee80211_get_hdrlen_from_skb(skb);
++	const unsigned int iv_len =
++	    ((!!(skbdesc->iv)) * 4) + ((!!(skbdesc->eiv)) * 4);
++
++	if (!(skbdesc->flags & FRAME_DESC_IV_STRIPPED))
++		return;
++
++	skb_push(skb, iv_len);
++
++	/* Move ieee80211 header */
++	memmove(skb->data, skb->data + iv_len, header_length);
++
++	/* Copy IV/EIV data */
++	if (iv_len >= 4)
++		memcpy(skb->data + header_length, &skbdesc->iv, 4);
++	if (iv_len >= 8)
++		memcpy(skb->data + header_length + 4, &skbdesc->eiv, 4);
++
++	/* IV/EIV data has returned into the frame */
++	skbdesc->flags &= ~FRAME_DESC_IV_STRIPPED;
++}
++
++void rt2x00crypto_rx_insert_iv(struct sk_buff *skb, unsigned int align,
++			       unsigned int header_length,
++			       struct rxdone_entry_desc *rxdesc)
++{
++	unsigned int payload_len = rxdesc->size - header_length;
++	unsigned int iv_len;
++	unsigned int icv_len;
++	unsigned int transfer = 0;
++
++	/*
++	 * WEP64/WEP128: Provides IV & ICV
++	 * TKIP: Provides IV/EIV & ICV
++	 * AES: Provies IV/EIV & ICV
++	 */
++	switch (rxdesc->cipher) {
++	case CIPHER_WEP64:
++	case CIPHER_WEP128:
++		iv_len = 4;
++		icv_len = 4;
++		break;
++	case CIPHER_TKIP:
++		iv_len = 8;
++		icv_len = 4;
++		break;
++	case CIPHER_AES:
++		iv_len = 8;
++		icv_len = 8;
++		break;
++	default:
++		/* Unsupport type */
++		return;
++	}
++
++	/*
++	 * Make room for new data, note that we increase both
++	 * headsize and tailsize when required. The tailsize is
++	 * only needed when ICV data needs to be inserted and
++	 * the padding is smaller then the ICV data.
++	 * When alignment requirements is greater then the
++	 * ICV data we must trim the skb to the correct size
++	 * because we need to remove the extra bytes.
++	 */
++	skb_push(skb, iv_len + align);
++	if (align < icv_len)
++		skb_put(skb, icv_len - align);
++	else if (align > icv_len)
++		skb_trim(skb, rxdesc->size + iv_len + icv_len);
++
++	/* Move ieee80211 header */
++	memmove(skb->data + transfer,
++		skb->data + transfer + iv_len + align,
++		header_length);
++	transfer += header_length;
++
++	/* Copy IV data */
++	if (iv_len >= 4) {
++		memcpy(skb->data + transfer, &rxdesc->iv, 4);
++		transfer += 4;
++	}
++
++	/* Copy EIV data */
++	if (iv_len >= 8) {
++		memcpy(skb->data + transfer, &rxdesc->eiv, 4);
++		transfer += 4;
++	}
++
++	/* Move payload */
++	if (align) {
++		memmove(skb->data + transfer,
++			skb->data + transfer + align,
++			payload_len);
++	}
++
++	/*
++	 * NOTE: Always count the payload as transfered,
++	 * even when alignment was set to zero. This is required
++	 * for determining the correct offset for the ICV data.
++	 */
++	transfer += payload_len;
++
++	/* Copy ICV data */
++	if (icv_len >= 4) {
++		memcpy(skb->data + transfer, &rxdesc->icv, 4);
++		/*
++		 * AES appends 8 bytes, we can't fill the upper
++		 * 4 bytes, but mac80211 doesn't care about what
++		 * we provide here anyway and strips it immediately.
++		 */
++		transfer += icv_len;
++	}
++
++	/* IV/EIV/ICV has been inserted into frame */
++	rxdesc->size = transfer;
++	rxdesc->flags &= ~RX_FLAG_IV_STRIPPED;
++}
+diff --git a/drivers/net/wireless/rt2x00/rt2x00debug.c b/drivers/net/wireless/rt2x00/rt2x00debug.c
+index 6bee1d6..5cf4c85 100644
+--- a/drivers/net/wireless/rt2x00/rt2x00debug.c
++++ b/drivers/net/wireless/rt2x00/rt2x00debug.c
+@@ -35,6 +35,13 @@
+ 
+ #define MAX_LINE_LENGTH 64
+ 
++struct rt2x00debug_crypto {
++	unsigned long success;
++	unsigned long icv_error;
++	unsigned long mic_error;
++	unsigned long key_error;
++};
++
+ struct rt2x00debug_intf {
+ 	/*
+ 	 * Pointer to driver structure where
+@@ -63,6 +70,7 @@ struct rt2x00debug_intf {
+ 	 *   - queue folder
+ 	 *     - frame dump file
+ 	 *     - queue stats file
++	 *     - crypto stats file
+ 	 */
+ 	struct dentry *driver_folder;
+ 	struct dentry *driver_entry;
+@@ -80,6 +88,7 @@ struct rt2x00debug_intf {
+ 	struct dentry *queue_folder;
+ 	struct dentry *queue_frame_dump_entry;
+ 	struct dentry *queue_stats_entry;
++	struct dentry *crypto_stats_entry;
+ 
+ 	/*
+ 	 * The frame dump file only allows a single reader,
+@@ -98,6 +107,12 @@ struct rt2x00debug_intf {
+ 	wait_queue_head_t frame_dump_waitqueue;
+ 
+ 	/*
++	 * HW crypto statistics.
++	 * All statistics are stored seperately per cipher type.
++	 */
++	struct rt2x00debug_crypto crypto_stats[CIPHER_MAX];
++
++	/*
+ 	 * Driver and chipset files will use a data buffer
+ 	 * that has been created in advance. This will simplify
+ 	 * the code since we can use the debugfs functions.
+@@ -114,6 +129,25 @@ struct rt2x00debug_intf {
+ 	unsigned int offset_rf;
+ };
+ 
++void rt2x00debug_update_crypto(struct rt2x00_dev *rt2x00dev,
++			       enum cipher cipher, enum rx_crypto status)
++{
++	struct rt2x00debug_intf *intf = rt2x00dev->debugfs_intf;
++
++	if (cipher == CIPHER_TKIP_NO_MIC)
++		cipher = CIPHER_TKIP;
++	if (cipher == CIPHER_NONE || cipher > CIPHER_MAX)
++		return;
++
++	/* Remove CIPHER_NONE index */
++	cipher--;
++
++	intf->crypto_stats[cipher].success += (status == RX_CRYPTO_SUCCESS);
++	intf->crypto_stats[cipher].icv_error += (status == RX_CRYPTO_FAIL_ICV);
++	intf->crypto_stats[cipher].mic_error += (status == RX_CRYPTO_FAIL_MIC);
++	intf->crypto_stats[cipher].key_error += (status == RX_CRYPTO_FAIL_KEY);
++}
++
+ void rt2x00debug_dump_frame(struct rt2x00_dev *rt2x00dev,
+ 			    enum rt2x00_dump_type type, struct sk_buff *skb)
+ {
+@@ -327,6 +361,59 @@ static const struct file_operations rt2x00debug_fop_queue_stats = {
+ 	.release	= rt2x00debug_file_release,
+ };
+ 
++#ifdef CONFIG_RT2X00_LIB_CRYPTO
++static ssize_t rt2x00debug_read_crypto_stats(struct file *file,
++					     char __user *buf,
++					     size_t length,
++					     loff_t *offset)
++{
++	struct rt2x00debug_intf *intf = file->private_data;
++	char *name[] = { "WEP64", "WEP128", "TKIP", "AES" };
++	char *data;
++	char *temp;
++	size_t size;
++	unsigned int i;
++
++	if (*offset)
++		return 0;
++
++	data = kzalloc((1 + CIPHER_MAX)* MAX_LINE_LENGTH, GFP_KERNEL);
++	if (!data)
++		return -ENOMEM;
++
++	temp = data;
++	temp += sprintf(data, "cipher\tsuccess\ticv err\tmic err\tkey err\n");
++
++	for (i = 0; i < CIPHER_MAX; i++) {
++		temp += sprintf(temp, "%s\t%lu\t%lu\t%lu\t%lu\n", name[i],
++				intf->crypto_stats[i].success,
++				intf->crypto_stats[i].icv_error,
++				intf->crypto_stats[i].mic_error,
++				intf->crypto_stats[i].key_error);
++	}
++
++	size = strlen(data);
++	size = min(size, length);
++
++	if (copy_to_user(buf, data, size)) {
++		kfree(data);
++		return -EFAULT;
++	}
++
++	kfree(data);
++
++	*offset += size;
++	return size;
++}
++
++static const struct file_operations rt2x00debug_fop_crypto_stats = {
++	.owner		= THIS_MODULE,
++	.read		= rt2x00debug_read_crypto_stats,
++	.open		= rt2x00debug_file_open,
++	.release	= rt2x00debug_file_release,
++};
++#endif
++
+ #define RT2X00DEBUGFS_OPS_READ(__name, __format, __type)	\
+ static ssize_t rt2x00debug_read_##__name(struct file *file,	\
+ 					 char __user *buf,	\
+@@ -569,6 +656,13 @@ void rt2x00debug_register(struct rt2x00_dev *rt2x00dev)
+ 	    debugfs_create_file("queue", S_IRUSR, intf->queue_folder,
+ 				intf, &rt2x00debug_fop_queue_stats);
+ 
++#ifdef CONFIG_RT2X00_LIB_CRYPTO
++	if (test_bit(CONFIG_SUPPORT_HW_CRYPTO, &rt2x00dev->flags))
++		intf->crypto_stats_entry =
++		    debugfs_create_file("crypto", S_IRUGO, intf->queue_folder,
++					intf, &rt2x00debug_fop_crypto_stats);
++#endif
++
+ 	return;
+ 
+ exit:
+@@ -587,6 +681,9 @@ void rt2x00debug_deregister(struct rt2x00_dev *rt2x00dev)
+ 
+ 	skb_queue_purge(&intf->frame_dump_skbqueue);
+ 
++#ifdef CONFIG_RT2X00_LIB_CRYPTO
++	debugfs_remove(intf->crypto_stats_entry);
++#endif
+ 	debugfs_remove(intf->queue_stats_entry);
+ 	debugfs_remove(intf->queue_frame_dump_entry);
+ 	debugfs_remove(intf->queue_folder);
+diff --git a/drivers/net/wireless/rt2x00/rt2x00dev.c b/drivers/net/wireless/rt2x00/rt2x00dev.c
+index f42283a..1829522 100644
+--- a/drivers/net/wireless/rt2x00/rt2x00dev.c
++++ b/drivers/net/wireless/rt2x00/rt2x00dev.c
+@@ -508,6 +508,15 @@ void rt2x00lib_txdone(struct queue_entry *entry,
+ 	rt2x00queue_unmap_skb(rt2x00dev, entry->skb);
+ 
+ 	/*
++	 * If the IV/EIV data was stripped from the frame before it was
++	 * passed to the hardware, we should now reinsert it again because
++	 * mac80211 will expect the the same data to be present it the
++	 * frame as it was passed to us.
++	 */
++	if (test_bit(CONFIG_SUPPORT_HW_CRYPTO, &rt2x00dev->flags))
++		rt2x00crypto_tx_insert_iv(entry->skb);
++
++	/*
+ 	 * Send frame to debugfs immediately, after this call is completed
+ 	 * we are going to overwrite the skb->cb array.
+ 	 */
+@@ -585,7 +594,7 @@ void rt2x00lib_rxdone(struct rt2x00_dev *rt2x00dev,
+ 	struct ieee80211_supported_band *sband;
+ 	struct ieee80211_hdr *hdr;
+ 	const struct rt2x00_rate *rate;
+-	unsigned int header_size;
++	unsigned int header_length;
+ 	unsigned int align;
+ 	unsigned int i;
+ 	int idx = -1;
+@@ -613,10 +622,19 @@ void rt2x00lib_rxdone(struct rt2x00_dev *rt2x00dev,
+ 	 * The data behind the ieee80211 header must be
+ 	 * aligned on a 4 byte boundary.
+ 	 */
+-	header_size = ieee80211_get_hdrlen_from_skb(entry->skb);
+-	align = ((unsigned long)(entry->skb->data + header_size)) & 3;
++	header_length = ieee80211_get_hdrlen_from_skb(entry->skb);
++	align = ((unsigned long)(entry->skb->data + header_length)) & 3;
+ 
+-	if (align) {
++	/*
++	 * Hardware might have stripped the IV/EIV/ICV data,
++	 * in that case it is possible that the data was
++	 * provided seperately (through hardware descriptor)
++	 * in which case we should reinsert the data into the frame.
++	 */
++	if ((rxdesc.flags & RX_FLAG_IV_STRIPPED)) {
++		rt2x00crypto_rx_insert_iv(entry->skb, align,
++					  header_length, &rxdesc);
++	} else if (align) {
+ 		skb_push(entry->skb, align);
+ 		/* Move entire frame in 1 command */
+ 		memmove(entry->skb->data, entry->skb->data + align,
+@@ -657,6 +675,10 @@ void rt2x00lib_rxdone(struct rt2x00_dev *rt2x00dev,
+ 	    (rxdesc.dev_flags & RXDONE_MY_BSS))
+ 		rt2x00lib_update_link_stats(&rt2x00dev->link, rxdesc.rssi);
+ 
++	rt2x00debug_update_crypto(rt2x00dev,
++				  rxdesc.cipher,
++				  rxdesc.cipher_status);
++
+ 	rt2x00dev->link.qual.rx_success++;
+ 
+ 	rx_status->mactime = rxdesc.timestamp;
+diff --git a/drivers/net/wireless/rt2x00/rt2x00lib.h b/drivers/net/wireless/rt2x00/rt2x00lib.h
+index c5fb3a7..7bbc16b 100644
+--- a/drivers/net/wireless/rt2x00/rt2x00lib.h
++++ b/drivers/net/wireless/rt2x00/rt2x00lib.h
+@@ -181,6 +181,8 @@ void rt2x00debug_register(struct rt2x00_dev *rt2x00dev);
+ void rt2x00debug_deregister(struct rt2x00_dev *rt2x00dev);
+ void rt2x00debug_dump_frame(struct rt2x00_dev *rt2x00dev,
+ 			    enum rt2x00_dump_type type, struct sk_buff *skb);
++void rt2x00debug_update_crypto(struct rt2x00_dev *rt2x00dev,
++			       enum cipher cipher, enum rx_crypto status);
+ #else
+ static inline void rt2x00debug_register(struct rt2x00_dev *rt2x00dev)
+ {
+@@ -195,9 +197,54 @@ static inline void rt2x00debug_dump_frame(struct rt2x00_dev *rt2x00dev,
+ 					  struct sk_buff *skb)
+ {
+ }
++
++static inline void rt2x00debug_update_crypto(struct rt2x00_dev *rt2x00dev,
++					     enum cipher cipher,
++					     enum rx_crypto status)
++{
++}
+ #endif /* CONFIG_RT2X00_LIB_DEBUGFS */
+ 
+ /*
++ * Crypto handlers.
++ */
++#ifdef CONFIG_RT2X00_LIB_CRYPTO
++enum cipher rt2x00crypto_key_to_cipher(struct ieee80211_key_conf *key);
++unsigned int rt2x00crypto_tx_overhead(struct ieee80211_tx_info *tx_info);
++void rt2x00crypto_tx_remove_iv(struct sk_buff *skb, unsigned int iv_len);
++void rt2x00crypto_tx_insert_iv(struct sk_buff *skb);
++void rt2x00crypto_rx_insert_iv(struct sk_buff *skb, unsigned int align,
++			       unsigned int header_length,
++			       struct rxdone_entry_desc *rxdesc);
++#else
++static inline enum cipher rt2x00crypto_key_to_cipher(struct ieee80211_key_conf *key)
++{
++	return CIPHER_NONE;
++}
++
++static inline unsigned int rt2x00crypto_tx_overhead(struct ieee80211_tx_info *tx_info)
++{
++	return 0;
++}
++
++static inline void rt2x00crypto_tx_remove_iv(struct sk_buff *skb,
++					     unsigned int iv_len)
++{
++}
++
++static inline void rt2x00crypto_tx_insert_iv(struct sk_buff *skb)
++{
++}
++
++static inline void rt2x00crypto_rx_insert_iv(struct sk_buff *skb,
++					     unsigned int align,
++					     unsigned int header_length,
++					     struct rxdone_entry_desc *rxdesc)
++{
++}
++#endif
++
++/*
+  * RFkill handlers.
+  */
+ #ifdef CONFIG_RT2X00_LIB_RFKILL
+diff --git a/drivers/net/wireless/rt2x00/rt2x00mac.c b/drivers/net/wireless/rt2x00/rt2x00mac.c
+index 4b9fde9..3af4273 100644
+--- a/drivers/net/wireless/rt2x00/rt2x00mac.c
++++ b/drivers/net/wireless/rt2x00/rt2x00mac.c
+@@ -36,22 +36,22 @@ static int rt2x00mac_tx_rts_cts(struct rt2x00_dev *rt2x00dev,
+ 	struct ieee80211_tx_info *tx_info = IEEE80211_SKB_CB(frag_skb);
+ 	struct ieee80211_tx_info *rts_info;
+ 	struct sk_buff *skb;
+-	int size;
++	unsigned int data_length;
+ 	int retval = 0;
+ 
+ 	if (tx_info->flags & IEEE80211_TX_CTL_USE_CTS_PROTECT)
+-		size = sizeof(struct ieee80211_cts);
++		data_length = sizeof(struct ieee80211_cts);
+ 	else
+-		size = sizeof(struct ieee80211_rts);
++		data_length = sizeof(struct ieee80211_rts);
+ 
+-	skb = dev_alloc_skb(size + rt2x00dev->hw->extra_tx_headroom);
++	skb = dev_alloc_skb(data_length + rt2x00dev->hw->extra_tx_headroom);
+ 	if (unlikely(!skb)) {
+ 		WARNING(rt2x00dev, "Failed to create RTS/CTS frame.\n");
+ 		return -ENOMEM;
+ 	}
+ 
+ 	skb_reserve(skb, rt2x00dev->hw->extra_tx_headroom);
+-	skb_put(skb, size);
++	skb_put(skb, data_length);
+ 
+ 	/*
+ 	 * Copy TX information over from original frame to
+@@ -64,7 +64,6 @@ static int rt2x00mac_tx_rts_cts(struct rt2x00_dev *rt2x00dev,
+ 	 */
+ 	memcpy(skb->cb, frag_skb->cb, sizeof(skb->cb));
+ 	rts_info = IEEE80211_SKB_CB(skb);
+-	rts_info->control.hw_key = NULL;
+ 	rts_info->flags &= ~IEEE80211_TX_CTL_USE_RTS_CTS;
+ 	rts_info->flags &= ~IEEE80211_TX_CTL_USE_CTS_PROTECT;
+ 	rts_info->flags &= ~IEEE80211_TX_CTL_REQ_TX_STATUS;
+@@ -74,13 +73,24 @@ static int rt2x00mac_tx_rts_cts(struct rt2x00_dev *rt2x00dev,
+ 	else
+ 		rts_info->flags &= ~IEEE80211_TX_CTL_NO_ACK;
+ 
++	skb->do_not_encrypt = 1;
++
++	/*
++	 * RTS/CTS frame should use the length of the frame plus any
++	 * encryption overhead that will be added by the hardware.
++	 */
++#ifdef CONFIG_RT2X00_LIB_CRYPTO
++	if (!frag_skb->do_not_encrypt)
++		data_length += rt2x00crypto_tx_overhead(tx_info);
++#endif /* CONFIG_RT2X00_LIB_CRYPTO */
++
+ 	if (tx_info->flags & IEEE80211_TX_CTL_USE_CTS_PROTECT)
+ 		ieee80211_ctstoself_get(rt2x00dev->hw, tx_info->control.vif,
+-					frag_skb->data, size, tx_info,
++					frag_skb->data, data_length, tx_info,
+ 					(struct ieee80211_cts *)(skb->data));
+ 	else
+ 		ieee80211_rts_get(rt2x00dev->hw, tx_info->control.vif,
+-				  frag_skb->data, size, tx_info,
++				  frag_skb->data, data_length, tx_info,
+ 				  (struct ieee80211_rts *)(skb->data));
+ 
+ 	retval = rt2x00queue_write_tx_frame(queue, skb);
+@@ -464,6 +474,90 @@ void rt2x00mac_configure_filter(struct ieee80211_hw *hw,
+ }
+ EXPORT_SYMBOL_GPL(rt2x00mac_configure_filter);
+ 
++#ifdef CONFIG_RT2X00_LIB_CRYPTO
++int rt2x00mac_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
++		      const u8 *local_address, const u8 *address,
++		      struct ieee80211_key_conf *key)
++{
++	struct rt2x00_dev *rt2x00dev = hw->priv;
++	int (*set_key) (struct rt2x00_dev *rt2x00dev,
++			struct rt2x00lib_crypto *crypto,
++			struct ieee80211_key_conf *key);
++	struct rt2x00lib_crypto crypto;
++
++	if (!test_bit(CONFIG_SUPPORT_HW_CRYPTO, &rt2x00dev->flags))
++		return -EOPNOTSUPP;
++	else if (key->keylen > 32)
++		return -ENOSPC;
++
++	memset(&crypto, 0, sizeof(crypto));
++
++	/*
++	 * When in STA mode, bssidx is always 0 otherwise local_address[5]
++	 * contains the bss number, see BSS_ID_MASK comments for details.
++	 */
++	if (rt2x00dev->intf_sta_count)
++		crypto.bssidx = 0;
++	else
++		crypto.bssidx =
++		    local_address[5] & (rt2x00dev->ops->max_ap_intf - 1);
++
++	crypto.cipher = rt2x00crypto_key_to_cipher(key);
++	if (crypto.cipher == CIPHER_NONE)
++		return -EOPNOTSUPP;
++
++	crypto.cmd = cmd;
++	crypto.address = address;
++
++	if (crypto.cipher == CIPHER_TKIP) {
++		if (key->keylen > NL80211_TKIP_DATA_OFFSET_ENCR_KEY)
++			memcpy(&crypto.key,
++			       &key->key[NL80211_TKIP_DATA_OFFSET_ENCR_KEY],
++			       sizeof(crypto.key));
++
++		if (key->keylen > NL80211_TKIP_DATA_OFFSET_TX_MIC_KEY)
++			memcpy(&crypto.tx_mic,
++			       &key->key[NL80211_TKIP_DATA_OFFSET_TX_MIC_KEY],
++			       sizeof(crypto.tx_mic));
++
++		if (key->keylen > NL80211_TKIP_DATA_OFFSET_RX_MIC_KEY)
++			memcpy(&crypto.rx_mic,
++			       &key->key[NL80211_TKIP_DATA_OFFSET_RX_MIC_KEY],
++			       sizeof(crypto.rx_mic));
++	} else
++		memcpy(&crypto.key, &key->key[0], key->keylen);
++
++	/*
++	 * Each BSS has a maximum of 4 shared keys.
++	 * Shared key index values:
++	 *	0) BSS0 key0
++	 *	1) BSS0 key1
++	 *	...
++	 *	4) BSS1 key0
++	 *	...
++	 *	8) BSS2 key0
++	 *	...
++	 * Both pairwise as shared key indeces are determined by
++	 * driver. This is required because the hardware requires
++	 * keys to be assigned in correct order (When key 1 is
++	 * provided but key 0 is not, then the key is not found
++	 * by the hardware during RX).
++	 */
++	key->hw_key_idx = 0;
++
++	if (key->flags & IEEE80211_KEY_FLAG_PAIRWISE)
++		set_key = rt2x00dev->ops->lib->config_pairwise_key;
++	else
++		set_key = rt2x00dev->ops->lib->config_shared_key;
++
++	if (!set_key)
++		return -EOPNOTSUPP;
++
++	return set_key(rt2x00dev, &crypto, key);
++}
++EXPORT_SYMBOL_GPL(rt2x00mac_set_key);
++#endif /* CONFIG_RT2X00_LIB_CRYPTO */
++
+ int rt2x00mac_get_stats(struct ieee80211_hw *hw,
+ 			struct ieee80211_low_level_stats *stats)
+ {
+diff --git a/drivers/net/wireless/rt2x00/rt2x00queue.c b/drivers/net/wireless/rt2x00/rt2x00queue.c
+index 898cdd7..c0f97c5 100644
+--- a/drivers/net/wireless/rt2x00/rt2x00queue.c
++++ b/drivers/net/wireless/rt2x00/rt2x00queue.c
+@@ -33,10 +33,11 @@
+ struct sk_buff *rt2x00queue_alloc_rxskb(struct rt2x00_dev *rt2x00dev,
+ 					struct queue_entry *entry)
+ {
+-	unsigned int frame_size;
+-	unsigned int reserved_size;
+ 	struct sk_buff *skb;
+ 	struct skb_frame_desc *skbdesc;
++	unsigned int frame_size;
++	unsigned int head_size = 0;
++	unsigned int tail_size = 0;
+ 
+ 	/*
+ 	 * The frame size includes descriptor size, because the
+@@ -49,16 +50,32 @@ struct sk_buff *rt2x00queue_alloc_rxskb(struct rt2x00_dev *rt2x00dev,
+ 	 * this means we need at least 3 bytes for moving the frame
+ 	 * into the correct offset.
+ 	 */
+-	reserved_size = 4;
++	head_size = 4;
++
++	/*
++	 * For IV/EIV/ICV assembly we must make sure there is
++	 * at least 8 bytes bytes available in headroom for IV/EIV
++	 * and 4 bytes for ICV data as tailroon.
++	 */
++#ifdef CONFIG_RT2X00_LIB_CRYPTO
++	if (test_bit(CONFIG_SUPPORT_HW_CRYPTO, &rt2x00dev->flags)) {
++		head_size += 8;
++		tail_size += 4;
++	}
++#endif /* CONFIG_RT2X00_LIB_CRYPTO */
+ 
+ 	/*
+ 	 * Allocate skbuffer.
+ 	 */
+-	skb = dev_alloc_skb(frame_size + reserved_size);
++	skb = dev_alloc_skb(frame_size + head_size + tail_size);
+ 	if (!skb)
+ 		return NULL;
+ 
+-	skb_reserve(skb, reserved_size);
++	/*
++	 * Make sure we not have a frame with the requested bytes
++	 * available in the head and tail.
++	 */
++	skb_reserve(skb, head_size);
+ 	skb_put(skb, frame_size);
+ 
+ 	/*
+@@ -140,7 +157,7 @@ static void rt2x00queue_create_tx_descriptor(struct queue_entry *entry,
+ 	txdesc->cw_max = entry->queue->cw_max;
+ 	txdesc->aifs = entry->queue->aifs;
+ 
+-	/* Data length should be extended with 4 bytes for CRC */
++	/* Data length + CRC + IV/EIV/ICV/MMIC (when using encryption) */
+ 	data_length = entry->skb->len + 4;
+ 
+ 	/*
+@@ -149,6 +166,35 @@ static void rt2x00queue_create_tx_descriptor(struct queue_entry *entry,
+ 	if (!(tx_info->flags & IEEE80211_TX_CTL_NO_ACK))
+ 		__set_bit(ENTRY_TXD_ACK, &txdesc->flags);
+ 
++#ifdef CONFIG_RT2X00_LIB_CRYPTO
++	if (test_bit(CONFIG_SUPPORT_HW_CRYPTO, &rt2x00dev->flags) &&
++	    !entry->skb->do_not_encrypt) {
++		struct ieee80211_key_conf *hw_key = tx_info->control.hw_key;
++
++		__set_bit(ENTRY_TXD_ENCRYPT, &txdesc->flags);
++
++		txdesc->cipher = rt2x00crypto_key_to_cipher(hw_key);
++
++		if (hw_key->flags & IEEE80211_KEY_FLAG_PAIRWISE)
++			__set_bit(ENTRY_TXD_ENCRYPT_PAIRWISE, &txdesc->flags);
++
++		txdesc->key_idx = hw_key->hw_key_idx;
++		txdesc->iv_offset = ieee80211_get_hdrlen_from_skb(entry->skb);
++
++		/*
++		 * Extend frame length to include all encryption overhead
++		 * that will be added by the hardware.
++		 */
++		data_length += rt2x00crypto_tx_overhead(tx_info);
++
++		if (!(hw_key->flags & IEEE80211_KEY_FLAG_GENERATE_IV))
++			__set_bit(ENTRY_TXD_ENCRYPT_IV, &txdesc->flags);
++
++		if (!(hw_key->flags & IEEE80211_KEY_FLAG_GENERATE_MMIC))
++			__set_bit(ENTRY_TXD_ENCRYPT_MMIC, &txdesc->flags);
++	}
++#endif /* CONFIG_RT2X00_LIB_CRYPTO */
++
+ 	/*
+ 	 * Check if this is a RTS/CTS frame
+ 	 */
+@@ -305,6 +351,7 @@ int rt2x00queue_write_tx_frame(struct data_queue *queue, struct sk_buff *skb)
+ 	struct queue_entry *entry = rt2x00queue_get_entry(queue, Q_INDEX);
+ 	struct txentry_desc txdesc;
+ 	struct skb_frame_desc *skbdesc;
++	unsigned int iv_len = IEEE80211_SKB_CB(skb)->control.iv_len;
+ 
+ 	if (unlikely(rt2x00queue_full(queue)))
+ 		return -EINVAL;
+@@ -326,15 +373,33 @@ int rt2x00queue_write_tx_frame(struct data_queue *queue, struct sk_buff *skb)
+ 	rt2x00queue_create_tx_descriptor(entry, &txdesc);
+ 
+ 	/*
+-	 * skb->cb array is now ours and we are free to use it.
++	 * All information is retreived from the skb->cb array,
++	 * now we should claim ownership of the driver part of that
++	 * array.
+ 	 */
+ 	skbdesc = get_skb_frame_desc(entry->skb);
+ 	memset(skbdesc, 0, sizeof(*skbdesc));
+ 	skbdesc->entry = entry;
+ 
++	/*
++	 * When hardware encryption is supported, and this frame
++	 * is to be encrypted, we should strip the IV/EIV data from
++	 * the frame so we can provide it to the driver seperately.
++	 */
++	if (test_bit(ENTRY_TXD_ENCRYPT, &txdesc.flags) &&
++	    !test_bit(ENTRY_TXD_ENCRYPT_IV, &txdesc.flags))
++		rt2x00crypto_tx_remove_iv(skb, iv_len);
++
++	/*
++	 * It could be possible that the queue was corrupted and this
++	 * call failed. Just drop the frame, we cannot rollback and pass
++	 * the frame to mac80211 because the skb->cb has now been tainted.
++	 */
+ 	if (unlikely(queue->rt2x00dev->ops->lib->write_tx_data(entry))) {
+ 		__clear_bit(ENTRY_OWNER_DEVICE_DATA, &entry->flags);
+-		return -EIO;
++		dev_kfree_skb_any(entry->skb);
++		entry->skb = NULL;
++		return 0;
+ 	}
+ 
+ 	if (test_bit(DRIVER_REQUIRE_DMA, &queue->rt2x00dev->flags))
+diff --git a/drivers/net/wireless/rt2x00/rt2x00queue.h b/drivers/net/wireless/rt2x00/rt2x00queue.h
+index ff78e52..37f3f98 100644
+--- a/drivers/net/wireless/rt2x00/rt2x00queue.h
++++ b/drivers/net/wireless/rt2x00/rt2x00queue.h
+@@ -87,10 +87,13 @@ enum data_queue_qid {
+  *
+  * @SKBDESC_DMA_MAPPED_RX: &skb_dma field has been mapped for RX
+  * @SKBDESC_DMA_MAPPED_TX: &skb_dma field has been mapped for TX
++ * @FRAME_DESC_IV_STRIPPED: Frame contained a IV/EIV provided by
++ *	mac80211 but was stripped for processing by the driver.
+  */
+ enum skb_frame_desc_flags {
+-	SKBDESC_DMA_MAPPED_RX = (1 << 0),
+-	SKBDESC_DMA_MAPPED_TX = (1 << 1),
++	SKBDESC_DMA_MAPPED_RX = 1 << 0,
++	SKBDESC_DMA_MAPPED_TX = 1 << 1,
++	FRAME_DESC_IV_STRIPPED = 1 << 2,
+ };
+ 
+ /**
+@@ -104,6 +107,8 @@ enum skb_frame_desc_flags {
+  * @desc: Pointer to descriptor part of the frame.
+  *	Note that this pointer could point to something outside
+  *	of the scope of the skb->data pointer.
++ * @iv: IV data used during encryption/decryption.
++ * @eiv: EIV data used during encryption/decryption.
+  * @skb_dma: (PCI-only) the DMA address associated with the sk buffer.
+  * @entry: The entry to which this sk buffer belongs.
+  */
+@@ -113,6 +118,9 @@ struct skb_frame_desc {
+ 	unsigned int desc_len;
+ 	void *desc;
+ 
++	__le32 iv;
++	__le32 eiv;
++
+ 	dma_addr_t skb_dma;
+ 
+ 	struct queue_entry *entry;
+@@ -152,7 +160,11 @@ enum rxdone_entry_desc_flags {
+  * @size: Data size of the received frame.
+  * @flags: MAC80211 receive flags (See &enum mac80211_rx_flags).
+  * @dev_flags: Ralink receive flags (See &enum rxdone_entry_desc_flags).
+-
++ * @cipher: Cipher type used during decryption.
++ * @cipher_status: Decryption status.
++ * @iv: IV data used during decryption.
++ * @eiv: EIV data used during decryption.
++ * @icv: ICV data used during decryption.
+  */
+ struct rxdone_entry_desc {
+ 	u64 timestamp;
+@@ -161,6 +173,12 @@ struct rxdone_entry_desc {
+ 	int size;
+ 	int flags;
+ 	int dev_flags;
++	u8 cipher;
++	u8 cipher_status;
++
++	__le32 iv;
++	__le32 eiv;
++	__le32 icv;
+ };
+ 
+ /**
+@@ -206,6 +224,10 @@ struct txdone_entry_desc {
+  * @ENTRY_TXD_BURST: This frame belongs to the same burst event.
+  * @ENTRY_TXD_ACK: An ACK is required for this frame.
+  * @ENTRY_TXD_RETRY_MODE: When set, the long retry count is used.
++ * @ENTRY_TXD_ENCRYPT: This frame should be encrypted.
++ * @ENTRY_TXD_ENCRYPT_PAIRWISE: Use pairwise key table (instead of shared).
++ * @ENTRY_TXD_ENCRYPT_IV: Generate IV/EIV in hardware.
++ * @ENTRY_TXD_ENCRYPT_MMIC: Generate MIC in hardware.
+  */
+ enum txentry_desc_flags {
+ 	ENTRY_TXD_RTS_FRAME,
+@@ -218,6 +240,10 @@ enum txentry_desc_flags {
+ 	ENTRY_TXD_BURST,
+ 	ENTRY_TXD_ACK,
+ 	ENTRY_TXD_RETRY_MODE,
++	ENTRY_TXD_ENCRYPT,
++	ENTRY_TXD_ENCRYPT_PAIRWISE,
++	ENTRY_TXD_ENCRYPT_IV,
++	ENTRY_TXD_ENCRYPT_MMIC,
+ };
+ 
+ /**
+@@ -236,6 +262,9 @@ enum txentry_desc_flags {
+  * @ifs: IFS value.
+  * @cw_min: cwmin value.
+  * @cw_max: cwmax value.
++ * @cipher: Cipher type used for encryption.
++ * @key_idx: Key index used for encryption.
++ * @iv_offset: Position where IV should be inserted by hardware.
+  */
+ struct txentry_desc {
+ 	unsigned long flags;
+@@ -252,6 +281,10 @@ struct txentry_desc {
+ 	short ifs;
+ 	short cw_min;
+ 	short cw_max;
++
++	enum cipher cipher;
++	u16 key_idx;
++	u16 iv_offset;
+ };
+ 
+ /**
+@@ -484,25 +517,51 @@ static inline int rt2x00queue_threshold(struct data_queue *queue)
+ }
+ 
+ /**
+- * rt2x00_desc_read - Read a word from the hardware descriptor.
++ * _rt2x00_desc_read - Read a word from the hardware descriptor.
++ * @desc: Base descriptor address
++ * @word: Word index from where the descriptor should be read.
++ * @value: Address where the descriptor value should be written into.
++ */
++static inline void _rt2x00_desc_read(__le32 *desc, const u8 word, __le32 *value)
++{
++	*value = desc[word];
++}
++
++/**
++ * rt2x00_desc_read - Read a word from the hardware descriptor, this
++ * function will take care of the byte ordering.
+  * @desc: Base descriptor address
+  * @word: Word index from where the descriptor should be read.
+  * @value: Address where the descriptor value should be written into.
+  */
+ static inline void rt2x00_desc_read(__le32 *desc, const u8 word, u32 *value)
+ {
+-	*value = le32_to_cpu(desc[word]);
++	__le32 tmp;
++	_rt2x00_desc_read(desc, word, &tmp);
++	*value = le32_to_cpu(tmp);
++}
++
++/**
++ * rt2x00_desc_write - write a word to the hardware descriptor, this
++ * function will take care of the byte ordering.
++ * @desc: Base descriptor address
++ * @word: Word index from where the descriptor should be written.
++ * @value: Value that should be written into the descriptor.
++ */
++static inline void _rt2x00_desc_write(__le32 *desc, const u8 word, __le32 value)
++{
++	desc[word] = value;
+ }
+ 
+ /**
+- * rt2x00_desc_write - wrote a word to the hardware descriptor.
++ * rt2x00_desc_write - write a word to the hardware descriptor.
+  * @desc: Base descriptor address
+  * @word: Word index from where the descriptor should be written.
+  * @value: Value that should be written into the descriptor.
+  */
+ static inline void rt2x00_desc_write(__le32 *desc, const u8 word, u32 value)
+ {
+-	desc[word] = cpu_to_le32(value);
++	_rt2x00_desc_write(desc, word, cpu_to_le32(value));
+ }
+ 
+ #endif /* RT2X00QUEUE_H */
+diff --git a/drivers/net/wireless/rt2x00/rt2x00reg.h b/drivers/net/wireless/rt2x00/rt2x00reg.h
+index 7e88ce5..6d5acf9 100644
+--- a/drivers/net/wireless/rt2x00/rt2x00reg.h
++++ b/drivers/net/wireless/rt2x00/rt2x00reg.h
+@@ -27,6 +27,16 @@
+ #define RT2X00REG_H
+ 
+ /*
++ * RX crypto status
++ */
++enum rx_crypto {
++	RX_CRYPTO_SUCCESS = 0,
++	RX_CRYPTO_FAIL_ICV = 1,
++	RX_CRYPTO_FAIL_MIC = 2,
++	RX_CRYPTO_FAIL_KEY = 3,
++};
++
++/*
+  * Antenna values
+  */
+ enum antenna {
+@@ -104,7 +114,14 @@ enum cipher {
+  */
+ 	CIPHER_CKIP64 = 5,
+ 	CIPHER_CKIP128 = 6,
+-	CIPHER_TKIP_NO_MIC = 7,
++	CIPHER_TKIP_NO_MIC = 7, /* Don't send to device */
++
++/*
++ * Max cipher type.
++ * Note that CIPHER_NONE isn't counted, and CKIP64 and CKIP128
++ * are excluded due to limitations in mac80211.
++ */
++	CIPHER_MAX = 4,
+ };
+ 
+ /*
+
+commit 61e754f44b57060464b1fcf261a8428ecfa23bed
+Author: Ivo van Doorn <ivdoorn@gmail.com>
+Date:   Mon Aug 4 16:38:02 2008 +0200
+
+    rt2x00: Implement HW encryption (rt61pci)
+    
+    rt61pci supports hardware encryption.
+    rt61pci supports up to 4 shared keys and up to 64 pairwise keys.
+    
+    Signed-off-by: Ivo van Doorn <IvDoorn@gmail.com>
+    Signed-off-by: John W. Linville <linville@tuxdriver.com>
+
+diff --git a/drivers/net/wireless/rt2x00/Kconfig b/drivers/net/wireless/rt2x00/Kconfig
+index 2f60e17..f333f61 100644
+--- a/drivers/net/wireless/rt2x00/Kconfig
++++ b/drivers/net/wireless/rt2x00/Kconfig
+@@ -107,6 +107,7 @@ config RT61PCI
+ 	depends on PCI
+ 	select RT2X00_LIB_PCI
+ 	select RT2X00_LIB_FIRMWARE
++	select RT2X00_LIB_CRYPTO
+ 	select CRC_ITU_T
+ 	select EEPROM_93CX6
+ 	---help---
+diff --git a/drivers/net/wireless/rt2x00/rt61pci.c b/drivers/net/wireless/rt2x00/rt61pci.c
+index 087e90b..86e7a50 100644
+--- a/drivers/net/wireless/rt2x00/rt61pci.c
++++ b/drivers/net/wireless/rt2x00/rt61pci.c
+@@ -346,6 +346,204 @@ static void rt61pci_init_led(struct rt2x00_dev *rt2x00dev,
+ /*
+  * Configuration handlers.
+  */
++static int rt61pci_config_shared_key(struct rt2x00_dev *rt2x00dev,
++				     struct rt2x00lib_crypto *crypto,
++				     struct ieee80211_key_conf *key)
++{
++	struct hw_key_entry key_entry;
++	struct rt2x00_field32 field;
++	u32 mask;
++	u32 reg;
++
++	if (crypto->cmd == SET_KEY) {
++		/*
++		 * rt2x00lib can't determine the correct free
++		 * key_idx for shared keys. We have 1 register
++		 * with key valid bits. The goal is simple, read
++		 * the register, if that is full we have no slots
++		 * left.
++		 * Note that each BSS is allowed to have up to 4
++		 * shared keys, so put a mask over the allowed
++		 * entries.
++		 */
++		mask = (0xf << crypto->bssidx);
++
++		rt2x00pci_register_read(rt2x00dev, SEC_CSR0, &reg);
++		reg &= mask;
++
++		if (reg && reg == mask)
++			return -ENOSPC;
++
++		key->hw_key_idx += reg ? (ffz(reg) - 1) : 0;
++
++		/*
++		 * Upload key to hardware
++		 */
++		memcpy(key_entry.key, crypto->key,
++		       sizeof(key_entry.key));
++		memcpy(key_entry.tx_mic, crypto->tx_mic,
++		       sizeof(key_entry.tx_mic));
++		memcpy(key_entry.rx_mic, crypto->rx_mic,
++		       sizeof(key_entry.rx_mic));
++
++		reg = SHARED_KEY_ENTRY(key->hw_key_idx);
++		rt2x00pci_register_multiwrite(rt2x00dev, reg,
++					      &key_entry, sizeof(key_entry));
++
++		/*
++		 * The cipher types are stored over 2 registers.
++		 * bssidx 0 and 1 keys are stored in SEC_CSR1 and
++		 * bssidx 1 and 2 keys are stored in SEC_CSR5.
++		 * Using the correct defines correctly will cause overhead,
++		 * so just calculate the correct offset.
++		 */
++		if (key->hw_key_idx < 8) {
++			field.bit_offset = (3 * key->hw_key_idx);
++			field.bit_mask = 0x7 << field.bit_offset;
++
++			rt2x00pci_register_read(rt2x00dev, SEC_CSR1, &reg);
++			rt2x00_set_field32(&reg, field, crypto->cipher);
++			rt2x00pci_register_write(rt2x00dev, SEC_CSR1, reg);
++		} else {
++			field.bit_offset = (3 * (key->hw_key_idx - 8));
++			field.bit_mask = 0x7 << field.bit_offset;
++
++			rt2x00pci_register_read(rt2x00dev, SEC_CSR5, &reg);
++			rt2x00_set_field32(&reg, field, crypto->cipher);
++			rt2x00pci_register_write(rt2x00dev, SEC_CSR5, reg);
++		}
++
++		/*
++		 * The driver does not support the IV/EIV generation
++		 * in hardware. However it doesn't support the IV/EIV
++		 * inside the ieee80211 frame either, but requires it
++		 * to be provided seperately for the descriptor.
++		 * rt2x00lib will cut the IV/EIV data out of all frames
++		 * given to us by mac80211, but we must tell mac80211
++		 * to generate the IV/EIV data.
++		 */
++		key->flags |= IEEE80211_KEY_FLAG_GENERATE_IV;
++	}
++
++	/*
++	 * SEC_CSR0 contains only single-bit fields to indicate
++	 * a particular key is valid. Because using the FIELD32()
++	 * defines directly will cause a lot of overhead we use
++	 * a calculation to determine the correct bit directly.
++	 */
++	mask = 1 << key->hw_key_idx;
++
++	rt2x00pci_register_read(rt2x00dev, SEC_CSR0, &reg);
++	if (crypto->cmd == SET_KEY)
++		reg |= mask;
++	else if (crypto->cmd == DISABLE_KEY)
++		reg &= ~mask;
++	rt2x00pci_register_write(rt2x00dev, SEC_CSR0, reg);
++
++	return 0;
++}
++
++static int rt61pci_config_pairwise_key(struct rt2x00_dev *rt2x00dev,
++				       struct rt2x00lib_crypto *crypto,
++				       struct ieee80211_key_conf *key)
++{
++	struct hw_pairwise_ta_entry addr_entry;
++	struct hw_key_entry key_entry;
++	u32 mask;
++	u32 reg;
++
++	if (crypto->cmd == SET_KEY) {
++		/*
++		 * rt2x00lib can't determine the correct free
++		 * key_idx for pairwise keys. We have 2 registers
++		 * with key valid bits. The goal is simple, read
++		 * the first register, if that is full move to
++		 * the next register.
++		 * When both registers are full, we drop the key,
++		 * otherwise we use the first invalid entry.
++		 */
++		rt2x00pci_register_read(rt2x00dev, SEC_CSR2, &reg);
++		if (reg && reg == ~0) {
++			key->hw_key_idx = 32;
++			rt2x00pci_register_read(rt2x00dev, SEC_CSR3, &reg);
++			if (reg && reg == ~0)
++				return -ENOSPC;
++		}
++
++		key->hw_key_idx += reg ? (ffz(reg) - 1) : 0;
++
++		/*
++		 * Upload key to hardware
++		 */
++		memcpy(key_entry.key, crypto->key,
++		       sizeof(key_entry.key));
++		memcpy(key_entry.tx_mic, crypto->tx_mic,
++		       sizeof(key_entry.tx_mic));
++		memcpy(key_entry.rx_mic, crypto->rx_mic,
++		       sizeof(key_entry.rx_mic));
++
++		memset(&addr_entry, 0, sizeof(addr_entry));
++		memcpy(&addr_entry, crypto->address, ETH_ALEN);
++		addr_entry.cipher = crypto->cipher;
++
++		reg = PAIRWISE_KEY_ENTRY(key->hw_key_idx);
++		rt2x00pci_register_multiwrite(rt2x00dev, reg,
++					      &key_entry, sizeof(key_entry));
++
++		reg = PAIRWISE_TA_ENTRY(key->hw_key_idx);
++		rt2x00pci_register_multiwrite(rt2x00dev, reg,
++					      &addr_entry, sizeof(addr_entry));
++
++		/*
++		 * Enable pairwise lookup table for given BSS idx,
++		 * without this received frames will not be decrypted
++		 * by the hardware.
++		 */
++		rt2x00pci_register_read(rt2x00dev, SEC_CSR4, &reg);
++		reg |= (1 << crypto->bssidx);
++		rt2x00pci_register_write(rt2x00dev, SEC_CSR4, reg);
++
++		/*
++		 * The driver does not support the IV/EIV generation
++		 * in hardware. However it doesn't support the IV/EIV
++		 * inside the ieee80211 frame either, but requires it
++		 * to be provided seperately for the descriptor.
++		 * rt2x00lib will cut the IV/EIV data out of all frames
++		 * given to us by mac80211, but we must tell mac80211
++		 * to generate the IV/EIV data.
++		 */
++		key->flags |= IEEE80211_KEY_FLAG_GENERATE_IV;
++	}
++
++	/*
++	 * SEC_CSR2 and SEC_CSR3 contain only single-bit fields to indicate
++	 * a particular key is valid. Because using the FIELD32()
++	 * defines directly will cause a lot of overhead we use
++	 * a calculation to determine the correct bit directly.
++	 */
++	if (key->hw_key_idx < 32) {
++		mask = 1 << key->hw_key_idx;
++
++		rt2x00pci_register_read(rt2x00dev, SEC_CSR2, &reg);
++		if (crypto->cmd == SET_KEY)
++			reg |= mask;
++		else if (crypto->cmd == DISABLE_KEY)
++			reg &= ~mask;
++		rt2x00pci_register_write(rt2x00dev, SEC_CSR2, reg);
++	} else {
++		mask = 1 << (key->hw_key_idx - 32);
++
++		rt2x00pci_register_read(rt2x00dev, SEC_CSR3, &reg);
++		if (crypto->cmd == SET_KEY)
++			reg |= mask;
++		else if (crypto->cmd == DISABLE_KEY)
++			reg &= ~mask;
++		rt2x00pci_register_write(rt2x00dev, SEC_CSR3, reg);
++	}
++
++	return 0;
++}
++
+ static void rt61pci_config_filter(struct rt2x00_dev *rt2x00dev,
+ 				  const unsigned int filter_flags)
+ {
+@@ -1533,8 +1731,8 @@ static int rt61pci_set_device_state(struct rt2x00_dev *rt2x00dev,
+  * TX descriptor initialization
+  */
+ static void rt61pci_write_tx_desc(struct rt2x00_dev *rt2x00dev,
+-				    struct sk_buff *skb,
+-				    struct txentry_desc *txdesc)
++				  struct sk_buff *skb,
++				  struct txentry_desc *txdesc)
+ {
+ 	struct skb_frame_desc *skbdesc = get_skb_frame_desc(skb);
+ 	__le32 *txd = skbdesc->desc;
+@@ -1548,7 +1746,7 @@ static void rt61pci_write_tx_desc(struct rt2x00_dev *rt2x00dev,
+ 	rt2x00_set_field32(&word, TXD_W1_AIFSN, txdesc->aifs);
+ 	rt2x00_set_field32(&word, TXD_W1_CWMIN, txdesc->cw_min);
+ 	rt2x00_set_field32(&word, TXD_W1_CWMAX, txdesc->cw_max);
+-	rt2x00_set_field32(&word, TXD_W1_IV_OFFSET, IEEE80211_HEADER);
++	rt2x00_set_field32(&word, TXD_W1_IV_OFFSET, txdesc->iv_offset);
+ 	rt2x00_set_field32(&word, TXD_W1_HW_SEQUENCE,
+ 			   test_bit(ENTRY_TXD_GENERATE_SEQ, &txdesc->flags));
+ 	rt2x00_set_field32(&word, TXD_W1_BUFFER_COUNT, 1);
+@@ -1561,6 +1759,11 @@ static void rt61pci_write_tx_desc(struct rt2x00_dev *rt2x00dev,
+ 	rt2x00_set_field32(&word, TXD_W2_PLCP_LENGTH_HIGH, txdesc->length_high);
+ 	rt2x00_desc_write(txd, 2, word);
+ 
++	if (test_bit(ENTRY_TXD_ENCRYPT, &txdesc->flags)) {
++		_rt2x00_desc_write(txd, 3, skbdesc->iv);
++		_rt2x00_desc_write(txd, 4, skbdesc->eiv);
++	}
++
+ 	rt2x00_desc_read(txd, 5, &word);
+ 	rt2x00_set_field32(&word, TXD_W5_PID_TYPE, skbdesc->entry->queue->qid);
+ 	rt2x00_set_field32(&word, TXD_W5_PID_SUBTYPE,
+@@ -1595,11 +1798,15 @@ static void rt61pci_write_tx_desc(struct rt2x00_dev *rt2x00dev,
+ 	rt2x00_set_field32(&word, TXD_W0_IFS, txdesc->ifs);
+ 	rt2x00_set_field32(&word, TXD_W0_RETRY_MODE,
+ 			   test_bit(ENTRY_TXD_RETRY_MODE, &txdesc->flags));
+-	rt2x00_set_field32(&word, TXD_W0_TKIP_MIC, 0);
++	rt2x00_set_field32(&word, TXD_W0_TKIP_MIC,
++			   test_bit(ENTRY_TXD_ENCRYPT_MMIC, &txdesc->flags));
++	rt2x00_set_field32(&word, TXD_W0_KEY_TABLE,
++			   test_bit(ENTRY_TXD_ENCRYPT_PAIRWISE, &txdesc->flags));
++	rt2x00_set_field32(&word, TXD_W0_KEY_INDEX, txdesc->key_idx);
+ 	rt2x00_set_field32(&word, TXD_W0_DATABYTE_COUNT, skb->len);
+ 	rt2x00_set_field32(&word, TXD_W0_BURST,
+ 			   test_bit(ENTRY_TXD_BURST, &txdesc->flags));
+-	rt2x00_set_field32(&word, TXD_W0_CIPHER_ALG, CIPHER_NONE);
++	rt2x00_set_field32(&word, TXD_W0_CIPHER_ALG, txdesc->cipher);
+ 	rt2x00_desc_write(txd, 0, word);
+ }
+ 
+@@ -1718,6 +1925,7 @@ static int rt61pci_agc_to_rssi(struct rt2x00_dev *rt2x00dev, int rxd_w1)
+ static void rt61pci_fill_rxdone(struct queue_entry *entry,
+ 			        struct rxdone_entry_desc *rxdesc)
+ {
++	struct rt2x00_dev *rt2x00dev = entry->queue->rt2x00dev;
+ 	struct queue_entry_priv_pci *entry_priv = entry->priv_data;
+ 	u32 word0;
+ 	u32 word1;
+@@ -1728,6 +1936,38 @@ static void rt61pci_fill_rxdone(struct queue_entry *entry,
+ 	if (rt2x00_get_field32(word0, RXD_W0_CRC_ERROR))
+ 		rxdesc->flags |= RX_FLAG_FAILED_FCS_CRC;
+ 
++	if (test_bit(CONFIG_SUPPORT_HW_CRYPTO, &rt2x00dev->flags)) {
++		rxdesc->cipher =
++		    rt2x00_get_field32(word0, RXD_W0_CIPHER_ALG);
++		rxdesc->cipher_status =
++		    rt2x00_get_field32(word0, RXD_W0_CIPHER_ERROR);
++	}
++
++	if (rxdesc->cipher != CIPHER_NONE) {
++		_rt2x00_desc_read(entry_priv->desc, 2, &rxdesc->iv);
++		_rt2x00_desc_read(entry_priv->desc, 3, &rxdesc->eiv);
++		_rt2x00_desc_read(entry_priv->desc, 4, &rxdesc->icv);
++
++		/*
++		 * Hardware has stripped IV/EIV data from 802.11 frame during
++		 * decryption. It has provided the data seperately but rt2x00lib
++		 * should decide if it should be reinserted.
++		 */
++		rxdesc->flags |= RX_FLAG_IV_STRIPPED;
++
++		/*
++		 * FIXME: Legacy driver indicates that the frame does
++		 * contain the Michael Mic. Unfortunately, in rt2x00
++		 * the MIC seems to be missing completely...
++		 */
++		rxdesc->flags |= RX_FLAG_MMIC_STRIPPED;
++
++		if (rxdesc->cipher_status == RX_CRYPTO_SUCCESS)
++			rxdesc->flags |= RX_FLAG_DECRYPTED;
++		else if (rxdesc->cipher_status == RX_CRYPTO_FAIL_MIC)
++			rxdesc->flags |= RX_FLAG_MMIC_ERROR;
++	}
++
+ 	/*
+ 	 * Obtain the status about this packet.
+ 	 * When frame was received with an OFDM bitrate,
+@@ -1735,7 +1975,7 @@ static void rt61pci_fill_rxdone(struct queue_entry *entry,
+ 	 * a CCK bitrate the signal is the rate in 100kbit/s.
+ 	 */
+ 	rxdesc->signal = rt2x00_get_field32(word1, RXD_W1_SIGNAL);
+-	rxdesc->rssi = rt61pci_agc_to_rssi(entry->queue->rt2x00dev, word1);
++	rxdesc->rssi = rt61pci_agc_to_rssi(rt2x00dev, word1);
+ 	rxdesc->size = rt2x00_get_field32(word0, RXD_W0_DATABYTE_COUNT);
+ 
+ 	if (rt2x00_get_field32(word0, RXD_W0_OFDM))
+@@ -2355,6 +2595,7 @@ static int rt61pci_probe_hw(struct rt2x00_dev *rt2x00dev)
+ 	 */
+ 	__set_bit(DRIVER_REQUIRE_FIRMWARE, &rt2x00dev->flags);
+ 	__set_bit(DRIVER_REQUIRE_DMA, &rt2x00dev->flags);
++	__set_bit(CONFIG_SUPPORT_HW_CRYPTO, &rt2x00dev->flags);
+ 
+ 	/*
+ 	 * Set the rssi offset.
+@@ -2404,6 +2645,7 @@ static const struct ieee80211_ops rt61pci_mac80211_ops = {
+ 	.config			= rt2x00mac_config,
+ 	.config_interface	= rt2x00mac_config_interface,
+ 	.configure_filter	= rt2x00mac_configure_filter,
++	.set_key		= rt2x00mac_set_key,
+ 	.get_stats		= rt2x00mac_get_stats,
+ 	.set_retry_limit	= rt61pci_set_retry_limit,
+ 	.bss_info_changed	= rt2x00mac_bss_info_changed,
+@@ -2432,6 +2674,8 @@ static const struct rt2x00lib_ops rt61pci_rt2x00_ops = {
+ 	.write_beacon		= rt61pci_write_beacon,
+ 	.kick_tx_queue		= rt61pci_kick_tx_queue,
+ 	.fill_rxdone		= rt61pci_fill_rxdone,
++	.config_shared_key	= rt61pci_config_shared_key,
++	.config_pairwise_key	= rt61pci_config_pairwise_key,
+ 	.config_filter		= rt61pci_config_filter,
+ 	.config_intf		= rt61pci_config_intf,
+ 	.config_erp		= rt61pci_config_erp,
+diff --git a/drivers/net/wireless/rt2x00/rt61pci.h b/drivers/net/wireless/rt2x00/rt61pci.h
+index 1004d5b..6d591ce 100644
+--- a/drivers/net/wireless/rt2x00/rt61pci.h
++++ b/drivers/net/wireless/rt2x00/rt61pci.h
+@@ -134,6 +134,16 @@
+ #define PAIRWISE_KEY_TABLE_BASE		0x1200
+ #define PAIRWISE_TA_TABLE_BASE		0x1a00
+ 
++#define SHARED_KEY_ENTRY(__idx) \
++	( SHARED_KEY_TABLE_BASE + \
++		((__idx) * sizeof(struct hw_key_entry)) )
++#define PAIRWISE_KEY_ENTRY(__idx) \
++	( PAIRWISE_KEY_TABLE_BASE + \
++		((__idx) * sizeof(struct hw_key_entry)) )
++#define PAIRWISE_TA_ENTRY(__idx) \
++	( PAIRWISE_TA_TABLE_BASE + \
++		((__idx) * sizeof(struct hw_pairwise_ta_entry)) )
++
+ struct hw_key_entry {
+ 	u8 key[16];
+ 	u8 tx_mic[8];
+@@ -142,7 +152,8 @@ struct hw_key_entry {
+ 
+ struct hw_pairwise_ta_entry {
+ 	u8 address[6];
+-	u8 reserved[2];
++	u8 cipher;
++	u8 reserved;
+ } __attribute__ ((packed));
+ 
+ /*
+@@ -662,6 +673,10 @@ struct hw_pairwise_ta_entry {
+  * SEC_CSR4: Pairwise key table lookup control.
+  */
+ #define SEC_CSR4			0x30b0
++#define SEC_CSR4_ENABLE_BSS0		FIELD32(0x00000001)
++#define SEC_CSR4_ENABLE_BSS1		FIELD32(0x00000002)
++#define SEC_CSR4_ENABLE_BSS2		FIELD32(0x00000004)
++#define SEC_CSR4_ENABLE_BSS3		FIELD32(0x00000008)
+ 
+ /*
+  * SEC_CSR5: shared key table security mode register.
+@@ -1428,8 +1443,10 @@ struct hw_pairwise_ta_entry {
+ 
+ /*
+  * Word4
++ * ICV: Received ICV of originally encrypted.
++ * NOTE: This is a guess, the official definition is "reserved"
+  */
+-#define RXD_W4_RESERVED			FIELD32(0xffffffff)
++#define RXD_W4_ICV			FIELD32(0xffffffff)
+ 
+ /*
+  * the above 20-byte is called RXINFO and will be DMAed to MAC RX block
+
+commit 906c110fcc24bdd5bf0fa22d89ac75d99c747e53
+Author: Ivo van Doorn <ivdoorn@gmail.com>
+Date:   Mon Aug 4 16:38:24 2008 +0200
+
+    rt2x00: Implement HW encryption (rt73usb)
+    
+    rt73usb supports hardware encryption.
+    rt73usb supports up to 4 shared keys and up to 64 pairwise keys.
+    
+    Signed-off-by: Ivo van Doorn <IvDoorn@gmail.com>
+    Signed-off-by: John W. Linville <linville@tuxdriver.com>
+
+diff --git a/drivers/net/wireless/rt2x00/Kconfig b/drivers/net/wireless/rt2x00/Kconfig
+index f333f61..11f590d 100644
+--- a/drivers/net/wireless/rt2x00/Kconfig
++++ b/drivers/net/wireless/rt2x00/Kconfig
+@@ -156,6 +156,7 @@ config RT73USB
+ 	depends on USB
+ 	select RT2X00_LIB_USB
+ 	select RT2X00_LIB_FIRMWARE
++	select RT2X00_LIB_CRYPTO
+ 	select CRC_ITU_T
+ 	---help---
+ 	  This adds support for rt2501 wireless chipset family.
+diff --git a/drivers/net/wireless/rt2x00/rt73usb.c b/drivers/net/wireless/rt2x00/rt73usb.c
+index 9761eaa..ddba747 100644
+--- a/drivers/net/wireless/rt2x00/rt73usb.c
++++ b/drivers/net/wireless/rt2x00/rt73usb.c
+@@ -357,6 +357,219 @@ static void rt73usb_init_led(struct rt2x00_dev *rt2x00dev,
+ /*
+  * Configuration handlers.
+  */
++static int rt73usb_config_shared_key(struct rt2x00_dev *rt2x00dev,
++				     struct rt2x00lib_crypto *crypto,
++				     struct ieee80211_key_conf *key)
++{
++	struct hw_key_entry key_entry;
++	struct rt2x00_field32 field;
++	int timeout;
++	u32 mask;
++	u32 reg;
++
++	if (crypto->cmd == SET_KEY) {
++		/*
++		 * rt2x00lib can't determine the correct free
++		 * key_idx for shared keys. We have 1 register
++		 * with key valid bits. The goal is simple, read
++		 * the register, if that is full we have no slots
++		 * left.
++		 * Note that each BSS is allowed to have up to 4
++		 * shared keys, so put a mask over the allowed
++		 * entries.
++		 */
++		mask = (0xf << crypto->bssidx);
++
++		rt73usb_register_read(rt2x00dev, SEC_CSR0, &reg);
++		reg &= mask;
++
++		if (reg && reg == mask)
++			return -ENOSPC;
++
++		key->hw_key_idx += reg ? (ffz(reg) - 1) : 0;
++
++		/*
++		 * Upload key to hardware
++		 */
++		memcpy(key_entry.key, crypto->key,
++		       sizeof(key_entry.key));
++		memcpy(key_entry.tx_mic, crypto->tx_mic,
++		       sizeof(key_entry.tx_mic));
++		memcpy(key_entry.rx_mic, crypto->rx_mic,
++		       sizeof(key_entry.rx_mic));
++
++		reg = SHARED_KEY_ENTRY(key->hw_key_idx);
++		timeout = REGISTER_TIMEOUT32(sizeof(key_entry));
++		rt2x00usb_vendor_request_large_buff(rt2x00dev, USB_MULTI_WRITE,
++						    USB_VENDOR_REQUEST_OUT, reg,
++						    &key_entry,
++						    sizeof(key_entry),
++						    timeout);
++
++		/*
++		 * The cipher types are stored over 2 registers.
++		 * bssidx 0 and 1 keys are stored in SEC_CSR1 and
++		 * bssidx 1 and 2 keys are stored in SEC_CSR5.
++		 * Using the correct defines correctly will cause overhead,
++		 * so just calculate the correct offset.
++		 */
++		if (key->hw_key_idx < 8) {
++			field.bit_offset = (3 * key->hw_key_idx);
++			field.bit_mask = 0x7 << field.bit_offset;
++
++			rt73usb_register_read(rt2x00dev, SEC_CSR1, &reg);
++			rt2x00_set_field32(&reg, field, crypto->cipher);
++			rt73usb_register_write(rt2x00dev, SEC_CSR1, reg);
++		} else {
++			field.bit_offset = (3 * (key->hw_key_idx - 8));
++			field.bit_mask = 0x7 << field.bit_offset;
++
++			rt73usb_register_read(rt2x00dev, SEC_CSR5, &reg);
++			rt2x00_set_field32(&reg, field, crypto->cipher);
++			rt73usb_register_write(rt2x00dev, SEC_CSR5, reg);
++		}
++
++		/*
++		 * The driver does not support the IV/EIV generation
++		 * in hardware. However it doesn't support the IV/EIV
++		 * inside the ieee80211 frame either, but requires it
++		 * to be provided seperately for the descriptor.
++		 * rt2x00lib will cut the IV/EIV data out of all frames
++		 * given to us by mac80211, but we must tell mac80211
++		 * to generate the IV/EIV data.
++		 */
++		key->flags |= IEEE80211_KEY_FLAG_GENERATE_IV;
++	}
++
++	/*
++	 * SEC_CSR0 contains only single-bit fields to indicate
++	 * a particular key is valid. Because using the FIELD32()
++	 * defines directly will cause a lot of overhead we use
++	 * a calculation to determine the correct bit directly.
++	 */
++	mask = 1 << key->hw_key_idx;
++
++	rt73usb_register_read(rt2x00dev, SEC_CSR0, &reg);
++	if (crypto->cmd == SET_KEY)
++		reg |= mask;
++	else if (crypto->cmd == DISABLE_KEY)
++		reg &= ~mask;
++	rt73usb_register_write(rt2x00dev, SEC_CSR0, reg);
++
++	return 0;
++}
++
++static int rt73usb_config_pairwise_key(struct rt2x00_dev *rt2x00dev,
++				       struct rt2x00lib_crypto *crypto,
++				       struct ieee80211_key_conf *key)
++{
++	struct hw_pairwise_ta_entry addr_entry;
++	struct hw_key_entry key_entry;
++	int timeout;
++	u32 mask;
++	u32 reg;
++
++	if (crypto->cmd == SET_KEY) {
++		/*
++		 * rt2x00lib can't determine the correct free
++		 * key_idx for pairwise keys. We have 2 registers
++		 * with key valid bits. The goal is simple, read
++		 * the first register, if that is full move to
++		 * the next register.
++		 * When both registers are full, we drop the key,
++		 * otherwise we use the first invalid entry.
++		 */
++		rt73usb_register_read(rt2x00dev, SEC_CSR2, &reg);
++		if (reg && reg == ~0) {
++			key->hw_key_idx = 32;
++			rt73usb_register_read(rt2x00dev, SEC_CSR3, &reg);
++			if (reg && reg == ~0)
++				return -ENOSPC;
++		}
++
++		key->hw_key_idx += reg ? (ffz(reg) - 1) : 0;
++
++		/*
++		 * Upload key to hardware
++		 */
++		memcpy(key_entry.key, crypto->key,
++		       sizeof(key_entry.key));
++		memcpy(key_entry.tx_mic, crypto->tx_mic,
++		       sizeof(key_entry.tx_mic));
++		memcpy(key_entry.rx_mic, crypto->rx_mic,
++		       sizeof(key_entry.rx_mic));
++
++		reg = PAIRWISE_KEY_ENTRY(key->hw_key_idx);
++		timeout = REGISTER_TIMEOUT32(sizeof(key_entry));
++		rt2x00usb_vendor_request_large_buff(rt2x00dev, USB_MULTI_WRITE,
++						    USB_VENDOR_REQUEST_OUT, reg,
++						    &key_entry,
++						    sizeof(key_entry),
++						    timeout);
++
++		/*
++		 * Send the address and cipher type to the hardware register.
++		 * This data fits within the CSR cache size, so we can use
++		 * rt73usb_register_multiwrite() directly.
++		 */
++		memset(&addr_entry, 0, sizeof(addr_entry));
++		memcpy(&addr_entry, crypto->address, ETH_ALEN);
++		addr_entry.cipher = crypto->cipher;
++
++		reg = PAIRWISE_TA_ENTRY(key->hw_key_idx);
++		rt73usb_register_multiwrite(rt2x00dev, reg,
++					    &addr_entry, sizeof(addr_entry));
++
++		/*
++		 * Enable pairwise lookup table for given BSS idx,
++		 * without this received frames will not be decrypted
++		 * by the hardware.
++		 */
++		rt73usb_register_read(rt2x00dev, SEC_CSR4, &reg);
++		reg |= (1 << crypto->bssidx);
++		rt73usb_register_write(rt2x00dev, SEC_CSR4, reg);
++
++		/*
++		 * The driver does not support the IV/EIV generation
++		 * in hardware. However it doesn't support the IV/EIV
++		 * inside the ieee80211 frame either, but requires it
++		 * to be provided seperately for the descriptor.
++		 * rt2x00lib will cut the IV/EIV data out of all frames
++		 * given to us by mac80211, but we must tell mac80211
++		 * to generate the IV/EIV data.
++		 */
++		key->flags |= IEEE80211_KEY_FLAG_GENERATE_IV;
++	}
++
++	/*
++	 * SEC_CSR2 and SEC_CSR3 contain only single-bit fields to indicate
++	 * a particular key is valid. Because using the FIELD32()
++	 * defines directly will cause a lot of overhead we use
++	 * a calculation to determine the correct bit directly.
++	 */
++	if (key->hw_key_idx < 32) {
++		mask = 1 << key->hw_key_idx;
++
++		rt73usb_register_read(rt2x00dev, SEC_CSR2, &reg);
++		if (crypto->cmd == SET_KEY)
++			reg |= mask;
++		else if (crypto->cmd == DISABLE_KEY)
++			reg &= ~mask;
++		rt73usb_register_write(rt2x00dev, SEC_CSR2, reg);
++	} else {
++		mask = 1 << (key->hw_key_idx - 32);
++
++		rt73usb_register_read(rt2x00dev, SEC_CSR3, &reg);
++		if (crypto->cmd == SET_KEY)
++			reg |= mask;
++		else if (crypto->cmd == DISABLE_KEY)
++			reg &= ~mask;
++		rt73usb_register_write(rt2x00dev, SEC_CSR3, reg);
++	}
++
++	return 0;
++}
++
+ static void rt73usb_config_filter(struct rt2x00_dev *rt2x00dev,
+ 				  const unsigned int filter_flags)
+ {
+@@ -1265,8 +1478,8 @@ static int rt73usb_set_device_state(struct rt2x00_dev *rt2x00dev,
+  * TX descriptor initialization
+  */
+ static void rt73usb_write_tx_desc(struct rt2x00_dev *rt2x00dev,
+-				    struct sk_buff *skb,
+-				    struct txentry_desc *txdesc)
++				  struct sk_buff *skb,
++				  struct txentry_desc *txdesc)
+ {
+ 	struct skb_frame_desc *skbdesc = get_skb_frame_desc(skb);
+ 	__le32 *txd = skbdesc->desc;
+@@ -1280,7 +1493,7 @@ static void rt73usb_write_tx_desc(struct rt2x00_dev *rt2x00dev,
+ 	rt2x00_set_field32(&word, TXD_W1_AIFSN, txdesc->aifs);
+ 	rt2x00_set_field32(&word, TXD_W1_CWMIN, txdesc->cw_min);
+ 	rt2x00_set_field32(&word, TXD_W1_CWMAX, txdesc->cw_max);
+-	rt2x00_set_field32(&word, TXD_W1_IV_OFFSET, IEEE80211_HEADER);
++	rt2x00_set_field32(&word, TXD_W1_IV_OFFSET, txdesc->iv_offset);
+ 	rt2x00_set_field32(&word, TXD_W1_HW_SEQUENCE,
+ 			   test_bit(ENTRY_TXD_GENERATE_SEQ, &txdesc->flags));
+ 	rt2x00_desc_write(txd, 1, word);
+@@ -1292,6 +1505,11 @@ static void rt73usb_write_tx_desc(struct rt2x00_dev *rt2x00dev,
+ 	rt2x00_set_field32(&word, TXD_W2_PLCP_LENGTH_HIGH, txdesc->length_high);
+ 	rt2x00_desc_write(txd, 2, word);
+ 
++	if (test_bit(ENTRY_TXD_ENCRYPT, &txdesc->flags)) {
++		_rt2x00_desc_write(txd, 3, skbdesc->iv);
++		_rt2x00_desc_write(txd, 4, skbdesc->eiv);
++	}
++
+ 	rt2x00_desc_read(txd, 5, &word);
+ 	rt2x00_set_field32(&word, TXD_W5_TX_POWER,
+ 			   TXPOWER_TO_DEV(rt2x00dev->tx_power));
+@@ -1313,12 +1531,16 @@ static void rt73usb_write_tx_desc(struct rt2x00_dev *rt2x00dev,
+ 	rt2x00_set_field32(&word, TXD_W0_IFS, txdesc->ifs);
+ 	rt2x00_set_field32(&word, TXD_W0_RETRY_MODE,
+ 			   test_bit(ENTRY_TXD_RETRY_MODE, &txdesc->flags));
+-	rt2x00_set_field32(&word, TXD_W0_TKIP_MIC, 0);
++	rt2x00_set_field32(&word, TXD_W0_TKIP_MIC,
++			   test_bit(ENTRY_TXD_ENCRYPT_MMIC, &txdesc->flags));
++	rt2x00_set_field32(&word, TXD_W0_KEY_TABLE,
++			   test_bit(ENTRY_TXD_ENCRYPT_PAIRWISE, &txdesc->flags));
++	rt2x00_set_field32(&word, TXD_W0_KEY_INDEX, txdesc->key_idx);
+ 	rt2x00_set_field32(&word, TXD_W0_DATABYTE_COUNT,
+ 			   skb->len - skbdesc->desc_len);
+ 	rt2x00_set_field32(&word, TXD_W0_BURST2,
+ 			   test_bit(ENTRY_TXD_BURST, &txdesc->flags));
+-	rt2x00_set_field32(&word, TXD_W0_CIPHER_ALG, CIPHER_NONE);
++	rt2x00_set_field32(&word, TXD_W0_CIPHER_ALG, txdesc->cipher);
+ 	rt2x00_desc_write(txd, 0, word);
+ }
+ 
+@@ -1468,6 +1690,7 @@ static int rt73usb_agc_to_rssi(struct rt2x00_dev *rt2x00dev, int rxd_w1)
+ static void rt73usb_fill_rxdone(struct queue_entry *entry,
+ 			        struct rxdone_entry_desc *rxdesc)
+ {
++	struct rt2x00_dev *rt2x00dev = entry->queue->rt2x00dev;
+ 	struct skb_frame_desc *skbdesc = get_skb_frame_desc(entry->skb);
+ 	__le32 *rxd = (__le32 *)entry->skb->data;
+ 	u32 word0;
+@@ -1489,6 +1712,38 @@ static void rt73usb_fill_rxdone(struct queue_entry *entry,
+ 	if (rt2x00_get_field32(word0, RXD_W0_CRC_ERROR))
+ 		rxdesc->flags |= RX_FLAG_FAILED_FCS_CRC;
+ 
++	if (test_bit(CONFIG_SUPPORT_HW_CRYPTO, &rt2x00dev->flags)) {
++		rxdesc->cipher =
++		    rt2x00_get_field32(word0, RXD_W0_CIPHER_ALG);
++		rxdesc->cipher_status =
++		    rt2x00_get_field32(word0, RXD_W0_CIPHER_ERROR);
++	}
++
++	if (rxdesc->cipher != CIPHER_NONE) {
++		_rt2x00_desc_read(rxd, 2, &rxdesc->iv);
++		_rt2x00_desc_read(rxd, 3, &rxdesc->eiv);
++		_rt2x00_desc_read(rxd, 4, &rxdesc->icv);
++
++		/*
++		 * Hardware has stripped IV/EIV data from 802.11 frame during
++		 * decryption. It has provided the data seperately but rt2x00lib
++		 * should decide if it should be reinserted.
++		 */
++		rxdesc->flags |= RX_FLAG_IV_STRIPPED;
++
++		/*
++		 * FIXME: Legacy driver indicates that the frame does
++		 * contain the Michael Mic. Unfortunately, in rt2x00
++		 * the MIC seems to be missing completely...
++		 */
++		rxdesc->flags |= RX_FLAG_MMIC_STRIPPED;
++
++		if (rxdesc->cipher_status == RX_CRYPTO_SUCCESS)
++			rxdesc->flags |= RX_FLAG_DECRYPTED;
++		else if (rxdesc->cipher_status == RX_CRYPTO_FAIL_MIC)
++			rxdesc->flags |= RX_FLAG_MMIC_ERROR;
++	}
++
+ 	/*
+ 	 * Obtain the status about this packet.
+ 	 * When frame was received with an OFDM bitrate,
+@@ -1496,7 +1751,7 @@ static void rt73usb_fill_rxdone(struct queue_entry *entry,
+ 	 * a CCK bitrate the signal is the rate in 100kbit/s.
+ 	 */
+ 	rxdesc->signal = rt2x00_get_field32(word1, RXD_W1_SIGNAL);
+-	rxdesc->rssi = rt73usb_agc_to_rssi(entry->queue->rt2x00dev, word1);
++	rxdesc->rssi = rt73usb_agc_to_rssi(rt2x00dev, word1);
+ 	rxdesc->size = rt2x00_get_field32(word0, RXD_W0_DATABYTE_COUNT);
+ 
+ 	if (rt2x00_get_field32(word0, RXD_W0_OFDM))
+@@ -1938,6 +2193,7 @@ static int rt73usb_probe_hw(struct rt2x00_dev *rt2x00dev)
+ 	 */
+ 	__set_bit(DRIVER_REQUIRE_FIRMWARE, &rt2x00dev->flags);
+ 	__set_bit(DRIVER_REQUIRE_SCHEDULED, &rt2x00dev->flags);
++	__set_bit(CONFIG_SUPPORT_HW_CRYPTO, &rt2x00dev->flags);
+ 
+ 	/*
+ 	 * Set the rssi offset.
+@@ -1997,6 +2253,7 @@ static const struct ieee80211_ops rt73usb_mac80211_ops = {
+ 	.config			= rt2x00mac_config,
+ 	.config_interface	= rt2x00mac_config_interface,
+ 	.configure_filter	= rt2x00mac_configure_filter,
++	.set_key		= rt2x00mac_set_key,
+ 	.get_stats		= rt2x00mac_get_stats,
+ 	.set_retry_limit	= rt73usb_set_retry_limit,
+ 	.bss_info_changed	= rt2x00mac_bss_info_changed,
+@@ -2024,6 +2281,8 @@ static const struct rt2x00lib_ops rt73usb_rt2x00_ops = {
+ 	.get_tx_data_len	= rt73usb_get_tx_data_len,
+ 	.kick_tx_queue		= rt73usb_kick_tx_queue,
+ 	.fill_rxdone		= rt73usb_fill_rxdone,
++	.config_shared_key	= rt73usb_config_shared_key,
++	.config_pairwise_key	= rt73usb_config_pairwise_key,
+ 	.config_filter		= rt73usb_config_filter,
+ 	.config_intf		= rt73usb_config_intf,
+ 	.config_erp		= rt73usb_config_erp,
+diff --git a/drivers/net/wireless/rt2x00/rt73usb.h b/drivers/net/wireless/rt2x00/rt73usb.h
+index 1484935..91e04d3 100644
+--- a/drivers/net/wireless/rt2x00/rt73usb.h
++++ b/drivers/net/wireless/rt2x00/rt73usb.h
+@@ -92,6 +92,16 @@
+ #define PAIRWISE_KEY_TABLE_BASE		0x1200
+ #define PAIRWISE_TA_TABLE_BASE		0x1a00
+ 
++#define SHARED_KEY_ENTRY(__idx) \
++	( SHARED_KEY_TABLE_BASE + \
++		((__idx) * sizeof(struct hw_key_entry)) )
++#define PAIRWISE_KEY_ENTRY(__idx) \
++	( PAIRWISE_KEY_TABLE_BASE + \
++		((__idx) * sizeof(struct hw_key_entry)) )
++#define PAIRWISE_TA_ENTRY(__idx) \
++	( PAIRWISE_TA_TABLE_BASE + \
++		((__idx) * sizeof(struct hw_pairwise_ta_entry)) )
++
+ struct hw_key_entry {
+ 	u8 key[16];
+ 	u8 tx_mic[8];
+@@ -100,7 +110,8 @@ struct hw_key_entry {
+ 
+ struct hw_pairwise_ta_entry {
+ 	u8 address[6];
+-	u8 reserved[2];
++	u8 cipher;
++	u8 reserved;
+ } __attribute__ ((packed));
+ 
+ /*
+@@ -563,6 +574,10 @@ struct hw_pairwise_ta_entry {
+  * SEC_CSR4: Pairwise key table lookup control.
+  */
+ #define SEC_CSR4			0x30b0
++#define SEC_CSR4_ENABLE_BSS0		FIELD32(0x00000001)
++#define SEC_CSR4_ENABLE_BSS1		FIELD32(0x00000002)
++#define SEC_CSR4_ENABLE_BSS2		FIELD32(0x00000004)
++#define SEC_CSR4_ENABLE_BSS3		FIELD32(0x00000008)
+ 
+ /*
+  * SEC_CSR5: shared key table security mode register.
+@@ -1010,8 +1025,10 @@ struct hw_pairwise_ta_entry {
+ 
+ /*
+  * Word4
++ * ICV: Received ICV of originally encrypted.
++ * NOTE: This is a guess, the official definition is "reserved"
+  */
+-#define RXD_W4_RESERVED			FIELD32(0xffffffff)
++#define RXD_W4_ICV			FIELD32(0xffffffff)
+ 
+ /*
+  * the above 20-byte is called RXINFO and will be DMAed to MAC RX block
+
+commit edcc25b22f7c328f56e8c129afa1e10c8bacb2ef
+Author: Ivo van Doorn <ivdoorn@gmail.com>
+Date:   Mon Aug 4 16:39:05 2008 +0200
+
+    rt2x00: Release rt2x00 2.2.0
+    
+    Signed-off-by: Ivo van Doorn <IvDoorn@gmail.com>
+    Signed-off-by: John W. Linville <linville@tuxdriver.com>
+
+diff --git a/drivers/net/wireless/rt2x00/rt2x00.h b/drivers/net/wireless/rt2x00/rt2x00.h
+index 323bd54..ced0a52 100644
+--- a/drivers/net/wireless/rt2x00/rt2x00.h
++++ b/drivers/net/wireless/rt2x00/rt2x00.h
+@@ -44,7 +44,7 @@
+ /*
+  * Module information.
+  */
+-#define DRV_VERSION	"2.1.8"
++#define DRV_VERSION	"2.2.0"
+ #define DRV_PROJECT	"http://rt2x00.serialmonkey.com"
+ 
+ /*
+
+commit ba2ab47129eee76f6f0ef52b4beae30a12cee7f6
+Author: Ivo van Doorn <ivdoorn@gmail.com>
+Date:   Wed Aug 6 16:22:17 2008 +0200
+
+    rt2x00: Move lna_gain calculation to config() callback
+    
+    We can optimize lna calculation in IRQ context by
+    calculating most of the value during the config() callback
+    when most of the value is actually influenced.
+    
+    This will be required later by rt2800pci and rt2800usb as
+    well, since they need the lna_gain value during config().
+    
+    Signed-off-by: Ivo van Doorn <IvDoorn@gmail.com>
+    Signed-off-by: John W. Linville <linville@tuxdriver.com>
+
+diff --git a/drivers/net/wireless/rt2x00/rt2x00.h b/drivers/net/wireless/rt2x00/rt2x00.h
+index ced0a52..3fa3d5b 100644
+--- a/drivers/net/wireless/rt2x00/rt2x00.h
++++ b/drivers/net/wireless/rt2x00/rt2x00.h
+@@ -804,6 +804,11 @@ struct rt2x00_dev {
+ 	u32 *rf;
+ 
+ 	/*
++	 * LNA gain
++	 */
++	short lna_gain;
++
++	/*
+ 	 * USB Max frame size (for rt2500usb & rt73usb).
+ 	 */
+ 	u16 usb_maxpacket;
+diff --git a/drivers/net/wireless/rt2x00/rt61pci.c b/drivers/net/wireless/rt2x00/rt61pci.c
+index 87012f8..0fcc456 100644
+--- a/drivers/net/wireless/rt2x00/rt61pci.c
++++ b/drivers/net/wireless/rt2x00/rt61pci.c
+@@ -638,6 +638,30 @@ static void rt61pci_config_erp(struct rt2x00_dev *rt2x00dev,
+ 	rt2x00pci_register_write(rt2x00dev, TXRX_CSR4, reg);
+ }
+ 
++
++static void rt61pci_config_lna_gain(struct rt2x00_dev *rt2x00dev,
++				    struct rt2x00lib_conf *libconf)
++{
++	u16 eeprom;
++	short lna_gain = 0;
++
++	if (libconf->band == IEEE80211_BAND_2GHZ) {
++		if (test_bit(CONFIG_EXTERNAL_LNA_BG, &rt2x00dev->flags))
++			lna_gain += 14;
++
++		rt2x00_eeprom_read(rt2x00dev, EEPROM_RSSI_OFFSET_BG, &eeprom);
++		lna_gain -= rt2x00_get_field16(eeprom, EEPROM_RSSI_OFFSET_BG_1);
++	} else {
++		if (test_bit(CONFIG_EXTERNAL_LNA_A, &rt2x00dev->flags))
++			lna_gain += 14;
++
++		rt2x00_eeprom_read(rt2x00dev, EEPROM_RSSI_OFFSET_A, &eeprom);
++		lna_gain -= rt2x00_get_field16(eeprom, EEPROM_RSSI_OFFSET_A_1);
++	}
++
++	rt2x00dev->lna_gain = lna_gain;
++}
++
+ static void rt61pci_config_phymode(struct rt2x00_dev *rt2x00dev,
+ 				   const int basic_rate_mask)
+ {
+@@ -956,6 +980,9 @@ static void rt61pci_config(struct rt2x00_dev *rt2x00dev,
+ 			   struct rt2x00lib_conf *libconf,
+ 			   const unsigned int flags)
+ {
++	/* Always recalculate LNA gain before changing configuration */
++	rt61pci_config_lna_gain(rt2x00dev, libconf);
++
+ 	if (flags & CONFIG_UPDATE_PHYMODE)
+ 		rt61pci_config_phymode(rt2x00dev, libconf->basic_rates);
+ 	if (flags & CONFIG_UPDATE_CHANNEL)
+@@ -1883,40 +1910,27 @@ static void rt61pci_kick_tx_queue(struct rt2x00_dev *rt2x00dev,
+  */
+ static int rt61pci_agc_to_rssi(struct rt2x00_dev *rt2x00dev, int rxd_w1)
+ {
+-	u16 eeprom;
+-	u8 offset;
++	u8 offset = rt2x00dev->lna_gain;
+ 	u8 lna;
+ 
+ 	lna = rt2x00_get_field32(rxd_w1, RXD_W1_RSSI_LNA);
+ 	switch (lna) {
+ 	case 3:
+-		offset = 90;
++		offset += 90;
+ 		break;
+ 	case 2:
+-		offset = 74;
++		offset += 74;
+ 		break;
+ 	case 1:
+-		offset = 64;
++		offset += 64;
+ 		break;
+ 	default:
+ 		return 0;
+ 	}
+ 
+ 	if (rt2x00dev->rx_status.band == IEEE80211_BAND_5GHZ) {
+-		if (test_bit(CONFIG_EXTERNAL_LNA_A, &rt2x00dev->flags))
+-			offset += 14;
+-
+ 		if (lna == 3 || lna == 2)
+ 			offset += 10;
+-
+-		rt2x00_eeprom_read(rt2x00dev, EEPROM_RSSI_OFFSET_A, &eeprom);
+-		offset -= rt2x00_get_field16(eeprom, EEPROM_RSSI_OFFSET_A_1);
+-	} else {
+-		if (test_bit(CONFIG_EXTERNAL_LNA_BG, &rt2x00dev->flags))
+-			offset += 14;
+-
+-		rt2x00_eeprom_read(rt2x00dev, EEPROM_RSSI_OFFSET_BG, &eeprom);
+-		offset -= rt2x00_get_field16(eeprom, EEPROM_RSSI_OFFSET_BG_1);
+ 	}
+ 
+ 	return rt2x00_get_field32(rxd_w1, RXD_W1_RSSI_AGC) * 2 - offset;
+diff --git a/drivers/net/wireless/rt2x00/rt73usb.c b/drivers/net/wireless/rt2x00/rt73usb.c
+index 1bd6b3f..4f2eb90 100644
+--- a/drivers/net/wireless/rt2x00/rt73usb.c
++++ b/drivers/net/wireless/rt2x00/rt73usb.c
+@@ -664,6 +664,26 @@ static void rt73usb_config_erp(struct rt2x00_dev *rt2x00dev,
+ 	rt73usb_register_write(rt2x00dev, TXRX_CSR4, reg);
+ }
+ 
++static void rt73usb_config_lna_gain(struct rt2x00_dev *rt2x00dev,
++				    struct rt2x00lib_conf *libconf)
++{
++	u16 eeprom;
++	short lna_gain = 0;
++
++	if (libconf->band == IEEE80211_BAND_2GHZ) {
++		if (test_bit(CONFIG_EXTERNAL_LNA_BG, &rt2x00dev->flags))
++			lna_gain += 14;
++
++		rt2x00_eeprom_read(rt2x00dev, EEPROM_RSSI_OFFSET_BG, &eeprom);
++		lna_gain -= rt2x00_get_field16(eeprom, EEPROM_RSSI_OFFSET_BG_1);
++	} else {
++		rt2x00_eeprom_read(rt2x00dev, EEPROM_RSSI_OFFSET_A, &eeprom);
++		lna_gain -= rt2x00_get_field16(eeprom, EEPROM_RSSI_OFFSET_A_1);
++	}
++
++	rt2x00dev->lna_gain = lna_gain;
++}
++
+ static void rt73usb_config_phymode(struct rt2x00_dev *rt2x00dev,
+ 				   const int basic_rate_mask)
+ {
+@@ -918,6 +938,9 @@ static void rt73usb_config(struct rt2x00_dev *rt2x00dev,
+ 			   struct rt2x00lib_conf *libconf,
+ 			   const unsigned int flags)
+ {
++	/* Always recalculate LNA gain before changing configuration */
++	rt73usb_config_lna_gain(rt2x00dev, libconf);
++
+ 	if (flags & CONFIG_UPDATE_PHYMODE)
+ 		rt73usb_config_phymode(rt2x00dev, libconf->basic_rates);
+ 	if (flags & CONFIG_UPDATE_CHANNEL)
+@@ -1644,20 +1667,19 @@ static void rt73usb_kick_tx_queue(struct rt2x00_dev *rt2x00dev,
+  */
+ static int rt73usb_agc_to_rssi(struct rt2x00_dev *rt2x00dev, int rxd_w1)
+ {
+-	u16 eeprom;
+-	u8 offset;
++	u8 offset = rt2x00dev->lna_gain;
+ 	u8 lna;
+ 
+ 	lna = rt2x00_get_field32(rxd_w1, RXD_W1_RSSI_LNA);
+ 	switch (lna) {
+ 	case 3:
+-		offset = 90;
++		offset += 90;
+ 		break;
+ 	case 2:
+-		offset = 74;
++		offset += 74;
+ 		break;
+ 	case 1:
+-		offset = 64;
++		offset += 64;
+ 		break;
+ 	default:
+ 		return 0;
+@@ -1673,15 +1695,6 @@ static int rt73usb_agc_to_rssi(struct rt2x00_dev *rt2x00dev, int rxd_w1)
+ 			else if (lna == 2)
+ 				offset += 8;
+ 		}
+-
+-		rt2x00_eeprom_read(rt2x00dev, EEPROM_RSSI_OFFSET_A, &eeprom);
+-		offset -= rt2x00_get_field16(eeprom, EEPROM_RSSI_OFFSET_A_1);
+-	} else {
+-		if (test_bit(CONFIG_EXTERNAL_LNA_BG, &rt2x00dev->flags))
+-			offset += 14;
+-
+-		rt2x00_eeprom_read(rt2x00dev, EEPROM_RSSI_OFFSET_BG, &eeprom);
+-		offset -= rt2x00_get_field16(eeprom, EEPROM_RSSI_OFFSET_BG_1);
+ 	}
+ 
+ 	return rt2x00_get_field32(rxd_w1, RXD_W1_RSSI_AGC) * 2 - offset;
+
+commit 008c44825db74c6cdcea13dfb1598896e74fe908
+Author: Ivo van Doorn <ivdoorn@gmail.com>
+Date:   Wed Aug 6 17:27:31 2008 +0200
+
+    rt2x00: Add module parameter to disable HW crypto
+    
+    Add a module parameter to rt61 and rt73 to disable
+    HW crypto. The option should only be checked when
+    determining if the SUPPORT_HW_CRYPTO flag should
+    be set or not.
+    
+    Signed-off-by: Ivo van Doorn <IvDoorn@gmail.com>
+    Signed-off-by: John W. Linville <linville@tuxdriver.com>
+
+diff --git a/drivers/net/wireless/rt2x00/rt61pci.c b/drivers/net/wireless/rt2x00/rt61pci.c
+index 0fcc456..23cf93d 100644
+--- a/drivers/net/wireless/rt2x00/rt61pci.c
++++ b/drivers/net/wireless/rt2x00/rt61pci.c
+@@ -38,6 +38,13 @@
+ #include "rt61pci.h"
+ 
+ /*
++ * Allow hardware encryption to be disabled.
++ */
++static int modparam_nohwcrypt = 0;
++module_param_named(nohwcrypt, modparam_nohwcrypt, bool, S_IRUGO);
++MODULE_PARM_DESC(nohwcrypt, "Disable hardware encryption.");
++
++/*
+  * Register access.
+  * BBP and RF register require indirect register access,
+  * and use the CSR registers PHY_CSR3 and PHY_CSR4 to achieve this.
+@@ -2617,7 +2624,8 @@ static int rt61pci_probe_hw(struct rt2x00_dev *rt2x00dev)
+ 	 */
+ 	__set_bit(DRIVER_REQUIRE_FIRMWARE, &rt2x00dev->flags);
+ 	__set_bit(DRIVER_REQUIRE_DMA, &rt2x00dev->flags);
+-	__set_bit(CONFIG_SUPPORT_HW_CRYPTO, &rt2x00dev->flags);
++	if (!modparam_nohwcrypt)
++		__set_bit(CONFIG_SUPPORT_HW_CRYPTO, &rt2x00dev->flags);
+ 
+ 	/*
+ 	 * Set the rssi offset.
+diff --git a/drivers/net/wireless/rt2x00/rt73usb.c b/drivers/net/wireless/rt2x00/rt73usb.c
+index 4f2eb90..f58fd05 100644
+--- a/drivers/net/wireless/rt2x00/rt73usb.c
++++ b/drivers/net/wireless/rt2x00/rt73usb.c
+@@ -37,6 +37,13 @@
+ #include "rt73usb.h"
+ 
+ /*
++ * Allow hardware encryption to be disabled.
++ */
++static int modparam_nohwcrypt = 0;
++module_param_named(nohwcrypt, modparam_nohwcrypt, bool, S_IRUGO);
++MODULE_PARM_DESC(nohwcrypt, "Disable hardware encryption.");
++
++/*
+  * Register access.
+  * All access to the CSR registers will go through the methods
+  * rt73usb_register_read and rt73usb_register_write.
+@@ -2211,7 +2218,8 @@ static int rt73usb_probe_hw(struct rt2x00_dev *rt2x00dev)
+ 	 */
+ 	__set_bit(DRIVER_REQUIRE_FIRMWARE, &rt2x00dev->flags);
+ 	__set_bit(DRIVER_REQUIRE_SCHEDULED, &rt2x00dev->flags);
+-	__set_bit(CONFIG_SUPPORT_HW_CRYPTO, &rt2x00dev->flags);
++	if (!modparam_nohwcrypt)
++		__set_bit(CONFIG_SUPPORT_HW_CRYPTO, &rt2x00dev->flags);
+ 
+ 	/*
+ 	 * Set the rssi offset.
+
+commit 0262ab0df64a67d4c0ed7577a29b7d866819cc68
+Author: Ivo van Doorn <ivdoorn@gmail.com>
+Date:   Fri Aug 29 21:04:26 2008 +0200
+
+    rt2x00: Fix race conditions in flag handling
+    
+    Some of the flags should be accessed atomically to
+    prevent race conditions. The flags that are most important
+    are those that can change often and indicate the actual
+    state of the device, queue or queue entry.
+    
+    The big flag rename was done to move all state flags to
+    the same naming type as the other rt2x00dev flags and
+    made sure all places where the flags were used were changed. ;)
+    
+    Thanks to Stephen for most of the queue flags updates,
+    which fixes some of the most obvious consequences of the
+    race conditions. Among those the notorious:
+    
+    rt2x00queue_write_tx_frame: Error - Arrived at non-free entry in the non-full queue 0.
+    rt2x00queue_write_tx_frame: Error - Arrived at non-free entry in the non-full queue 0.
+    rt2x00queue_write_tx_frame: Error - Arrived at non-free entry in the non-full queue 0.
+    
+    Signed-off-by: Stephen Blackheath <tramp.enshrine.stephen@blacksapphire.com>
+    Signed-off-by: Ivo van Doorn <IvDoorn@gmail.com>
+    Signed-off-by: John W. Linville <linville@tuxdriver.com>
+
+diff --git a/drivers/net/wireless/rt2x00/rt2400pci.c b/drivers/net/wireless/rt2x00/rt2400pci.c
+index 0107cec..18b703c 100644
+--- a/drivers/net/wireless/rt2x00/rt2400pci.c
++++ b/drivers/net/wireless/rt2x00/rt2400pci.c
+@@ -1241,7 +1241,7 @@ static irqreturn_t rt2400pci_interrupt(int irq, void *dev_instance)
+ 	if (!reg)
+ 		return IRQ_NONE;
+ 
+-	if (!test_bit(DEVICE_ENABLED_RADIO, &rt2x00dev->flags))
++	if (!test_bit(DEVICE_STATE_ENABLED_RADIO, &rt2x00dev->flags))
+ 		return IRQ_HANDLED;
+ 
+ 	/*
+diff --git a/drivers/net/wireless/rt2x00/rt2500pci.c b/drivers/net/wireless/rt2x00/rt2500pci.c
+index e0ff76f..5cc706a 100644
+--- a/drivers/net/wireless/rt2x00/rt2500pci.c
++++ b/drivers/net/wireless/rt2x00/rt2500pci.c
+@@ -1377,7 +1377,7 @@ static irqreturn_t rt2500pci_interrupt(int irq, void *dev_instance)
+ 	if (!reg)
+ 		return IRQ_NONE;
+ 
+-	if (!test_bit(DEVICE_ENABLED_RADIO, &rt2x00dev->flags))
++	if (!test_bit(DEVICE_STATE_ENABLED_RADIO, &rt2x00dev->flags))
+ 		return IRQ_HANDLED;
+ 
+ 	/*
+diff --git a/drivers/net/wireless/rt2x00/rt2500usb.c b/drivers/net/wireless/rt2x00/rt2500usb.c
+index 3b90ed6..c6be4dd 100644
+--- a/drivers/net/wireless/rt2x00/rt2500usb.c
++++ b/drivers/net/wireless/rt2x00/rt2500usb.c
+@@ -1297,7 +1297,7 @@ static void rt2500usb_beacondone(struct urb *urb)
+ 	struct queue_entry *entry = (struct queue_entry *)urb->context;
+ 	struct queue_entry_priv_usb_bcn *bcn_priv = entry->priv_data;
+ 
+-	if (!test_bit(DEVICE_ENABLED_RADIO, &entry->queue->rt2x00dev->flags))
++	if (!test_bit(DEVICE_STATE_ENABLED_RADIO, &entry->queue->rt2x00dev->flags))
+ 		return;
+ 
+ 	/*
+diff --git a/drivers/net/wireless/rt2x00/rt2x00.h b/drivers/net/wireless/rt2x00/rt2x00.h
+index 3fa3d5b..08095bf 100644
+--- a/drivers/net/wireless/rt2x00/rt2x00.h
++++ b/drivers/net/wireless/rt2x00/rt2x00.h
+@@ -629,14 +629,14 @@ enum rt2x00_flags {
+ 	/*
+ 	 * Device state flags
+ 	 */
+-	DEVICE_PRESENT,
+-	DEVICE_REGISTERED_HW,
+-	DEVICE_INITIALIZED,
+-	DEVICE_STARTED,
+-	DEVICE_STARTED_SUSPEND,
+-	DEVICE_ENABLED_RADIO,
+-	DEVICE_DISABLED_RADIO_HW,
+-	DEVICE_DIRTY_CONFIG,
++	DEVICE_STATE_PRESENT,
++	DEVICE_STATE_REGISTERED_HW,
++	DEVICE_STATE_INITIALIZED,
++	DEVICE_STATE_STARTED,
++	DEVICE_STATE_STARTED_SUSPEND,
++	DEVICE_STATE_ENABLED_RADIO,
++	DEVICE_STATE_DISABLED_RADIO_HW,
++	DEVICE_STATE_DIRTY_CONFIG,
+ 
+ 	/*
+ 	 * Driver requirements
+diff --git a/drivers/net/wireless/rt2x00/rt2x00config.c b/drivers/net/wireless/rt2x00/rt2x00config.c
+index ea37c79..ca051f5 100644
+--- a/drivers/net/wireless/rt2x00/rt2x00config.c
++++ b/drivers/net/wireless/rt2x00/rt2x00config.c
+@@ -121,7 +121,7 @@ void rt2x00lib_config_antenna(struct rt2x00_dev *rt2x00dev,
+ 	 * Antenna setup changes require the RX to be disabled,
+ 	 * else the changes will be ignored by the device.
+ 	 */
+-	if (test_bit(DEVICE_ENABLED_RADIO, &rt2x00dev->flags))
++	if (test_bit(DEVICE_STATE_ENABLED_RADIO, &rt2x00dev->flags))
+ 		rt2x00lib_toggle_rx(rt2x00dev, STATE_RADIO_RX_OFF_LINK);
+ 
+ 	/*
+@@ -136,7 +136,7 @@ void rt2x00lib_config_antenna(struct rt2x00_dev *rt2x00dev,
+ 	rt2x00dev->link.ant.active.rx = libconf.ant.rx;
+ 	rt2x00dev->link.ant.active.tx = libconf.ant.tx;
+ 
+-	if (test_bit(DEVICE_ENABLED_RADIO, &rt2x00dev->flags))
++	if (test_bit(DEVICE_STATE_ENABLED_RADIO, &rt2x00dev->flags))
+ 		rt2x00lib_toggle_rx(rt2x00dev, STATE_RADIO_RX_ON_LINK);
+ }
+ 
+diff --git a/drivers/net/wireless/rt2x00/rt2x00dev.c b/drivers/net/wireless/rt2x00/rt2x00dev.c
+index 328ff8b..330ab77 100644
+--- a/drivers/net/wireless/rt2x00/rt2x00dev.c
++++ b/drivers/net/wireless/rt2x00/rt2x00dev.c
+@@ -34,7 +34,7 @@
+  */
+ void rt2x00lib_reset_link_tuner(struct rt2x00_dev *rt2x00dev)
+ {
+-	if (!test_bit(DEVICE_ENABLED_RADIO, &rt2x00dev->flags))
++	if (!test_bit(DEVICE_STATE_ENABLED_RADIO, &rt2x00dev->flags))
+ 		return;
+ 
+ 	/*
+@@ -94,8 +94,8 @@ int rt2x00lib_enable_radio(struct rt2x00_dev *rt2x00dev)
+ 	 * Don't enable the radio twice.
+ 	 * And check if the hardware button has been disabled.
+ 	 */
+-	if (test_bit(DEVICE_ENABLED_RADIO, &rt2x00dev->flags) ||
+-	    test_bit(DEVICE_DISABLED_RADIO_HW, &rt2x00dev->flags))
++	if (test_bit(DEVICE_STATE_ENABLED_RADIO, &rt2x00dev->flags) ||
++	    test_bit(DEVICE_STATE_DISABLED_RADIO_HW, &rt2x00dev->flags))
+ 		return 0;
+ 
+ 	/*
+@@ -117,7 +117,7 @@ int rt2x00lib_enable_radio(struct rt2x00_dev *rt2x00dev)
+ 	rt2x00leds_led_radio(rt2x00dev, true);
+ 	rt2x00led_led_activity(rt2x00dev, true);
+ 
+-	__set_bit(DEVICE_ENABLED_RADIO, &rt2x00dev->flags);
++	set_bit(DEVICE_STATE_ENABLED_RADIO, &rt2x00dev->flags);
+ 
+ 	/*
+ 	 * Enable RX.
+@@ -134,7 +134,7 @@ int rt2x00lib_enable_radio(struct rt2x00_dev *rt2x00dev)
+ 
+ void rt2x00lib_disable_radio(struct rt2x00_dev *rt2x00dev)
+ {
+-	if (!__test_and_clear_bit(DEVICE_ENABLED_RADIO, &rt2x00dev->flags))
++	if (!test_and_clear_bit(DEVICE_STATE_ENABLED_RADIO, &rt2x00dev->flags))
+ 		return;
+ 
+ 	/*
+@@ -354,7 +354,7 @@ static void rt2x00lib_link_tuner(struct work_struct *work)
+ 	 * When the radio is shutting down we should
+ 	 * immediately cease all link tuning.
+ 	 */
+-	if (!test_bit(DEVICE_ENABLED_RADIO, &rt2x00dev->flags))
++	if (!test_bit(DEVICE_STATE_ENABLED_RADIO, &rt2x00dev->flags))
+ 		return;
+ 
+ 	/*
+@@ -431,7 +431,7 @@ static void rt2x00lib_intf_scheduled_iter(void *data, u8 *mac,
+ 	 * note that in the spinlock protected area above the delayed_flags
+ 	 * have been cleared correctly.
+ 	 */
+-	if (!test_bit(DEVICE_ENABLED_RADIO, &rt2x00dev->flags))
++	if (!test_bit(DEVICE_STATE_ENABLED_RADIO, &rt2x00dev->flags))
+ 		return;
+ 
+ 	if (delayed_flags & DELAYED_UPDATE_BEACON)
+@@ -484,7 +484,7 @@ static void rt2x00lib_beacondone_iter(void *data, u8 *mac,
+ 
+ void rt2x00lib_beacondone(struct rt2x00_dev *rt2x00dev)
+ {
+-	if (!test_bit(DEVICE_ENABLED_RADIO, &rt2x00dev->flags))
++	if (!test_bit(DEVICE_STATE_ENABLED_RADIO, &rt2x00dev->flags))
+ 		return;
+ 
+ 	ieee80211_iterate_active_interfaces_atomic(rt2x00dev->hw,
+@@ -572,7 +572,7 @@ void rt2x00lib_txdone(struct queue_entry *entry,
+ 
+ 	rt2x00dev->ops->lib->init_txentry(rt2x00dev, entry);
+ 
+-	__clear_bit(ENTRY_OWNER_DEVICE_DATA, &entry->flags);
++	clear_bit(ENTRY_OWNER_DEVICE_DATA, &entry->flags);
+ 	rt2x00queue_index_inc(entry->queue, Q_INDEX_DONE);
+ 
+ 	/*
+@@ -888,7 +888,7 @@ static int rt2x00lib_probe_hw_modes(struct rt2x00_dev *rt2x00dev,
+ 
+ static void rt2x00lib_remove_hw(struct rt2x00_dev *rt2x00dev)
+ {
+-	if (test_bit(DEVICE_REGISTERED_HW, &rt2x00dev->flags))
++	if (test_bit(DEVICE_STATE_REGISTERED_HW, &rt2x00dev->flags))
+ 		ieee80211_unregister_hw(rt2x00dev->hw);
+ 
+ 	if (likely(rt2x00dev->hw->wiphy->bands[IEEE80211_BAND_2GHZ])) {
+@@ -906,6 +906,9 @@ static int rt2x00lib_probe_hw(struct rt2x00_dev *rt2x00dev)
+ 	struct hw_mode_spec *spec = &rt2x00dev->spec;
+ 	int status;
+ 
++	if (test_bit(DEVICE_STATE_REGISTERED_HW, &rt2x00dev->flags))
++		return 0;
++
+ 	/*
+ 	 * Initialize HW modes.
+ 	 */
+@@ -927,7 +930,7 @@ static int rt2x00lib_probe_hw(struct rt2x00_dev *rt2x00dev)
+ 		return status;
+ 	}
+ 
+-	__set_bit(DEVICE_REGISTERED_HW, &rt2x00dev->flags);
++	set_bit(DEVICE_STATE_REGISTERED_HW, &rt2x00dev->flags);
+ 
+ 	return 0;
+ }
+@@ -937,7 +940,7 @@ static int rt2x00lib_probe_hw(struct rt2x00_dev *rt2x00dev)
+  */
+ static void rt2x00lib_uninitialize(struct rt2x00_dev *rt2x00dev)
+ {
+-	if (!__test_and_clear_bit(DEVICE_INITIALIZED, &rt2x00dev->flags))
++	if (!test_and_clear_bit(DEVICE_STATE_INITIALIZED, &rt2x00dev->flags))
+ 		return;
+ 
+ 	/*
+@@ -960,7 +963,7 @@ static int rt2x00lib_initialize(struct rt2x00_dev *rt2x00dev)
+ {
+ 	int status;
+ 
+-	if (test_bit(DEVICE_INITIALIZED, &rt2x00dev->flags))
++	if (test_bit(DEVICE_STATE_INITIALIZED, &rt2x00dev->flags))
+ 		return 0;
+ 
+ 	/*
+@@ -979,7 +982,7 @@ static int rt2x00lib_initialize(struct rt2x00_dev *rt2x00dev)
+ 		return status;
+ 	}
+ 
+-	__set_bit(DEVICE_INITIALIZED, &rt2x00dev->flags);
++	set_bit(DEVICE_STATE_INITIALIZED, &rt2x00dev->flags);
+ 
+ 	/*
+ 	 * Register the extra components.
+@@ -993,7 +996,7 @@ int rt2x00lib_start(struct rt2x00_dev *rt2x00dev)
+ {
+ 	int retval;
+ 
+-	if (test_bit(DEVICE_STARTED, &rt2x00dev->flags))
++	if (test_bit(DEVICE_STATE_STARTED, &rt2x00dev->flags))
+ 		return 0;
+ 
+ 	/*
+@@ -1024,15 +1027,15 @@ int rt2x00lib_start(struct rt2x00_dev *rt2x00dev)
+ 	rt2x00dev->intf_sta_count = 0;
+ 	rt2x00dev->intf_associated = 0;
+ 
+-	__set_bit(DEVICE_STARTED, &rt2x00dev->flags);
+-	__set_bit(DEVICE_DIRTY_CONFIG, &rt2x00dev->flags);
++	set_bit(DEVICE_STATE_STARTED, &rt2x00dev->flags);
++	set_bit(DEVICE_STATE_DIRTY_CONFIG, &rt2x00dev->flags);
+ 
+ 	return 0;
+ }
+ 
+ void rt2x00lib_stop(struct rt2x00_dev *rt2x00dev)
+ {
+-	if (!test_bit(DEVICE_STARTED, &rt2x00dev->flags))
++	if (!test_and_clear_bit(DEVICE_STATE_STARTED, &rt2x00dev->flags))
+ 		return;
+ 
+ 	/*
+@@ -1044,8 +1047,6 @@ void rt2x00lib_stop(struct rt2x00_dev *rt2x00dev)
+ 	rt2x00dev->intf_ap_count = 0;
+ 	rt2x00dev->intf_sta_count = 0;
+ 	rt2x00dev->intf_associated = 0;
+-
+-	__clear_bit(DEVICE_STARTED, &rt2x00dev->flags);
+ }
+ 
+ /*
+@@ -1100,7 +1101,7 @@ int rt2x00lib_probe_dev(struct rt2x00_dev *rt2x00dev)
+ 	rt2x00rfkill_allocate(rt2x00dev);
+ 	rt2x00debug_register(rt2x00dev);
+ 
+-	__set_bit(DEVICE_PRESENT, &rt2x00dev->flags);
++	set_bit(DEVICE_STATE_PRESENT, &rt2x00dev->flags);
+ 
+ 	return 0;
+ 
+@@ -1113,7 +1114,7 @@ EXPORT_SYMBOL_GPL(rt2x00lib_probe_dev);
+ 
+ void rt2x00lib_remove_dev(struct rt2x00_dev *rt2x00dev)
+ {
+-	__clear_bit(DEVICE_PRESENT, &rt2x00dev->flags);
++	clear_bit(DEVICE_STATE_PRESENT, &rt2x00dev->flags);
+ 
+ 	/*
+ 	 * Disable radio.
+@@ -1158,14 +1159,15 @@ int rt2x00lib_suspend(struct rt2x00_dev *rt2x00dev, pm_message_t state)
+ 	int retval;
+ 
+ 	NOTICE(rt2x00dev, "Going to sleep.\n");
+-	__clear_bit(DEVICE_PRESENT, &rt2x00dev->flags);
+ 
+ 	/*
+ 	 * Only continue if mac80211 has open interfaces.
+ 	 */
+-	if (!test_bit(DEVICE_STARTED, &rt2x00dev->flags))
++	if (!test_and_clear_bit(DEVICE_STATE_PRESENT, &rt2x00dev->flags) ||
++	    !test_bit(DEVICE_STATE_STARTED, &rt2x00dev->flags))
+ 		goto exit;
+-	__set_bit(DEVICE_STARTED_SUSPEND, &rt2x00dev->flags);
++
++	set_bit(DEVICE_STATE_STARTED_SUSPEND, &rt2x00dev->flags);
+ 
+ 	/*
+ 	 * Disable radio.
+@@ -1237,7 +1239,7 @@ int rt2x00lib_resume(struct rt2x00_dev *rt2x00dev)
+ 	/*
+ 	 * Only continue if mac80211 had open interfaces.
+ 	 */
+-	if (!__test_and_clear_bit(DEVICE_STARTED_SUSPEND, &rt2x00dev->flags))
++	if (!test_and_clear_bit(DEVICE_STATE_STARTED_SUSPEND, &rt2x00dev->flags))
+ 		return 0;
+ 
+ 	/*
+@@ -1264,7 +1266,7 @@ int rt2x00lib_resume(struct rt2x00_dev *rt2x00dev)
+ 	/*
+ 	 * We are ready again to receive requests from mac80211.
+ 	 */
+-	__set_bit(DEVICE_PRESENT, &rt2x00dev->flags);
++	set_bit(DEVICE_STATE_PRESENT, &rt2x00dev->flags);
+ 
+ 	/*
+ 	 * It is possible that during that mac80211 has attempted
+@@ -1284,7 +1286,7 @@ int rt2x00lib_resume(struct rt2x00_dev *rt2x00dev)
+ 	return 0;
+ 
+ exit:
+-	rt2x00lib_disable_radio(rt2x00dev);
++	rt2x00lib_stop(rt2x00dev);
+ 	rt2x00lib_uninitialize(rt2x00dev);
+ 	rt2x00debug_deregister(rt2x00dev);
+ 
+diff --git a/drivers/net/wireless/rt2x00/rt2x00mac.c b/drivers/net/wireless/rt2x00/rt2x00mac.c
+index 3af4273..11be895 100644
+--- a/drivers/net/wireless/rt2x00/rt2x00mac.c
++++ b/drivers/net/wireless/rt2x00/rt2x00mac.c
+@@ -117,7 +117,7 @@ int rt2x00mac_tx(struct ieee80211_hw *hw, struct sk_buff *skb)
+ 	 * Note that we can only stop the TX queues inside the TX path
+ 	 * due to possible race conditions in mac80211.
+ 	 */
+-	if (!test_bit(DEVICE_PRESENT, &rt2x00dev->flags))
++	if (!test_bit(DEVICE_STATE_PRESENT, &rt2x00dev->flags))
+ 		goto exit_fail;
+ 
+ 	/*
+@@ -175,7 +175,7 @@ int rt2x00mac_start(struct ieee80211_hw *hw)
+ {
+ 	struct rt2x00_dev *rt2x00dev = hw->priv;
+ 
+-	if (!test_bit(DEVICE_PRESENT, &rt2x00dev->flags))
++	if (!test_bit(DEVICE_STATE_PRESENT, &rt2x00dev->flags))
+ 		return 0;
+ 
+ 	return rt2x00lib_start(rt2x00dev);
+@@ -186,7 +186,7 @@ void rt2x00mac_stop(struct ieee80211_hw *hw)
+ {
+ 	struct rt2x00_dev *rt2x00dev = hw->priv;
+ 
+-	if (!test_bit(DEVICE_PRESENT, &rt2x00dev->flags))
++	if (!test_bit(DEVICE_STATE_PRESENT, &rt2x00dev->flags))
+ 		return;
+ 
+ 	rt2x00lib_stop(rt2x00dev);
+@@ -206,8 +206,8 @@ int rt2x00mac_add_interface(struct ieee80211_hw *hw,
+ 	 * Don't allow interfaces to be added
+ 	 * the device has disappeared.
+ 	 */
+-	if (!test_bit(DEVICE_PRESENT, &rt2x00dev->flags) ||
+-	    !test_bit(DEVICE_STARTED, &rt2x00dev->flags))
++	if (!test_bit(DEVICE_STATE_PRESENT, &rt2x00dev->flags) ||
++	    !test_bit(DEVICE_STATE_STARTED, &rt2x00dev->flags))
+ 		return -ENODEV;
+ 
+ 	switch (conf->type) {
+@@ -256,7 +256,7 @@ int rt2x00mac_add_interface(struct ieee80211_hw *hw,
+ 	 */
+ 	for (i = 0; i < queue->limit; i++) {
+ 		entry = &queue->entries[i];
+-		if (!__test_and_set_bit(ENTRY_BCN_ASSIGNED, &entry->flags))
++		if (!test_and_set_bit(ENTRY_BCN_ASSIGNED, &entry->flags))
+ 			break;
+ 	}
+ 
+@@ -310,7 +310,7 @@ void rt2x00mac_remove_interface(struct ieee80211_hw *hw,
+ 	 * either the device has disappeared or when
+ 	 * no interface is present.
+ 	 */
+-	if (!test_bit(DEVICE_PRESENT, &rt2x00dev->flags) ||
++	if (!test_bit(DEVICE_STATE_PRESENT, &rt2x00dev->flags) ||
+ 	    (conf->type == IEEE80211_IF_TYPE_AP && !rt2x00dev->intf_ap_count) ||
+ 	    (conf->type != IEEE80211_IF_TYPE_AP && !rt2x00dev->intf_sta_count))
+ 		return;
+@@ -324,7 +324,7 @@ void rt2x00mac_remove_interface(struct ieee80211_hw *hw,
+ 	 * Release beacon entry so it is available for
+ 	 * new interfaces again.
+ 	 */
+-	__clear_bit(ENTRY_BCN_ASSIGNED, &intf->beacon->flags);
++	clear_bit(ENTRY_BCN_ASSIGNED, &intf->beacon->flags);
+ 
+ 	/*
+ 	 * Make sure the bssid and mac address registers
+@@ -344,14 +344,14 @@ int rt2x00mac_config(struct ieee80211_hw *hw, struct ieee80211_conf *conf)
+ 	 * Mac80211 might be calling this function while we are trying
+ 	 * to remove the device or perhaps suspending it.
+ 	 */
+-	if (!test_bit(DEVICE_PRESENT, &rt2x00dev->flags))
++	if (!test_bit(DEVICE_STATE_PRESENT, &rt2x00dev->flags))
+ 		return 0;
+ 
+ 	/*
+ 	 * Check if we need to disable the radio,
+ 	 * if this is not the case, at least the RX must be disabled.
+ 	 */
+-	if (test_bit(DEVICE_ENABLED_RADIO, &rt2x00dev->flags)) {
++	if (test_bit(DEVICE_STATE_ENABLED_RADIO, &rt2x00dev->flags)) {
+ 		if (!conf->radio_enabled)
+ 			rt2x00lib_disable_radio(rt2x00dev);
+ 		else
+@@ -366,14 +366,14 @@ int rt2x00mac_config(struct ieee80211_hw *hw, struct ieee80211_conf *conf)
+ 	 * initialized.
+ 	 */
+ 	force_reconfig =
+-	    __test_and_clear_bit(DEVICE_DIRTY_CONFIG, &rt2x00dev->flags);
++	    test_and_clear_bit(DEVICE_STATE_DIRTY_CONFIG, &rt2x00dev->flags);
+ 
+ 	rt2x00lib_config(rt2x00dev, conf, force_reconfig);
+ 
+ 	/*
+ 	 * Reenable RX only if the radio should be on.
+ 	 */
+-	if (test_bit(DEVICE_ENABLED_RADIO, &rt2x00dev->flags))
++	if (test_bit(DEVICE_STATE_ENABLED_RADIO, &rt2x00dev->flags))
+ 		rt2x00lib_toggle_rx(rt2x00dev, STATE_RADIO_RX_ON);
+ 	else if (conf->radio_enabled)
+ 		return rt2x00lib_enable_radio(rt2x00dev);
+@@ -395,7 +395,7 @@ int rt2x00mac_config_interface(struct ieee80211_hw *hw,
+ 	 * Mac80211 might be calling this function while we are trying
+ 	 * to remove the device or perhaps suspending it.
+ 	 */
+-	if (!test_bit(DEVICE_PRESENT, &rt2x00dev->flags))
++	if (!test_bit(DEVICE_STATE_PRESENT, &rt2x00dev->flags))
+ 		return 0;
+ 
+ 	spin_lock(&intf->lock);
+diff --git a/drivers/net/wireless/rt2x00/rt2x00queue.c b/drivers/net/wireless/rt2x00/rt2x00queue.c
+index c0f97c5..d10a801 100644
+--- a/drivers/net/wireless/rt2x00/rt2x00queue.c
++++ b/drivers/net/wireless/rt2x00/rt2x00queue.c
+@@ -356,7 +356,7 @@ int rt2x00queue_write_tx_frame(struct data_queue *queue, struct sk_buff *skb)
+ 	if (unlikely(rt2x00queue_full(queue)))
+ 		return -EINVAL;
+ 
+-	if (__test_and_set_bit(ENTRY_OWNER_DEVICE_DATA, &entry->flags)) {
++	if (test_and_set_bit(ENTRY_OWNER_DEVICE_DATA, &entry->flags)) {
+ 		ERROR(queue->rt2x00dev,
+ 		      "Arrived at non-free entry in the non-full queue %d.\n"
+ 		      "Please file bug report to %s.\n",
+@@ -396,7 +396,7 @@ int rt2x00queue_write_tx_frame(struct data_queue *queue, struct sk_buff *skb)
+ 	 * the frame to mac80211 because the skb->cb has now been tainted.
+ 	 */
+ 	if (unlikely(queue->rt2x00dev->ops->lib->write_tx_data(entry))) {
+-		__clear_bit(ENTRY_OWNER_DEVICE_DATA, &entry->flags);
++		clear_bit(ENTRY_OWNER_DEVICE_DATA, &entry->flags);
+ 		dev_kfree_skb_any(entry->skb);
+ 		entry->skb = NULL;
+ 		return 0;
+@@ -405,7 +405,7 @@ int rt2x00queue_write_tx_frame(struct data_queue *queue, struct sk_buff *skb)
+ 	if (test_bit(DRIVER_REQUIRE_DMA, &queue->rt2x00dev->flags))
+ 		rt2x00queue_map_txskb(queue->rt2x00dev, skb);
+ 
+-	__set_bit(ENTRY_DATA_PENDING, &entry->flags);
++	set_bit(ENTRY_DATA_PENDING, &entry->flags);
+ 
+ 	rt2x00queue_index_inc(queue, Q_INDEX);
+ 	rt2x00queue_write_tx_descriptor(entry, &txdesc);
+diff --git a/drivers/net/wireless/rt2x00/rt2x00rfkill.c b/drivers/net/wireless/rt2x00/rt2x00rfkill.c
+index 04b2971..8a2fefb 100644
+--- a/drivers/net/wireless/rt2x00/rt2x00rfkill.c
++++ b/drivers/net/wireless/rt2x00/rt2x00rfkill.c
+@@ -41,16 +41,16 @@ static int rt2x00rfkill_toggle_radio(void *data, enum rfkill_state state)
+ 	/*
+ 	 * Only continue if there are enabled interfaces.
+ 	 */
+-	if (!test_bit(DEVICE_STARTED, &rt2x00dev->flags))
++	if (!test_bit(DEVICE_STATE_STARTED, &rt2x00dev->flags))
+ 		return 0;
+ 
+ 	if (state == RFKILL_STATE_UNBLOCKED) {
+ 		INFO(rt2x00dev, "Hardware button pressed, enabling radio.\n");
+-		__clear_bit(DEVICE_DISABLED_RADIO_HW, &rt2x00dev->flags);
++		clear_bit(DEVICE_STATE_DISABLED_RADIO_HW, &rt2x00dev->flags);
+ 		retval = rt2x00lib_enable_radio(rt2x00dev);
+ 	} else if (state == RFKILL_STATE_SOFT_BLOCKED) {
+ 		INFO(rt2x00dev, "Hardware button pressed, disabling radio.\n");
+-		__set_bit(DEVICE_DISABLED_RADIO_HW, &rt2x00dev->flags);
++		set_bit(DEVICE_STATE_DISABLED_RADIO_HW, &rt2x00dev->flags);
+ 		rt2x00lib_disable_radio(rt2x00dev);
+ 	} else {
+ 		WARNING(rt2x00dev, "Received unexpected rfkill state %d.\n",
+diff --git a/drivers/net/wireless/rt2x00/rt2x00usb.c b/drivers/net/wireless/rt2x00/rt2x00usb.c
+index 2050227..2dd7c83 100644
+--- a/drivers/net/wireless/rt2x00/rt2x00usb.c
++++ b/drivers/net/wireless/rt2x00/rt2x00usb.c
+@@ -163,7 +163,7 @@ static void rt2x00usb_interrupt_txdone(struct urb *urb)
+ 	struct rt2x00_dev *rt2x00dev = entry->queue->rt2x00dev;
+ 	struct txdone_entry_desc txdesc;
+ 
+-	if (!test_bit(DEVICE_ENABLED_RADIO, &rt2x00dev->flags) ||
++	if (!test_bit(DEVICE_STATE_ENABLED_RADIO, &rt2x00dev->flags) ||
+ 	    !test_bit(ENTRY_OWNER_DEVICE_DATA, &entry->flags))
+ 		return;
+ 
+@@ -232,7 +232,7 @@ static inline void rt2x00usb_kick_tx_entry(struct queue_entry *entry)
+ {
+ 	struct queue_entry_priv_usb *entry_priv = entry->priv_data;
+ 
+-	if (__test_and_clear_bit(ENTRY_DATA_PENDING, &entry->flags))
++	if (test_and_clear_bit(ENTRY_DATA_PENDING, &entry->flags))
+ 		usb_submit_urb(entry_priv->urb, GFP_ATOMIC);
+ }
+ 
+@@ -283,7 +283,7 @@ static void rt2x00usb_interrupt_rxdone(struct urb *urb)
+ 	struct skb_frame_desc *skbdesc = get_skb_frame_desc(entry->skb);
+ 	u8 rxd[32];
+ 
+-	if (!test_bit(DEVICE_ENABLED_RADIO, &rt2x00dev->flags) ||
++	if (!test_bit(DEVICE_STATE_ENABLED_RADIO, &rt2x00dev->flags) ||
+ 	    !test_bit(ENTRY_OWNER_DEVICE_DATA, &entry->flags))
+ 		return;
+ 
+@@ -293,7 +293,7 @@ static void rt2x00usb_interrupt_rxdone(struct urb *urb)
+ 	 * a problem.
+ 	 */
+ 	if (urb->actual_length < entry->queue->desc_size || urb->status) {
+-		__set_bit(ENTRY_OWNER_DEVICE_DATA, &entry->flags);
++		set_bit(ENTRY_OWNER_DEVICE_DATA, &entry->flags);
+ 		usb_submit_urb(urb, GFP_ATOMIC);
+ 		return;
+ 	}
+@@ -361,7 +361,7 @@ void rt2x00usb_init_rxentry(struct rt2x00_dev *rt2x00dev,
+ 			  entry->skb->data, entry->skb->len,
+ 			  rt2x00usb_interrupt_rxdone, entry);
+ 
+-	__set_bit(ENTRY_OWNER_DEVICE_DATA, &entry->flags);
++	set_bit(ENTRY_OWNER_DEVICE_DATA, &entry->flags);
+ 	usb_submit_urb(entry_priv->urb, GFP_ATOMIC);
+ }
+ EXPORT_SYMBOL_GPL(rt2x00usb_init_rxentry);
+diff --git a/drivers/net/wireless/rt2x00/rt61pci.c b/drivers/net/wireless/rt2x00/rt61pci.c
+index 23cf93d..9d27ce0 100644
+--- a/drivers/net/wireless/rt2x00/rt61pci.c
++++ b/drivers/net/wireless/rt2x00/rt61pci.c
+@@ -2121,7 +2121,7 @@ static irqreturn_t rt61pci_interrupt(int irq, void *dev_instance)
+ 	if (!reg && !reg_mcu)
+ 		return IRQ_NONE;
+ 
+-	if (!test_bit(DEVICE_ENABLED_RADIO, &rt2x00dev->flags))
++	if (!test_bit(DEVICE_STATE_ENABLED_RADIO, &rt2x00dev->flags))
+ 		return IRQ_HANDLED;
+ 
+ 	/*
+
+commit 3ee54a07d34fd9b5c34bb1488113fb32be58e38f
+Author: Ivo van Doorn <ivdoorn@gmail.com>
+Date:   Fri Aug 29 21:04:50 2008 +0200
+
+    rt2x00: Map extra_tx_headroom to DMA
+    
+    If a driver requests additional headroom it should
+    be mapped to DMA as well because it will be send to
+    the hardware as well (as form of extra descriptor).
+    
+    Signed-off-by: Ivo van Doorn <IvDoorn@gmail.com>
+    Signed-off-by: John W. Linville <linville@tuxdriver.com>
+
+diff --git a/drivers/net/wireless/rt2x00/rt2x00queue.c b/drivers/net/wireless/rt2x00/rt2x00queue.c
+index d10a801..2822684 100644
+--- a/drivers/net/wireless/rt2x00/rt2x00queue.c
++++ b/drivers/net/wireless/rt2x00/rt2x00queue.c
+@@ -100,8 +100,21 @@ void rt2x00queue_map_txskb(struct rt2x00_dev *rt2x00dev, struct sk_buff *skb)
+ {
+ 	struct skb_frame_desc *skbdesc = get_skb_frame_desc(skb);
+ 
+-	skbdesc->skb_dma = dma_map_single(rt2x00dev->dev, skb->data, skb->len,
+-					  DMA_TO_DEVICE);
++	/*
++	 * If device has requested headroom, we should make sure that
++	 * is also mapped to the DMA so it can be used for transfering
++	 * additional descriptor information to the hardware.
++	 */
++	skb_push(skb, rt2x00dev->hw->extra_tx_headroom);
++
++	skbdesc->skb_dma =
++	    dma_map_single(rt2x00dev->dev, skb->data, skb->len, DMA_TO_DEVICE);
++
++	/*
++	 * Restore data pointer to original location again.
++	 */
++	skb_pull(skb, rt2x00dev->hw->extra_tx_headroom);
++
+ 	skbdesc->flags |= SKBDESC_DMA_MAPPED_TX;
+ }
+ EXPORT_SYMBOL_GPL(rt2x00queue_map_txskb);
+@@ -117,7 +130,12 @@ void rt2x00queue_unmap_skb(struct rt2x00_dev *rt2x00dev, struct sk_buff *skb)
+ 	}
+ 
+ 	if (skbdesc->flags & SKBDESC_DMA_MAPPED_TX) {
+-		dma_unmap_single(rt2x00dev->dev, skbdesc->skb_dma, skb->len,
++		/*
++		 * Add headroom to the skb length, it has been removed
++		 * by the driver, but it was actually mapped to DMA.
++		 */
++		dma_unmap_single(rt2x00dev->dev, skbdesc->skb_dma,
++				 skb->len + rt2x00dev->hw->extra_tx_headroom,
+ 				 DMA_TO_DEVICE);
+ 		skbdesc->flags &= ~SKBDESC_DMA_MAPPED_TX;
+ 	}
+
+commit 0b57664cf2393bc1eff594ff7e5ff26533843fe6
+Author: Johannes Berg <johannes@sipsolutions.net>
+Date:   Tue Jul 15 02:08:24 2008 -0700
+
+    wireless: fix warnings from QoS patch
+    
+    When I removed the special "default" meaning from the QoS
+    parameters, I forgot to update drivers and this lead to
+    warnings because some drivers were checking for the special
+    values and putting in defaults. This fixes that by removing
+    the default special-casing completely.
+    
+    Signed-off-by: Johannes Berg <johannes@sipsolutions.net>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
+
+diff --git a/drivers/net/wireless/rt2x00/rt2x00mac.c b/drivers/net/wireless/rt2x00/rt2x00mac.c
+index 77af1df..f1dcbaa 100644
+--- a/drivers/net/wireless/rt2x00/rt2x00mac.c
++++ b/drivers/net/wireless/rt2x00/rt2x00mac.c
+@@ -554,10 +554,7 @@ int rt2x00mac_conf_tx(struct ieee80211_hw *hw, u16 queue_idx,
+ 	else
+ 		queue->cw_max = 10; /* cw_min: 2^10 = 1024. */
+ 
+-	if (params->aifs >= 0)
+-		queue->aifs = params->aifs;
+-	else
+-		queue->aifs = 2;
++	queue->aifs = params->aifs;
+ 
+ 	INFO(rt2x00dev,
+ 	     "Configured TX queue %d - CWmin: %d, CWmax: %d, Aifs: %d.\n",
+
+commit 2575c11d6ee7266f0f035e55c5056b36597cd336
+Author: Mattias Nissler <mattias.nissler@gmx.de>
+Date:   Fri Aug 29 21:05:21 2008 +0200
+
+    rt2x00: Only configure hardware when radio is enabled
+    
+    Some hardware configuration registers such as antenna and channel configuration
+    can only be written when the radio is enabled. Previously, we didn't consider
+    this, so some configuration items could be set inconsistently after reenabling
+    the radio. This patch changes the config() handler to only reprogram the
+    hardware when the radio is enabled. Configuration changes that are made while
+    the radio is off are postponed until the radio is switched back on. We also
+    leave the radio turned off during initialization and only enable it when
+    requested by mac80211. This allows us to get rid of the DIRTY_CONFIG flag,
+    because the device is now guaranteed to be completely initialized when brought
+    up by mac80211.
+    
+    Signed-off-by: Mattias Nissler <mattias.nissler@gmx.de>
+    Signed-off-by: Ivo van Doorn <IvDoorn@gmail.com>
+    Signed-off-by: John W. Linville <linville@tuxdriver.com>
+
+diff --git a/drivers/net/wireless/rt2x00/rt2x00.h b/drivers/net/wireless/rt2x00/rt2x00.h
+index 08095bf..5e4f783 100644
+--- a/drivers/net/wireless/rt2x00/rt2x00.h
++++ b/drivers/net/wireless/rt2x00/rt2x00.h
+@@ -636,7 +636,6 @@ enum rt2x00_flags {
+ 	DEVICE_STATE_STARTED_SUSPEND,
+ 	DEVICE_STATE_ENABLED_RADIO,
+ 	DEVICE_STATE_DISABLED_RADIO_HW,
+-	DEVICE_STATE_DIRTY_CONFIG,
+ 
+ 	/*
+ 	 * Driver requirements
+diff --git a/drivers/net/wireless/rt2x00/rt2x00dev.c b/drivers/net/wireless/rt2x00/rt2x00dev.c
+index 330ab77..5278ae2 100644
+--- a/drivers/net/wireless/rt2x00/rt2x00dev.c
++++ b/drivers/net/wireless/rt2x00/rt2x00dev.c
+@@ -1014,21 +1014,11 @@ int rt2x00lib_start(struct rt2x00_dev *rt2x00dev)
+ 	if (retval)
+ 		return retval;
+ 
+-	/*
+-	 * Enable radio.
+-	 */
+-	retval = rt2x00lib_enable_radio(rt2x00dev);
+-	if (retval) {
+-		rt2x00lib_uninitialize(rt2x00dev);
+-		return retval;
+-	}
+-
+ 	rt2x00dev->intf_ap_count = 0;
+ 	rt2x00dev->intf_sta_count = 0;
+ 	rt2x00dev->intf_associated = 0;
+ 
+ 	set_bit(DEVICE_STATE_STARTED, &rt2x00dev->flags);
+-	set_bit(DEVICE_STATE_DIRTY_CONFIG, &rt2x00dev->flags);
+ 
+ 	return 0;
+ }
+diff --git a/drivers/net/wireless/rt2x00/rt2x00mac.c b/drivers/net/wireless/rt2x00/rt2x00mac.c
+index 11be895..64292c2 100644
+--- a/drivers/net/wireless/rt2x00/rt2x00mac.c
++++ b/drivers/net/wireless/rt2x00/rt2x00mac.c
+@@ -338,7 +338,8 @@ EXPORT_SYMBOL_GPL(rt2x00mac_remove_interface);
+ int rt2x00mac_config(struct ieee80211_hw *hw, struct ieee80211_conf *conf)
+ {
+ 	struct rt2x00_dev *rt2x00dev = hw->priv;
+-	int force_reconfig;
++	int radio_on;
++	int status;
+ 
+ 	/*
+ 	 * Mac80211 might be calling this function while we are trying
+@@ -348,35 +349,34 @@ int rt2x00mac_config(struct ieee80211_hw *hw, struct ieee80211_conf *conf)
+ 		return 0;
+ 
+ 	/*
+-	 * Check if we need to disable the radio,
+-	 * if this is not the case, at least the RX must be disabled.
++	 * Only change device state when the radio is enabled. It does not
++	 * matter what parameters we have configured when the radio is disabled
++	 * because we won't be able to send or receive anyway. Also note that
++	 * some configuration parameters (e.g. channel and antenna values) can
++	 * only be set when the radio is enabled.
+ 	 */
+-	if (test_bit(DEVICE_STATE_ENABLED_RADIO, &rt2x00dev->flags)) {
+-		if (!conf->radio_enabled)
+-			rt2x00lib_disable_radio(rt2x00dev);
+-		else
+-			rt2x00lib_toggle_rx(rt2x00dev, STATE_RADIO_RX_OFF);
+-	}
++	radio_on = test_bit(DEVICE_STATE_ENABLED_RADIO, &rt2x00dev->flags);
++	if (conf->radio_enabled) {
++		/* For programming the values, we have to turn RX off */
++		rt2x00lib_toggle_rx(rt2x00dev, STATE_RADIO_RX_OFF);
+ 
+-	/*
+-	 * When the DEVICE_DIRTY_CONFIG flag is set, the device has recently
+-	 * been started and the configuration must be forced upon the hardware.
+-	 * Otherwise registers will not be intialized correctly and could
+-	 * result in non-working hardware because essential registers aren't
+-	 * initialized.
+-	 */
+-	force_reconfig =
+-	    test_and_clear_bit(DEVICE_STATE_DIRTY_CONFIG, &rt2x00dev->flags);
++		/* Enable the radio */
++		status = rt2x00lib_enable_radio(rt2x00dev);
++		if (unlikely(status))
++			return status;
+ 
+-	rt2x00lib_config(rt2x00dev, conf, force_reconfig);
++		/*
++		 * When we've just turned on the radio, we want to reprogram
++		 * everything to ensure a consistent state
++		 */
++		rt2x00lib_config(rt2x00dev, conf, !radio_on);
+ 
+-	/*
+-	 * Reenable RX only if the radio should be on.
+-	 */
+-	if (test_bit(DEVICE_STATE_ENABLED_RADIO, &rt2x00dev->flags))
++		/* Turn RX back on */
+ 		rt2x00lib_toggle_rx(rt2x00dev, STATE_RADIO_RX_ON);
+-	else if (conf->radio_enabled)
+-		return rt2x00lib_enable_radio(rt2x00dev);
++	} else {
++		/* Disable the radio */
++		rt2x00lib_disable_radio(rt2x00dev);
++	}
+ 
+ 	return 0;
+ }
+
+commit 2af0a570b45ec315f364ea2c8a6d072cfcaa9d32
+Author: Ivo van Doorn <ivdoorn@gmail.com>
+Date:   Fri Aug 29 21:05:45 2008 +0200
+
+    rt2x00: Initialize txop during conf_tx() callback
+    
+    The txop parameter is supported by rt61pci and rt73usb,
+    and thus should be written to the register instead
+    of using the fixed value set during initialization.
+    
+    Signed-off-by: Ivo van Doorn <IvDoorn@gmail.com>
+    Signed-off-by: John W. Linville <linville@tuxdriver.com>
+
+diff --git a/drivers/net/wireless/rt2x00/rt2x00mac.c b/drivers/net/wireless/rt2x00/rt2x00mac.c
+index 64292c2..56829fa 100644
+--- a/drivers/net/wireless/rt2x00/rt2x00mac.c
++++ b/drivers/net/wireless/rt2x00/rt2x00mac.c
+@@ -666,10 +666,11 @@ int rt2x00mac_conf_tx(struct ieee80211_hw *hw, u16 queue_idx,
+ 		queue->cw_max = 10; /* cw_min: 2^10 = 1024. */
+ 
+ 	queue->aifs = params->aifs;
++	queue->txop = params->txop;
+ 
+ 	INFO(rt2x00dev,
+-	     "Configured TX queue %d - CWmin: %d, CWmax: %d, Aifs: %d.\n",
+-	     queue_idx, queue->cw_min, queue->cw_max, queue->aifs);
++	     "Configured TX queue %d - CWmin: %d, CWmax: %d, Aifs: %d, TXop: %d.\n",
++	     queue_idx, queue->cw_min, queue->cw_max, queue->aifs, queue->txop);
+ 
+ 	return 0;
+ }
+diff --git a/drivers/net/wireless/rt2x00/rt2x00queue.c b/drivers/net/wireless/rt2x00/rt2x00queue.c
+index 2822684..a5e9650 100644
+--- a/drivers/net/wireless/rt2x00/rt2x00queue.c
++++ b/drivers/net/wireless/rt2x00/rt2x00queue.c
+@@ -736,6 +736,7 @@ static void rt2x00queue_init(struct rt2x00_dev *rt2x00dev,
+ 
+ 	queue->rt2x00dev = rt2x00dev;
+ 	queue->qid = qid;
++	queue->txop = 0;
+ 	queue->aifs = 2;
+ 	queue->cw_min = 5;
+ 	queue->cw_max = 10;
+diff --git a/drivers/net/wireless/rt2x00/rt2x00queue.h b/drivers/net/wireless/rt2x00/rt2x00queue.h
+index 37f3f98..654fa0c 100644
+--- a/drivers/net/wireless/rt2x00/rt2x00queue.h
++++ b/drivers/net/wireless/rt2x00/rt2x00queue.h
+@@ -368,6 +368,7 @@ enum queue_index {
+  * @length: Number of frames in queue.
+  * @index: Index pointers to entry positions in the queue,
+  *	use &enum queue_index to get a specific index field.
++ * @txop: maximum burst time.
+  * @aifs: The aifs value for outgoing frames (field ignored in RX queue).
+  * @cw_min: The cw min value for outgoing frames (field ignored in RX queue).
+  * @cw_max: The cw max value for outgoing frames (field ignored in RX queue).
+@@ -387,6 +388,7 @@ struct data_queue {
+ 	unsigned short length;
+ 	unsigned short index[Q_INDEX_MAX];
+ 
++	unsigned short txop;
+ 	unsigned short aifs;
+ 	unsigned short cw_min;
+ 	unsigned short cw_max;
+diff --git a/drivers/net/wireless/rt2x00/rt61pci.c b/drivers/net/wireless/rt2x00/rt61pci.c
+index 9d27ce0..5253710 100644
+--- a/drivers/net/wireless/rt2x00/rt61pci.c
++++ b/drivers/net/wireless/rt2x00/rt61pci.c
+@@ -1478,16 +1478,6 @@ static int rt61pci_init_registers(struct rt2x00_dev *rt2x00dev)
+ 
+ 	rt2x00pci_register_write(rt2x00dev, M2H_CMD_DONE_CSR, 0xffffffff);
+ 
+-	rt2x00pci_register_read(rt2x00dev, AC_TXOP_CSR0, &reg);
+-	rt2x00_set_field32(&reg, AC_TXOP_CSR0_AC0_TX_OP, 0);
+-	rt2x00_set_field32(&reg, AC_TXOP_CSR0_AC1_TX_OP, 0);
+-	rt2x00pci_register_write(rt2x00dev, AC_TXOP_CSR0, reg);
+-
+-	rt2x00pci_register_read(rt2x00dev, AC_TXOP_CSR1, &reg);
+-	rt2x00_set_field32(&reg, AC_TXOP_CSR1_AC2_TX_OP, 192);
+-	rt2x00_set_field32(&reg, AC_TXOP_CSR1_AC3_TX_OP, 48);
+-	rt2x00pci_register_write(rt2x00dev, AC_TXOP_CSR1, reg);
+-
+ 	/*
+ 	 * Clear all beacons
+ 	 * For the Beacon base registers we only need to clear
+@@ -2652,6 +2642,63 @@ static int rt61pci_set_retry_limit(struct ieee80211_hw *hw,
+ 	return 0;
+ }
+ 
++static int rt61pci_conf_tx(struct ieee80211_hw *hw, u16 queue_idx,
++			   const struct ieee80211_tx_queue_params *params)
++{
++	struct rt2x00_dev *rt2x00dev = hw->priv;
++	struct data_queue *queue;
++	struct rt2x00_field32 field;
++	int retval;
++	u32 reg;
++
++	/*
++	 * First pass the configuration through rt2x00lib, that will
++	 * update the queue settings and validate the input. After that
++	 * we are free to update the registers based on the value
++	 * in the queue parameter.
++	 */
++	retval = rt2x00mac_conf_tx(hw, queue_idx, params);
++	if (retval)
++		return retval;
++
++	queue = rt2x00queue_get_queue(rt2x00dev, queue_idx);
++
++	/* Update WMM TXOP register */
++	if (queue_idx < 2) {
++		field.bit_offset = queue_idx * 16;
++		field.bit_mask = 0xffff << field.bit_offset;
++
++		rt2x00pci_register_read(rt2x00dev, AC_TXOP_CSR0, &reg);
++		rt2x00_set_field32(&reg, field, queue->txop);
++		rt2x00pci_register_write(rt2x00dev, AC_TXOP_CSR0, reg);
++	} else if (queue_idx < 4) {
++		field.bit_offset = (queue_idx - 2) * 16;
++		field.bit_mask = 0xffff << field.bit_offset;
++
++		rt2x00pci_register_read(rt2x00dev, AC_TXOP_CSR1, &reg);
++		rt2x00_set_field32(&reg, field, queue->txop);
++		rt2x00pci_register_write(rt2x00dev, AC_TXOP_CSR1, reg);
++	}
++
++	/* Update WMM registers */
++	field.bit_offset = queue_idx * 4;
++	field.bit_mask = 0xf << field.bit_offset;
++
++	rt2x00pci_register_read(rt2x00dev, AIFSN_CSR, &reg);
++	rt2x00_set_field32(&reg, field, queue->aifs);
++	rt2x00pci_register_write(rt2x00dev, AIFSN_CSR, reg);
++
++	rt2x00pci_register_read(rt2x00dev, CWMIN_CSR, &reg);
++	rt2x00_set_field32(&reg, field, queue->cw_min);
++	rt2x00pci_register_write(rt2x00dev, CWMIN_CSR, reg);
++
++	rt2x00pci_register_read(rt2x00dev, CWMAX_CSR, &reg);
++	rt2x00_set_field32(&reg, field, queue->cw_max);
++	rt2x00pci_register_write(rt2x00dev, CWMAX_CSR, reg);
++
++	return 0;
++}
++
+ static u64 rt61pci_get_tsf(struct ieee80211_hw *hw)
+ {
+ 	struct rt2x00_dev *rt2x00dev = hw->priv;
+@@ -2679,7 +2726,7 @@ static const struct ieee80211_ops rt61pci_mac80211_ops = {
+ 	.get_stats		= rt2x00mac_get_stats,
+ 	.set_retry_limit	= rt61pci_set_retry_limit,
+ 	.bss_info_changed	= rt2x00mac_bss_info_changed,
+-	.conf_tx		= rt2x00mac_conf_tx,
++	.conf_tx		= rt61pci_conf_tx,
+ 	.get_tx_stats		= rt2x00mac_get_tx_stats,
+ 	.get_tsf		= rt61pci_get_tsf,
+ };
+diff --git a/drivers/net/wireless/rt2x00/rt73usb.c b/drivers/net/wireless/rt2x00/rt73usb.c
+index f58fd05..636b4e0 100644
+--- a/drivers/net/wireless/rt2x00/rt73usb.c
++++ b/drivers/net/wireless/rt2x00/rt73usb.c
+@@ -1277,16 +1277,6 @@ static int rt73usb_init_registers(struct rt2x00_dev *rt2x00dev)
+ 	rt73usb_register_write(rt2x00dev, PHY_CSR6, 0x00080606);
+ 	rt73usb_register_write(rt2x00dev, PHY_CSR7, 0x00000408);
+ 
+-	rt73usb_register_read(rt2x00dev, AC_TXOP_CSR0, &reg);
+-	rt2x00_set_field32(&reg, AC_TXOP_CSR0_AC0_TX_OP, 0);
+-	rt2x00_set_field32(&reg, AC_TXOP_CSR0_AC1_TX_OP, 0);
+-	rt73usb_register_write(rt2x00dev, AC_TXOP_CSR0, reg);
+-
+-	rt73usb_register_read(rt2x00dev, AC_TXOP_CSR1, &reg);
+-	rt2x00_set_field32(&reg, AC_TXOP_CSR1_AC2_TX_OP, 192);
+-	rt2x00_set_field32(&reg, AC_TXOP_CSR1_AC3_TX_OP, 48);
+-	rt73usb_register_write(rt2x00dev, AC_TXOP_CSR1, reg);
+-
+ 	rt73usb_register_read(rt2x00dev, MAC_CSR9, &reg);
+ 	rt2x00_set_field32(&reg, MAC_CSR9_CW_SELECT, 0);
+ 	rt73usb_register_write(rt2x00dev, MAC_CSR9, reg);
+@@ -2246,6 +2236,63 @@ static int rt73usb_set_retry_limit(struct ieee80211_hw *hw,
+ 	return 0;
+ }
+ 
++static int rt73usb_conf_tx(struct ieee80211_hw *hw, u16 queue_idx,
++			   const struct ieee80211_tx_queue_params *params)
++{
++	struct rt2x00_dev *rt2x00dev = hw->priv;
++	struct data_queue *queue;
++	struct rt2x00_field32 field;
++	int retval;
++	u32 reg;
++
++	/*
++	 * First pass the configuration through rt2x00lib, that will
++	 * update the queue settings and validate the input. After that
++	 * we are free to update the registers based on the value
++	 * in the queue parameter.
++	 */
++	retval = rt2x00mac_conf_tx(hw, queue_idx, params);
++	if (retval)
++		return retval;
++
++	queue = rt2x00queue_get_queue(rt2x00dev, queue_idx);
++
++	/* Update WMM TXOP register */
++	if (queue_idx < 2) {
++		field.bit_offset = queue_idx * 16;
++		field.bit_mask = 0xffff << field.bit_offset;
++
++		rt73usb_register_read(rt2x00dev, AC_TXOP_CSR0, &reg);
++		rt2x00_set_field32(&reg, field, queue->txop);
++		rt73usb_register_write(rt2x00dev, AC_TXOP_CSR0, reg);
++	} else if (queue_idx < 4) {
++		field.bit_offset = (queue_idx - 2) * 16;
++		field.bit_mask = 0xffff << field.bit_offset;
++
++		rt73usb_register_read(rt2x00dev, AC_TXOP_CSR1, &reg);
++		rt2x00_set_field32(&reg, field, queue->txop);
++		rt73usb_register_write(rt2x00dev, AC_TXOP_CSR1, reg);
++	}
++
++	/* Update WMM registers */
++	field.bit_offset = queue_idx * 4;
++	field.bit_mask = 0xf << field.bit_offset;
++
++	rt73usb_register_read(rt2x00dev, AIFSN_CSR, &reg);
++	rt2x00_set_field32(&reg, field, queue->aifs);
++	rt73usb_register_write(rt2x00dev, AIFSN_CSR, reg);
++
++	rt73usb_register_read(rt2x00dev, CWMIN_CSR, &reg);
++	rt2x00_set_field32(&reg, field, queue->cw_min);
++	rt73usb_register_write(rt2x00dev, CWMIN_CSR, reg);
++
++	rt73usb_register_read(rt2x00dev, CWMAX_CSR, &reg);
++	rt2x00_set_field32(&reg, field, queue->cw_max);
++	rt73usb_register_write(rt2x00dev, CWMAX_CSR, reg);
++
++	return 0;
++}
++
+ #if 0
+ /*
+  * Mac80211 demands get_tsf must be atomic.
+@@ -2283,7 +2330,7 @@ static const struct ieee80211_ops rt73usb_mac80211_ops = {
+ 	.get_stats		= rt2x00mac_get_stats,
+ 	.set_retry_limit	= rt73usb_set_retry_limit,
+ 	.bss_info_changed	= rt2x00mac_bss_info_changed,
+-	.conf_tx		= rt2x00mac_conf_tx,
++	.conf_tx		= rt73usb_conf_tx,
+ 	.get_tx_stats		= rt2x00mac_get_tx_stats,
+ 	.get_tsf		= rt73usb_get_tsf,
+ };
+
+commit 6c6aa3c004e702532cb0f549a96eb2f75636bd3b
+Author: Ivo van Doorn <ivdoorn@gmail.com>
+Date:   Fri Aug 29 21:07:16 2008 +0200
+
+    rt2x00: Add Signal type flag
+    
+    Instead of using the PLCP flag to indicate if the
+    signal value is plcp or the bitrate we should add
+    a new flag to mark the bitrate type explicitely.
+    This is usefull when new types are added later for
+    rt2800.
+    
+    Signed-off-by: Ivo van Doorn <IvDoorn@gmail.com>
+    Signed-off-by: John W. Linville <linville@tuxdriver.com>
+
+diff --git a/drivers/net/wireless/rt2x00/rt2500pci.c b/drivers/net/wireless/rt2x00/rt2500pci.c
+index 5cc706a..2a96a01 100644
+--- a/drivers/net/wireless/rt2x00/rt2500pci.c
++++ b/drivers/net/wireless/rt2x00/rt2500pci.c
+@@ -1316,6 +1316,8 @@ static void rt2500pci_fill_rxdone(struct queue_entry *entry,
+ 
+ 	if (rt2x00_get_field32(word0, RXD_W0_OFDM))
+ 		rxdesc->dev_flags |= RXDONE_SIGNAL_PLCP;
++	else
++		rxdesc->dev_flags |= RXDONE_SIGNAL_BITRATE;
+ 	if (rt2x00_get_field32(word0, RXD_W0_MY_BSS))
+ 		rxdesc->dev_flags |= RXDONE_MY_BSS;
+ }
+diff --git a/drivers/net/wireless/rt2x00/rt2500usb.c b/drivers/net/wireless/rt2x00/rt2500usb.c
+index c6be4dd..c5f49e3 100644
+--- a/drivers/net/wireless/rt2x00/rt2500usb.c
++++ b/drivers/net/wireless/rt2x00/rt2500usb.c
+@@ -1280,6 +1280,8 @@ static void rt2500usb_fill_rxdone(struct queue_entry *entry,
+ 
+ 	if (rt2x00_get_field32(word0, RXD_W0_OFDM))
+ 		rxdesc->dev_flags |= RXDONE_SIGNAL_PLCP;
++	else
++		rxdesc->dev_flags |= RXDONE_SIGNAL_BITRATE;
+ 	if (rt2x00_get_field32(word0, RXD_W0_MY_BSS))
+ 		rxdesc->dev_flags |= RXDONE_MY_BSS;
+ 
+diff --git a/drivers/net/wireless/rt2x00/rt2x00dev.c b/drivers/net/wireless/rt2x00/rt2x00dev.c
+index 5278ae2..369b0b2 100644
+--- a/drivers/net/wireless/rt2x00/rt2x00dev.c
++++ b/drivers/net/wireless/rt2x00/rt2x00dev.c
+@@ -653,7 +653,7 @@ void rt2x00lib_rxdone(struct rt2x00_dev *rt2x00dev,
+ 
+ 		if (((rxdesc.dev_flags & RXDONE_SIGNAL_PLCP) &&
+ 		     (rate->plcp == rxdesc.signal)) ||
+-		    (!(rxdesc.dev_flags & RXDONE_SIGNAL_PLCP) &&
++		    ((rxdesc.dev_flags & RXDONE_SIGNAL_BITRATE) &&
+ 		      (rate->bitrate == rxdesc.signal))) {
+ 			idx = i;
+ 			break;
+diff --git a/drivers/net/wireless/rt2x00/rt2x00queue.h b/drivers/net/wireless/rt2x00/rt2x00queue.h
+index 654fa0c..9dbf04f 100644
+--- a/drivers/net/wireless/rt2x00/rt2x00queue.h
++++ b/drivers/net/wireless/rt2x00/rt2x00queue.h
+@@ -140,13 +140,14 @@ static inline struct skb_frame_desc* get_skb_frame_desc(struct sk_buff *skb)
+ /**
+  * enum rxdone_entry_desc_flags: Flags for &struct rxdone_entry_desc
+  *
+- * @RXDONE_SIGNAL_PLCP: Does the signal field contain the plcp value,
+- *	or does it contain the bitrate itself.
++ * @RXDONE_SIGNAL_PLCP: Signal field contains the plcp value.
++ * @RXDONE_SIGNAL_BITRATE: Signal field contains the bitrate value.
+  * @RXDONE_MY_BSS: Does this frame originate from device's BSS.
+  */
+ enum rxdone_entry_desc_flags {
+ 	RXDONE_SIGNAL_PLCP = 1 << 0,
+-	RXDONE_MY_BSS = 1 << 1,
++	RXDONE_SIGNAL_BITRATE = 1 << 1,
++	RXDONE_MY_BSS = 1 << 2,
+ };
+ 
+ /**
+diff --git a/drivers/net/wireless/rt2x00/rt61pci.c b/drivers/net/wireless/rt2x00/rt61pci.c
+index 5253710..d740f56 100644
+--- a/drivers/net/wireless/rt2x00/rt61pci.c
++++ b/drivers/net/wireless/rt2x00/rt61pci.c
+@@ -1991,6 +1991,8 @@ static void rt61pci_fill_rxdone(struct queue_entry *entry,
+ 
+ 	if (rt2x00_get_field32(word0, RXD_W0_OFDM))
+ 		rxdesc->dev_flags |= RXDONE_SIGNAL_PLCP;
++	else
++		rxdesc->dev_flags |= RXDONE_SIGNAL_BITRATE;
+ 	if (rt2x00_get_field32(word0, RXD_W0_MY_BSS))
+ 		rxdesc->dev_flags |= RXDONE_MY_BSS;
+ }
+diff --git a/drivers/net/wireless/rt2x00/rt73usb.c b/drivers/net/wireless/rt2x00/rt73usb.c
+index 636b4e0..cf236ec 100644
+--- a/drivers/net/wireless/rt2x00/rt73usb.c
++++ b/drivers/net/wireless/rt2x00/rt73usb.c
+@@ -1766,6 +1766,8 @@ static void rt73usb_fill_rxdone(struct queue_entry *entry,
+ 
+ 	if (rt2x00_get_field32(word0, RXD_W0_OFDM))
+ 		rxdesc->dev_flags |= RXDONE_SIGNAL_PLCP;
++	else
++		rxdesc->dev_flags |= RXDONE_SIGNAL_BITRATE;
+ 	if (rt2x00_get_field32(word0, RXD_W0_MY_BSS))
+ 		rxdesc->dev_flags |= RXDONE_MY_BSS;
+ 
+
+commit 1abc3656e961e62218257a85b3fe0a90ccd9036c
+Author: Mattias Nissler <mattias.nissler@gmx.de>
+Date:   Fri Aug 29 21:07:20 2008 +0200
+
+    rt2x00: skb->data pointer should not include TX descriptor
+    
+    Make sure the skb->data pointer points to the frame data, not the TX
+    descriptor. The frame dumping code relies on that.
+    
+    Signed-off-by: Mattias Nissler <mattias.nissler@gmx.de>
+    Signed-off-by: Ivo van Doorn <IvDoorn@gmail.com>
+    Signed-off-by: John W. Linville <linville@tuxdriver.com>
+
+diff --git a/drivers/net/wireless/rt2x00/rt2500usb.c b/drivers/net/wireless/rt2x00/rt2500usb.c
+index c5f49e3..0e008b6 100644
+--- a/drivers/net/wireless/rt2x00/rt2500usb.c
++++ b/drivers/net/wireless/rt2x00/rt2500usb.c
+@@ -1114,8 +1114,7 @@ static void rt2500usb_write_tx_desc(struct rt2x00_dev *rt2x00dev,
+ 	rt2x00_set_field32(&word, TXD_W0_NEW_SEQ,
+ 			   test_bit(ENTRY_TXD_FIRST_FRAGMENT, &txdesc->flags));
+ 	rt2x00_set_field32(&word, TXD_W0_IFS, txdesc->ifs);
+-	rt2x00_set_field32(&word, TXD_W0_DATABYTE_COUNT,
+-			   skb->len - skbdesc->desc_len);
++	rt2x00_set_field32(&word, TXD_W0_DATABYTE_COUNT, skb->len);
+ 	rt2x00_set_field32(&word, TXD_W0_CIPHER, CIPHER_NONE);
+ 	rt2x00_desc_write(txd, 0, word);
+ }
+diff --git a/drivers/net/wireless/rt2x00/rt2x00usb.c b/drivers/net/wireless/rt2x00/rt2x00usb.c
+index 2dd7c83..b73a7e0 100644
+--- a/drivers/net/wireless/rt2x00/rt2x00usb.c
++++ b/drivers/net/wireless/rt2x00/rt2x00usb.c
+@@ -168,11 +168,6 @@ static void rt2x00usb_interrupt_txdone(struct urb *urb)
+ 		return;
+ 
+ 	/*
+-	 * Remove the descriptor data from the buffer.
+-	 */
+-	skb_pull(entry->skb, entry->queue->desc_size);
+-
+-	/*
+ 	 * Obtain the status about this packet.
+ 	 * Note that when the status is 0 it does not mean the
+ 	 * frame was send out correctly. It only means the frame
+@@ -224,6 +219,12 @@ int rt2x00usb_write_tx_data(struct queue_entry *entry)
+ 			  entry->skb->data, length,
+ 			  rt2x00usb_interrupt_txdone, entry);
+ 
++	/*
++	 * Make sure the skb->data pointer points to the frame, not the
++	 * descriptor.
++	 */
++	skb_pull(entry->skb, entry->queue->desc_size);
++
+ 	return 0;
+ }
+ EXPORT_SYMBOL_GPL(rt2x00usb_write_tx_data);
+diff --git a/drivers/net/wireless/rt2x00/rt73usb.c b/drivers/net/wireless/rt2x00/rt73usb.c
+index cf236ec..e698ae0 100644
+--- a/drivers/net/wireless/rt2x00/rt73usb.c
++++ b/drivers/net/wireless/rt2x00/rt73usb.c
+@@ -1556,8 +1556,7 @@ static void rt73usb_write_tx_desc(struct rt2x00_dev *rt2x00dev,
+ 	rt2x00_set_field32(&word, TXD_W0_KEY_TABLE,
+ 			   test_bit(ENTRY_TXD_ENCRYPT_PAIRWISE, &txdesc->flags));
+ 	rt2x00_set_field32(&word, TXD_W0_KEY_INDEX, txdesc->key_idx);
+-	rt2x00_set_field32(&word, TXD_W0_DATABYTE_COUNT,
+-			   skb->len - skbdesc->desc_len);
++	rt2x00_set_field32(&word, TXD_W0_DATABYTE_COUNT, skb->len);
+ 	rt2x00_set_field32(&word, TXD_W0_BURST2,
+ 			   test_bit(ENTRY_TXD_BURST, &txdesc->flags));
+ 	rt2x00_set_field32(&word, TXD_W0_CIPHER_ALG, txdesc->cipher);
+
+commit 35e032d82f3e2a9b0d92077b4fbc97166525ed53
+Author: Ivo van Doorn <ivdoorn@gmail.com>
+Date:   Fri Aug 29 21:07:22 2008 +0200
+
+    rt2x00: Release rt2x00 2.2.1
+    
+    Signed-off-by: Ivo van Doorn <IvDoorn@gmail.com>
+    Signed-off-by: John W. Linville <linville@tuxdriver.com>
+
+diff --git a/drivers/net/wireless/rt2x00/rt2x00.h b/drivers/net/wireless/rt2x00/rt2x00.h
+index 5e4f783..6f296ce 100644
+--- a/drivers/net/wireless/rt2x00/rt2x00.h
++++ b/drivers/net/wireless/rt2x00/rt2x00.h
+@@ -44,7 +44,7 @@
+ /*
+  * Module information.
+  */
+-#define DRV_VERSION	"2.2.0"
++#define DRV_VERSION	"2.2.1"
+ #define DRV_PROJECT	"http://rt2x00.serialmonkey.com"
+ 
+ /*
+
+commit 445df54fec7c1924f44018c4db2a9613b877f10e
+Author: Boaz Harrosh <bharrosh@panasas.com>
+Date:   Mon Sep 1 14:47:19 2008 +0300
+
+    rt2x00: Compiler warning unmasked by fix of BUILD_BUG_ON
+    
+    A "Set" to a sign-bit in an "&" operation causes a compiler warning.
+    Make calculations unsigned.
+    
+    [ The warning was masked by the old definition of BUILD_BUG_ON() ]
+    
+    Also remove __builtin_constant_p from FIELD_CHECK since BUILD_BUG_ON
+    no longer permits non-const values.
+    
+    Signed-off-by: Boaz Harrosh <bharrosh@panasas.com>
+    CC: Ingo Molnar <mingo@elte.hu>
+    CC: Rusty Russell <rusty@rustcorp.com.au>
+    Acked-by: Ivo van Doorn <IvDoorn@gmail.com>
+    Signed-off-by: John W. Linville <linville@tuxdriver.com>
+
+diff --git a/drivers/net/wireless/rt2x00/rt2x00reg.h b/drivers/net/wireless/rt2x00/rt2x00reg.h
+index 7e88ce5..2ea7866 100644
+--- a/drivers/net/wireless/rt2x00/rt2x00reg.h
++++ b/drivers/net/wireless/rt2x00/rt2x00reg.h
+@@ -136,7 +136,7 @@ struct rt2x00_field32 {
+  */
+ #define is_power_of_two(x)	( !((x) & ((x)-1)) )
+ #define low_bit_mask(x)		( ((x)-1) & ~(x) )
+-#define is_valid_mask(x)	is_power_of_two(1 + (x) + low_bit_mask(x))
++#define is_valid_mask(x)	is_power_of_two(1LU + (x) + low_bit_mask(x))
+ 
+ /*
+  * Macro's to find first set bit in a variable.
+@@ -173,8 +173,7 @@ struct rt2x00_field32 {
+  * does not exceed the given typelimit.
+  */
+ #define FIELD_CHECK(__mask, __type)			\
+-	BUILD_BUG_ON(!__builtin_constant_p(__mask) ||	\
+-		     !(__mask) ||			\
++	BUILD_BUG_ON(!(__mask) ||			\
+ 		     !is_valid_mask(__mask) ||		\
+ 		     (__mask) != (__type)(__mask))	\
+ 
+
+commit 17dce5dfe38ae2fb359b61e855f5d8a3a8b7892b
+Merge: 712d695... 82a28c7...
+Author: David S. Miller <davem@davemloft.net>
+Date:   Mon Sep 8 16:59:05 2008 -0700
+
+    Merge branch 'master' of master.kernel.org:/pub/scm/linux/kernel/git/torvalds/linux-2.6
+    
+    Conflicts:
+    
+    	net/mac80211/mlme.c
+
+commit 79636a5fbbdfb303dbf2bfe7a7fa396f40bfac31
+Author: Ivo van Doorn <ivdoorn@gmail.com>
+Date:   Mon Sep 8 17:31:49 2008 +0200
+
+    rt2x00: Revert "rt2x00: Fix the beacon length bug"
+    
+    This reverts:
+    	b93ce437eba7e0232683326f30d9d1167a872fad
+    	rt2x00: Fix the beacon length bug
+    
+    The workaround is no longer required since it has been
+    correctly fixed in rt2x00usb now.
+    
+    Signed-off-by: Ivo van Doorn <IvDoorn@gmail.com>
+    Signed-off-by: John W. Linville <linville@tuxdriver.com>
+
+diff --git a/drivers/net/wireless/rt2x00/rt2500usb.c b/drivers/net/wireless/rt2x00/rt2500usb.c
+index 0e008b6..1cfda45 100644
+--- a/drivers/net/wireless/rt2x00/rt2500usb.c
++++ b/drivers/net/wireless/rt2x00/rt2500usb.c
+@@ -1133,7 +1133,6 @@ static void rt2500usb_write_beacon(struct queue_entry *entry)
+ 	int pipe = usb_sndbulkpipe(usb_dev, 1);
+ 	int length;
+ 	u16 reg;
+-	u32 word, len;
+ 
+ 	/*
+ 	 * Add the descriptor in front of the skb.
+@@ -1143,17 +1142,6 @@ static void rt2500usb_write_beacon(struct queue_entry *entry)
+ 	skbdesc->desc = entry->skb->data;
+ 
+ 	/*
+-	 * Adjust the beacon databyte count. The current number is
+-	 * calculated before this function gets called, but falsely
+-	 * assumes that the descriptor was already present in the SKB.
+-	 */
+-	rt2x00_desc_read(skbdesc->desc, 0, &word);
+-	len  = rt2x00_get_field32(word, TXD_W0_DATABYTE_COUNT);
+-	len += skbdesc->desc_len;
+-	rt2x00_set_field32(&word, TXD_W0_DATABYTE_COUNT, len);
+-	rt2x00_desc_write(skbdesc->desc, 0, word);
+-
+-	/*
+ 	 * Disable beaconing while we are reloading the beacon data,
+ 	 * otherwise we might be sending out invalid data.
+ 	 */
+diff --git a/drivers/net/wireless/rt2x00/rt73usb.c b/drivers/net/wireless/rt2x00/rt73usb.c
+index e698ae0..d9ef34c 100644
+--- a/drivers/net/wireless/rt2x00/rt73usb.c
++++ b/drivers/net/wireless/rt2x00/rt73usb.c
+@@ -1572,7 +1572,6 @@ static void rt73usb_write_beacon(struct queue_entry *entry)
+ 	struct skb_frame_desc *skbdesc = get_skb_frame_desc(entry->skb);
+ 	unsigned int beacon_base;
+ 	u32 reg;
+-	u32 word, len;
+ 
+ 	/*
+ 	 * Add the descriptor in front of the skb.
+@@ -1582,17 +1581,6 @@ static void rt73usb_write_beacon(struct queue_entry *entry)
+ 	skbdesc->desc = entry->skb->data;
+ 
+ 	/*
+-	 * Adjust the beacon databyte count. The current number is
+-	 * calculated before this function gets called, but falsely
+-	 * assumes that the descriptor was already present in the SKB.
+-	 */
+-	rt2x00_desc_read(skbdesc->desc, 0, &word);
+-	len  = rt2x00_get_field32(word, TXD_W0_DATABYTE_COUNT);
+-	len += skbdesc->desc_len;
+-	rt2x00_set_field32(&word, TXD_W0_DATABYTE_COUNT, len);
+-	rt2x00_desc_write(skbdesc->desc, 0, word);
+-
+-	/*
+ 	 * Disable beaconing while we are reloading the beacon data,
+ 	 * otherwise we might be sending out invalid data.
+ 	 */
+
+commit 58169529986e81e0d477ce11eb8b91f025f649c1
+Author: Ivo van Doorn <ivdoorn@gmail.com>
+Date:   Mon Sep 8 18:46:29 2008 +0200
+
+    rt2x00: Make RFKILL enabled by default
+    
+    RFKILL should be enabled for _all_ hardware whether
+    or not they feature a rfkill button or not.
+    
+    Remove driver specific RFKILL configuration options
+    and make the rt2x00lib version depend on CONFIG_RFKILL
+    and defaulting to 'y' to make sure it will always
+    be enabled when RFKILL was enabled.
+    
+    This also fixes some bugs where RFKILL wasn't initialized
+    and didn't respond to RFKILL key presses.
+    
+    Signed-off-by: Ivo van Doorn <IvDoorn@gmail.com>
+    Signed-off-by: John W. Linville <linville@tuxdriver.com>
+
+diff --git a/drivers/net/wireless/rt2x00/Kconfig b/drivers/net/wireless/rt2x00/Kconfig
+index 11f590d..c896c99 100644
+--- a/drivers/net/wireless/rt2x00/Kconfig
++++ b/drivers/net/wireless/rt2x00/Kconfig
+@@ -40,7 +40,8 @@ config RT2X00_LIB_CRYPTO
+ config RT2X00_LIB_RFKILL
+ 	boolean
+ 	depends on RT2X00_LIB
+-	select RFKILL
++	depends on RFKILL
++	default y
+ 
+ config RT2X00_LIB_LEDS
+ 	boolean
+@@ -57,15 +58,6 @@ config RT2400PCI
+ 
+ 	  When compiled as a module, this driver will be called "rt2400pci.ko".
+ 
+-config RT2400PCI_RFKILL
+-	bool "Ralink rt2400 rfkill support"
+-	depends on RT2400PCI
+-	select RT2X00_LIB_RFKILL
+-	---help---
+-	  This adds support for integrated rt2400 hardware that features a
+-	  hardware button to control the radio state.
+-	  This feature depends on the RF switch subsystem rfkill.
+-
+ config RT2400PCI_LEDS
+ 	bool "Ralink rt2400 leds support"
+ 	depends on RT2400PCI && NEW_LEDS
+@@ -85,15 +77,6 @@ config RT2500PCI
+ 
+ 	  When compiled as a module, this driver will be called "rt2500pci.ko".
+ 
+-config RT2500PCI_RFKILL
+-	bool "Ralink rt2500 rfkill support"
+-	depends on RT2500PCI
+-	select RT2X00_LIB_RFKILL
+-	---help---
+-	  This adds support for integrated rt2500 hardware that features a
+-	  hardware button to control the radio state.
+-	  This feature depends on the RF switch subsystem rfkill.
+-
+ config RT2500PCI_LEDS
+ 	bool "Ralink rt2500 leds support"
+ 	depends on RT2500PCI && NEW_LEDS
+@@ -116,15 +99,6 @@ config RT61PCI
+ 
+ 	  When compiled as a module, this driver will be called "rt61pci.ko".
+ 
+-config RT61PCI_RFKILL
+-	bool "Ralink rt2501/rt61 rfkill support"
+-	depends on RT61PCI
+-	select RT2X00_LIB_RFKILL
+-	---help---
+-	  This adds support for integrated rt61 hardware that features a
+-	  hardware button to control the radio state.
+-	  This feature depends on the RF switch subsystem rfkill.
+-
+ config RT61PCI_LEDS
+ 	bool "Ralink rt2501/rt61 leds support"
+ 	depends on RT61PCI && NEW_LEDS
+diff --git a/drivers/net/wireless/rt2x00/rt2400pci.c b/drivers/net/wireless/rt2x00/rt2400pci.c
+index 18b703c..0083e7e 100644
+--- a/drivers/net/wireless/rt2x00/rt2400pci.c
++++ b/drivers/net/wireless/rt2x00/rt2400pci.c
+@@ -231,7 +231,7 @@ static const struct rt2x00debug rt2400pci_rt2x00debug = {
+ };
+ #endif /* CONFIG_RT2X00_LIB_DEBUGFS */
+ 
+-#ifdef CONFIG_RT2400PCI_RFKILL
++#ifdef CONFIG_RT2X00_LIB_RFKILL
+ static int rt2400pci_rfkill_poll(struct rt2x00_dev *rt2x00dev)
+ {
+ 	u32 reg;
+@@ -241,7 +241,7 @@ static int rt2400pci_rfkill_poll(struct rt2x00_dev *rt2x00dev)
+ }
+ #else
+ #define rt2400pci_rfkill_poll	NULL
+-#endif /* CONFIG_RT2400PCI_RFKILL */
++#endif /* CONFIG_RT2X00_LIB_RFKILL */
+ 
+ #ifdef CONFIG_RT2400PCI_LEDS
+ static void rt2400pci_brightness_set(struct led_classdev *led_cdev,
+@@ -1386,10 +1386,10 @@ static int rt2400pci_init_eeprom(struct rt2x00_dev *rt2x00dev)
+ 	/*
+ 	 * Detect if this device has an hardware controlled radio.
+ 	 */
+-#ifdef CONFIG_RT2400PCI_RFKILL
++#ifdef CONFIG_RT2X00_LIB_RFKILL
+ 	if (rt2x00_get_field16(eeprom, EEPROM_ANTENNA_HARDWARE_RADIO))
+ 		__set_bit(CONFIG_SUPPORT_HW_BUTTON, &rt2x00dev->flags);
+-#endif /* CONFIG_RT2400PCI_RFKILL */
++#endif /* CONFIG_RT2X00_LIB_RFKILL */
+ 
+ 	/*
+ 	 * Check if the BBP tuning should be enabled.
+diff --git a/drivers/net/wireless/rt2x00/rt2500pci.c b/drivers/net/wireless/rt2x00/rt2500pci.c
+index 2a96a01..d8c9d67 100644
+--- a/drivers/net/wireless/rt2x00/rt2500pci.c
++++ b/drivers/net/wireless/rt2x00/rt2500pci.c
+@@ -231,7 +231,7 @@ static const struct rt2x00debug rt2500pci_rt2x00debug = {
+ };
+ #endif /* CONFIG_RT2X00_LIB_DEBUGFS */
+ 
+-#ifdef CONFIG_RT2500PCI_RFKILL
++#ifdef CONFIG_RT2X00_LIB_RFKILL
+ static int rt2500pci_rfkill_poll(struct rt2x00_dev *rt2x00dev)
+ {
+ 	u32 reg;
+@@ -241,7 +241,7 @@ static int rt2500pci_rfkill_poll(struct rt2x00_dev *rt2x00dev)
+ }
+ #else
+ #define rt2500pci_rfkill_poll	NULL
+-#endif /* CONFIG_RT2500PCI_RFKILL */
++#endif /* CONFIG_RT2X00_LIB_RFKILL */
+ 
+ #ifdef CONFIG_RT2500PCI_LEDS
+ static void rt2500pci_brightness_set(struct led_classdev *led_cdev,
+@@ -1545,10 +1545,10 @@ static int rt2500pci_init_eeprom(struct rt2x00_dev *rt2x00dev)
+ 	/*
+ 	 * Detect if this device has an hardware controlled radio.
+ 	 */
+-#ifdef CONFIG_RT2500PCI_RFKILL
++#ifdef CONFIG_RT2X00_LIB_RFKILL
+ 	if (rt2x00_get_field16(eeprom, EEPROM_ANTENNA_HARDWARE_RADIO))
+ 		__set_bit(CONFIG_SUPPORT_HW_BUTTON, &rt2x00dev->flags);
+-#endif /* CONFIG_RT2500PCI_RFKILL */
++#endif /* CONFIG_RT2X00_LIB_RFKILL */
+ 
+ 	/*
+ 	 * Check if the BBP tuning should be enabled.
+diff --git a/drivers/net/wireless/rt2x00/rt2x00rfkill.c b/drivers/net/wireless/rt2x00/rt2x00rfkill.c
+index 8a2fefb..55eff58 100644
+--- a/drivers/net/wireless/rt2x00/rt2x00rfkill.c
++++ b/drivers/net/wireless/rt2x00/rt2x00rfkill.c
+@@ -45,16 +45,15 @@ static int rt2x00rfkill_toggle_radio(void *data, enum rfkill_state state)
+ 		return 0;
+ 
+ 	if (state == RFKILL_STATE_UNBLOCKED) {
+-		INFO(rt2x00dev, "Hardware button pressed, enabling radio.\n");
++		INFO(rt2x00dev, "RFKILL event: enabling radio.\n");
+ 		clear_bit(DEVICE_STATE_DISABLED_RADIO_HW, &rt2x00dev->flags);
+ 		retval = rt2x00lib_enable_radio(rt2x00dev);
+ 	} else if (state == RFKILL_STATE_SOFT_BLOCKED) {
+-		INFO(rt2x00dev, "Hardware button pressed, disabling radio.\n");
++		INFO(rt2x00dev, "RFKILL event: disabling radio.\n");
+ 		set_bit(DEVICE_STATE_DISABLED_RADIO_HW, &rt2x00dev->flags);
+ 		rt2x00lib_disable_radio(rt2x00dev);
+ 	} else {
+-		WARNING(rt2x00dev, "Received unexpected rfkill state %d.\n",
+-			state);
++		WARNING(rt2x00dev, "RFKILL event: unknown state %d.\n", state);
+ 	}
+ 
+ 	return retval;
+@@ -64,7 +63,12 @@ static int rt2x00rfkill_get_state(void *data, enum rfkill_state *state)
+ {
+ 	struct rt2x00_dev *rt2x00dev = data;
+ 
+-	*state = rt2x00dev->rfkill->state;
++	/*
++	 * rfkill_poll reports 1 when the key has been pressed and the
++	 * radio should be blocked.
++	 */
++	*state = rt2x00dev->ops->lib->rfkill_poll(rt2x00dev) ?
++	    RFKILL_STATE_SOFT_BLOCKED : RFKILL_STATE_UNBLOCKED;
+ 
+ 	return 0;
+ }
+@@ -73,19 +77,18 @@ static void rt2x00rfkill_poll(struct work_struct *work)
+ {
+ 	struct rt2x00_dev *rt2x00dev =
+ 	    container_of(work, struct rt2x00_dev, rfkill_work.work);
+-	int state;
++	enum rfkill_state state;
+ 
+-	if (!test_bit(RFKILL_STATE_REGISTERED, &rt2x00dev->rfkill_state))
++	if (!test_bit(RFKILL_STATE_REGISTERED, &rt2x00dev->rfkill_state) ||
++	    !test_bit(CONFIG_SUPPORT_HW_BUTTON, &rt2x00dev->flags))
+ 		return;
+ 
+ 	/*
+-	 * rfkill_poll reports 1 when the key has been pressed and the
+-	 * radio should be blocked.
++	 * Poll latest state and report it to rfkill who should sort
++	 * out if the state should be toggled or not.
+ 	 */
+-	state = !rt2x00dev->ops->lib->rfkill_poll(rt2x00dev) ?
+-	    RFKILL_STATE_UNBLOCKED : RFKILL_STATE_SOFT_BLOCKED;
+-
+-	rfkill_force_state(rt2x00dev->rfkill, state);
++	if (!rt2x00rfkill_get_state(rt2x00dev, &state))
++		rfkill_force_state(rt2x00dev->rfkill, state);
+ 
+ 	queue_delayed_work(rt2x00dev->hw->workqueue,
+ 			   &rt2x00dev->rfkill_work, RFKILL_POLL_INTERVAL);
+@@ -93,8 +96,8 @@ static void rt2x00rfkill_poll(struct work_struct *work)
+ 
+ void rt2x00rfkill_register(struct rt2x00_dev *rt2x00dev)
+ {
+-	if (!test_bit(CONFIG_SUPPORT_HW_BUTTON, &rt2x00dev->flags) ||
+-	    !test_bit(RFKILL_STATE_ALLOCATED, &rt2x00dev->rfkill_state))
++	if (!test_bit(RFKILL_STATE_ALLOCATED, &rt2x00dev->rfkill_state) ||
++	    test_bit(RFKILL_STATE_REGISTERED, &rt2x00dev->rfkill_state))
+ 		return;
+ 
+ 	if (rfkill_register(rt2x00dev->rfkill)) {
+@@ -114,7 +117,7 @@ void rt2x00rfkill_register(struct rt2x00_dev *rt2x00dev)
+ 
+ void rt2x00rfkill_unregister(struct rt2x00_dev *rt2x00dev)
+ {
+-	if (!test_bit(CONFIG_SUPPORT_HW_BUTTON, &rt2x00dev->flags) ||
++	if (!test_bit(RFKILL_STATE_ALLOCATED, &rt2x00dev->rfkill_state) ||
+ 	    !test_bit(RFKILL_STATE_REGISTERED, &rt2x00dev->rfkill_state))
+ 		return;
+ 
+@@ -127,21 +130,25 @@ void rt2x00rfkill_unregister(struct rt2x00_dev *rt2x00dev)
+ 
+ void rt2x00rfkill_allocate(struct rt2x00_dev *rt2x00dev)
+ {
+-	if (!test_bit(CONFIG_SUPPORT_HW_BUTTON, &rt2x00dev->flags))
++	struct device *dev = wiphy_dev(rt2x00dev->hw->wiphy);
++
++	if (test_bit(RFKILL_STATE_ALLOCATED, &rt2x00dev->rfkill_state))
+ 		return;
+ 
+-	rt2x00dev->rfkill =
+-	    rfkill_allocate(wiphy_dev(rt2x00dev->hw->wiphy), RFKILL_TYPE_WLAN);
++	rt2x00dev->rfkill = rfkill_allocate(dev, RFKILL_TYPE_WLAN);
+ 	if (!rt2x00dev->rfkill) {
+ 		ERROR(rt2x00dev, "Failed to allocate rfkill handler.\n");
+ 		return;
+ 	}
+ 
++	__set_bit(RFKILL_STATE_ALLOCATED, &rt2x00dev->rfkill_state);
++
+ 	rt2x00dev->rfkill->name = rt2x00dev->ops->name;
+ 	rt2x00dev->rfkill->data = rt2x00dev;
+ 	rt2x00dev->rfkill->state = -1;
+ 	rt2x00dev->rfkill->toggle_radio = rt2x00rfkill_toggle_radio;
+-	rt2x00dev->rfkill->get_state = rt2x00rfkill_get_state;
++	if (test_bit(CONFIG_SUPPORT_HW_BUTTON, &rt2x00dev->flags))
++		rt2x00dev->rfkill->get_state = rt2x00rfkill_get_state;
+ 
+ 	INIT_DELAYED_WORK(&rt2x00dev->rfkill_work, rt2x00rfkill_poll);
+ 
+@@ -150,8 +157,7 @@ void rt2x00rfkill_allocate(struct rt2x00_dev *rt2x00dev)
+ 
+ void rt2x00rfkill_free(struct rt2x00_dev *rt2x00dev)
+ {
+-	if (!test_bit(CONFIG_SUPPORT_HW_BUTTON, &rt2x00dev->flags) ||
+-	    !test_bit(RFKILL_STATE_ALLOCATED, &rt2x00dev->rfkill_state))
++	if (!test_bit(RFKILL_STATE_ALLOCATED, &rt2x00dev->flags))
+ 		return;
+ 
+ 	cancel_delayed_work_sync(&rt2x00dev->rfkill_work);
+diff --git a/drivers/net/wireless/rt2x00/rt61pci.c b/drivers/net/wireless/rt2x00/rt61pci.c
+index d740f56..a5c9352 100644
+--- a/drivers/net/wireless/rt2x00/rt61pci.c
++++ b/drivers/net/wireless/rt2x00/rt61pci.c
+@@ -271,7 +271,7 @@ static const struct rt2x00debug rt61pci_rt2x00debug = {
+ };
+ #endif /* CONFIG_RT2X00_LIB_DEBUGFS */
+ 
+-#ifdef CONFIG_RT61PCI_RFKILL
++#ifdef CONFIG_RT2X00_LIB_RFKILL
+ static int rt61pci_rfkill_poll(struct rt2x00_dev *rt2x00dev)
+ {
+ 	u32 reg;
+@@ -281,7 +281,7 @@ static int rt61pci_rfkill_poll(struct rt2x00_dev *rt2x00dev)
+ }
+ #else
+ #define rt61pci_rfkill_poll	NULL
+-#endif /* CONFIG_RT61PCI_RFKILL */
++#endif /* CONFIG_RT2X00_LIB_RFKILL */
+ 
+ #ifdef CONFIG_RT61PCI_LEDS
+ static void rt61pci_brightness_set(struct led_classdev *led_cdev,
+@@ -2313,10 +2313,10 @@ static int rt61pci_init_eeprom(struct rt2x00_dev *rt2x00dev)
+ 	/*
+ 	 * Detect if this device has an hardware controlled radio.
+ 	 */
+-#ifdef CONFIG_RT61PCI_RFKILL
++#ifdef CONFIG_RT2X00_LIB_RFKILL
+ 	if (rt2x00_get_field16(eeprom, EEPROM_ANTENNA_HARDWARE_RADIO))
+ 		__set_bit(CONFIG_SUPPORT_HW_BUTTON, &rt2x00dev->flags);
+-#endif /* CONFIG_RT61PCI_RFKILL */
++#endif /* CONFIG_RT2X00_LIB_RFKILL */
+ 
+ 	/*
+ 	 * Read frequency offset and RF programming sequence.
+
+commit 771fd565195727d12f0b75d918b9fcb9f33a5476
+Author: Ivo van Doorn <ivdoorn@gmail.com>
+Date:   Mon Sep 8 19:07:15 2008 +0200
+
+    rt2x00: Make rt2x00 LEDS invisible config option
+    
+    There isn't really a good reason to have the LED
+    configuration options selectable per driver, lets
+    make it default 'y' and make it depend on the
+    NEW_LEDS and LEDS_CLASS interface.
+    
+    Signed-off-by: Ivo van Doorn <IvDoorn@gmail.com
+    Signed-off-by: John W. Linville <linville@tuxdriver.com>
+
+diff --git a/drivers/net/wireless/rt2x00/Kconfig b/drivers/net/wireless/rt2x00/Kconfig
+index c896c99..b686dc4 100644
+--- a/drivers/net/wireless/rt2x00/Kconfig
++++ b/drivers/net/wireless/rt2x00/Kconfig
+@@ -45,7 +45,10 @@ config RT2X00_LIB_RFKILL
+ 
+ config RT2X00_LIB_LEDS
+ 	boolean
+-	depends on RT2X00_LIB && NEW_LEDS
++	depends on RT2X00_LIB
++	depends on NEW_LEDS
++	depends on LEDS_CLASS
++	default y
+ 
+ config RT2400PCI
+ 	tristate "Ralink rt2400 (PCI/PCMCIA) support"
+@@ -58,14 +61,6 @@ config RT2400PCI
+ 
+ 	  When compiled as a module, this driver will be called "rt2400pci.ko".
+ 
+-config RT2400PCI_LEDS
+-	bool "Ralink rt2400 leds support"
+-	depends on RT2400PCI && NEW_LEDS
+-	select LEDS_CLASS
+-	select RT2X00_LIB_LEDS
+-	---help---
+-	  This adds support for led triggers provided my mac80211.
+-
+ config RT2500PCI
+ 	tristate "Ralink rt2500 (PCI/PCMCIA) support"
+ 	depends on PCI
+@@ -77,14 +72,6 @@ config RT2500PCI
+ 
+ 	  When compiled as a module, this driver will be called "rt2500pci.ko".
+ 
+-config RT2500PCI_LEDS
+-	bool "Ralink rt2500 leds support"
+-	depends on RT2500PCI && NEW_LEDS
+-	select LEDS_CLASS
+-	select RT2X00_LIB_LEDS
+-	---help---
+-	  This adds support for led triggers provided my mac80211.
+-
+ config RT61PCI
+ 	tristate "Ralink rt2501/rt61 (PCI/PCMCIA) support"
+ 	depends on PCI
+@@ -99,14 +86,6 @@ config RT61PCI
+ 
+ 	  When compiled as a module, this driver will be called "rt61pci.ko".
+ 
+-config RT61PCI_LEDS
+-	bool "Ralink rt2501/rt61 leds support"
+-	depends on RT61PCI && NEW_LEDS
+-	select LEDS_CLASS
+-	select RT2X00_LIB_LEDS
+-	---help---
+-	  This adds support for led triggers provided my mac80211.
+-
+ config RT2500USB
+ 	tristate "Ralink rt2500 (USB) support"
+ 	depends on USB
+@@ -117,14 +96,6 @@ config RT2500USB
+ 
+ 	  When compiled as a module, this driver will be called "rt2500usb.ko".
+ 
+-config RT2500USB_LEDS
+-	bool "Ralink rt2500 leds support"
+-	depends on RT2500USB && NEW_LEDS
+-	select LEDS_CLASS
+-	select RT2X00_LIB_LEDS
+-	---help---
+-	  This adds support for led triggers provided my mac80211.
+-
+ config RT73USB
+ 	tristate "Ralink rt2501/rt73 (USB) support"
+ 	depends on USB
+@@ -138,14 +109,6 @@ config RT73USB
+ 
+ 	  When compiled as a module, this driver will be called "rt73usb.ko".
+ 
+-config RT73USB_LEDS
+-	bool "Ralink rt2501/rt73 leds support"
+-	depends on RT73USB && NEW_LEDS
+-	select LEDS_CLASS
+-	select RT2X00_LIB_LEDS
+-	---help---
+-	  This adds support for led triggers provided my mac80211.
+-
+ config RT2X00_LIB_DEBUGFS
+ 	bool "Ralink debugfs support"
+ 	depends on RT2X00_LIB && MAC80211_DEBUGFS
+diff --git a/drivers/net/wireless/rt2x00/rt2400pci.c b/drivers/net/wireless/rt2x00/rt2400pci.c
+index 0083e7e..08cb9ee 100644
+--- a/drivers/net/wireless/rt2x00/rt2400pci.c
++++ b/drivers/net/wireless/rt2x00/rt2400pci.c
+@@ -243,7 +243,7 @@ static int rt2400pci_rfkill_poll(struct rt2x00_dev *rt2x00dev)
+ #define rt2400pci_rfkill_poll	NULL
+ #endif /* CONFIG_RT2X00_LIB_RFKILL */
+ 
+-#ifdef CONFIG_RT2400PCI_LEDS
++#ifdef CONFIG_RT2X00_LIB_LEDS
+ static void rt2400pci_brightness_set(struct led_classdev *led_cdev,
+ 				     enum led_brightness brightness)
+ {
+@@ -288,7 +288,7 @@ static void rt2400pci_init_led(struct rt2x00_dev *rt2x00dev,
+ 	led->led_dev.blink_set = rt2400pci_blink_set;
+ 	led->flags = LED_INITIALIZED;
+ }
+-#endif /* CONFIG_RT2400PCI_LEDS */
++#endif /* CONFIG_RT2X00_LIB_LEDS */
+ 
+ /*
+  * Configuration handlers.
+@@ -1374,14 +1374,14 @@ static int rt2400pci_init_eeprom(struct rt2x00_dev *rt2x00dev)
+ 	/*
+ 	 * Store led mode, for correct led behaviour.
+ 	 */
+-#ifdef CONFIG_RT2400PCI_LEDS
++#ifdef CONFIG_RT2X00_LIB_LEDS
+ 	value = rt2x00_get_field16(eeprom, EEPROM_ANTENNA_LED_MODE);
+ 
+ 	rt2400pci_init_led(rt2x00dev, &rt2x00dev->led_radio, LED_TYPE_RADIO);
+ 	if (value == LED_MODE_TXRX_ACTIVITY)
+ 		rt2400pci_init_led(rt2x00dev, &rt2x00dev->led_qual,
+ 				   LED_TYPE_ACTIVITY);
+-#endif /* CONFIG_RT2400PCI_LEDS */
++#endif /* CONFIG_RT2X00_LIB_LEDS */
+ 
+ 	/*
+ 	 * Detect if this device has an hardware controlled radio.
+diff --git a/drivers/net/wireless/rt2x00/rt2500pci.c b/drivers/net/wireless/rt2x00/rt2500pci.c
+index d8c9d67..ef42cc0 100644
+--- a/drivers/net/wireless/rt2x00/rt2500pci.c
++++ b/drivers/net/wireless/rt2x00/rt2500pci.c
+@@ -243,7 +243,7 @@ static int rt2500pci_rfkill_poll(struct rt2x00_dev *rt2x00dev)
+ #define rt2500pci_rfkill_poll	NULL
+ #endif /* CONFIG_RT2X00_LIB_RFKILL */
+ 
+-#ifdef CONFIG_RT2500PCI_LEDS
++#ifdef CONFIG_RT2X00_LIB_LEDS
+ static void rt2500pci_brightness_set(struct led_classdev *led_cdev,
+ 				     enum led_brightness brightness)
+ {
+@@ -288,7 +288,7 @@ static void rt2500pci_init_led(struct rt2x00_dev *rt2x00dev,
+ 	led->led_dev.blink_set = rt2500pci_blink_set;
+ 	led->flags = LED_INITIALIZED;
+ }
+-#endif /* CONFIG_RT2500PCI_LEDS */
++#endif /* CONFIG_RT2X00_LIB_LEDS */
+ 
+ /*
+  * Configuration handlers.
+@@ -1533,14 +1533,14 @@ static int rt2500pci_init_eeprom(struct rt2x00_dev *rt2x00dev)
+ 	/*
+ 	 * Store led mode, for correct led behaviour.
+ 	 */
+-#ifdef CONFIG_RT2500PCI_LEDS
++#ifdef CONFIG_RT2X00_LIB_LEDS
+ 	value = rt2x00_get_field16(eeprom, EEPROM_ANTENNA_LED_MODE);
+ 
+ 	rt2500pci_init_led(rt2x00dev, &rt2x00dev->led_radio, LED_TYPE_RADIO);
+ 	if (value == LED_MODE_TXRX_ACTIVITY)
+ 		rt2500pci_init_led(rt2x00dev, &rt2x00dev->led_qual,
+ 				   LED_TYPE_ACTIVITY);
+-#endif /* CONFIG_RT2500PCI_LEDS */
++#endif /* CONFIG_RT2X00_LIB_LEDS */
+ 
+ 	/*
+ 	 * Detect if this device has an hardware controlled radio.
+diff --git a/drivers/net/wireless/rt2x00/rt2500usb.c b/drivers/net/wireless/rt2x00/rt2500usb.c
+index 1cfda45..cb5f2d0 100644
+--- a/drivers/net/wireless/rt2x00/rt2500usb.c
++++ b/drivers/net/wireless/rt2x00/rt2500usb.c
+@@ -288,7 +288,7 @@ static const struct rt2x00debug rt2500usb_rt2x00debug = {
+ };
+ #endif /* CONFIG_RT2X00_LIB_DEBUGFS */
+ 
+-#ifdef CONFIG_RT2500USB_LEDS
++#ifdef CONFIG_RT2X00_LIB_LEDS
+ static void rt2500usb_brightness_set(struct led_classdev *led_cdev,
+ 				     enum led_brightness brightness)
+ {
+@@ -333,7 +333,7 @@ static void rt2500usb_init_led(struct rt2x00_dev *rt2x00dev,
+ 	led->led_dev.blink_set = rt2500usb_blink_set;
+ 	led->flags = LED_INITIALIZED;
+ }
+-#endif /* CONFIG_RT2500USB_LEDS */
++#endif /* CONFIG_RT2X00_LIB_LEDS */
+ 
+ /*
+  * Configuration handlers.
+@@ -1473,14 +1473,14 @@ static int rt2500usb_init_eeprom(struct rt2x00_dev *rt2x00dev)
+ 	/*
+ 	 * Store led mode, for correct led behaviour.
+ 	 */
+-#ifdef CONFIG_RT2500USB_LEDS
++#ifdef CONFIG_RT2X00_LIB_LEDS
+ 	value = rt2x00_get_field16(eeprom, EEPROM_ANTENNA_LED_MODE);
+ 
+ 	rt2500usb_init_led(rt2x00dev, &rt2x00dev->led_radio, LED_TYPE_RADIO);
+ 	if (value == LED_MODE_TXRX_ACTIVITY)
+ 		rt2500usb_init_led(rt2x00dev, &rt2x00dev->led_qual,
+ 				   LED_TYPE_ACTIVITY);
+-#endif /* CONFIG_RT2500USB_LEDS */
++#endif /* CONFIG_RT2X00_LIB_LEDS */
+ 
+ 	/*
+ 	 * Check if the BBP tuning should be disabled.
+diff --git a/drivers/net/wireless/rt2x00/rt61pci.c b/drivers/net/wireless/rt2x00/rt61pci.c
+index a5c9352..2c36b91 100644
+--- a/drivers/net/wireless/rt2x00/rt61pci.c
++++ b/drivers/net/wireless/rt2x00/rt61pci.c
+@@ -163,7 +163,7 @@ rf_write:
+ 	rt2x00_rf_write(rt2x00dev, word, value);
+ }
+ 
+-#ifdef CONFIG_RT61PCI_LEDS
++#ifdef CONFIG_RT2X00_LIB_LEDS
+ /*
+  * This function is only called from rt61pci_led_brightness()
+  * make gcc happy by placing this function inside the
+@@ -195,7 +195,7 @@ static void rt61pci_mcu_request(struct rt2x00_dev *rt2x00dev,
+ 	rt2x00_set_field32(&reg, HOST_CMD_CSR_INTERRUPT_MCU, 1);
+ 	rt2x00pci_register_write(rt2x00dev, HOST_CMD_CSR, reg);
+ }
+-#endif /* CONFIG_RT61PCI_LEDS */
++#endif /* CONFIG_RT2X00_LIB_LEDS */
+ 
+ static void rt61pci_eepromregister_read(struct eeprom_93cx6 *eeprom)
+ {
+@@ -283,7 +283,7 @@ static int rt61pci_rfkill_poll(struct rt2x00_dev *rt2x00dev)
+ #define rt61pci_rfkill_poll	NULL
+ #endif /* CONFIG_RT2X00_LIB_RFKILL */
+ 
+-#ifdef CONFIG_RT61PCI_LEDS
++#ifdef CONFIG_RT2X00_LIB_LEDS
+ static void rt61pci_brightness_set(struct led_classdev *led_cdev,
+ 				   enum led_brightness brightness)
+ {
+@@ -348,7 +348,7 @@ static void rt61pci_init_led(struct rt2x00_dev *rt2x00dev,
+ 	led->led_dev.blink_set = rt61pci_blink_set;
+ 	led->flags = LED_INITIALIZED;
+ }
+-#endif /* CONFIG_RT61PCI_LEDS */
++#endif /* CONFIG_RT2X00_LIB_LEDS */
+ 
+ /*
+  * Configuration handlers.
+@@ -2374,7 +2374,7 @@ static int rt61pci_init_eeprom(struct rt2x00_dev *rt2x00dev)
+ 	 * If the eeprom value is invalid,
+ 	 * switch to default led mode.
+ 	 */
+-#ifdef CONFIG_RT61PCI_LEDS
++#ifdef CONFIG_RT2X00_LIB_LEDS
+ 	rt2x00_eeprom_read(rt2x00dev, EEPROM_LED, &eeprom);
+ 	value = rt2x00_get_field16(eeprom, EEPROM_LED_LED_MODE);
+ 
+@@ -2408,7 +2408,7 @@ static int rt61pci_init_eeprom(struct rt2x00_dev *rt2x00dev)
+ 	rt2x00_set_field16(&rt2x00dev->led_mcu_reg, MCU_LEDCS_POLARITY_READY_A,
+ 			   rt2x00_get_field16(eeprom,
+ 					      EEPROM_LED_POLARITY_RDY_A));
+-#endif /* CONFIG_RT61PCI_LEDS */
++#endif /* CONFIG_RT2X00_LIB_LEDS */
+ 
+ 	return 0;
+ }
+diff --git a/drivers/net/wireless/rt2x00/rt73usb.c b/drivers/net/wireless/rt2x00/rt73usb.c
+index d9ef34c..27dde3e 100644
+--- a/drivers/net/wireless/rt2x00/rt73usb.c
++++ b/drivers/net/wireless/rt2x00/rt73usb.c
+@@ -292,7 +292,7 @@ static const struct rt2x00debug rt73usb_rt2x00debug = {
+ };
+ #endif /* CONFIG_RT2X00_LIB_DEBUGFS */
+ 
+-#ifdef CONFIG_RT73USB_LEDS
++#ifdef CONFIG_RT2X00_LIB_LEDS
+ static void rt73usb_brightness_set(struct led_classdev *led_cdev,
+ 				   enum led_brightness brightness)
+ {
+@@ -359,7 +359,7 @@ static void rt73usb_init_led(struct rt2x00_dev *rt2x00dev,
+ 	led->led_dev.blink_set = rt73usb_blink_set;
+ 	led->flags = LED_INITIALIZED;
+ }
+-#endif /* CONFIG_RT73USB_LEDS */
++#endif /* CONFIG_RT2X00_LIB_LEDS */
+ 
+ /*
+  * Configuration handlers.
+@@ -1932,7 +1932,7 @@ static int rt73usb_init_eeprom(struct rt2x00_dev *rt2x00dev)
+ 	/*
+ 	 * Store led settings, for correct led behaviour.
+ 	 */
+-#ifdef CONFIG_RT73USB_LEDS
++#ifdef CONFIG_RT2X00_LIB_LEDS
+ 	rt2x00_eeprom_read(rt2x00dev, EEPROM_LED, &eeprom);
+ 
+ 	rt73usb_init_led(rt2x00dev, &rt2x00dev->led_radio, LED_TYPE_RADIO);
+@@ -1965,7 +1965,7 @@ static int rt73usb_init_eeprom(struct rt2x00_dev *rt2x00dev)
+ 	rt2x00_set_field16(&rt2x00dev->led_mcu_reg, MCU_LEDCS_POLARITY_READY_A,
+ 			   rt2x00_get_field16(eeprom,
+ 					      EEPROM_LED_POLARITY_RDY_A));
+-#endif /* CONFIG_RT73USB_LEDS */
++#endif /* CONFIG_RT2X00_LIB_LEDS */
+ 
+ 	return 0;
+ }
+
+commit acaf908d408ccd49f13aeb46cbd4428a4db174d1
+Author: Ivo van Doorn <ivdoorn@gmail.com>
+Date:   Mon Sep 22 19:40:04 2008 +0200
+
+    rt2x00: Fix HW crypto key handling
+    
+    When a crypto key is being removed, rt2x00mac should not
+    reset the key->hw_key_idx value because that will prevent
+    the driver from removing the correct key from the hardware.
+    
+    Furthermore ffz() starts counting at 0 instead of 1, so we don't
+    need to substract 1 from the resulting value.
+    
+    Signed-off-by: Stephen Blackheath <tramp.enshrine.stephen@blacksapphire.com>
+    Signed-off-by: Ivo van Doorn <IvDoorn@gmail.com>
+    Signed-off-by: John W. Linville <linville@tuxdriver.com>
+
+diff --git a/drivers/net/wireless/rt2x00/rt2x00mac.c b/drivers/net/wireless/rt2x00/rt2x00mac.c
+index 485c40d..2c6cc5c 100644
+--- a/drivers/net/wireless/rt2x00/rt2x00mac.c
++++ b/drivers/net/wireless/rt2x00/rt2x00mac.c
+@@ -543,7 +543,8 @@ int rt2x00mac_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
+ 	 * provided but key 0 is not, then the key is not found
+ 	 * by the hardware during RX).
+ 	 */
+-	key->hw_key_idx = 0;
++	if (cmd == SET_KEY)
++		key->hw_key_idx = 0;
+ 
+ 	if (key->flags & IEEE80211_KEY_FLAG_PAIRWISE)
+ 		set_key = rt2x00dev->ops->lib->config_pairwise_key;
+diff --git a/drivers/net/wireless/rt2x00/rt61pci.c b/drivers/net/wireless/rt2x00/rt61pci.c
+index 2c36b91..a461620 100644
+--- a/drivers/net/wireless/rt2x00/rt61pci.c
++++ b/drivers/net/wireless/rt2x00/rt61pci.c
+@@ -381,7 +381,7 @@ static int rt61pci_config_shared_key(struct rt2x00_dev *rt2x00dev,
+ 		if (reg && reg == mask)
+ 			return -ENOSPC;
+ 
+-		key->hw_key_idx += reg ? (ffz(reg) - 1) : 0;
++		key->hw_key_idx += reg ? ffz(reg) : 0;
+ 
+ 		/*
+ 		 * Upload key to hardware
+@@ -477,7 +477,7 @@ static int rt61pci_config_pairwise_key(struct rt2x00_dev *rt2x00dev,
+ 				return -ENOSPC;
+ 		}
+ 
+-		key->hw_key_idx += reg ? (ffz(reg) - 1) : 0;
++		key->hw_key_idx += reg ? ffz(reg) : 0;
+ 
+ 		/*
+ 		 * Upload key to hardware
+diff --git a/drivers/net/wireless/rt2x00/rt73usb.c b/drivers/net/wireless/rt2x00/rt73usb.c
+index 27dde3e..934f8e0 100644
+--- a/drivers/net/wireless/rt2x00/rt73usb.c
++++ b/drivers/net/wireless/rt2x00/rt73usb.c
+@@ -393,7 +393,7 @@ static int rt73usb_config_shared_key(struct rt2x00_dev *rt2x00dev,
+ 		if (reg && reg == mask)
+ 			return -ENOSPC;
+ 
+-		key->hw_key_idx += reg ? (ffz(reg) - 1) : 0;
++		key->hw_key_idx += reg ? ffz(reg) : 0;
+ 
+ 		/*
+ 		 * Upload key to hardware
+@@ -494,7 +494,7 @@ static int rt73usb_config_pairwise_key(struct rt2x00_dev *rt2x00dev,
+ 				return -ENOSPC;
+ 		}
+ 
+-		key->hw_key_idx += reg ? (ffz(reg) - 1) : 0;
++		key->hw_key_idx += reg ? ffz(reg) : 0;
+ 
+ 		/*
+ 		 * Upload key to hardware
+
+commit 4c99f3e4cfc3190e01c55e72d15a837d9dc41426
+Author: Gertjan van Wingerde <gwingerde@kpnplanet.nl>
+Date:   Sun Sep 28 15:11:38 2008 +0200
+
+    rt2x00: Fix build errors due to modularized rfkill or leds and built-in rt2x00.
+    
+    Fix by disabling rt2x00 rfkill support when rt2x00 is built-in and rfkill has been modularized, and
+    a similar scheme for the relationship between leds_class and rt2x00..
+    Also, give a warning to the end-user when rfkill-/leds-support is disabled this way, so that the
+    end-user has at least some clues on what is going on.
+    
+    Proper fixing required some general updates of the Kconfig-structure for the rt2x00 driver, whereby
+    internal configuration symbols had to be moved to after the user-visible configuration symbols.
+    
+    Signed-off-by: Gertjan van Wingerde <gwingerde@kpnplanet.nl>
+    Signed-off-by: Ivo van Doorn <IvDoorn@gmail.com>
+    Signed-off-by: John W. Linville <linville@tuxdriver.com>
+
+diff --git a/drivers/net/wireless/rt2x00/Kconfig b/drivers/net/wireless/rt2x00/Kconfig
+index b686dc4..f839ce0 100644
+--- a/drivers/net/wireless/rt2x00/Kconfig
++++ b/drivers/net/wireless/rt2x00/Kconfig
+@@ -1,5 +1,5 @@
+-config RT2X00
+-	tristate "Ralink driver support"
++menuconfig RT2X00
++	bool "Ralink driver support"
+ 	depends on MAC80211 && WLAN_80211 && EXPERIMENTAL
+ 	---help---
+ 	  This will enable the experimental support for the Ralink drivers,
+@@ -17,39 +17,6 @@ config RT2X00
+ 
+ if RT2X00
+ 
+-config RT2X00_LIB
+-	tristate
+-
+-config RT2X00_LIB_PCI
+-	tristate
+-	select RT2X00_LIB
+-
+-config RT2X00_LIB_USB
+-	tristate
+-	select RT2X00_LIB
+-
+-config RT2X00_LIB_FIRMWARE
+-	boolean
+-	depends on RT2X00_LIB
+-	select FW_LOADER
+-
+-config RT2X00_LIB_CRYPTO
+-	boolean
+-	depends on RT2X00_LIB
+-
+-config RT2X00_LIB_RFKILL
+-	boolean
+-	depends on RT2X00_LIB
+-	depends on RFKILL
+-	default y
+-
+-config RT2X00_LIB_LEDS
+-	boolean
+-	depends on RT2X00_LIB
+-	depends on NEW_LEDS
+-	depends on LEDS_CLASS
+-	default y
+-
+ config RT2400PCI
+ 	tristate "Ralink rt2400 (PCI/PCMCIA) support"
+ 	depends on PCI
+@@ -109,6 +76,38 @@ config RT73USB
+ 
+ 	  When compiled as a module, this driver will be called "rt73usb.ko".
+ 
++config RT2X00_LIB_PCI
++	tristate
++	select RT2X00_LIB
++
++config RT2X00_LIB_USB
++	tristate
++	select RT2X00_LIB
++
++config RT2X00_LIB
++	tristate
++
++config RT2X00_LIB_FIRMWARE
++	boolean
++	select FW_LOADER
++
++config RT2X00_LIB_CRYPTO
++	boolean
++
++config RT2X00_LIB_RFKILL
++	boolean
++	default y if (RT2X00_LIB=y && RFKILL=y) || (RT2X00_LIB=m && RFKILL!=n)
++
++comment "rt2x00 rfkill support disabled due to modularized RFKILL and built-in rt2x00"
++	depends on RT2X00_LIB=y && RFKILL=m
++
++config RT2X00_LIB_LEDS
++	boolean
++	default y if (RT2X00_LIB=y && LEDS_CLASS=y) || (RT2X00_LIB=m && LEDS_CLASS!=n)
++
++comment "rt2x00 leds support disabled due to modularized LEDS_CLASS and built-in rt2x00"
++	depends on RT2X00_LIB=y && LEDS_CLASS=m
++
+ config RT2X00_LIB_DEBUGFS
+ 	bool "Ralink debugfs support"
+ 	depends on RT2X00_LIB && MAC80211_DEBUGFS
+
+commit 5b5d13afeeee959a74114b73c560d3e243f34a11
+Author: Gertjan van Wingerde <gwingerde@kpnplanet.nl>
+Date:   Fri Oct 3 20:20:32 2008 +0200
+
+    rt2x00: Fix rfkill structure initialization to prevent rfkill WARN_ON.
+    
+    The state field of the rfkill structure was incorrectly initialized to -1, which results in rfkill
+    issueing a WARN_ON. Fix this by initializing the state field to the proper value as indicated by
+    the driver.
+    
+    Signed-off-by: Gertjan van Wingerde <gwingerde@kpnplanet.nl>
+    Signed-off-by: Ivo van Doorn <IvDoorn@gmail.com>
+    Signed-off-by: John W. Linville <linville@tuxdriver.com>
+
+diff --git a/drivers/net/wireless/rt2x00/rt2x00rfkill.c b/drivers/net/wireless/rt2x00/rt2x00rfkill.c
+index 55eff58..c3f53a9 100644
+--- a/drivers/net/wireless/rt2x00/rt2x00rfkill.c
++++ b/drivers/net/wireless/rt2x00/rt2x00rfkill.c
+@@ -145,10 +145,15 @@ void rt2x00rfkill_allocate(struct rt2x00_dev *rt2x00dev)
+ 
+ 	rt2x00dev->rfkill->name = rt2x00dev->ops->name;
+ 	rt2x00dev->rfkill->data = rt2x00dev;
+-	rt2x00dev->rfkill->state = -1;
+ 	rt2x00dev->rfkill->toggle_radio = rt2x00rfkill_toggle_radio;
+-	if (test_bit(CONFIG_SUPPORT_HW_BUTTON, &rt2x00dev->flags))
++	if (test_bit(CONFIG_SUPPORT_HW_BUTTON, &rt2x00dev->flags)) {
+ 		rt2x00dev->rfkill->get_state = rt2x00rfkill_get_state;
++		rt2x00dev->rfkill->state =
++			rt2x00dev->ops->lib->rfkill_poll(rt2x00dev) ?
++			    RFKILL_STATE_SOFT_BLOCKED : RFKILL_STATE_UNBLOCKED;
++	} else {
++		rt2x00dev->rfkill->state = RFKILL_STATE_UNBLOCKED;
++	}
+ 
+ 	INIT_DELAYED_WORK(&rt2x00dev->rfkill_work, rt2x00rfkill_poll);
+ 
+commit 5dc5340cfc00097e79d9d787567d311e898aaa84
+Author: Ivo van Doorn <ivdoorn@gmail.com>
+Date:   Wed Oct 29 17:19:08 2008 +0100
+
+    rt2x00: Fix build error when mac80211=M rt2x00=Y
+    
+    Make menuconfig RT2X00 a tristate instead of boolean,
+    otherwise we do not correctly inherit the mac80211 value
+    on which RT2X00 depends, and makes it possible to
+    compile rt2x00 into the kernel while mac80211 is a
+    module.
+    
+    Signed-off-by: Ivo van Doorn <IvDoorn@gmail.com>
+    Signed-off-by: John W. Linville <linville@tuxdriver.com>
+
+diff --git a/drivers/net/wireless/rt2x00/Kconfig b/drivers/net/wireless/rt2x00/Kconfig
+index f839ce0..95511ac 100644
+--- a/drivers/net/wireless/rt2x00/Kconfig
++++ b/drivers/net/wireless/rt2x00/Kconfig
+@@ -1,5 +1,5 @@
+ menuconfig RT2X00
+-	bool "Ralink driver support"
++	tristate "Ralink driver support"
+ 	depends on MAC80211 && WLAN_80211 && EXPERIMENTAL
+ 	---help---
+ 	  This will enable the experimental support for the Ralink drivers,

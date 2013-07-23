@@ -1,0 +1,41 @@
+From 8d7979fae69abfff1086a98381a099858c2e4fe6 Mon Sep 17 00:00:00 2001
+From: Peter Hutterer <peter.hutterer@redhat.com>
+Date: Mon, 25 Aug 2008 15:23:41 +0930
+Subject: [PATCH] Don't overwrite previously assigned type indices with useless ones.
+
+The default type for a key with no levels is ONE_LEVEL.
+Let's not overwrite the kt_index with this default type if we have previously
+assigned a real type.
+
+Reproduceable by running setxkbmap -layout "ru(phonetic),us", the first group
+is assigned ONE_LEVEL and shift stops working.
+
+Red Hat Bug #436626 <https://bugzilla.redhat.com/show_bug.cgi?id=436626>
+---
+ symbols.c |   10 +++++++++-
+ 1 files changed, 9 insertions(+), 1 deletions(-)
+
+diff --git xkbcomp-1.0.5/symbols.c xkbcomp-1.0.5/symbols.c
+index ffc26b2..762e5ac 100644
+--- xkbcomp-1.0.5/symbols.c
++++ xkbcomp-1.0.5/symbols.c
+@@ -1757,7 +1757,15 @@ unsigned	types[XkbNumKbdGroups];
+     xkb->map->key_sym_map[kc].group_info= XkbSetNumGroups(i,nGroups);
+     xkb->map->key_sym_map[kc].width= width;
+     for (i=0;i<nGroups;i++) {
+-	xkb->map->key_sym_map[kc].kt_index[i]= types[i];
++        /* assign kt_index[i] to the index of the type in map->types.
++         * kt_index[i] may have been set by a previous run (if we have two
++         * layouts specified). Let's not overwrite it with the ONE_LEVEL
++         * default group if we dont even have keys for this group anyway.
++         *
++         * FIXME: There should be a better fix for this.
++         */
++	if (key->numLevels[i])
++	    xkb->map->key_sym_map[kc].kt_index[i]= types[i];
+ 	if (key->syms[i]!=NULL) {
+ 	    for (tmp=0;tmp<width;tmp++) {
+ 		if (tmp<key->numLevels[i])
+-- 
+1.5.4.3
+

@@ -1,0 +1,39 @@
+Index: kdelibs/kio/misc/fileshareset
+===================================================================
+--- kdelibs.orig/kio/misc/fileshareset
++++ kdelibs/kio/misc/fileshareset
+@@ -284,13 +284,7 @@ sub update_server {
+ 	if (system('PATH=/bin:/sbin pidof rpc.mountd >/dev/null') != 0 ||
+ 	    system('PATH=/bin:/sbin pidof nfsd >/dev/null') != 0) {
+ 	    # trying to start the server...
+-	    system('/etc/init.d/portmap start') if system('/etc/init.d/portmap status') != 0;
+-            if ( -f '/etc/init.d/nfs' ) {
+-	        system('/etc/init.d/nfs', $_) foreach 'stop', 'start';
+-            }
+-            elsif ( -f '/etc/init.d/nfs-kernel-server' ) {
+-	        system('/etc/init.d/nfs-kernel-server', $_) foreach 'stop', 'start';
+-            }
++        system('/bin/service nfs_server restart');
+ 	}
+ 	exit 0;
+     }
+@@ -412,18 +406,7 @@ sub update_server {
+     if (system('PATH=/bin:/sbin pidof smbd >/dev/null') != 0 ||
+ 	system('PATH=/bin:/sbin pidof nmbd >/dev/null') != 0) {
+ # trying to start the server...
+-      if ( -f '/etc/init.d/smb' ) {
+-	system('/etc/init.d/smb', $_) foreach 'stop', 'start';
+-      }
+-      elsif ( -f '/etc/init.d/samba' ) {
+-	system('/etc/init.d/samba', $_) foreach 'stop', 'start';
+-      }
+-	  elsif ( -f '/etc/rc.d/rc.samba' ) {
+-	system('/etc/rc.d/rc.samba', $_) foreach 'stop', 'start';
+-	  }
+-      else {
+-	print STDERR "Error: Can't find the samba init script \n";
+-      }
++        system('/bin/service samba restart');
+     }
+     exit 0;
+   }

@@ -1,0 +1,399 @@
+Index: Python-2.6.5/Lib/distutils/command/build_ext.py
+===================================================================
+--- Python-2.6.5.orig/Lib/distutils/command/build_ext.py
++++ Python-2.6.5/Lib/distutils/command/build_ext.py
+@@ -531,7 +531,7 @@ class build_ext (Command):
+             target_lang=language)
+ 
+ 
+-    def swig_sources (self, sources, extension):
++    def swig_sources (self, sources, extension=None):
+ 
+         """Walk the list of source files in 'sources', looking for SWIG
+         interface (.i) files.  Run SWIG on all that are found, and
+Index: Python-2.6.5/Lib/distutils/unixccompiler.py
+===================================================================
+--- Python-2.6.5.orig/Lib/distutils/unixccompiler.py
++++ Python-2.6.5/Lib/distutils/unixccompiler.py
+@@ -305,6 +305,8 @@ class UnixCCompiler(CCompiler):
+         dylib_f = self.library_filename(lib, lib_type='dylib')
+         static_f = self.library_filename(lib, lib_type='static')
+ 
++        print "Looking in %s for %s" % (lib, dirs)
++
+         for dir in dirs:
+             shared = os.path.join(dir, shared_f)
+             dylib = os.path.join(dir, dylib_f)
+@@ -314,10 +316,13 @@ class UnixCCompiler(CCompiler):
+             # assuming that *all* Unix C compilers do.  And of course I'm
+             # ignoring even GCC's "-static" option.  So sue me.
+             if os.path.exists(dylib):
++                print "Found %s" % dylib
+                 return dylib
+             elif os.path.exists(shared):
++                print "Found %s" % shared
+                 return shared
+             elif os.path.exists(static):
++                print "Found %s" % static
+                 return static
+ 
+         # Oops, didn't find it in *any* of 'dirs'
+Index: Python-2.6.5/setup.py
+===================================================================
+--- Python-2.6.5.orig/setup.py
++++ Python-2.6.5/setup.py
+@@ -198,10 +198,13 @@ class PyBuildExt(build_ext):
+         # unfortunately, distutils doesn't let us provide separate C and C++
+         # compilers
+         if compiler is not None:
+-            (ccshared,cflags) = sysconfig.get_config_vars('CCSHARED','CFLAGS')
++            (ccshared, cflags) = sysconfig.get_config_vars('CCSHARED', 'CFLAGS')
++            cflags = os.environ["CFLAGS"]
+             args['compiler_so'] = compiler + ' ' + ccshared + ' ' + cflags
+         self.compiler.set_executables(**args)
+ 
++        self.make_args = args
++
+         build_ext.build_extensions(self)
+ 
+         longest = max([len(e.name) for e in self.extensions])
+@@ -234,9 +237,18 @@ class PyBuildExt(build_ext):
+ 
+     def build_extension(self, ext):
+ 
++        nexecf = " -Wa,--noexecstack"
+         if ext.name == '_ctypes':
+             if not self.configure_ctypes(ext):
+                 return
++            # Add -Wa,--noexecstack to CFLAGS
++            if 'compiler_so' in self.make_args:
++                if not self.make_args['compiler_so'].endswith(nexecf):
++                    self.make_args['compiler_so'] += nexecf
++        elif 'compiler_so' in self.make_args:
++            self.make_args['compiler_so'] = \
++                    self.make_args['compiler_so'].replace(nexecf,'')
++        self.compiler.set_executables(**self.make_args)
+ 
+         try:
+             build_ext.build_extension(self, ext)
+@@ -274,6 +286,12 @@ class PyBuildExt(build_ext):
+         ext_filename = os.path.join(
+             self.build_lib,
+             self.get_ext_filename(self.get_ext_fullname(ext.name)))
++
++        # if modules compiled as cross, do not test them
++        if os.environ["BUILD"] != os.environ["TARGET"]:
++            print "Cross compiled module: [%s]" % ext.name
++            return
++
+         try:
+             imp.load_dynamic(ext.name, ext_filename)
+         except ImportError, why:
+@@ -320,6 +338,9 @@ class PyBuildExt(build_ext):
+         # directly since an inconsistently reproducible issue comes up where
+         # the environment variable is not set even though the value were passed
+         # into configure and stored in the Makefile (issue found on OS X 10.3).
++        inc_dirs = [ "%s/usr/include" % sysroot ]
++        lib_dirs = [ "%s/usr/lib" % sysroot, "%s/lib" % sysroot ]
++
+         for env_var, arg_name, dir_list in (
+                 ('LDFLAGS', '-R', self.compiler.runtime_library_dirs),
+                 ('LDFLAGS', '-L', self.compiler.library_dirs),
+@@ -349,9 +370,9 @@ class PyBuildExt(build_ext):
+                         add_dir_to_list(dir_list, directory)
+ 
+         add_dir_to_list(self.compiler.library_dirs,
+-                        sysconfig.get_config_var("LIBDIR"))
++                        "%s/usr/lib" % sysroot)
+         add_dir_to_list(self.compiler.include_dirs,
+-                        sysconfig.get_config_var("INCLUDEDIR"))
++                        "%s/usr/include" % sysroot)
+ 
+         try:
+             have_unicode = unicode
+@@ -546,7 +567,7 @@ class PyBuildExt(build_ext):
+         # Operations on audio samples
+         # According to #993173, this one should actually work fine on
+         # 64-bit platforms.
+-        exts.append( Extension('audioop', ['audioop.c']) )
++        exts.append( Extension('audioop', ['audioop.c'], library_dirs=lib_dirs, libraries=['m']) )
+ 
+         # Disabled on 64-bit platforms
+         if sys.maxint != 9223372036854775807L:
+@@ -588,8 +609,7 @@ class PyBuildExt(build_ext):
+                 readline_libs.append('ncurses')
+             elif self.compiler.find_library_file(lib_dirs, 'curses'):
+                 readline_libs.append('curses')
+-            elif self.compiler.find_library_file(lib_dirs +
+-                                               ['/usr/lib/termcap'],
++            elif self.compiler.find_library_file(lib_dirs,
+                                                'termcap'):
+                 readline_libs.append('termcap')
+             exts.append( Extension('readline', ['readline.c'],
+@@ -617,22 +637,19 @@ class PyBuildExt(build_ext):
+         exts.append( Extension('_socket', ['socketmodule.c'],
+                                depends = ['socketmodule.h']) )
+         # Detect SSL support for the socket module (via _ssl)
+-        search_for_ssl_incs_in = [
+-                              '/usr/local/ssl/include',
+-                              '/usr/contrib/ssl/include/'
+-                             ]
++        search_for_ssl_incs_in = [
++                '%s/usr/include' % sysroot,
++                '%s/usr/include/openssl' % sysroot, ]
+         ssl_incs = find_file('openssl/ssl.h', inc_dirs,
+-                             search_for_ssl_incs_in
+-                             )
++                             search_for_ssl_incs_in )
+         if ssl_incs is not None:
+             krb5_h = find_file('krb5.h', inc_dirs,
+-                               ['/usr/kerberos/include'])
++                               ['%s/usr/include/kerberos' % sysroot,])
+             if krb5_h:
+                 ssl_incs += krb5_h
+         ssl_libs = find_library_file(self.compiler, 'ssl',lib_dirs,
+-                                     ['/usr/local/ssl/lib',
+-                                      '/usr/contrib/ssl/lib/'
+-                                     ] )
++                                     ['%s/usr/lib/engines' % sysroot,
++                                      '%s/usr/lib' % sysroot] )
+ 
+         if (ssl_incs is not None and
+             ssl_libs is not None):
+@@ -709,69 +726,17 @@ class PyBuildExt(build_ext):
+         # a release.  Most open source OSes come with one or more
+         # versions of BerkeleyDB already installed.
+ 
+-        max_db_ver = (4, 7)
++        max_db_ver = (4, 6, 7)
+         min_db_ver = (3, 3)
+-        db_setup_debug = False   # verbose debug prints from this script?
+-
+-        def allow_db_ver(db_ver):
+-            """Returns a boolean if the given BerkeleyDB version is acceptable.
+-
+-            Args:
+-              db_ver: A tuple of the version to verify.
+-            """
+-            if not (min_db_ver <= db_ver <= max_db_ver):
+-                return False
+-            # Use this function to filter out known bad configurations.
+-            if (4, 6) == db_ver[:2]:
+-                # BerkeleyDB 4.6.x is not stable on many architectures.
+-                arch = platform_machine()
+-                if arch not in ('i386', 'i486', 'i586', 'i686',
+-                                'x86_64', 'ia64'):
+-                    return False
+-            return True
+-
+-        def gen_db_minor_ver_nums(major):
+-            if major == 4:
+-                for x in range(max_db_ver[1]+1):
+-                    if allow_db_ver((4, x)):
+-                        yield x
+-            elif major == 3:
+-                for x in (3,):
+-                    if allow_db_ver((3, x)):
+-                        yield x
+-            else:
+-                raise ValueError("unknown major BerkeleyDB version", major)
++        db_setup_debug = True  # verbose debug prints from this script?
+ 
+         # construct a list of paths to look for the header file in on
+         # top of the normal inc_dirs.
+-        db_inc_paths = [
+-            '/usr/include/db4',
+-            '/usr/local/include/db4',
+-            '/opt/sfw/include/db4',
+-            '/usr/include/db3',
+-            '/usr/local/include/db3',
+-            '/opt/sfw/include/db3',
+-            # Fink defaults (http://fink.sourceforge.net/)
+-            '/sw/include/db4',
+-            '/sw/include/db3',
+-        ]
++        db_inc_paths = [ '%s/usr/include/' % sysroot, ]
+         # 4.x minor number specific paths
+-        for x in gen_db_minor_ver_nums(4):
+-            db_inc_paths.append('/usr/include/db4%d' % x)
+-            db_inc_paths.append('/usr/include/db4.%d' % x)
+-            db_inc_paths.append('/usr/local/BerkeleyDB.4.%d/include' % x)
+-            db_inc_paths.append('/usr/local/include/db4%d' % x)
+-            db_inc_paths.append('/pkg/db-4.%d/include' % x)
+-            db_inc_paths.append('/opt/db-4.%d/include' % x)
+-            # MacPorts default (http://www.macports.org/)
+-            db_inc_paths.append('/opt/local/include/db4%d' % x)
+-        # 3.x minor number specific paths
+-        for x in gen_db_minor_ver_nums(3):
+-            db_inc_paths.append('/usr/include/db3%d' % x)
+-            db_inc_paths.append('/usr/local/BerkeleyDB.3.%d/include' % x)
+-            db_inc_paths.append('/usr/local/include/db3%d' % x)
+-            db_inc_paths.append('/pkg/db-3.%d/include' % x)
+-            db_inc_paths.append('/opt/db-3.%d/include' % x)
++        for x in max_db_ver:
++            db_inc_paths.append('%s/usr/include/db4%d' % (sysroot, x))
++            db_inc_paths.append('%s/usr/include/db4.%d' % (sysroot, x))
+ 
+         # Add some common subdirectories for Sleepycat DB to the list,
+         # based on the standard include directories. This way DB3/4 gets
+@@ -779,14 +744,10 @@ class PyBuildExt(build_ext):
+         # the user has added that prefix into inc_dirs.
+         std_variants = []
+         for dn in inc_dirs:
+-            std_variants.append(os.path.join(dn, 'db3'))
+             std_variants.append(os.path.join(dn, 'db4'))
+-            for x in gen_db_minor_ver_nums(4):
++            for x in max_db_ver:
+                 std_variants.append(os.path.join(dn, "db4%d"%x))
+                 std_variants.append(os.path.join(dn, "db4.%d"%x))
+-            for x in gen_db_minor_ver_nums(3):
+-                std_variants.append(os.path.join(dn, "db3%d"%x))
+-                std_variants.append(os.path.join(dn, "db3.%d"%x))
+ 
+         db_inc_paths = std_variants + db_inc_paths
+         db_inc_paths = [p for p in db_inc_paths if os.path.exists(p)]
+@@ -818,8 +779,7 @@ class PyBuildExt(build_ext):
+                                 print "being ignored (4.6.x must be >= 4.6.21)"
+                                 continue
+ 
+-                        if ( (db_ver not in db_ver_inc_map) and
+-                            allow_db_ver(db_ver) ):
++                        if db_ver not in db_ver_inc_map:
+                             # save the include directory with the db.h version
+                             # (first occurrence only)
+                             db_ver_inc_map[db_ver] = d
+@@ -1246,7 +1206,7 @@ class PyBuildExt(build_ext):
+             # This requires sizeof(int) == sizeof(long) == sizeof(char*)
+             dl_inc = find_file('dlfcn.h', [], inc_dirs)
+             if (dl_inc is not None) and (platform not in ['atheos']):
+-                exts.append( Extension('dl', ['dlmodule.c']) )
++                exts.append( Extension('dl', ['dlmodule.c'], library_dirs=lib_dirs, libraries=['dl']) )
+             else:
+                 missing.append('dl')
+         else:
+@@ -1255,63 +1215,12 @@ class PyBuildExt(build_ext):
+         # Thomas Heller's _ctypes module
+         self.detect_ctypes(inc_dirs, lib_dirs)
+ 
+-        # Richard Oudkerk's multiprocessing module
+-        if platform == 'win32':             # Windows
+-            macros = dict()
+-            libraries = ['ws2_32']
+-
+-        elif platform == 'darwin':          # Mac OSX
+-            macros = dict(
+-                HAVE_SEM_OPEN=1,
+-                HAVE_SEM_TIMEDWAIT=0,
+-                HAVE_FD_TRANSFER=1,
+-                HAVE_BROKEN_SEM_GETVALUE=1
+-                )
+-            libraries = []
+-
+-        elif platform == 'cygwin':          # Cygwin
+-            macros = dict(
+-                HAVE_SEM_OPEN=1,
+-                HAVE_SEM_TIMEDWAIT=1,
+-                HAVE_FD_TRANSFER=0,
+-                HAVE_BROKEN_SEM_UNLINK=1
+-                )
+-            libraries = []
+-
+-        elif platform in ('freebsd4', 'freebsd5', 'freebsd6', 'freebsd7', 'freebsd8'):
+-            # FreeBSD's P1003.1b semaphore support is very experimental
+-            # and has many known problems. (as of June 2008)
+-            macros = dict(                  # FreeBSD
+-                HAVE_SEM_OPEN=0,
+-                HAVE_SEM_TIMEDWAIT=0,
+-                HAVE_FD_TRANSFER=1,
+-                )
+-            libraries = []
+-
+-        elif platform.startswith('openbsd'):
+-            macros = dict(                  # OpenBSD
+-                HAVE_SEM_OPEN=0,            # Not implemented
+-                HAVE_SEM_TIMEDWAIT=0,
+-                HAVE_FD_TRANSFER=1,
+-                )
+-            libraries = []
+-
+-        elif platform.startswith('netbsd'):
+-            macros = dict(                  # at least NetBSD 5
+-                HAVE_SEM_OPEN=1,
+-                HAVE_SEM_TIMEDWAIT=0,
+-                HAVE_FD_TRANSFER=1,
+-                HAVE_BROKEN_SEM_GETVALUE=1
+-                )
+-            libraries = []
+-
+-        else:                                   # Linux and other unices
+-            macros = dict(
++        macros = dict(
+                 HAVE_SEM_OPEN=1,
+                 HAVE_SEM_TIMEDWAIT=1,
+                 HAVE_FD_TRANSFER=1
+                 )
+-            libraries = ['rt']
++        libraries = ['rt']
+ 
+         if platform == 'win32':
+             multiprocessing_srcs = [ '_multiprocessing/multiprocessing.c',
+@@ -1332,6 +1241,7 @@ class PyBuildExt(build_ext):
+         if sysconfig.get_config_var('WITH_THREAD'):
+             exts.append ( Extension('_multiprocessing', multiprocessing_srcs,
+                                     define_macros=macros.items(),
++                                    libraries=['pthread'],
+                                     include_dirs=["Modules/_multiprocessing"]))
+         else:
+             missing.append('_multiprocessing')
+@@ -1519,7 +1429,7 @@ class PyBuildExt(build_ext):
+ 
+         # All existing framework builds of Tcl/Tk don't support 64-bit
+         # architectures.
+-        cflags = sysconfig.get_config_vars('CFLAGS')[0]
++        cflags = os.environ["CFLAGS"] #sysconfig.get_config_vars('CFLAGS')[0]
+         archs = re.findall('-arch\s+(\w+)', cflags)
+         fp = os.popen("file %s/Tk.framework/Tk | grep 'for architecture'"%(F,))
+         detected_archs = []
+@@ -1673,9 +1583,6 @@ class PyBuildExt(build_ext):
+ 
+     def configure_ctypes(self, ext):
+         if not self.use_system_libffi:
+-            if sys.platform == 'darwin':
+-                return self.configure_ctypes_darwin(ext)
+-
+             (srcdir,) = sysconfig.get_config_vars('srcdir')
+             ffi_builddir = os.path.join(self.build_temp, 'libffi')
+             ffi_srcdir = os.path.abspath(os.path.join(srcdir, 'Modules',
+@@ -1691,12 +1598,14 @@ class PyBuildExt(build_ext):
+                                          ffi_configfile):
+                 from distutils.dir_util import mkpath
+                 mkpath(ffi_builddir)
+-                config_args = ['--host=%s' % os.environ["HOST_SYS"], ]
++                config_args = ["--host=%s" % os.environ["HOST"],
++                               "--target=%s" % os.environ["TARGET"]]
+ 
+                 # Pass empty CFLAGS because we'll just append the resulting
+                 # CFLAGS to Python's; -g or -O2 is to be avoided.
+-                cmd = "(cd %s && autoconf -W cross) && (cd %s && env CFLAGS='' '%s/configure' %s)" \
+-                      % (ffi_srcdir, ffi_builddir, ffi_srcdir, " ".join(config_args))
++                cmd = "(cd %s && autoconf -W cross) && \
++                       (cd %s && env CFLAGS='' '%s/configure' %s)" \
++                       % (ffi_srcdir, ffi_builddir, ffi_srcdir, " ".join(config_args))
+ 
+                 res = os.system(cmd)
+                 if res or not os.path.exists(ffi_configfile):
+@@ -1758,10 +1667,13 @@ class PyBuildExt(build_ext):
+                         include_dirs=include_dirs,
+                         extra_compile_args=extra_compile_args,
+                         extra_link_args=extra_link_args,
+-                        libraries=[],
++			library_dirs=lib_dirs,
++                        libraries=['dl'],
+                         sources=sources,
+                         depends=depends)
+         ext_test = Extension('_ctypes_test',
++			     libraries=['m'],
++			     library_dirs=lib_dirs,
+                              sources=['_ctypes/_ctypes_test.c'])
+         self.extensions.extend([ext, ext_test])
+ 

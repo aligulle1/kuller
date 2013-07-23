@@ -1,0 +1,105 @@
+From 2cf03dd66146bcb532a749673d5c595fc0e85d43 Mon Sep 17 00:00:00 2001
+From: Mehmet Emre Atasever <memre@pardus.org.tr>
+Date: Tue, 12 Apr 2011 14:41:10 +0300
+Subject: [PATCH 5/5] icu.icu6284.strictalias
+
+---
+ common/putil.c |   54 ++++++++++++++++++++++++++----------------------------
+ 1 files changed, 26 insertions(+), 28 deletions(-)
+
+diff --git a/common/putil.c b/common/putil.c
+index 499d25a..db35601 100644
+--- a/common/putil.c
++++ b/common/putil.c
+@@ -177,29 +177,32 @@ static const BitPatternConversion gInf = { (int64_t) INT64_C(0x7FF0000000000000)
+ #   define U_POSIX_LOCALE    1
+ #endif
+ 
+-/*
+-    WARNING! u_topNBytesOfDouble and u_bottomNBytesOfDouble
+-    can't be properly optimized by the gcc compiler sometimes (i.e. gcc 3.2).
+-*/
+-#if !IEEE_754
+-static char*
+-u_topNBytesOfDouble(double* d, int n)
+-{
+ #if U_IS_BIG_ENDIAN
+-    return (char*)d;
++#   define ARR_INDEX 1
+ #else
+-    return (char*)(d + 1) - n;
++#   define ARR_INDEX 0
+ #endif
++
++union u_T {
++    double d;
++    uint32_t i[2];
++};
++
++#if !IEEE_754
++static uint32_t
++u_topOfDoubleAsUint32(double d)
++{
++    union u_T u = { .d = d; }
++
++    return u.i [INDEX];
+ }
+ 
+-static char*
+-u_bottomNBytesOfDouble(double* d, int n)
++static uint32_t
++u_bottomOfDoubleAsUint32(double d)
+ {
+-#if U_IS_BIG_ENDIAN
+-    return (char*)(d + 1) - n;
+-#else
+-    return (char*)d;
+-#endif
++    union u_T u = { .d = d; }
++
++    return u.i [INDEX];
+ }
+ #endif   /* !IEEE_754 */
+ 
+@@ -344,10 +347,8 @@ uprv_isNaN(double number)
+     return (UBool)((convertedNumber.i64 & U_INT64_MAX) > gInf.i64);
+ 
+ #elif defined(OS390)
+-    uint32_t highBits = *(uint32_t*)u_topNBytesOfDouble(&number,
+-                        sizeof(uint32_t));
+-    uint32_t lowBits  = *(uint32_t*)u_bottomNBytesOfDouble(&number,
+-                        sizeof(uint32_t));
++    uint32_t highBits = u_topOfDoubleAsUint32(number);
++    uint32_t lowBits  = u_bottomOfDoubleAsUint32(number);
+ 
+     return ((highBits & 0x7F080000L) == 0x7F080000L) &&
+       (lowBits == 0x00000000L);
+@@ -369,10 +370,8 @@ uprv_isInfinite(double number)
+     /* Infinity is exactly 0x7FF0000000000000U. */
+     return (UBool)((convertedNumber.i64 & U_INT64_MAX) == gInf.i64);
+ #elif defined(OS390)
+-    uint32_t highBits = *(uint32_t*)u_topNBytesOfDouble(&number,
+-                        sizeof(uint32_t));
+-    uint32_t lowBits  = *(uint32_t*)u_bottomNBytesOfDouble(&number,
+-                        sizeof(uint32_t));
++    uint32_t highBits = u_topOfDoubleAsUint32(number);
++    uint32_t lowBits  = u_bottomOfDoubleAsUint32(number);
+ 
+     return ((highBits  & ~SIGN) == 0x70FF0000L) && (lowBits == 0x00000000L);
+ 
+@@ -401,10 +400,9 @@ uprv_isNegativeInfinity(double number)
+     return (UBool)(number < 0 && uprv_isInfinite(number));
+ 
+ #else
+-    uint32_t highBits = *(uint32_t*)u_topNBytesOfDouble(&number,
+-                        sizeof(uint32_t));
+-    return((highBits & SIGN) && uprv_isInfinite(number));
++    uint32_t highBits = u_topOfDoubleAsUint32(number);
+ 
++    return((highBits & SIGN) && uprv_isInfinite(number));
+ #endif
+ }
+ 
+-- 
+1.7.3.4
+

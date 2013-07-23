@@ -1,0 +1,108 @@
+--- a/src/winscard_svc.c	(revision 4207)
++++ b/src/winscard_svc.c	(revision 4208)
+@@ -387,6 +387,14 @@
+ 		dwProtocol = stStr->pdwProtocol;
+ 		cbAtrLen = stStr->pcbAtrLen;
+ 
++		/* avoids buffer overflow */
++		if ((cchReaderLen > sizeof(stStr->mszReaderNames))
++			|| (cbAtrLen > sizeof(stStr->pbAtr)))
++		{
++			stStr->rv = SCARD_E_INSUFFICIENT_BUFFER ;
++			break;
++		}
++
+ 		stStr->rv = SCardStatus(stStr->hCard, stStr->mszReaderNames,
+ 			&cchReaderLen, &dwState,
+ 			&dwProtocol, stStr->pbAtr, &cbAtrLen);
+@@ -402,6 +410,14 @@
+ 		rv = MSGCheckHandleAssociation(trStr->hCard, dwContextIndex);
+ 		if (rv != 0) return rv;
+ 
++		/* avoids buffer overflow */
++		if ((trStr->pcbRecvLength > sizeof(trStr->pbRecvBuffer))
++			|| (trStr->cbSendLength > sizeof(trStr->pbSendBuffer)))
++		{
++			trStr->rv = SCARD_E_INSUFFICIENT_BUFFER ;
++			break;
++		}
++
+ 		ioSendPci.dwProtocol = trStr->pioSendPciProtocol;
+ 		ioSendPci.cbPciLength = trStr->pioSendPciLength;
+ 		ioRecvPci.dwProtocol = trStr->pioRecvPciProtocol;
+@@ -426,6 +442,14 @@
+ 		rv = MSGCheckHandleAssociation(ctStr->hCard, dwContextIndex);
+ 		if (rv != 0) return rv;
+ 
++		/* avoids buffer overflow */
++		if ((ctStr->dwBytesReturned > sizeof(ctStr->cbRecvLength))
++			|| (ctStr->cbSendLength > sizeof(ctStr->pbSendBuffer)))
++		{
++			ctStr->rv = SCARD_E_INSUFFICIENT_BUFFER;
++			break;
++		}
++
+ 		dwBytesReturned = ctStr->dwBytesReturned;
+ 
+ 		ctStr->rv = SCardControl(ctStr->hCard, ctStr->dwControlCode,
+@@ -442,6 +466,13 @@
+ 		rv = MSGCheckHandleAssociation(gsStr->hCard, dwContextIndex);
+ 		if (rv != 0) return rv;
+ 
++		/* avoids buffer overflow */
++		if (gsStr->cbAttrLen > sizeof(gsStr->pbAttr))
++		{
++			gsStr->rv = SCARD_E_INSUFFICIENT_BUFFER ;
++			break;
++		}
++
+ 		cbAttrLen = gsStr->cbAttrLen;
+ 
+ 		gsStr->rv = SCardGetAttrib(gsStr->hCard, gsStr->dwAttrId,
+@@ -455,6 +486,14 @@
+ 		gsStr = ((getset_struct *) msgStruct->data);
+ 		rv = MSGCheckHandleAssociation(gsStr->hCard, dwContextIndex);
+ 		if (rv != 0) return rv;
++
++		/* avoids buffer overflow */
++		if (gsStr->cbAttrLen <= sizeof(gsStr->pbAttr))
++		{
++			gsStr->rv = SCARD_E_INSUFFICIENT_BUFFER ;
++			break;
++		}
++
+ 		gsStr->rv = SCardSetAttrib(gsStr->hCard, gsStr->dwAttrId,
+ 			gsStr->pbAttr, gsStr->cbAttrLen);
+ 		break;
+@@ -469,6 +508,15 @@
+ 			rv = MSGCheckHandleAssociation(treStr->hCard, dwContextIndex);
+ 			if (rv != 0) return rv;
+ 
++			/* avoids buffer overflow */
++			if ((treStr->size > sizeof(pbSendBuffer))
++				|| (treStr->cbSendLength > sizeof(pbSendBuffer))
++				|| (treStr->pcbRecvLength > sizeof(pbRecvBuffer)))
++			{
++				treStr->rv = SCARD_E_INSUFFICIENT_BUFFER;
++				break;
++			}
++
+ 			/* on more block to read? */
+ 			if (treStr->size > PCSCLITE_MAX_MESSAGE_SIZE)
+ 			{
+@@ -550,6 +598,15 @@
+ 			rv = MSGCheckHandleAssociation(cteStr->hCard, dwContextIndex);
+ 			if (rv != 0) return rv;
+ 
++			/* avoids buffer overflow */
++			if ((cteStr->size > sizeof(pbSendBuffer))
++				|| (cteStr->cbSendLength > sizeof(pbSendBuffer))
++				|| (cteStr->cbRecvLength > sizeof(pbRecvBuffer)))
++			{
++				cteStr->rv = SCARD_E_INSUFFICIENT_BUFFER;
++				break;
++			}
++
+ 			/* on more block to read? */
+ 			if (cteStr->size > PCSCLITE_MAX_MESSAGE_SIZE)
+ 			{

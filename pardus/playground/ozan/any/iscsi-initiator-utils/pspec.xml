@@ -1,0 +1,81 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>iscsi-initiator-utils</Name>
+        <Homepage>http://www.open-iscsi.org</Homepage>
+        <Packager>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Packager>
+        <License>BSD</License>
+        <IsA>library</IsA>
+        <IsA>app:console</IsA>
+        <Summary>iSCSI daemon and utility programs</Summary>
+        <Description>iscsi-initiator-utils provides the server daemon for the iSCSI protocol, as well as the utility programs used to manage it. iSCSI is a protocol for distributed disk access using SCSI commands sent over Internet Protocol networks.</Description>
+        <Archive sha1sum="4f4bf366a5bb00f43e978e95e1060cb4cf1bb0e9" type="targz">http://people.redhat.com/mchristi/iscsi/rhel6.0/source/open-iscsi-2.0-872-rc4-bnx2i.tar.gz</Archive>
+        <BuildDependencies>
+            <Dependency>openslp</Dependency>
+            <Dependency>doxygen</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <Patch level="1">fedora/iscsi-initiator-utils-update-initscripts-and-docs.patch</Patch>
+            <Patch level="1">fedora/iscsi-initiator-utils-use-var-for-config.patch</Patch>
+            <Patch level="1">fedora/iscsi-initiator-utils-add-libiscsi.patch</Patch>
+            <Patch level="1">fedora/iscsi-initiator-utils-uip-mgmt.patch</Patch>
+            <Patch level="1">fedora/iscsi-initiator-utils-disable-isns-for-lib.patch</Patch>
+            <Patch level="1">fedora/iscsi-initiator-utils-fix-lib-sysfs-init.patch</Patch>
+            <Patch level="1">fedora/iscsi-initiator-utils-fix-uip-init-race.patch</Patch>
+            <Patch level="1">fedora/iscsi-initiator-utils-dont-use-static.patch</Patch>
+
+            <Patch level="1">fix-linking.patch</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>iscsi-initiator-utils</Name>
+        <RuntimeDependencies>
+            <Dependency>openslp</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="executable">/sbin</Path>
+            <Path fileType="executable">/etc/NetworkManager/dispatcher.d</Path>
+            <Path fileType="config">/etc/iscsi</Path>
+            <Path fileType="library">/usr/lib</Path>
+            <Path fileType="doc">/usr/share/doc</Path>
+            <Path fileType="man">/usr/share/man</Path>
+            <Path fileType="data">/var/lib</Path>
+            <Path fileType="data">/var/lock</Path>
+        </Files>
+        <AdditionalFiles>
+            <AdditionalFile owner="root" permission="0755" target="/etc/NetworkManager/dispatcher.d/04-iscsi">fedora/04-iscsi</AdditionalFile>
+            <AdditionalFile owner="root" permission="0755" target="/etc/iscsi/initiatorname.iscsi">initiatorname.iscsi</AdditionalFile>
+        </AdditionalFiles>
+        <Provides>
+            <COMAR script="iscsi-service.py" name="iscsi">System.Service</COMAR>
+            <COMAR script="iscsid-service.py" name="iscsid">System.Service</COMAR>
+        </Provides>
+    </Package>
+
+    <Package>
+        <Name>iscsi-initiator-utils-devel</Name>
+        <Summary>Development files for iscsi-initiator-utils</Summary>
+        <RuntimeDependencies>
+            <Dependency release="current">iscsi-initiator-utils</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="header">/usr/include</Path>
+            <Path fileType="man">/usr/share/man/man3</Path>
+        </Files>
+    </Package>
+
+    <History>
+        <Update release="1">
+            <Date>2010-07-17</Date>
+            <Version>2.0_872</Version>
+            <Comment>Initial release.</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+    </History>
+</PISI>

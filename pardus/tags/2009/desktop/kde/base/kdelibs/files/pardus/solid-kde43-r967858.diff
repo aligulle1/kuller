@@ -1,0 +1,4353 @@
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/examples/minibrowser/CMakeLists.txt solid-libs-export/examples/minibrowser/CMakeLists.txt
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/examples/minibrowser/CMakeLists.txt	1970-01-01 02:00:00.000000000 +0200
++++ solid/examples/minibrowser/CMakeLists.txt	2009-03-09 20:33:59.016552000 +0200
+@@ -0,0 +1,12 @@
++project(minibrowser)
++
++# search KDE4 and use apply default (but optional) settings
++find_package(KDE4 REQUIRED)
++include(KDE4Defaults)
++
++include_directories(${KDE4_INCLUDE_DIR} ${QT_INCLUDES})
++add_definitions(${QT_DEFINITIONS} ${KDE4_DEFINITIONS})
++
++kde4_add_executable(minibrowser main.cpp)
++
++target_link_libraries(minibrowser ${KDE4_KDEUI_LIBS} ${KDE4_SOLID_LIBS})
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/examples/minibrowser/main.cpp solid-libs-export/examples/minibrowser/main.cpp
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/examples/minibrowser/main.cpp	1970-01-01 02:00:00.000000000 +0200
++++ solid/examples/minibrowser/main.cpp	2009-03-09 20:33:59.016552000 +0200
+@@ -0,0 +1,178 @@
++/*  This file is part of the KDE project
++    Copyright (C) 2009 Harald Fernengel <harry@kdevelop.org>
++
++    This library is free software; you can redistribute it and/or
++    modify it under the terms of the GNU Library General Public
++    License version 2 as published by the Free Software Foundation.
++
++    This library is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++    Library General Public License for more details.
++
++    You should have received a copy of the GNU Library General Public License
++    along with this library; see the file COPYING.LIB.  If not, write to
++    the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
++    Boston, MA 02110-1301, USA.
++
++*/
++
++#include <kapplication.h>
++#include <kaboutdata.h>
++#include <kcmdlineargs.h>
++#include <kmainwindow.h>
++#include <kmenubar.h>
++
++#include <solid/devicenotifier.h>
++#include <solid/device.h>
++#include <solid/genericinterface.h>
++
++#include <QtGui>
++
++class SolidItem : public QTreeWidgetItem
++{
++public:
++    enum SolidItemType { SolidType = UserType + 42 };
++
++    SolidItem(const Solid::Device &device)
++        : QTreeWidgetItem(SolidType)
++    {
++        setText(0, device.udi());
++    }
++};
++
++class SolidBrowser : public QMainWindow
++{
++    Q_OBJECT
++public:
++    SolidBrowser(QWidget *parent = 0)
++        : QMainWindow(parent)
++    {
++        QWidget *central = new QWidget;
++        QVBoxLayout *layout = new QVBoxLayout(central);
++
++        view = new QTreeWidget;
++        view->setColumnCount(1);
++        view->setHeaderLabel("Solid UDI");
++        connect(view, SIGNAL(currentItemChanged(QTreeWidgetItem*,QTreeWidgetItem*)),
++                SLOT(currentItemChanged(QTreeWidgetItem*)));
++
++        details = new QTextBrowser;
++
++        layout->addWidget(new QLabel("Devices:"));
++        layout->addWidget(view);
++        layout->addWidget(new QLabel("Details:"));
++        layout->addWidget(details);
++
++        QMenu *editMenu = menuBar()->addMenu("&Edit");
++        QAction *reloadAction = editMenu->addAction("&Refresh", this, SLOT(populate()));
++        reloadAction->setShortcut(QKeySequence::Refresh);
++
++        setCentralWidget(central);
++    }
++
++public slots:
++    void populate();
++
++private slots:
++    void currentItemChanged(QTreeWidgetItem *current);
++
++private:
++    QTreeWidget *view;
++    QTextBrowser *details;
++};
++
++void SolidBrowser::currentItemChanged(QTreeWidgetItem *current)
++{
++    details->clear();
++
++    // 0 pointer means selection was cleared, no more current item.
++    if (!current || current->type() != SolidItem::SolidType)
++        return;
++
++    SolidItem *item = static_cast<SolidItem *>(current);
++    const QString udi = item->text(0);
++    details->append("<h3>Details for " + udi + "</h3>");
++
++    Solid::Device device(udi);
++    if (!device.isValid()) {
++        details->append("<p>Invalid Device (it might have been removed?)</p>");
++        return;
++    }
++
++    if (Solid::GenericInterface *iface = device.as<Solid::GenericInterface>()) {
++        QString out = "<table><tr><th>Property</th><th>Value</th></tr>\n";
++        const QMap<QString, QVariant> allProperties = iface->allProperties();
++        for (QMap<QString, QVariant>::const_iterator it = allProperties.constBegin();
++             it != allProperties.constEnd(); ++it) {
++            QString row;
++            QVariant val = it.value();
++            row += "<tr><td align=\"right\">";
++            row += Qt::escape(it.key());
++            row += ": </td><td>";
++            if (val.type() == QVariant::ByteArray) {
++                // byte arrays are usually only used as arrays of bytes,
++                // not 8-bit strings. Output them as hex
++                row += val.toByteArray().toHex();
++            } else {
++                row += Qt::escape(it.value().toString());
++            }
++            row += "</td></tr>\n";
++            out += row;
++        }
++        out += "</table>\n";
++        details->append(out);
++    }
++}
++
++void SolidBrowser::populate()
++{
++    // wipe out all data
++    view->clear();
++
++    QHash<QString, SolidItem *> deviceHash;
++
++    // create on QTreeWidgetItem per device
++    const QList<Solid::Device> allDevices = Solid::Device::allDevices();
++    foreach (const Solid::Device &device, allDevices) {
++        deviceHash[device.udi()] = new SolidItem(device);
++    }
++
++    // sort them
++    foreach (const Solid::Device &device, allDevices) {
++        SolidItem *item = deviceHash[device.udi()];
++        const QString parentUdi = device.parentUdi();
++        if (parentUdi.isEmpty()) {
++            view->invisibleRootItem()->addChild(item);
++        } else {
++            SolidItem *parentItem = deviceHash.value(parentUdi);
++            Q_ASSERT(parentItem);
++            parentItem->addChild(item);
++        }
++    }
++}
++
++int main (int argc, char *argv[])
++{
++    KAboutData aboutData("solid-browser",
++                         0,
++                         ki18n("Solid Browser"),
++                         "0.1",
++                         ki18n("Displays a Solid Device Tree"),
++                         KAboutData::License_GPL,
++                         ki18n("(c) 2009 Harald Fernengel"),
++                         ki18n("Simple and quick hack for showing a solid device tree"),
++                         "http://www.kde.org/",
++                         "submit@bugs.kde.org");
++
++    KCmdLineArgs::init(argc, argv, &aboutData);
++    KApplication app;
++
++    SolidBrowser browser;
++    browser.populate();
++    browser.show();
++
++    return app.exec();
++}
++
++#include "main.moc"
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/fakehw/fakedevice.cpp solid-libs-export/solid/backends/fakehw/fakedevice.cpp
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/fakehw/fakedevice.cpp	2008-07-22 03:05:39.000000000 +0300
++++ solid/solid/backends/fakehw/fakedevice.cpp	2009-04-17 22:39:25.292638000 +0300
+@@ -35,6 +35,7 @@
+ #include "fakebutton.h"
+ #include "fakeaudiointerface.h"
+ #include "fakedvbinterface.h"
++#include "fakesmartcardreader.h"
+ 
+ #include <QtCore/QStringList>
+ #include <QtDBus/QDBusConnection>
+@@ -283,6 +284,9 @@
+         break;
+     case Solid::DeviceInterface::Video:
+         break;
++    case Solid::DeviceInterface::SmartCardReader:
++        iface = new FakeSmartCardReader(this);
++        break;
+     case Solid::DeviceInterface::Unknown:
+         break;
+     case Solid::DeviceInterface::Last:
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/fakehw/fakesmartcardreader.cpp solid-libs-export/solid/backends/fakehw/fakesmartcardreader.cpp
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/fakehw/fakesmartcardreader.cpp	1970-01-01 02:00:00.000000000 +0200
++++ solid/solid/backends/fakehw/fakesmartcardreader.cpp	2009-04-26 15:06:28.577813000 +0300
+@@ -0,0 +1,48 @@
++/*  This file is part of the KDE project
++    Copyright (C) 2009 Christopher Blauvelt <cblauvelt@gmail.com>
++
++    This library is free software; you can redistribute it and/or
++    modify it under the terms of the GNU Library General Public
++    License version 3 as published by the Free Software Foundation.
++
++    This library is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++    Library General Public License for more details.
++
++    You should have received a copy of the GNU Library General Public License
++    along with this library; see the file COPYING.LIB.  If not, write to
++    the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
++    Boston, MA 02110-1301, USA.
++
++*/
++
++#include "fakesmartcardreader.h"
++
++using namespace Solid::Backends::Fake;
++
++FakeSmartCardReader::FakeSmartCardReader(FakeDevice *device)
++    : FakeDeviceInterface(device)
++{
++
++}
++
++FakeSmartCardReader::~FakeSmartCardReader()
++{
++
++}
++
++Solid::SmartCardReader::ReaderType FakeSmartCardReader::readerType() const
++{
++    QString type = fakeDevice()->property("smartcardReaderType").toString();
++
++    if (type == "reader") {
++        return Solid::SmartCardReader::CardReader;
++    } else if (type == "cryptoToken") {
++        return Solid::SmartCardReader::CryptoToken;
++    } else {
++        return Solid::SmartCardReader::UnknownReaderType;
++    }
++}
++
++#include "backends/fakehw/fakesmartcardreader.moc"
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/fakehw/fakesmartcardreader.h solid-libs-export/solid/backends/fakehw/fakesmartcardreader.h
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/fakehw/fakesmartcardreader.h	1970-01-01 02:00:00.000000000 +0200
++++ solid/solid/backends/fakehw/fakesmartcardreader.h	2009-04-26 15:06:28.577813000 +0300
+@@ -0,0 +1,49 @@
++/*  This file is part of the KDE project
++    Copyright (C) 2009 Christopher Blauvelt <cblauvelt@gmail.com>
++
++    This library is free software; you can redistribute it and/or
++    modify it under the terms of the GNU Library General Public
++    License version 3 as published by the Free Software Foundation.
++
++    This library is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++    Library General Public License for more details.
++
++    You should have received a copy of the GNU Library General Public License
++    along with this library; see the file COPYING.LIB.  If not, write to
++    the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
++    Boston, MA 02110-1301, USA.
++
++*/
++
++#ifndef SOLID_BACKENDS_FAKEHW_FAKESMARTCARDREADER_H
++#define SOLID_BACKENDS_FAKEHW_FAKESMARTCARDREADER_H
++
++#include "fakedeviceinterface.h"
++#include <solid/ifaces/smartcardreader.h>
++#include <solid/smartcardreader.h>
++
++namespace Solid
++{
++namespace Backends
++{
++namespace Fake
++{
++class FakeSmartCardReader : public FakeDeviceInterface, virtual public Solid::Ifaces::SmartCardReader
++{
++    Q_OBJECT
++    Q_INTERFACES(Solid::Ifaces::SmartCardReader)
++
++public:
++    explicit FakeSmartCardReader(FakeDevice *device);
++    ~FakeSmartCardReader();
++
++    virtual Solid::SmartCardReader::ReaderType readerType() const;
++
++};
++}
++}
++}
++
++#endif // SOLID_BACKENDS_FAKEHW_FAKESMARTCARDREADER_H
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/hal/halbattery.cpp solid-libs-export/solid/backends/hal/halbattery.cpp
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/hal/halbattery.cpp	2008-05-21 14:07:38.000000000 +0300
++++ solid/solid/backends/hal/halbattery.cpp	2009-03-31 06:58:04.964496000 +0300
+@@ -112,12 +112,14 @@
+     {
+         emit chargePercentChanged(chargePercent(), m_device->udi());
+     }
+-    else if (changes.contains("battery.rechargeable.is_charging")
++
++    if (changes.contains("battery.rechargeable.is_charging")
+            || changes.contains("battery.rechargeable.is_discharging"))
+     {
+         emit chargeStateChanged(chargeState(), m_device->udi());
+     }
+-    else if ( changes.contains( "battery.present" ) )
++
++    if ( changes.contains( "battery.present" ) )
+     {
+         emit plugStateChanged(isPlugged(), m_device->udi());
+     }
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/hal/haldevice.cpp solid-libs-export/solid/backends/hal/haldevice.cpp
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/hal/haldevice.cpp	2008-10-17 14:01:39.000000000 +0300
++++ solid/solid/backends/hal/haldevice.cpp	2009-04-17 06:43:05.290215000 +0300
+@@ -45,6 +45,8 @@
+ #include "halaudiointerface.h"
+ #include "haldvbinterface.h"
+ #include "halvideo.h"
++#include "halserialinterface.h"
++#include "halsmartcardreader.h"
+ 
+ using namespace Solid::Backends::Hal;
+ 
+@@ -246,6 +248,12 @@
+         case Solid::AudioInterface::Modem:
+             return QLatin1String("modem");
+         }
++    } else if (category == "serial") {
++        // TODO - a serial device can be a modem, or just
++        // a COM port - need a new icon?
++        return QLatin1String("modem");
++    } else if (category == "smart_card_reader") {
++        return QLatin1String("smart-card-reader");
+     }
+ 
+     return QString();
+@@ -334,7 +342,7 @@
+     if (type==Solid::DeviceInterface::GenericInterface) {
+         return true;
+     } else if (type==Solid::DeviceInterface::StorageAccess) {
+-        return property("info.interfaces").toStringList().contains("org.freedesktop.Hal.Device.Volume")
++        return property("org.freedesktop.Hal.Device.Volume.method_names").toStringList().contains("Mount")
+             || property("info.interfaces").toStringList().contains("org.freedesktop.Hal.Device.Volume.Crypto");
+     }
+     else if (type==Solid::DeviceInterface::Video) {
+@@ -343,7 +351,6 @@
+     }
+ 
+     QStringList cap_list = DeviceInterface::toStringList(type);
+-    QStringList result;
+ 
+     foreach (const QString &cap, cap_list)
+     {
+@@ -422,6 +429,9 @@
+     case Solid::DeviceInterface::Video:
+         iface = new Video(this);
+         break;
++    case Solid::DeviceInterface::SerialInterface:
++        iface = new SerialInterface(this);
++        break;
+     case Solid::DeviceInterface::Unknown:
+     case Solid::DeviceInterface::Last:
+         break;
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/hal/haldeviceinterface.h solid-libs-export/solid/backends/hal/haldeviceinterface.h
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/hal/haldeviceinterface.h	2008-05-21 14:07:38.000000000 +0300
++++ solid/solid/backends/hal/haldeviceinterface.h	2009-04-17 06:43:05.290215000 +0300
+@@ -102,6 +102,11 @@
+         case Solid::DeviceInterface::Video:
+             list << "video4linux";
+             break;
++        case Solid::DeviceInterface::SerialInterface:
++            list << "serial";
++            break;
++        case Solid::DeviceInterface::SmartCardReader:
++            list << "smart_card_reader";
+         case Solid::DeviceInterface::Unknown:
+             break;
+         case Solid::DeviceInterface::Last:
+@@ -143,6 +148,10 @@
+             return Solid::DeviceInterface::DvbInterface;
+         else if (capability == "video4linux")
+             return Solid::DeviceInterface::Video;
++        else if (capability == "serial")
++            return Solid::DeviceInterface::SerialInterface;
++        else if (capability == "smart_card_reader")
++            return Solid::DeviceInterface::SmartCardReader;
+         else
+             return Solid::DeviceInterface::Unknown;
+     }
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/hal/halserialinterface.cpp solid-libs-export/solid/backends/hal/halserialinterface.cpp
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/hal/halserialinterface.cpp	1970-01-01 02:00:00.000000000 +0200
++++ solid/solid/backends/hal/halserialinterface.cpp	2009-01-21 09:54:35.854447000 +0200
+@@ -0,0 +1,59 @@
++/*  This file is part of the KDE project
++    Copyright (C) 2009 Harald Fernengel <harry@kdevelop.org>
++
++    This library is free software; you can redistribute it and/or
++    modify it under the terms of the GNU Library General Public
++    License version 2 as published by the Free Software Foundation.
++
++    This library is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++    Library General Public License for more details.
++
++    You should have received a copy of the GNU Library General Public License
++    along with this library; see the file COPYING.LIB.  If not, write to
++    the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
++    Boston, MA 02110-1301, USA.
++
++*/
++
++#include "halserialinterface.h"
++
++#include "haldevice.h"
++
++#include <QtCore/QStringList>
++
++using namespace Solid::Backends::Hal;
++
++SerialInterface::SerialInterface(HalDevice *device)
++    : DeviceInterface(device)
++{
++
++}
++
++SerialInterface::~SerialInterface()
++{
++
++}
++
++QVariant SerialInterface::driverHandle() const
++{
++    return m_device->property("serial.device");
++}
++
++Solid::SerialInterface::SerialType SerialInterface::serialType() const
++{
++    QString type = m_device->property("serial.type").toString();
++    if (type == QLatin1String("platform"))
++        return Solid::SerialInterface::Platform;
++    if (type == QLatin1String("usb"))
++        return Solid::SerialInterface::Usb;
++    return Solid::SerialInterface::Unknown;
++}
++
++int SerialInterface::port() const
++{
++    return m_device->property("serial.port").toInt();
++}
++
++#include "backends/hal/halserialinterface.moc"
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/hal/halserialinterface.h solid-libs-export/solid/backends/hal/halserialinterface.h
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/hal/halserialinterface.h	1970-01-01 02:00:00.000000000 +0200
++++ solid/solid/backends/hal/halserialinterface.h	2009-01-20 23:47:50.614760000 +0200
+@@ -0,0 +1,51 @@
++/*  This file is part of the KDE project
++    Copyright (C) 2009 Harald Fernengel <harry@kdevelop.org>
++
++    This library is free software; you can redistribute it and/or
++    modify it under the terms of the GNU Library General Public
++    License version 2 as published by the Free Software Foundation.
++
++    This library is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++    Library General Public License for more details.
++
++    You should have received a copy of the GNU Library General Public License
++    along with this library; see the file COPYING.LIB.  If not, write to
++    the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
++    Boston, MA 02110-1301, USA.
++
++*/
++
++#ifndef SOLID_BACKENDS_HAL_HALSERIALINTERFACE_H
++#define SOLID_BACKENDS_HAL_HALSERIALINTERFACE_H
++
++#include <solid/ifaces/serialinterface.h>
++#include "haldeviceinterface.h"
++
++namespace Solid
++{
++namespace Backends
++{
++namespace Hal
++{
++class HalDevice;
++
++class SerialInterface : public DeviceInterface, virtual public Solid::Ifaces::SerialInterface
++{
++    Q_OBJECT
++    Q_INTERFACES(Solid::Ifaces::SerialInterface)
++
++public:
++    SerialInterface(HalDevice *device);
++    virtual ~SerialInterface();
++
++    virtual QVariant driverHandle() const;
++    virtual Solid::SerialInterface::SerialType serialType() const;
++    virtual int port() const;
++};
++}
++}
++}
++
++#endif // SOLID_BACKENDS_HAL_HALSERIALINTERFACE_H
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/hal/halsmartcardreader.cpp solid-libs-export/solid/backends/hal/halsmartcardreader.cpp
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/hal/halsmartcardreader.cpp	1970-01-01 02:00:00.000000000 +0200
++++ solid/solid/backends/hal/halsmartcardreader.cpp	2009-04-26 15:06:28.577813000 +0300
+@@ -0,0 +1,54 @@
++/*  This file is part of the KDE project
++    Copyright (C) 2009 Christopher Blauvelt <cblauvelt@gmail.com>
++
++    This library is free software; you can redistribute it and/or
++    modify it under the terms of the GNU Library General Public
++    License version 3 as published by the Free Software Foundation.
++
++    This library is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++    Library General Public License for more details.
++
++    You should have received a copy of the GNU Library General Public License
++    along with this library; see the file COPYING.LIB.  If not, write to
++    the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
++    Boston, MA 02110-1301, USA.
++
++*/
++
++#include "halsmartcardreader.h"
++
++#include "haldevice.h"
++
++#include <QtCore/QStringList>
++
++using namespace Solid::Backends::Hal;
++
++SmartCardReader::SmartCardReader(HalDevice *device)
++    : DeviceInterface(device)
++{
++
++}
++
++SmartCardReader::~SmartCardReader()
++{
++
++}
++
++Solid::SmartCardReader::ReaderType SmartCardReader::readerType() const
++{
++    Solid::SmartCardReader::ReaderType type;
++    QStringList capabilities = m_device->property("info.capabilities").toStringList();
++
++    if (capabilities.contains("card_reader")) {
++        type = Solid::SmartCardReader::CardReader;
++    }
++    if (capabilities.contains("crypto_token")) {
++        type = Solid::SmartCardReader::CryptoToken;
++    }
++
++    return type;
++}
++
++#include "backends/hal/halsmartcardreader.moc"
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/hal/halsmartcardreader.h solid-libs-export/solid/backends/hal/halsmartcardreader.h
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/hal/halsmartcardreader.h	1970-01-01 02:00:00.000000000 +0200
++++ solid/solid/backends/hal/halsmartcardreader.h	2009-04-26 15:06:28.577813000 +0300
+@@ -0,0 +1,49 @@
++/*  This file is part of the KDE project
++    Copyright (C) 2009 Christopher Blauvelt <cblauvelt@gmail.com>
++
++    This library is free software; you can redistribute it and/or
++    modify it under the terms of the GNU Library General Public
++    License version 3 as published by the Free Software Foundation.
++
++    This library is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++    Library General Public License for more details.
++
++    You should have received a copy of the GNU Library General Public License
++    along with this library; see the file COPYING.LIB.  If not, write to
++    the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
++    Boston, MA 02110-1301, USA.
++
++*/
++
++#ifndef SOLID_BACKENDS_HAL_HALSMARTCARDREADER_H
++#define SOLID_BACKENDS_HAL_HALSMARTCARDREADER_H
++
++#include <solid/ifaces/smartcardreader.h>
++#include "haldeviceinterface.h"
++
++namespace Solid
++{
++namespace Backends
++{
++namespace Hal
++{
++class HalDevice;
++
++class SmartCardReader : public DeviceInterface, virtual public Solid::Ifaces::SmartCardReader
++{
++    Q_OBJECT
++    Q_INTERFACES(Solid::Ifaces::SmartCardReader)
++
++public:
++    SmartCardReader(HalDevice *device);
++    virtual ~SmartCardReader();
++
++    virtual Solid::SmartCardReader::ReaderType readerType() const;
++};
++}
++}
++}
++
++#endif // SOLID_BACKENDS_HAL_HALSMARTCARDREADER_H
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/iokit/cfhelper.cpp solid-libs-export/solid/backends/iokit/cfhelper.cpp
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/iokit/cfhelper.cpp	1970-01-01 02:00:00.000000000 +0200
++++ solid/solid/backends/iokit/cfhelper.cpp	2009-03-08 19:40:38.049055000 +0200
+@@ -0,0 +1,170 @@
++/*  This file is part of the KDE project
++    Copyright (C) 2009 Harald Fernengel <harry@kdevelop.org>
++
++    This library is free software; you can redistribute it and/or
++    modify it under the terms of the GNU Library General Public
++    License version 2 as published by the Free Software Foundation.
++
++    This library is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++    Library General Public License for more details.
++
++    You should have received a copy of the GNU Library General Public License
++    along with this library; see the file COPYING.LIB.  If not, write to
++    the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
++    Boston, MA 02110-1301, USA.
++
++*/
++
++#include <QtCore/qvarlengtharray.h>
++#include <QtCore/qstring.h>
++#include <QtCore/qstringlist.h>
++#include <QtCore/qvariant.h>
++#include <QtCore/qdatetime.h>
++#include <QtCore/qdebug.h>
++
++#include <CoreFoundation/CoreFoundation.h>
++
++/* helper classes to convert from CF types to Qt */
++
++static QString q_toString(const CFStringRef &str)
++{
++    CFIndex length = CFStringGetLength(str);
++    QVarLengthArray<UniChar> buffer(length);
++
++    CFRange range = { 0, length };
++    CFStringGetCharacters(str, range, buffer.data());
++    return QString(reinterpret_cast<const QChar *>(buffer.data()), length);
++}
++
++template <typename T>
++static inline T convertCFNumber(const CFNumberRef &num, CFNumberType type)
++{
++    T n;
++    CFNumberGetValue(num, type, &n);
++    return n;
++}
++
++static QVariant q_toVariant(const CFTypeRef &obj)
++{
++    const CFTypeID typeId = CFGetTypeID(obj);
++
++    if (typeId == CFStringGetTypeID())
++        return QVariant(q_toString(static_cast<const CFStringRef>(obj)));
++
++    if (typeId == CFNumberGetTypeID()) {
++        const CFNumberRef num = static_cast<const CFNumberRef>(obj);
++        const CFNumberType type = CFNumberGetType(num);
++        switch (type) {
++        case kCFNumberSInt8Type:
++            return qVariantFromValue(convertCFNumber<char>(num, type));
++        case kCFNumberSInt16Type:
++            return qVariantFromValue(convertCFNumber<qint16>(num, type));
++        case kCFNumberSInt32Type:
++            return qVariantFromValue(convertCFNumber<qint32>(num, type));
++        case kCFNumberSInt64Type:
++            return qVariantFromValue(convertCFNumber<qint64>(num, type));
++        case kCFNumberCharType:
++            return qVariantFromValue(convertCFNumber<uchar>(num, type));
++        case kCFNumberShortType:
++            return qVariantFromValue(convertCFNumber<short>(num, type));
++        case kCFNumberIntType:
++            return qVariantFromValue(convertCFNumber<int>(num, type));
++        case kCFNumberLongType:
++            return qVariantFromValue(convertCFNumber<long>(num, type));
++        case kCFNumberLongLongType:
++            return qVariantFromValue(convertCFNumber<long long>(num, type));
++        case kCFNumberFloatType:
++            return qVariantFromValue(convertCFNumber<float>(num, type));
++        case kCFNumberDoubleType:
++            return qVariantFromValue(convertCFNumber<double>(num, type));
++        default:
++            if (CFNumberIsFloatType(num))
++                return qVariantFromValue(convertCFNumber<double>(num, kCFNumberDoubleType));
++            return qVariantFromValue(convertCFNumber<quint64>(num, kCFNumberLongLongType));
++        }
++    }
++
++    if (typeId == CFDateGetTypeID()) {
++        QDateTime dt;
++        dt.setTime_t(uint(kCFAbsoluteTimeIntervalSince1970));
++        return dt.addSecs(int(CFDateGetAbsoluteTime(static_cast<const CFDateRef>(obj))));
++    }
++
++    if (typeId == CFDataGetTypeID()) {
++        const CFDataRef cfdata = static_cast<const CFDataRef>(obj);
++        return QByteArray(reinterpret_cast<const char *>(CFDataGetBytePtr(cfdata)),
++                    CFDataGetLength(cfdata));
++    }
++
++    if (typeId == CFBooleanGetTypeID())
++        return QVariant(bool(CFBooleanGetValue(static_cast<const CFBooleanRef>(obj))));
++
++    if (typeId == CFArrayGetTypeID()) {
++        const CFArrayRef cfarray = static_cast<const CFArrayRef>(obj);
++        QList<QVariant> list;
++        CFIndex size = CFArrayGetCount(cfarray);
++        bool metNonString = false;
++        for (CFIndex i = 0; i < size; ++i) {
++            QVariant value = q_toVariant(CFArrayGetValueAtIndex(cfarray, i));
++            if (value.type() != QVariant::String)
++                metNonString = true;
++            list << value;
++        }
++        if (metNonString)
++            return list;
++        else
++            return QVariant(list).toStringList();
++    }
++
++    if (typeId == CFDictionaryGetTypeID()) {
++        const CFDictionaryRef cfdict = static_cast<const CFDictionaryRef>(obj);
++        const CFTypeID arrayTypeId = CFArrayGetTypeID();
++        int size = int(CFDictionaryGetCount(cfdict));
++        QVarLengthArray<CFPropertyListRef> keys(size);
++        QVarLengthArray<CFPropertyListRef> values(size);
++        CFDictionaryGetKeysAndValues(cfdict, keys.data(), values.data());
++
++        QMultiMap<QString, QVariant> map;
++        for (int i = 0; i < size; ++i) {
++            QString key = q_toString(static_cast<const CFStringRef>(keys[i]));
++
++            if (CFGetTypeID(values[i]) == arrayTypeId) {
++                const CFArrayRef cfarray = static_cast<const CFArrayRef>(values[i]);
++                CFIndex arraySize = CFArrayGetCount(cfarray);
++                for (CFIndex j = arraySize - 1; j >= 0; --j)
++                    map.insert(key, q_toVariant(CFArrayGetValueAtIndex(cfarray, j)));
++            } else {
++                map.insert(key, q_toVariant(values[i]));
++            }
++        }
++        return map;
++    }
++
++    return QVariant();
++}
++
++QMap<QString, QVariant> q_toVariantMap (const CFMutableDictionaryRef &dict)
++{
++    Q_ASSERT(dict);
++
++    QMap<QString, QVariant> result;
++
++    const int count = CFDictionaryGetCount(dict);
++    QVarLengthArray<void *> keys(count);
++    QVarLengthArray<void *> values(count);
++
++    CFDictionaryGetKeysAndValues(dict,
++            const_cast<const void **>(keys.data()),
++            const_cast<const void **>(values.data()));
++
++    for (int i = 0; i < count; ++i) {
++        const QString key = q_toString((CFStringRef)keys[i]);
++        const QVariant value = q_toVariant((CFTypeRef)values[i]);
++        result[key] = value;
++    }
++
++    return result;
++}
++
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/iokit/iokitdevice.cpp solid-libs-export/solid/backends/iokit/iokitdevice.cpp
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/iokit/iokitdevice.cpp	1970-01-01 02:00:00.000000000 +0200
++++ solid/solid/backends/iokit/iokitdevice.cpp	2009-03-08 19:40:38.049055000 +0200
+@@ -0,0 +1,222 @@
++/*  This file is part of the KDE project
++    Copyright (C) 2009 Harald Fernengel <harry@kdevelop.org>
++
++    This library is free software; you can redistribute it and/or
++    modify it under the terms of the GNU Library General Public
++    License version 2 as published by the Free Software Foundation.
++
++    This library is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++    Library General Public License for more details.
++
++    You should have received a copy of the GNU Library General Public License
++    along with this library; see the file COPYING.LIB.  If not, write to
++    the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
++    Boston, MA 02110-1301, USA.
++
++*/
++
++
++#include "iokitdevice.h"
++#include "iokitgenericinterface.h"
++#include "iokitprocessor.h"
++#include "iokitnetworkinterface.h"
++
++#include <QtCore/qdebug.h>
++
++#include <IOKit/IOKitLib.h>
++#include <IOKit/usb/IOUSBLib.h>
++#include <IOKit/network/IOEthernetInterface.h>
++
++#include <CoreFoundation/CoreFoundation.h>
++
++// from cfhelper.cpp
++extern QMap<QString, QVariant> q_toVariantMap(const CFMutableDictionaryRef &dict);
++
++namespace Solid { namespace Backends { namespace IOKit {
++
++// returns a solid type from an entry and its properties
++static Solid::DeviceInterface::Type typeFromEntry(const io_registry_entry_t &entry,
++        const QMap<QString, QVariant> &properties)
++{
++    if (IOObjectConformsTo(entry, kIOEthernetInterfaceClass))
++        return Solid::DeviceInterface::NetworkInterface;
++    if (IOObjectConformsTo(entry, "AppleACPICPU")) {
++        return Solid::DeviceInterface::Processor;
++    }
++
++    return Solid::DeviceInterface::Unknown;
++}
++
++// gets all properties from an entry into a QMap
++static QMap<QString, QVariant> getProperties(const io_registry_entry_t &entry)
++{
++    CFMutableDictionaryRef propertyDict = 0;
++
++    if (IORegistryEntryCreateCFProperties(entry, &propertyDict, kCFAllocatorDefault, kNilOptions) != KERN_SUCCESS) {
++        return QMap<QString, QVariant>();
++    }
++
++    QMap<QString, QVariant> result = q_toVariantMap(propertyDict);
++
++    CFRelease(propertyDict);
++
++    return result;
++}
++
++// gets the parent's Udi from an entry
++static QString getParentDeviceUdi(const io_registry_entry_t &entry)
++{
++    io_registry_entry_t parent = 0;
++    kern_return_t ret = IORegistryEntryGetParentEntry(entry, kIOServicePlane, &parent);
++    if (ret != KERN_SUCCESS) {
++        // don't release parent here - docs say only on success
++        return QString();
++    }
++
++    QString result;
++    io_string_t pathName;
++    ret = IORegistryEntryGetPath(parent, kIOServicePlane, pathName);
++    if (ret == KERN_SUCCESS)
++        result = QString::fromUtf8(pathName);
++
++    // now we can release the parent
++    IOObjectRelease(parent);
++
++    return result;
++}
++
++
++class IOKitDevicePrivate
++{
++public:
++    inline IOKitDevicePrivate()
++        : type(Solid::DeviceInterface::Unknown)
++    {}
++
++    void init(const QString &udiString, const io_registry_entry_t & entry);
++
++    QString udi;
++    QString parentUdi;
++    QMap<QString, QVariant> properties;
++    Solid::DeviceInterface::Type type;
++};
++
++void IOKitDevicePrivate::init(const QString &udiString, const io_registry_entry_t &entry)
++{
++    Q_ASSERT(entry != MACH_PORT_NULL);
++
++    udi = udiString;
++
++    properties = getProperties(entry);
++
++    io_name_t className;
++    IOObjectGetClass(entry, className);
++    properties["className"] = QString::fromUtf8(className);
++
++    parentUdi = getParentDeviceUdi(entry);
++    type = typeFromEntry(entry, properties);
++
++    IOObjectRelease(entry);
++}
++
++IOKitDevice::IOKitDevice(const QString &udi, const io_registry_entry_t &entry)
++    : d(new IOKitDevicePrivate)
++{
++    d->init(udi, entry);
++}
++
++IOKitDevice::IOKitDevice(const QString &udi)
++    : d(new IOKitDevicePrivate)
++{
++    io_registry_entry_t entry = IORegistryEntryFromPath(
++            kIOMasterPortDefault,
++            udi.toLocal8Bit().constData());
++
++    if (entry == MACH_PORT_NULL) {
++        qDebug() << Q_FUNC_INFO << "Tried to create Device from invalid UDI" << udi;
++        return;
++    }
++
++    d->init(udi, entry);
++}
++
++IOKitDevice::~IOKitDevice()
++{
++    delete d;
++}
++
++QString IOKitDevice::udi() const
++{
++    return d->udi;
++}
++
++QString IOKitDevice::parentUdi() const
++{
++    return d->parentUdi;
++}
++
++QString IOKitDevice::vendor() const
++{
++    return QString(); // TODO
++}
++
++QString IOKitDevice::product() const
++{
++    return QString(); // TODO
++}
++
++QString IOKitDevice::icon() const
++{
++    return QString(); // TODO
++}
++
++QVariant IOKitDevice::property(const QString &key) const
++{
++    return d->properties.value(key);
++}
++
++QMap<QString, QVariant> IOKitDevice::allProperties() const
++{
++    return d->properties;
++}
++
++bool IOKitDevice::propertyExists(const QString &key) const
++{
++    return d->properties.contains(key);
++}
++
++bool IOKitDevice::queryDeviceInterface(const Solid::DeviceInterface::Type &type) const
++{
++    return (type == Solid::DeviceInterface::GenericInterface
++            || type == d->type);
++}
++
++QObject *IOKitDevice::createDeviceInterface(const Solid::DeviceInterface::Type &type)
++{
++    QObject *iface = 0;
++
++    switch (type)
++    {
++    case Solid::DeviceInterface::GenericInterface:
++        iface = new GenericInterface(this);
++        break;
++    case Solid::DeviceInterface::Processor:
++        if (d->type == Solid::DeviceInterface::Processor)
++            iface = new Processor(this);
++        break;
++    case Solid::DeviceInterface::NetworkInterface:
++        if (d->type == Solid::DeviceInterface::NetworkInterface)
++            iface = new NetworkInterface(this);
++        break;
++    // the rest is TODO
++    }
++
++
++    return iface;
++}
++
++
++} } } // namespaces
++
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/iokit/iokitdevice.h solid-libs-export/solid/backends/iokit/iokitdevice.h
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/iokit/iokitdevice.h	1970-01-01 02:00:00.000000000 +0200
++++ solid/solid/backends/iokit/iokitdevice.h	2009-03-08 19:40:38.049055000 +0200
+@@ -0,0 +1,72 @@
++/*  This file is part of the KDE project
++    Copyright (C) 2009 Harald Fernengel <harry@kdevelop.org>
++
++    This library is free software; you can redistribute it and/or
++    modify it under the terms of the GNU Library General Public
++    License version 2 as published by the Free Software Foundation.
++
++    This library is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++    Library General Public License for more details.
++
++    You should have received a copy of the GNU Library General Public License
++    along with this library; see the file COPYING.LIB.  If not, write to
++    the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
++    Boston, MA 02110-1301, USA.
++
++*/
++
++#ifndef SOLID_BACKENDS_IOKIT_IOKITDEVICE_H
++#define SOLID_BACKENDS_IOKIT_IOKITDEVICE_H
++
++#include <solid/ifaces/device.h>
++#include <IOKit/IOKitLib.h>
++
++namespace Solid
++{
++namespace Backends
++{
++namespace IOKit
++{
++class IOKitDevicePrivate;
++class IOKitManager;
++
++class IOKitDevice : public Solid::Ifaces::Device
++{
++    Q_OBJECT
++
++public:
++    IOKitDevice(const QString &udi);
++    virtual ~IOKitDevice();
++
++    virtual QString udi() const;
++    virtual QString parentUdi() const;
++
++    virtual QString vendor() const;
++    virtual QString product() const;
++    virtual QString icon() const;
++
++    virtual QVariant property(const QString &key) const;
++
++    virtual QMap<QString, QVariant> allProperties() const;
++
++    virtual bool propertyExists(const QString &key) const;
++
++    virtual bool queryDeviceInterface(const Solid::DeviceInterface::Type &type) const;
++    virtual QObject *createDeviceInterface(const Solid::DeviceInterface::Type &type);
++
++Q_SIGNALS:
++    void propertyChanged(const QMap<QString,int> &changes);
++    void conditionRaised(const QString &condition, const QString &reason);
++
++private:
++    friend class IOKitManager;
++    IOKitDevice(const QString &udi, const io_registry_entry_t &entry);
++    IOKitDevicePrivate * const d;
++};
++}
++}
++}
++
++#endif // SOLID_BACKENDS_IOKIT_IOKITDEVICE_H
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/iokit/iokitdeviceinterface.cpp solid-libs-export/solid/backends/iokit/iokitdeviceinterface.cpp
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/iokit/iokitdeviceinterface.cpp	1970-01-01 02:00:00.000000000 +0200
++++ solid/solid/backends/iokit/iokitdeviceinterface.cpp	2009-03-08 19:40:38.049055000 +0200
+@@ -0,0 +1,33 @@
++/*  This file is part of the KDE project
++    Copyright (C) 2009 Harald Fernengel <harry@kdevelop.org>
++
++    This library is free software; you can redistribute it and/or
++    modify it under the terms of the GNU Library General Public
++    License version 2 as published by the Free Software Foundation.
++
++    This library is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++    Library General Public License for more details.
++
++    You should have received a copy of the GNU Library General Public License
++    along with this library; see the file COPYING.LIB.  If not, write to
++    the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
++    Boston, MA 02110-1301, USA.
++
++*/
++
++#include "iokitdeviceinterface.h"
++
++using namespace Solid::Backends::IOKit;
++
++DeviceInterface::DeviceInterface(IOKitDevice *device)
++    : QObject(device), m_device(device)
++{
++}
++
++DeviceInterface::~DeviceInterface()
++{
++}
++
++#include "backends/iokit/iokitdeviceinterface.moc"
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/iokit/iokitdeviceinterface.h solid-libs-export/solid/backends/iokit/iokitdeviceinterface.h
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/iokit/iokitdeviceinterface.h	1970-01-01 02:00:00.000000000 +0200
++++ solid/solid/backends/iokit/iokitdeviceinterface.h	2009-03-08 19:40:38.049055000 +0200
+@@ -0,0 +1,50 @@
++/*  This file is part of the KDE project
++    Copyright (C) 2009 Harald Fernengel <harry@kdevelop.org>
++
++    This library is free software; you can redistribute it and/or
++    modify it under the terms of the GNU Library General Public
++    License version 2 as published by the Free Software Foundation.
++
++    This library is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++    Library General Public License for more details.
++
++    You should have received a copy of the GNU Library General Public License
++    along with this library; see the file COPYING.LIB.  If not, write to
++    the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
++    Boston, MA 02110-1301, USA.
++
++*/
++
++#ifndef SOLID_BACKENDS_IOKIT_DEVICEINTERFACE_H
++#define SOLID_BACKENDS_IOKIT_DEVICEINTERFACE_H
++
++#include <solid/ifaces/deviceinterface.h>
++#include "iokitdevice.h"
++
++#include <QtCore/QObject>
++#include <QtCore/QStringList>
++
++namespace Solid
++{
++namespace Backends
++{
++namespace IOKit
++{
++class DeviceInterface : public QObject, virtual public Solid::Ifaces::DeviceInterface
++{
++    Q_OBJECT
++    Q_INTERFACES(Solid::Ifaces::DeviceInterface)
++public:
++    DeviceInterface(IOKitDevice *device);
++    virtual ~DeviceInterface();
++
++protected:
++    IOKitDevice *m_device;
++};
++}
++}
++}
++
++#endif // SOLID_BACKENDS_IOKIT_DEVICEINTERFACE_H
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/iokit/iokitgenericinterface.cpp solid-libs-export/solid/backends/iokit/iokitgenericinterface.cpp
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/iokit/iokitgenericinterface.cpp	1970-01-01 02:00:00.000000000 +0200
++++ solid/solid/backends/iokit/iokitgenericinterface.cpp	2009-03-08 19:40:38.049055000 +0200
+@@ -0,0 +1,51 @@
++/*  This file is part of the KDE project
++    Copyright (C) 2009 Harald Fernengel <harry@kdevelop.org>
++
++    This library is free software; you can redistribute it and/or
++    modify it under the terms of the GNU Library General Public
++    License version 2 as published by the Free Software Foundation.
++
++    This library is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++    Library General Public License for more details.
++
++    You should have received a copy of the GNU Library General Public License
++    along with this library; see the file COPYING.LIB.  If not, write to
++    the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
++    Boston, MA 02110-1301, USA.
++
++*/
++
++#include "iokitgenericinterface.h"
++
++#include "iokitdevice.h"
++
++using namespace Solid::Backends::IOKit;
++
++GenericInterface::GenericInterface(IOKitDevice *device)
++    : DeviceInterface(device)
++{
++}
++
++GenericInterface::~GenericInterface()
++{
++
++}
++
++QVariant GenericInterface::property(const QString &key) const
++{
++    return m_device->property(key);
++}
++
++QMap<QString, QVariant> GenericInterface::allProperties() const
++{
++    return m_device->allProperties();
++}
++
++bool GenericInterface::propertyExists(const QString &key) const
++{
++    return m_device->propertyExists(key);
++}
++
++#include "backends/iokit/iokitgenericinterface.moc"
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/iokit/iokitgenericinterface.h solid-libs-export/solid/backends/iokit/iokitgenericinterface.h
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/iokit/iokitgenericinterface.h	1970-01-01 02:00:00.000000000 +0200
++++ solid/solid/backends/iokit/iokitgenericinterface.h	2009-03-08 19:40:38.049055000 +0200
+@@ -0,0 +1,56 @@
++/*  This file is part of the KDE project
++    Copyright (C) 2009 Harald Fernengel <harry@kdevelop.org>
++
++    This library is free software; you can redistribute it and/or
++    modify it under the terms of the GNU Library General Public
++    License version 2 as published by the Free Software Foundation.
++
++    This library is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++    Library General Public License for more details.
++
++    You should have received a copy of the GNU Library General Public License
++    along with this library; see the file COPYING.LIB.  If not, write to
++    the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
++    Boston, MA 02110-1301, USA.
++
++*/
++
++#ifndef SOLID_BACKENDS_IOKIT_GENERICINTERFACE_H
++#define SOLID_BACKENDS_IOKIT_GENERICINTERFACE_H
++
++#include <solid/ifaces/genericinterface.h>
++#include <solid/genericinterface.h>
++#include "iokitdeviceinterface.h"
++
++namespace Solid
++{
++namespace Backends
++{
++namespace IOKit
++{
++class IOKitDevice;
++
++class GenericInterface : public DeviceInterface, virtual public Solid::Ifaces::GenericInterface
++{
++    Q_OBJECT
++    Q_INTERFACES(Solid::Ifaces::GenericInterface)
++
++public:
++    GenericInterface(IOKitDevice *device);
++    virtual ~GenericInterface();
++
++    virtual QVariant property(const QString &key) const;
++    virtual QMap<QString, QVariant> allProperties() const;
++    virtual bool propertyExists(const QString &key) const;
++
++Q_SIGNALS:
++    void propertyChanged(const QMap<QString,int> &changes);
++    void conditionRaised(const QString &condition, const QString &reason);
++};
++}
++}
++}
++
++#endif // SOLID_BACKENDS_IOKIT_GENERICINTERFACE_H
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/iokit/iokitmanager.cpp solid-libs-export/solid/backends/iokit/iokitmanager.cpp
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/iokit/iokitmanager.cpp	1970-01-01 02:00:00.000000000 +0200
++++ solid/solid/backends/iokit/iokitmanager.cpp	2009-03-08 19:40:38.049055000 +0200
+@@ -0,0 +1,210 @@
++/*  This file is part of the KDE project
++    Copyright (C) 2009 Harald Fernengel <harry@kdevelop.org>
++
++    This library is free software; you can redistribute it and/or
++    modify it under the terms of the GNU Library General Public
++    License version 2 as published by the Free Software Foundation.
++
++    This library is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++    Library General Public License for more details.
++
++    You should have received a copy of the GNU Library General Public License
++    along with this library; see the file COPYING.LIB.  If not, write to
++    the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
++    Boston, MA 02110-1301, USA.
++
++*/
++
++#include "iokitmanager.h"
++#include "iokitdevice.h"
++
++#include <QtCore/qdebug.h>
++
++#include <IOKit/IOKitLib.h>
++#include <IOKit/usb/IOUSBLib.h>
++#include <IOKit/network/IOEthernetInterface.h>
++
++#include <CoreFoundation/CoreFoundation.h>
++
++namespace Solid { namespace Backends { namespace IOKit {
++
++class IOKitManagerPrivate
++{
++public:
++    inline IOKitManagerPrivate()
++        : port(0), source(0)
++    {}
++
++    IONotificationPortRef port;
++    CFRunLoopSourceRef source;
++
++    static const char *typeToName(Solid::DeviceInterface::Type type);
++    static QStringList devicesFromRegistry(io_iterator_t it);
++};
++
++// gets all registry pathes from an iterator
++QStringList IOKitManagerPrivate::devicesFromRegistry(io_iterator_t it)
++{
++    QStringList result;
++    io_object_t obj;
++    io_string_t pathName;
++    while ((obj = IOIteratorNext(it))) {
++        kern_return_t ret = IORegistryEntryGetPath(obj, kIOServicePlane, pathName);
++        if (ret != KERN_SUCCESS) {
++            qWarning() << Q_FUNC_INFO << "IORegistryEntryGetPath failed";
++            continue;
++        }
++        result += QString::fromUtf8(pathName);
++        ret = IOObjectRelease(obj);
++        if (ret != KERN_SUCCESS) {
++            // very unlikely to happen - keep it a qDebug just in case.
++            // compiler will nuke this code in release builds.
++            qDebug() << Q_FUNC_INFO << "Unable to release object reference";
++        }
++    }
++    IOObjectRelease(it);
++
++    return result;
++}
++
++const char *IOKitManagerPrivate::typeToName(Solid::DeviceInterface::Type type)
++{
++    switch (type) {
++    case Solid::DeviceInterface::Unknown:
++        return 0;
++    case Solid::DeviceInterface::NetworkInterface:
++        return kIOEthernetInterfaceClass;
++    case Solid::DeviceInterface::Processor:
++        return "AppleACPICPU";
++
++    //Solid::DeviceInterface::GenericInterface:
++    //Solid::DeviceInterface::Block:
++    //Solid::DeviceInterface::StorageAccess:
++    //Solid::DeviceInterface::StorageDrive:
++    //Solid::DeviceInterface::OpticalDrive:
++    //Solid::DeviceInterface::StorageVolume:
++    //Solid::DeviceInterface::OpticalDisc:
++    //Solid::DeviceInterface::Camera:
++    //Solid::DeviceInterface::PortableMediaPlayer:
++    //Solid::DeviceInterface::NetworkInterface:
++    //Solid::DeviceInterface::AcAdapter:
++    //Solid::DeviceInterface::Battery:
++    //Solid::DeviceInterface::Button:
++    //Solid::DeviceInterface::AudioInterface:
++    //Solid::DeviceInterface::DvbInterface:
++    //Solid::DeviceInterface::Video:
++    //Solid::DeviceInterface::SerialInterface:
++    }
++
++    return 0;
++}
++
++IOKitManager::IOKitManager(QObject *parent)
++    : Solid::Ifaces::DeviceManager(parent), d(new IOKitManagerPrivate)
++{
++    d->port = IONotificationPortCreate(kIOMasterPortDefault);
++    if (!d->port) {
++        qWarning() << Q_FUNC_INFO << "Unable to create notification port";
++        return;
++    }
++
++    d->source = IONotificationPortGetRunLoopSource(d->port);
++    if (!d->source) {
++        qWarning() << Q_FUNC_INFO << "Unable to create notification source";
++        return;
++    }
++
++    CFRunLoopAddSource(CFRunLoopGetCurrent(), d->source, kCFRunLoopDefaultMode);
++}
++
++IOKitManager::~IOKitManager()
++{
++    if (d->source)
++        CFRunLoopRemoveSource(CFRunLoopGetCurrent(), d->source, kCFRunLoopDefaultMode);
++    if (d->port)
++        IONotificationPortDestroy(d->port);
++
++    delete d;
++}
++
++QStringList IOKitManager::allDevices()
++{
++    // use an IORegistry Iterator to iterate over all devices in the service plane
++
++    io_iterator_t it;
++    kern_return_t ret = IORegistryCreateIterator(
++            kIOMasterPortDefault,
++            kIOServicePlane,
++            kIORegistryIterateRecursively,
++            &it);
++    if (ret != KERN_SUCCESS) {
++        qWarning() << Q_FUNC_INFO << "unable to create iterator";
++        return QStringList();
++    }
++
++    return IOKitManagerPrivate::devicesFromRegistry(it);
++}
++
++QStringList IOKitManager::devicesFromQuery(const QString &parentUdi,
++                                           Solid::DeviceInterface::Type type)
++{
++    QStringList result;
++
++    if (type == Solid::DeviceInterface::Unknown) {
++        // match all device interfaces
++        result = allDevices();
++    } else {
++        const char *deviceClassName = IOKitManagerPrivate::typeToName(type);
++        if (!deviceClassName)
++            return QStringList();
++
++        CFMutableDictionaryRef matchingDict = IOServiceMatching(deviceClassName);
++
++        if (!matchingDict)
++            return QStringList();
++
++        io_iterator_t it = 0;
++
++        // note - IOServiceGetMatchingServices dereferences the dict
++        kern_return_t ret = IOServiceGetMatchingServices(
++                kIOMasterPortDefault,
++                matchingDict,
++                &it);
++
++        result = IOKitManagerPrivate::devicesFromRegistry(it);
++    }
++
++    // if the parentUdi is an empty string, return all matches
++    if (parentUdi.isEmpty())
++        return result;
++
++    // return only matches that start with the parent's UDI
++    QStringList filtered;
++    foreach (QString udi, result) {
++        if (udi.startsWith(parentUdi))
++            filtered += udi;
++    }
++
++    return filtered;
++}
++
++QObject *IOKitManager::createDevice(const QString &udi)
++{
++    io_registry_entry_t entry = IORegistryEntryFromPath(
++            kIOMasterPortDefault,
++            udi.toLocal8Bit().constData());
++
++    // we have to do IOObjectConformsTo - comparing the class names is not good enough
++    //if (IOObjectConformsTo(entry, kIOEthernetInterfaceClass)) {
++    //}
++
++    if (entry == MACH_PORT_NULL)
++        return 0;
++
++    return new IOKitDevice(udi, entry);
++}
++
++}}} // namespaces
++
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/iokit/iokitmanager.h solid-libs-export/solid/backends/iokit/iokitmanager.h
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/iokit/iokitmanager.h	1970-01-01 02:00:00.000000000 +0200
++++ solid/solid/backends/iokit/iokitmanager.h	2009-03-08 19:40:38.049055000 +0200
+@@ -0,0 +1,58 @@
++/*  This file is part of the KDE project
++    Copyright (C) 2009 Harald Fernengel <harry@kdevelop.org>
++
++    This library is free software; you can redistribute it and/or
++    modify it under the terms of the GNU Library General Public
++    License version 2 as published by the Free Software Foundation.
++
++    This library is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++    Library General Public License for more details.
++
++    You should have received a copy of the GNU Library General Public License
++    along with this library; see the file COPYING.LIB.  If not, write to
++    the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
++    Boston, MA 02110-1301, USA.
++
++*/
++
++#ifndef SOLID_BACKENDS_IOKIT_IOKITMANAGER_H
++#define SOLID_BACKENDS_IOKIT_IOKITMANAGER_H
++
++#include <solid/ifaces/devicemanager.h>
++#include <solid/deviceinterface.h>
++
++#include <QtCore/QVariant>
++#include <QtCore/QStringList>
++
++namespace Solid
++{
++namespace Backends
++{
++namespace IOKit
++{
++class IOKitManagerPrivate;
++
++class IOKitManager : public Solid::Ifaces::DeviceManager
++{
++    Q_OBJECT
++
++public:
++    IOKitManager(QObject *parent);
++    virtual ~IOKitManager();
++
++    virtual QStringList allDevices();
++    virtual QStringList devicesFromQuery(const QString &parentUdi,
++                                         Solid::DeviceInterface::Type type);
++    virtual QObject *createDevice(const QString &udi);
++
++private:
++    IOKitManagerPrivate *d;
++};
++}
++}
++}
++
++#endif // SOLID_BACKENDS_IOKIT_IOKITMANAGER_H
++
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/iokit/iokitnetworkinterface.cpp solid-libs-export/solid/backends/iokit/iokitnetworkinterface.cpp
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/iokit/iokitnetworkinterface.cpp	1970-01-01 02:00:00.000000000 +0200
++++ solid/solid/backends/iokit/iokitnetworkinterface.cpp	2009-03-08 19:40:38.049055000 +0200
+@@ -0,0 +1,86 @@
++/*  This file is part of the KDE project
++    Copyright (C) 2009 Harald Fernengel <harry@kdevelop.org>
++
++    This library is free software; you can redistribute it and/or
++    modify it under the terms of the GNU Library General Public
++    License version 2 as published by the Free Software Foundation.
++
++    This library is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++    Library General Public License for more details.
++
++    You should have received a copy of the GNU Library General Public License
++    along with this library; see the file COPYING.LIB.  If not, write to
++    the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
++    Boston, MA 02110-1301, USA.
++
++*/
++
++#include "iokitnetworkinterface.h"
++
++#include "iokitdevice.h"
++
++#include <QtCore/qstringlist.h>
++#include <QtCore/qdebug.h>
++
++using namespace Solid::Backends::IOKit;
++
++NetworkInterface::NetworkInterface(IOKitDevice *device)
++    : DeviceInterface(device)
++{
++}
++
++NetworkInterface::~NetworkInterface()
++{
++}
++
++QString NetworkInterface::ifaceName() const
++{
++    return m_device->property(QLatin1String("BSD Name")).toString();
++}
++
++bool NetworkInterface::isWireless() const
++{
++    return m_device->propertyExists(QLatin1String("IO80211HardwareVersion"));
++}
++
++QString NetworkInterface::hwAddress() const
++{
++    // TODO - how to get the hw address? Return a string representation of the MAC addr for now
++    const QByteArray ba = IOKitDevice(m_device->parentUdi()).property(QLatin1String("IOMACAddress")).toByteArray();
++    qDebug() << ba.length();
++    if (ba.length() != 6)
++        return QString();
++
++    QString result;
++    for (int i = 0; i < 6; ++i) {
++        // produce a hex number, 2 digits width, 0-padded followed by a colon
++        result += QString::fromLatin1("%1:").arg(uchar(ba.at(i)), 2, 16, QLatin1Char('0'));
++    }
++    // remove tailing colon
++    result.chop(1);
++
++    return result;
++}
++
++qulonglong NetworkInterface::macAddress() const
++{
++    // IOMacAddress property returns the mac address encoded in 6 bytes
++    const QByteArray ba = IOKitDevice(m_device->parentUdi()).property(QLatin1String("IOMACAddress")).toByteArray();
++    if (ba.length() != 6)
++        return 0;
++
++    // need to bit-shift instead of memcpy because of alignment and endianess
++    qulonglong result;
++    result  = qulonglong((uchar)ba.at(0)) << 40;
++    result += qulonglong((uchar)ba.at(1)) << 32;
++    result += qulonglong((uchar)ba.at(2)) << 24;
++    result += qulonglong((uchar)ba.at(3)) << 16;
++    result += qulonglong((uchar)ba.at(4)) << 8;
++    result += (uchar)ba.at(5);
++
++    return result;
++}
++
++#include "backends/iokit/iokitnetworkinterface.moc"
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/iokit/iokitnetworkinterface.h solid-libs-export/solid/backends/iokit/iokitnetworkinterface.h
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/iokit/iokitnetworkinterface.h	1970-01-01 02:00:00.000000000 +0200
++++ solid/solid/backends/iokit/iokitnetworkinterface.h	2009-03-08 19:40:38.049055000 +0200
+@@ -0,0 +1,52 @@
++/*  This file is part of the KDE project
++    Copyright (C) 2009 Harald Fernengel <harry@kdevelop.org>
++
++    This library is free software; you can redistribute it and/or
++    modify it under the terms of the GNU Library General Public
++    License version 2 as published by the Free Software Foundation.
++
++    This library is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++    Library General Public License for more details.
++
++    You should have received a copy of the GNU Library General Public License
++    along with this library; see the file COPYING.LIB.  If not, write to
++    the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
++    Boston, MA 02110-1301, USA.
++
++*/
++
++#ifndef SOLID_BACKENDS_IOKIT_IOKITNETWORKINTERFACE_H
++#define SOLID_BACKENDS_IOKIT_IOKITNETWORKINTERFACE_H
++
++#include <solid/ifaces/networkinterface.h>
++#include "iokitdeviceinterface.h"
++
++namespace Solid
++{
++namespace Backends
++{
++namespace IOKit
++{
++class IOKitDevice;
++
++class NetworkInterface : public DeviceInterface, virtual public Solid::Ifaces::NetworkInterface
++{
++    Q_OBJECT
++    Q_INTERFACES(Solid::Ifaces::NetworkInterface)
++
++public:
++    NetworkInterface(IOKitDevice *device);
++    virtual ~NetworkInterface();
++
++    virtual QString ifaceName() const;
++    virtual bool isWireless() const;
++    virtual QString hwAddress() const;
++    virtual qulonglong macAddress() const;
++};
++}
++}
++}
++
++#endif // SOLID_BACKENDS_IOKIT_IOKITNETWORKINTERFACE_H
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/iokit/iokitprocessor.cpp solid-libs-export/solid/backends/iokit/iokitprocessor.cpp
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/iokit/iokitprocessor.cpp	1970-01-01 02:00:00.000000000 +0200
++++ solid/solid/backends/iokit/iokitprocessor.cpp	2009-03-08 19:40:38.049055000 +0200
+@@ -0,0 +1,58 @@
++/*  This file is part of the KDE project
++    Copyright (C) 2009 Harald Fernengel <harry@kdevelop.org>
++
++    This library is free software; you can redistribute it and/or
++    modify it under the terms of the GNU Library General Public
++    License version 2 as published by the Free Software Foundation.
++
++    This library is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++    Library General Public License for more details.
++
++    You should have received a copy of the GNU Library General Public License
++    along with this library; see the file COPYING.LIB.  If not, write to
++    the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
++    Boston, MA 02110-1301, USA.
++
++*/
++
++#include "iokitprocessor.h"
++#include "iokitdevice.h"
++
++#include <QtCore/qdebug.h>
++
++using namespace Solid::Backends::IOKit;
++
++Processor::Processor(IOKitDevice *device)
++    : DeviceInterface(device)
++{
++    //IOKitDevice parent(device->parentUdi());
++}
++
++Processor::~Processor()
++{
++
++}
++
++int Processor::number() const
++{
++    return m_device->property(QLatin1String("IOCPUNumber")).toInt();
++}
++
++int Processor::maxSpeed() const
++{
++    return 0; // TODO
++}
++
++bool Processor::canChangeFrequency() const
++{
++    return false; // TODO
++}
++
++Solid::Processor::InstructionSets Processor::instructionSets() const
++{
++    return 0; // TODO
++}
++
++#include "backends/iokit/iokitprocessor.moc"
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/iokit/iokitprocessor.h solid-libs-export/solid/backends/iokit/iokitprocessor.h
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/iokit/iokitprocessor.h	1970-01-01 02:00:00.000000000 +0200
++++ solid/solid/backends/iokit/iokitprocessor.h	2009-03-08 19:40:38.049055000 +0200
+@@ -0,0 +1,52 @@
++/*  This file is part of the KDE project
++    Copyright (C) 2009 Harald Fernengel <harry@kdevelop.org>
++
++    This library is free software; you can redistribute it and/or
++    modify it under the terms of the GNU Library General Public
++    License version 2 as published by the Free Software Foundation.
++
++    This library is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++    Library General Public License for more details.
++
++    You should have received a copy of the GNU Library General Public License
++    along with this library; see the file COPYING.LIB.  If not, write to
++    the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
++    Boston, MA 02110-1301, USA.
++
++*/
++
++#ifndef SOLID_BACKENDS_IOKIT_PROCESSOR_H
++#define SOLID_BACKENDS_IOKIT_PROCESSOR_H
++
++#include <solid/ifaces/processor.h>
++#include "iokitdeviceinterface.h"
++
++namespace Solid
++{
++namespace Backends
++{
++namespace IOKit
++{
++class IOKitDevice;
++
++class Processor : public DeviceInterface, virtual public Solid::Ifaces::Processor
++{
++    Q_OBJECT
++    Q_INTERFACES(Solid::Ifaces::Processor)
++
++public:
++    Processor(IOKitDevice *device);
++    virtual ~Processor();
++
++    virtual int number() const;
++    virtual int maxSpeed() const;
++    virtual bool canChangeFrequency() const;
++    virtual Solid::Processor::InstructionSets instructionSets() const;
++};
++}
++}
++}
++
++#endif // SOLID_BACKENDS_IOKIT_PROCESSOR_H
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/wmi/wmiblock.cpp solid-libs-export/solid/backends/wmi/wmiblock.cpp
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/wmi/wmiblock.cpp	2008-05-21 14:07:39.000000000 +0300
++++ solid/solid/backends/wmi/wmiblock.cpp	2009-04-11 16:22:00.548066000 +0300
+@@ -46,7 +46,7 @@
+ 
+ QString Block::device() const
+ {
+-    return m_device->property("block.device").toString();
++    return m_device->property("drive").toString();
+ }
+ 
+ #include "backends/wmi/wmiblock.moc"
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/wmi/wmicdrom.cpp solid-libs-export/solid/backends/wmi/wmicdrom.cpp
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/wmi/wmicdrom.cpp	2008-05-21 14:07:39.000000000 +0300
++++ solid/solid/backends/wmi/wmicdrom.cpp	2009-04-12 14:06:57.311743000 +0300
+@@ -21,8 +21,6 @@
+ 
+ #include <QtCore/QStringList>
+ 
+-#include "wmifstabhandling.h"
+-
+ using namespace Solid::Backends::Wmi;
+ 
+ Cdrom::Cdrom(WmiDevice *device)
+@@ -109,11 +107,7 @@
+     }
+     m_ejectInProgress = true;
+ 
+-    if (FstabHandling::isInFstab(m_device->property("block.device").toString())) {
+-        return callSystemEject();
+-    } else {
+-        return callWmiDriveEject();
+-    }
++    return callWmiDriveEject();
+ }
+ 
+ bool Cdrom::callWmiDriveEject()
+@@ -154,15 +148,6 @@
+     return false;
+ }
+ 
+-bool Solid::Backends::Wmi::Cdrom::callSystemEject()
+-{
+-    const QString device = m_device->property("block.device").toString();
+-    m_process = FstabHandling::callSystemCommand("eject", device,
+-                                                 this, SLOT(slotProcessFinished(int, QProcess::ExitStatus)));
+-
+-    return m_process!=0;
+-}
+-
+ void Solid::Backends::Wmi::Cdrom::slotProcessFinished(int exitCode, QProcess::ExitStatus exitStatus)
+ {
+     Q_UNUSED(exitStatus);
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/wmi/wmicdrom.h solid-libs-export/solid/backends/wmi/wmicdrom.h
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/wmi/wmicdrom.h	2008-05-21 14:07:39.000000000 +0300
++++ solid/solid/backends/wmi/wmicdrom.h	2009-04-12 14:06:57.311743000 +0300
+@@ -56,7 +56,6 @@
+ 
+ private:
+     bool callWmiDriveEject();
+-    bool callSystemEject();
+ 
+     bool m_ejectInProgress;
+     QProcess *m_process;
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/wmi/wmidevice.cpp solid-libs-export/solid/backends/wmi/wmidevice.cpp
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/wmi/wmidevice.cpp	2008-05-21 14:07:39.000000000 +0300
++++ solid/solid/backends/wmi/wmidevice.cpp	2009-04-13 22:17:36.125310000 +0300
+@@ -42,6 +42,7 @@
+ #include "wmivideo.h"
+ #include "wmiquery.h"
+ 
++
+ #ifdef _DEBUG
+ # pragma comment(lib, "comsuppwd.lib")
+ #else
+@@ -61,12 +62,12 @@
+ class Solid::Backends::Wmi::WmiDevicePrivate
+ {
+ public:
+-    WmiDevicePrivate(const QString &udi)
++    WmiDevicePrivate(const QString &_udi)
+         : parent(0)
+-        , m_query()
+-        , m_udi(udi)
+-        , m_wmiType()
+-        , m_solidType( Solid::DeviceInterface::Unknown )
++        , m_udi(_udi)
++        , m_wmiTable()
++        , m_wmiProperty()
++        , m_wmiValue()
+     {    
+     }
+ 
+@@ -76,43 +77,240 @@
+     
+     void discoverType()
+     {
++        if (!convertUDItoWMI(m_udi,m_wmiTable,m_wmiProperty,m_wmiValue))
++            return;
++        
++        // todo: add nicer implementation to detect device type
++        if (m_wmiTable == getWMITable(Solid::DeviceInterface::OpticalDrive))
++            interfaceList << "Block" << "StorageDrive" << "OpticalDrive";
+     }
+    
+     const QString udi() const { return m_udi; }
++
++    WmiQuery::ItemList sendQuery() 
++    {
++        QString query("SELECT * FROM " + m_wmiTable + " WHERE " + m_wmiProperty + "='" + m_wmiValue + "'");
++        WmiQuery::ItemList list = m_query.sendQuery(query);
++        return list;
++    }
++    
++    static bool convertUDItoWMI(const QString &udi, QString &wmiTable, QString &wmiProperty, QString &wmiValue)
++    {
++        QString _udi = udi;
++        QStringList x = _udi.remove("/org/kde/solid/wmi/").split("/");
++        if (x.size() != 3) {
++            qDebug() << "invalid udi detected" << _udi;
++            return false;
++        }
++        Solid::DeviceInterface::Type type = DeviceInterface::fromString(x[0]);
++        wmiTable = getWMITable(type);
++        wmiProperty = x[1];
++        wmiValue = x[2];
++        return true;
++    }
++
++    static bool exists(const QString &udi)
++    {
++        QString wmiTable;
++        QString wmiProperty;
++        QString wmiValue;
++        
++        if (!convertUDItoWMI(udi, wmiTable, wmiProperty, wmiValue))
++            return false;
++
++        QString query("SELECT * FROM " + wmiTable + " WHERE " + wmiProperty + "='" + wmiValue + "'");
++        WmiQuery::ItemList list = m_query.sendQuery(query);
++        return list.size() > 0;
++    }
++
++    static QString generateUDI(const QString &key, const QString &property, const QString &value)
++    {
++        return QString("/org/kde/solid/wmi/%1/%2/%3").arg(key).arg(property).arg(value);
++    }
+     
+-    const QString wmiType() const { return m_wmiType; }
++    static QStringList getInterfaces(const Solid::DeviceInterface::Type &type)
++    {
++        QStringList interfaceList;
++            
++        switch (type)
++        {
++        case Solid::DeviceInterface::GenericInterface:
++            break;
++        case Solid::DeviceInterface::Processor:
++            break;
++        case Solid::DeviceInterface::Block:
++            break;
++        case Solid::DeviceInterface::StorageAccess:
++            break;
++        case Solid::DeviceInterface::StorageDrive:
++            break;
++        case Solid::DeviceInterface::OpticalDrive:
++            interfaceList << "Block" << "StorageDrive" << "OpticalDrive";
++            break;
++        case Solid::DeviceInterface::StorageVolume:
++            break;
++        case Solid::DeviceInterface::OpticalDisc:
++            interfaceList << "Block" << "StorageDrive" << "OpticalDrive";
++            break;
++        case Solid::DeviceInterface::Camera:
++            break;
++        case Solid::DeviceInterface::PortableMediaPlayer:
++            break;
++        case Solid::DeviceInterface::NetworkInterface:
++            break;
++        case Solid::DeviceInterface::AcAdapter:
++            break;
++        case Solid::DeviceInterface::Battery:
++            break;
++        case Solid::DeviceInterface::Button:
++            break;
++        case Solid::DeviceInterface::AudioInterface:
++            break;
++        case Solid::DeviceInterface::DvbInterface:
++            break;        case Solid::DeviceInterface::Video:
++            break;
++        case Solid::DeviceInterface::Unknown:
++        case Solid::DeviceInterface::Last:
++        default:
++            break;
++        }
++        if (interfaceList.size() == 0)
++            qWarning() << "no interface found for type" << type;
++        return interfaceList;
++    }
+     
+-    Solid::DeviceInterface::Type type() const { return m_solidType; }
++    static QString getUDIKey(const Solid::DeviceInterface::Type &type)
++    {
++        QStringList list = DeviceInterface::toStringList(type);
++        QString value = list.size() > 0 ? list[0] : QString();
++        qDebug() << value;
++        return value;
++    }
++
++    static QString getWMITable(const Solid::DeviceInterface::Type &type)
++    {
++        QString wmiTable;
++        switch (type)
++        {
++        case Solid::DeviceInterface::GenericInterface:
++            break;
++        case Solid::DeviceInterface::Processor:
++            wmiTable = "Win32_Processor";
++            break;
++        case Solid::DeviceInterface::Block:
++            break;
++        case Solid::DeviceInterface::StorageAccess:
++            break;
++        case Solid::DeviceInterface::StorageDrive:
++            break;
++        case Solid::DeviceInterface::OpticalDrive:
++            wmiTable = "Win32_CDROMDrive";
++            break;
++        case Solid::DeviceInterface::StorageVolume:
++            break;
++        case Solid::DeviceInterface::OpticalDisc:
++            wmiTable = "Win32_CDROMDrive";
++            break;
++        case Solid::DeviceInterface::Camera:
++            break;
++        case Solid::DeviceInterface::PortableMediaPlayer:
++            break;
++        case Solid::DeviceInterface::NetworkInterface:
++            break;
++        case Solid::DeviceInterface::AcAdapter:
++            break;
++        case Solid::DeviceInterface::Battery:
++            wmiTable = "Win32_Battery";
++            break;
++        case Solid::DeviceInterface::Button:
++            break;
++        case Solid::DeviceInterface::AudioInterface:
++            break;
++        case Solid::DeviceInterface::DvbInterface:
++            break;
++        case Solid::DeviceInterface::Video:
++            break;
++        case Solid::DeviceInterface::Unknown:
++        case Solid::DeviceInterface::Last:
++        default:
++            wmiTable = "unknown";
++            break;
++        }
++        return wmiTable;
++    }    
++
++    static QString getPropertyNameForUDI(const Solid::DeviceInterface::Type &type)
++    {
++        QString propertyName;
++        if (type == Solid::DeviceInterface::OpticalDrive)
++            propertyName = "Drive";
++        else if (type == Solid::DeviceInterface::Battery)
++            propertyName = "Name";
++        else
++            propertyName = "DeviceID";    
++            
++        return propertyName;
++    }
+     
+-    QList<IWbemClassObject*> sendQuery( const QString &wql )
+-        { return m_query.sendQuery( wql ); }
++    static QStringList generateUDIList(const Solid::DeviceInterface::Type &type)
++    {
++        QStringList result;
++        
++        WmiQuery::ItemList list = m_query.sendQuery( "select * from " + getWMITable(type) );
++        foreach(WmiQuery::Item *item, list) {
++            QString propertyName = getPropertyNameForUDI(type);
++            QString property = item->getProperty(propertyName);
++            
++            result << generateUDI(getUDIKey(type),propertyName.toLower(),property.toLower());
++        }
++        return result;
++    }
+     
+     WmiDevice *parent;
+-    WmiQuery m_query;
++    static WmiQuery m_query;
+     QString m_udi;
+-    QString m_wmiType;
+-    Solid::DeviceInterface::Type m_solidType;
++    QString m_wmiTable;
++    QString m_wmiProperty;
++    QString m_wmiValue;
++    QStringList interfaceList;
+ };
+ 
++WmiQuery WmiDevicePrivate::m_query;
++
+ Q_DECLARE_METATYPE(ChangeDescription)
+ Q_DECLARE_METATYPE(QList<ChangeDescription>)
+-
+ WmiDevice::WmiDevice(const QString &udi)
+     : Device(), d(new WmiDevicePrivate(udi))
+ {
+     d->discoverType();
++    foreach (const QString &_interface, d->interfaceList)
++    {
++        Solid::DeviceInterface::Type type = Solid::DeviceInterface::stringToType(_interface);
++        createDeviceInterface(type);
++    }
+ }
+ 
+ WmiDevice::~WmiDevice()
+ {
+-    delete d->parent;
++    //delete d->parent;
+     delete d;
+ }
+ 
++QStringList WmiDevice::generateUDIList(const Solid::DeviceInterface::Type &type)
++{
++    return WmiDevicePrivate::generateUDIList(type);
++}
++
++bool WmiDevice::exists(const QString &udi)
++{
++    return WmiDevicePrivate::exists(udi);
++}
++
+ bool WmiDevice::isValid() const
+ {
++    // does not work 
+     //return sendQuery( "SELECT * FROM Win32_SystemDevices WHERE PartComponent='\\\\\\\\BEAST\root\cimv2:Win32_Processor.DeviceID=\"CPU0\"'" ).count() == 1;
+-    return false;
++    return true;
+ }
+ 
+ QString WmiDevice::udi() const
+@@ -127,12 +325,12 @@
+ 
+ QString WmiDevice::vendor() const
+ {
+-    return QString();
++    return property("Manufacturer").toString();
+ }
+ 
+ QString WmiDevice::product() const
+ {
+-    return property("info.product").toString();
++    return property("Name").toString();
+ }
+ 
+ QString WmiDevice::icon() const
+@@ -241,9 +439,13 @@
+ }
+ 
+ QVariant WmiDevice::property(const QString &key) const
+-{
+-    d->sendQuery( "SELECT " + key + " FROM " + d->wmiType() + " WHERE DeviceID=\"" + d->udi() + "\"" );
+-    return QVariant();
++{    
++    WmiQuery::ItemList list = d->sendQuery();
++    if (list.size() == 0)
++        return QString();
++        
++    QString result = list[0]->getProperty( key );
++    return result;
+ }
+ 
+ QMap<QString, QVariant> WmiDevice::allProperties() const
+@@ -263,16 +465,10 @@
+ 
+ bool WmiDevice::propertyExists(const QString &key) const
+ {
+-    // QDBusReply<bool> reply = d->device.call("PropertyExists", key);
+-
+-    // if (!reply.isValid())
+-    // {
+-        // qDebug() << Q_FUNC_INFO << " error: " << reply.error().name() << endl;
+-        // return false;
+-    // }
+-
+-    // return reply;
+-    return false;
++    WmiQuery::ItemList list = d->sendQuery();
++    if (list.size() == 0)
++        return false;
++    return list[0]->getProperty( key ).isEmpty() ? false: true;
+ }
+ 
+ bool WmiDevice::queryDeviceInterface(const Solid::DeviceInterface::Type &type) const
+@@ -281,31 +477,20 @@
+     if (type==Solid::DeviceInterface::GenericInterface) {
+         return true;
+     } else if (type==Solid::DeviceInterface::StorageAccess) {
++#if 1
++        qDebug() << " has to be implemented"; 
++        return false;
++#else
+         return property("info.interfaces").toStringList().contains("org.freedesktop.Wmi.Device.Volume")
+             || property("info.interfaces").toStringList().contains("org.freedesktop.Wmi.Device.Volume.Crypto");
++#endif
+     }
+     else if (type==Solid::DeviceInterface::Video) {
+         if (!property("video4linux.device").toString().contains("video" ) )
+           return false;
+     }
+ 
+-    QStringList cap_list = DeviceInterface::toStringList(type);
+-    QStringList result;
+-
+-    // foreach (const QString &cap, cap_list)
+-    // {
+-        // QDBusReply<bool> reply = d->device.call("QueryCapability", cap);
+-
+-        // if (!reply.isValid())
+-        // {
+-            // qWarning() << Q_FUNC_INFO << " error: " << reply.error().name() << endl;
+-            // return false;
+-        // }
+-
+-        // if (reply) return reply;
+-    // }
+-
+-    return false;
++    return d->interfaceList.contains(Solid::DeviceInterface::typeToString(type));
+ }
+ 
+ QObject *WmiDevice::createDeviceInterface(const Solid::DeviceInterface::Type &type)
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/wmi/wmidevice.h solid-libs-export/solid/backends/wmi/wmidevice.h
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/wmi/wmidevice.h	2008-05-21 14:07:39.000000000 +0300
++++ solid/solid/backends/wmi/wmidevice.h	2009-04-11 23:21:59.434087000 +0300
+@@ -63,6 +63,9 @@
+ 
+     virtual bool queryDeviceInterface(const Solid::DeviceInterface::Type &type) const;
+     virtual QObject *createDeviceInterface(const Solid::DeviceInterface::Type &type);
++    
++    static QStringList generateUDIList(const Solid::DeviceInterface::Type &type);
++    static bool exists(const QString &udi);
+ 
+ Q_SIGNALS:
+     void propertyChanged(const QMap<QString,int> &changes);
+@@ -74,6 +77,7 @@
+ 
+ private:
+     WmiDevicePrivate *d;
++    friend class WmiDevicePrivate;
+ };
+ }
+ }
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/wmi/wmifstabhandling.cpp solid-libs-export/solid/backends/wmi/wmifstabhandling.cpp
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/wmi/wmifstabhandling.cpp	2008-05-21 14:07:39.000000000 +0300
++++ solid/solid/backends/wmi/wmifstabhandling.cpp	1970-01-01 02:00:00.000000000 +0200
+@@ -1,144 +0,0 @@
+-/*  This file is part of the KDE project
+-    Copyright (C) 2007 Kevin Ottens <ervin@kde.org>
+-
+-    This library is free software; you can redistribute it and/or
+-    modify it under the terms of the GNU Library General Public
+-    License version 2 as published by the Free Software Foundation.
+-
+-    This library is distributed in the hope that it will be useful,
+-    but WITHOUT ANY WARRANTY; without even the implied warranty of
+-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+-    Library General Public License for more details.
+-
+-    You should have received a copy of the GNU Library General Public License
+-    along with this library; see the file COPYING.LIB.  If not, write to
+-    the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+-    Boston, MA 02110-1301, USA.
+-
+-*/
+-
+-#include "wmifstabhandling.h"
+-
+-#include <QtCore/QFile>
+-#include <QtCore/QObject>
+-#include <QtCore/QProcess>
+-#include <QtCore/QTextStream>
+-
+-#ifdef HAVE_MNTENT_H
+-#include <mntent.h>
+-#elif defined(HAVE_SYS_MNTENT_H)
+-#include <sys/mntent.h>
+-#endif
+-
+-#ifdef Q_OS_SOLARIS
+-#define FSTAB "/etc/vfstab"
+-#else
+-#define FSTAB "/etc/fstab"
+-#endif
+-
+-QString _k_resolveSymLink(const QString &filename)
+-{
+-    QString resolved = filename;
+-    QString tmp = QFile::symLinkTarget(filename);
+-
+-    while (!tmp.isEmpty()) {
+-        resolved = tmp;
+-        tmp = QFile::symLinkTarget(resolved);
+-    }
+-
+-    return resolved;
+-}
+-
+-bool Solid::Backends::Wmi::FstabHandling::isInFstab(const QString &device)
+-{
+-    const QString deviceToFind = _k_resolveSymLink(device);
+-
+-    if (deviceToFind.isEmpty()) {
+-        return false;
+-    }
+-
+-#ifdef HAVE_SETMNTENT
+-
+-    struct mntent *fstab;
+-    if ((fstab = setmntent(FSTAB, "r")) == 0) {
+-        return false;
+-    }
+-
+-    struct mntent *fe;
+-    while ((fe = getmntent(fstab)) != 0) {
+-        const QString device = _k_resolveSymLink(QFile::decodeName(fe->mnt_fsname));
+-
+-        if (device==deviceToFind) {
+-            endmntent(fstab);
+-            return true;
+-        }
+-    }
+-
+-    endmntent(fstab);
+-
+-#else
+-
+-    QFile fstab(FSTAB);
+-    if (!fstab.open(QIODevice::ReadOnly)) {
+-        return false;
+-    }
+-
+-    QTextStream stream(&fstab);
+-    QString line;
+-
+-    while (!stream.atEnd()) {
+-        line = stream.readLine().simplified();
+-        if (line.isEmpty() || line.startsWith('#')) {
+-            continue;
+-        }
+-
+-        // not empty or commented out by '#'
+-        QStringList items = line.split(' ');
+-
+-#ifdef Q_OS_SOLARIS
+-        if (items.count() < 5) {
+-            continue;
+-        }
+-#else
+-        if (items.count() < 4) {
+-            continue;
+-        }
+-#endif
+-
+-        const QString device = _k_resolveSymLink(items.first());
+-
+-        if (device==deviceToFind) {
+-            fstab.close();
+-            return true;
+-        }
+-   }
+-
+-   fstab.close();
+-#endif
+-
+-   return false;
+-}
+-
+-QProcess *Solid::Backends::Wmi::FstabHandling::callSystemCommand(const QString &commandName,
+-                                                                 const QString &device,
+-                                                                 QObject *obj, const char *slot)
+-{
+-    QStringList env = QProcess::systemEnvironment();
+-    env.replaceInStrings(QRegExp("^PATH=(.*)", Qt::CaseInsensitive), "PATH=/sbin:/bin:/usr/sbin/:/usr/bin");
+-
+-    QProcess *process = new QProcess(obj);
+-
+-    QObject::connect(process, SIGNAL(finished(int, QProcess::ExitStatus)),
+-                     obj, slot);
+-
+-    process->setEnvironment(env);
+-    process->start(commandName, QStringList() << device);
+-
+-    if (process->waitForStarted()) {
+-        return process;
+-    } else {
+-        delete process;
+-        return 0;
+-    }
+-}
+-
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/wmi/wmifstabhandling.h solid-libs-export/solid/backends/wmi/wmifstabhandling.h
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/wmi/wmifstabhandling.h	2008-05-21 14:07:39.000000000 +0300
++++ solid/solid/backends/wmi/wmifstabhandling.h	1970-01-01 02:00:00.000000000 +0200
+@@ -1,48 +0,0 @@
+-/*  This file is part of the KDE project
+-    Copyright (C) 2006 Kevin Ottens <ervin@kde.org>
+-
+-    This library is free software; you can redistribute it and/or
+-    modify it under the terms of the GNU Library General Public
+-    License version 2 as published by the Free Software Foundation.
+-
+-    This library is distributed in the hope that it will be useful,
+-    but WITHOUT ANY WARRANTY; without even the implied warranty of
+-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+-    Library General Public License for more details.
+-
+-    You should have received a copy of the GNU Library General Public License
+-    along with this library; see the file COPYING.LIB.  If not, write to
+-    the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+-    Boston, MA 02110-1301, USA.
+-
+-*/
+-
+-#ifndef SOLID_BACKENDS_WMI_FSTABHANDLING_H
+-#define SOLID_BACKENDS_WMI_FSTABHANDLING_H
+-
+-#include <QtCore/QString>
+-
+-class QProcess;
+-class QObject;
+-
+-namespace Solid
+-{
+-namespace Backends
+-{
+-namespace Wmi
+-{
+-class FstabHandling
+-{
+-public:
+-    static bool isInFstab(const QString &device);
+-    static QProcess *callSystemCommand(const QString &commandName,
+-                                       const QString &device,
+-                                       QObject *obj, const char *slot);
+-};
+-}
+-}
+-}
+-
+-#endif
+-
+-
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/wmi/wmimanager.cpp solid-libs-export/solid/backends/wmi/wmimanager.cpp
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/wmi/wmimanager.cpp	2008-05-21 14:07:39.000000000 +0300
++++ solid/solid/backends/wmi/wmimanager.cpp	2009-04-13 22:17:36.125310000 +0300
+@@ -46,17 +46,19 @@
+ public:
+     WmiManagerPrivate()
+         : m_query()
+-    {}
++    {
++    }
+ 
+-    ~WmiManagerPrivate() {}
+-    
++    ~WmiManagerPrivate() 
++    {
++    }
+     
+-    QList<IWbemClassObject*> sendQuery( const QString &wql )
++    WmiQuery::ItemList sendQuery( const QString &wql )
+     {
+         return m_query.sendQuery( wql );
+     }
+-    
+-    WmiQuery m_query;
++ 
++    WmiQuery m_query; 
+ };
+ 
+ 
+@@ -73,34 +75,27 @@
+ 
+ QStringList WmiManager::allDevices()
+ {
+-    // QDBusReply<QStringList> reply = d->manager.call("GetAllDevices");
++    QStringList deviceUdiList;
+ 
+-    // if (!reply.isValid())
+-    // {
+-        // qWarning() << Q_FUNC_INFO << " error: " << reply.error().name() << endl;
+-        // return QStringList();
+-    // }
++    QStringList aList = findDeviceByDeviceInterface(Solid::DeviceInterface::OpticalDrive);
++    foreach(QString udi, aList)
++    {
++        if (!deviceUdiList.contains(udi))
++            deviceUdiList << udi;
++    }
+ 
+-    // return reply;
+-    return QStringList();
++    return deviceUdiList;
+ }
+ 
+ bool WmiManager::deviceExists(const QString &udi)
+ {
+-    // QDBusReply<bool> reply = d->manager.call("DeviceExists", udi);
+-
+-    // if (!reply.isValid())
+-    // {
+-        // qWarning() << Q_FUNC_INFO << " error: " << reply.error().name() << endl;
+-        // return false;
+-    // }
+-
+-    return false;
++    return WmiDevice::exists(udi);
+ }
+ 
+ QStringList WmiManager::devicesFromQuery(const QString &parentUdi,
+                                          Solid::DeviceInterface::Type type)
+ {
++    qDebug() << parentUdi << type;
+     if (!parentUdi.isEmpty())
+     {
+         QStringList result = findDeviceStringMatch("info.parent", parentUdi);
+@@ -139,61 +134,66 @@
+ 
+ QStringList WmiManager::findDeviceStringMatch(const QString &key, const QString &value)
+ {
+-    // QDBusReply<QStringList> reply = d->manager.call("FindDeviceStringMatch", key, value);
++    qDebug() << "has to be implemented" << key << value;
++    QStringList result;
+ 
+-    // if (!reply.isValid())
+-    // {
+-        // qWarning() << Q_FUNC_INFO << " error: " << reply.error().name() << endl;
+-        // return QStringList();
+-    // }
+-
+-    // return reply;
+-    return QStringList();
++    qDebug() << result;
++    return result;
+ }
+ 
+ QStringList WmiManager::findDeviceByDeviceInterface(const Solid::DeviceInterface::Type &type)
+ {
+-    // QStringList cap_list = DeviceInterface::toStringList(type);
+-    // QStringList result;
++    qDebug() << type;
++    QStringList result;
++    WmiQuery::ItemList list;
+ 
+-    // foreach (const QString &cap, cap_list)
+-    // {
+-        // QDBusReply<QStringList> reply = d->manager.call("FindDeviceByCapability", cap);
+-
+-        // if (!reply.isValid())
+-        // {
+-            // qWarning() << Q_FUNC_INFO << " error: " << reply.error().name() << endl;
+-            // return QStringList();
+-        // }
+-        // if ( cap == QLatin1String( "video4linux" ) )
+-        // {
+-            // QStringList foundDevices ( reply );
+-            // QStringList filtered;
+-            // foreach ( const QString &udi, foundDevices )
+-            // {
+-                // QDBusInterface device( "org.freedesktop.Wmi", udi, "org.freedesktop.Wmi.Device", QDBusConnection::systemBus() );
+-                // QDBusReply<QString> reply = device.call( "GetProperty", "video4linux.device" );
+-                // if (!reply.isValid())
+-                // {
+-                    // qWarning() << Q_FUNC_INFO << " error getting video4linux.device: " << reply.error().name() << endl;
+-                    // continue;
+-                // }
+-                // if ( !reply.value().contains( "video" ) )
+-                // {
+-                    // continue;
+-                // }
+-                // filtered.append( udi );
+-            // }
+-            // result += filtered;
+-        // }
+-        // else
+-        // {
+-            // result << reply;
+-        // }
+-    // }
++    switch (type)
++    {
++    case Solid::DeviceInterface::GenericInterface:
++        break;
++    case Solid::DeviceInterface::Processor:
++        result << WmiDevice::generateUDIList(type);
++        break;
++    case Solid::DeviceInterface::Block:
++        break;
++    case Solid::DeviceInterface::StorageAccess:
++        break;
++    case Solid::DeviceInterface::StorageDrive:
++        break;
++    case Solid::DeviceInterface::OpticalDrive:
++        result << WmiDevice::generateUDIList(type);
++        break;
++    case Solid::DeviceInterface::StorageVolume:
++        break;
++    case Solid::DeviceInterface::OpticalDisc:
++        result << WmiDevice::generateUDIList(type);
++        break;
++    case Solid::DeviceInterface::Camera:
++        break;
++    case Solid::DeviceInterface::PortableMediaPlayer:
++        break;
++    case Solid::DeviceInterface::NetworkInterface:
++        break;
++    case Solid::DeviceInterface::AcAdapter:
++        break;
++    case Solid::DeviceInterface::Battery:
++        result << WmiDevice::generateUDIList(type);
++        break;
++    case Solid::DeviceInterface::Button:
++        break;
++    case Solid::DeviceInterface::AudioInterface:
++        break;
++    case Solid::DeviceInterface::DvbInterface:
++        break;
++    case Solid::DeviceInterface::Video:
++        break;
++    case Solid::DeviceInterface::Unknown:
++    case Solid::DeviceInterface::Last:
++        break;
++    }
+ 
+-    // return result;
+-    return QStringList();
++    qDebug() << result;
++    return result;
+ }
+ 
+ void WmiManager::slotDeviceAdded(const QString &udi)
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/wmi/wmiprocessor.cpp solid-libs-export/solid/backends/wmi/wmiprocessor.cpp
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/wmi/wmiprocessor.cpp	2008-05-21 14:07:39.000000000 +0300
++++ solid/solid/backends/wmi/wmiprocessor.cpp	2009-04-11 23:20:35.186722000 +0300
+@@ -41,13 +41,12 @@
+ 
+ int Processor::number() const
+ {
+-    return m_device->property("processor.number").toInt();
++    return m_device->property("NumberOfCores").toInt();
+ }
+ 
+ int Processor::maxSpeed() const
+ {
+-    // the property is not mandatory in WMI
+-    return m_device->property("processor.maximum_speed").toInt();
++    return m_device->property("MaxClockSpeed").toInt();
+ }
+ 
+ bool Processor::canChangeFrequency() const
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/wmi/wmiquery.cpp solid-libs-export/solid/backends/wmi/wmiquery.cpp
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/wmi/wmiquery.cpp	2009-02-27 00:15:42.000000000 +0200
++++ solid/solid/backends/wmi/wmiquery.cpp	2009-05-14 11:12:56.110981000 +0300
+@@ -22,6 +22,7 @@
+ #include <QtCore/QDebug>
+ #include <QtCore/QVariant>
+ #include <QtCore/QList>
++#include <QtCore/QStringList>
+ 
+ #ifdef _DEBUG
+ # pragma comment(lib, "comsuppwd.lib")
+@@ -38,6 +39,19 @@
+ # pragma comment(lib, "wbemuuid.lib")
+ 
+ using namespace Solid::Backends::Wmi;
++
++QString WmiQuery::Item::getProperty(const QString &property )
++{
++    qDebug() << "start property:" << property;
++    // todo check first if property is available
++    VARIANT vtProp;
++    HRESULT hr = m_p->Get((LPCWSTR)property.utf16(), 0, &vtProp, 0, 0);
++    VariantClear(&vtProp);
++    QString result((QChar*)vtProp.bstrVal, wcslen(vtProp.bstrVal));
++    m_p->Release();
++    qDebug() << "end result:" << result;
++    return result;
++}
+     
+ WmiQuery::WmiQuery()
+     : m_failed(false)
+@@ -50,7 +64,7 @@
+ 
+     HRESULT hres;
+ 
+-    hres =  CoInitializeEx( 0, COINIT_MULTITHREADED ); 
++    hres =  CoInitialize(0); 
+     if( FAILED(hres) && hres != S_FALSE && hres != RPC_E_CHANGED_MODE )
+     {
+         qCritical() << "Failed to initialize COM library.  Error code = 0x" << hex << quint32(hres) << endl;
+@@ -123,14 +137,14 @@
+       pSvc->Release();
+     if( pLoc )
+       pLoc->Release();
+-*/
+     if( m_bNeedUninit )
+       CoUninitialize();
++*/
+ }  
+     
+-QList<IWbemClassObject*> WmiQuery::sendQuery( const QString &wql )
++WmiQuery::ItemList WmiQuery::sendQuery( const QString &wql )
+ {
+-    QList<IWbemClassObject*> retList;
++    ItemList retList;
+     
+     HRESULT hres;
+     hres = pSvc->ExecQuery( bstr_t("WQL"), bstr_t( qPrintable( wql ) ),
+@@ -152,19 +166,13 @@
+             if( !uReturn )
+                 break;
+             
+-            retList.append( pclsObj );
+-            
+-            //VARIANT vtProp;
+-
+-            // Get the value of the Name property
+-            //hres = pclsObj->Get(L"Name", 0, &vtProp, 0, 0);
+-            //wcout << "Process Name : " << vtProp.bstrVal << endl;
+-            //VariantClear(&vtProp);
++         // TODO: any special thinks required to delete pclsObj ?
++            retList.append( new Item(pclsObj) );
+         }
+     } 
+     return retList;
+ }
+-      
++
+ bool WmiQuery::isLegit() const
+ {
+     return !m_failed;
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/wmi/wmiquery.h solid-libs-export/solid/backends/wmi/wmiquery.h
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/wmi/wmiquery.h	2008-10-30 17:18:57.000000000 +0300
++++ solid/solid/backends/wmi/wmiquery.h	2009-04-11 16:22:00.548066000 +0300
+@@ -50,9 +50,21 @@
+ class WmiQuery
+ {
+ public:
++    class Item {
++    public:
++        Item(IWbemClassObject *p) : m_p(p) {}
++        ~Item() {} // how to delete the pointer ?
++        QString getProperty(const QString &property );
++
++    private: 
++        IWbemClassObject * m_p;     
++    };
++
++    typedef QList<Item*> ItemList;
++
+     WmiQuery();
+     ~WmiQuery();
+-    QList<IWbemClassObject*> sendQuery( const QString &wql );
++    ItemList sendQuery( const QString &wql );
+     bool isLegit() const;
+     
+ private:
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/wmi/wmistorageaccess.cpp solid-libs-export/solid/backends/wmi/wmistorageaccess.cpp
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/backends/wmi/wmistorageaccess.cpp	2008-05-21 14:07:39.000000000 +0300
++++ solid/solid/backends/wmi/wmistorageaccess.cpp	2009-04-12 14:59:18.133740000 +0300
+@@ -25,8 +25,6 @@
+ 
+ #include <unistd.h>
+ 
+-#include "wmifstabhandling.h"
+-
+ using namespace Solid::Backends::Wmi;
+ 
+ StorageAccess::StorageAccess(WmiDevice *device)
+@@ -117,6 +115,7 @@
+ 
+ void Solid::Backends::Wmi::StorageAccess::slotProcessFinished(int exitCode, QProcess::ExitStatus exitStatus)
+ {
++/*    
+     Q_UNUSED(exitStatus);
+     if (m_setupInProgress) {
+         m_setupInProgress = false;
+@@ -140,6 +139,7 @@
+     }
+ 
+     delete m_process;
++ */
+ }
+ 
+ QString generateReturnObjectPath()
+@@ -189,20 +189,26 @@
+ 
+ bool Solid::Backends::Wmi::StorageAccess::callSystemMount()
+ {
++/*
+     const QString device = m_device->property("block.device").toString();
+     m_process = FstabHandling::callSystemCommand("mount", device,
+                                                  this, SLOT(slotProcessFinished(int, QProcess::ExitStatus)));
+ 
+     return m_process!=0;
++*/
++    return 0;
+ }
+ 
+ bool Solid::Backends::Wmi::StorageAccess::callSystemUnmount()
+ {
++/*
+     const QString device = m_device->property("block.device").toString();
+     m_process = FstabHandling::callSystemCommand("umount", device,
+                                                  this, SLOT(slotProcessFinished(int, QProcess::ExitStatus)));
+ 
+     return m_process!=0;
++*/
++    return 0;
+ }
+ 
+ #include "backends/wmi/wmistorageaccess.moc"
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/CMakeLists.txt solid-libs-export/solid/CMakeLists.txt
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/CMakeLists.txt	2008-11-19 12:20:13.000000000 +0200
++++ solid/solid/CMakeLists.txt	2009-04-17 22:39:25.292638000 +0300
+@@ -5,7 +5,7 @@
+ 
+ if(WIN32)
+    include_directories( ${KDEWIN32_INCLUDES} )
+-endif(WIN32) 
++endif(WIN32)
+ 
+ configure_file(solid_export.h.cmake ${CMAKE_CURRENT_BINARY_DIR}/solid_export.h)
+ 
+@@ -21,7 +21,7 @@
+ 
+ ########### next target ###############
+ 
+-file(MAKE_DIRECTORY 
++file(MAKE_DIRECTORY
+    ${CMAKE_CURRENT_BINARY_DIR}/backends/fakehw
+    ${CMAKE_CURRENT_BINARY_DIR}/backends/hal
+    ${CMAKE_CURRENT_BINARY_DIR}/backends/wmi
+@@ -29,35 +29,37 @@
+ 
+ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${KDE4_C_FLAGS}") # enable -fvisibility=hidden for C sources
+ 
+-set(solid_LIB_SRCS 
+-   solidnamespace.cpp 
+-   managerbase.cpp 
+-   device.cpp 
+-   devicemanager.cpp 
+-   deviceinterface.cpp 
+-   genericinterface.cpp 
+-   processor.cpp 
+-   block.cpp 
+-   storagedrive.cpp 
+-   opticaldrive.cpp 
+-   storagevolume.cpp 
+-   opticaldisc.cpp 
+-   storageaccess.cpp 
+-   camera.cpp 
+-   portablemediaplayer.cpp 
+-   networkinterface.cpp 
+-   acadapter.cpp 
+-   battery.cpp 
++set(solid_LIB_SRCS
++   solidnamespace.cpp
++   managerbase.cpp
++   device.cpp
++   devicemanager.cpp
++   deviceinterface.cpp
++   genericinterface.cpp
++   processor.cpp
++   block.cpp
++   storagedrive.cpp
++   opticaldrive.cpp
++   storagevolume.cpp
++   opticaldisc.cpp
++   storageaccess.cpp
++   camera.cpp
++   portablemediaplayer.cpp
++   networkinterface.cpp
++   serialinterface.cpp
++   acadapter.cpp
++   battery.cpp
+    button.cpp
+-   audiointerface.cpp 
++   audiointerface.cpp
+    dvbinterface.cpp
+-   predicate.cpp 
+-   predicateparse.cpp 
+-   predicate_lexer.c 
++   predicate.cpp
++   predicateparse.cpp
++   predicate_lexer.c
+    predicate_parser.c
+    powermanagement.cpp
+    networking.cpp
+    video.cpp
++   smartcardreader.cpp
+ 
+    ifaces/acadapter.cpp
+    ifaces/audiointerface.cpp
+@@ -72,6 +74,7 @@
+    ifaces/dvbinterface.cpp
+    ifaces/genericinterface.cpp
+    ifaces/networkinterface.cpp
++   ifaces/serialinterface.cpp
+    ifaces/opticaldisc.cpp
+    ifaces/portablemediaplayer.cpp
+    ifaces/processor.cpp
+@@ -79,6 +82,7 @@
+    ifaces/storagevolume.cpp
+    ifaces/storageaccess.cpp
+    ifaces/video.cpp
++   ifaces/smartcardreader.cpp
+ 
+    backends/fakehw/fakeacadapter.cpp
+    backends/fakehw/fakeaudiointerface.cpp
+@@ -100,6 +104,7 @@
+    backends/fakehw/fakestorageaccess.cpp
+    backends/fakehw/fakevideo.cpp
+    backends/fakehw/fakevolume.cpp
++   backends/fakehw/fakesmartcardreader.cpp
+ )
+ 
+ if(NOT WIN32 AND NOT APPLE)
+@@ -120,6 +125,7 @@
+    backends/hal/haldevice.cpp
+    backends/hal/halmanager.cpp
+    backends/hal/halnetworkinterface.cpp
++   backends/hal/halserialinterface.cpp
+    backends/hal/halopticaldisc.cpp
+    backends/hal/halportablemediaplayer.cpp
+    backends/hal/halprocessor.cpp
+@@ -127,10 +133,26 @@
+    backends/hal/halstorage.cpp
+    backends/hal/halvideo.cpp
+    backends/hal/halvolume.cpp
+-   
++   backends/hal/halsmartcardreader.cpp
++
+    )
+ endif(NOT WIN32 AND NOT APPLE)
+ 
++if(APPLE)
++   find_package(IOKit REQUIRED)
++
++   message(STATUS "-- Building Solid IOKit backend." )
++   set(solid_LIB_SRCS ${solid_LIB_SRCS}
++   backends/iokit/iokitmanager.cpp
++   backends/iokit/iokitdevice.cpp
++   backends/iokit/cfhelper.cpp
++   backends/iokit/iokitdeviceinterface.cpp
++   backends/iokit/iokitgenericinterface.cpp
++   backends/iokit/iokitprocessor.cpp
++   backends/iokit/iokitnetworkinterface.cpp
++   )
++endif(APPLE)
++
+ # TODO: mingw
+ if(MSVC)
+    message(STATUS "-- Building Solid WMI backend." )
+@@ -145,7 +167,6 @@
+    backends/wmi/wmicdrom.cpp
+    backends/wmi/wmideviceinterface.cpp
+    backends/wmi/wmidvbinterface.cpp
+-   backends/wmi/wmifstabhandling.cpp
+    backends/wmi/wmigenericinterface.cpp
+    backends/wmi/wmidevice.cpp
+    backends/wmi/wmimanager.cpp
+@@ -159,8 +180,8 @@
+    backends/wmi/wmivideo.cpp
+    backends/wmi/wmivolume.cpp
+ 
+-   )   
+-endif(MSVC)	
++   )
++endif(MSVC)
+ 
+ set_source_files_properties( org.freedesktop.PowerManagement.xml
+                              org.freedesktop.PowerManagement.Inhibit.xml
+@@ -178,6 +199,10 @@
+    set(solid_OPTIONAL_LIBS ${solid_OPTIONAL_LIBS} ${KDEWIN32_LIBRARY})
+ endif(WIN32)
+ 
++if(APPLE)
++   set(solid_OPTIONAL_LIBS ${IOKIT_LIBRARY})
++endif(APPLE)
++
+ kde4_add_library(solid SHARED ${solid_LIB_SRCS})
+ 
+ target_link_libraries(solid ${QT_QTCORE_LIBRARY} ${QT_QTDBUS_LIBRARY} ${QT_QTXML_LIBRARY} ${QT_QTGUI_LIBRARY} ${solid_OPTIONAL_LIBS})
+@@ -197,19 +222,19 @@
+ 
+ kde4_add_library(solid_static STATIC ${solid_LIB_SRCS})
+ 
+-target_link_libraries(solid_static ${QT_QTCORE_LIBRARY} ${QT_QTDBUS_LIBRARY} ${QT_QTXML_LIBRARY} ${QT_QTGUI_LIBRARY})
++target_link_libraries(solid_static ${QT_QTCORE_LIBRARY} ${QT_QTDBUS_LIBRARY} ${QT_QTXML_LIBRARY} ${QT_QTGUI_LIBRARY} ${solid_OPTIONAL_LIBS})
+ 
+ if(WIN32)
+    set_target_properties(solid_static PROPERTIES COMPILE_FLAGS -DSOLID_EXPORT=)
+ endif(WIN32)
+ ########### install files ###############
+ 
+-install( FILES ${CMAKE_CURRENT_BINARY_DIR}/solid_export.h solidnamespace.h device.h 
+-               devicenotifier.h deviceinterface.h genericinterface.h processor.h block.h 
+-               storageaccess.h storagedrive.h opticaldrive.h storagevolume.h opticaldisc.h 
+-               camera.h portablemediaplayer.h networkinterface.h acadapter.h battery.h 
+-               button.h audiointerface.h dvbinterface.h predicate.h powermanagement.h 
+-               networking.h video.h 
++install( FILES ${CMAKE_CURRENT_BINARY_DIR}/solid_export.h solidnamespace.h device.h
++               devicenotifier.h deviceinterface.h genericinterface.h processor.h block.h
++               storageaccess.h storagedrive.h opticaldrive.h storagevolume.h opticaldisc.h
++               camera.h portablemediaplayer.h networkinterface.h acadapter.h battery.h
++               button.h audiointerface.h dvbinterface.h predicate.h powermanagement.h
++               networking.h video.h serialinterface.h
+                DESTINATION ${INCLUDE_INSTALL_DIR}/solid COMPONENT Devel)
+ 
+ ########### parser build ###############
+@@ -219,6 +244,7 @@
+ 
+ find_package(Flex)
+ find_program(BISON_EXECUTABLE bison)
++mark_as_advanced(BISON_EXECUTABLE)      # don't show it in the simple view in cmake-gui/ccmake
+ 
+ if (FLEX_EXECUTABLE AND BISON_EXECUTABLE)
+ 
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/device.cpp solid-libs-export/solid/device.cpp
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/device.cpp	2008-12-04 10:36:01.000000000 +0200
++++ solid/solid/device.cpp	2009-01-20 23:47:50.614760000 +0200
+@@ -61,6 +61,8 @@
+ #include <solid/ifaces/dvbinterface.h>
+ #include <solid/video.h>
+ #include <solid/ifaces/video.h>
++#include <solid/serialinterface.h>
++#include <solid/ifaces/serialinterface.h>
+ 
+ 
+ Solid::Device::Device(const QString &udi)
+@@ -212,6 +214,9 @@
+             case DeviceInterface::Video:
+                 iface = deviceinterface_cast(Ifaces::Video, Video, dev_iface);
+                 break;
++            case DeviceInterface::SerialInterface:
++                iface = deviceinterface_cast(Ifaces::SerialInterface, SerialInterface, dev_iface);
++                break;
+             case DeviceInterface::Unknown:
+             case DeviceInterface::Last:
+                 break;
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/deviceinterface.h solid-libs-export/solid/deviceinterface.h
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/deviceinterface.h	2008-05-21 14:07:39.000000000 +0300
++++ solid/solid/deviceinterface.h	2009-04-17 06:43:05.290215000 +0300
+@@ -58,6 +58,8 @@
+          * - Camera : A digital camera
+          * - PortableMediaPlayer: A portable media player
+          * - NetworkInterface: A network interface
++         * - SerialInterface: A serial interface
++         * - SmartCardReader: A smart card reader interface
+          */
+         enum Type { Unknown = 0, GenericInterface = 1, Processor = 2,
+                     Block = 3, StorageAccess = 4, StorageDrive = 5,
+@@ -65,6 +67,7 @@
+                     Camera = 9, PortableMediaPlayer = 10,
+                     NetworkInterface = 11, AcAdapter = 12, Battery = 13,
+                     Button = 14, AudioInterface = 15, DvbInterface = 16, Video = 17,
++                    SerialInterface = 18, SmartCardReader = 19,
+                     Last = 0xffff  };
+ 
+         /**
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/ifaces/networkinterface.h solid-libs-export/solid/ifaces/networkinterface.h
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/ifaces/networkinterface.h	2008-05-21 14:07:37.000000000 +0300
++++ solid/solid/ifaces/networkinterface.h	2009-01-20 23:47:50.614760000 +0200
+@@ -38,6 +38,7 @@
+         virtual ~NetworkInterface();
+ 
+ 
++        /* TODO for KDE 5 - rename ifaceName() to interfaceName() */
+         /**
+          * Retrieves the name of the interface in the system.
+          * This name is system dependent, it allows to identify the interface
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/ifaces/serialinterface.cpp solid-libs-export/solid/ifaces/serialinterface.cpp
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/ifaces/serialinterface.cpp	1970-01-01 02:00:00.000000000 +0200
++++ solid/solid/ifaces/serialinterface.cpp	2009-01-20 23:47:50.614760000 +0200
+@@ -0,0 +1,25 @@
++/*  This file is part of the KDE project
++    Copyright (C) 2009 Harald Fernengel <harry@kdevelop.org>
++
++    This library is free software; you can redistribute it and/or
++    modify it under the terms of the GNU Library General Public
++    License version 2 as published by the Free Software Foundation.
++
++    This library is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++    Library General Public License for more details.
++
++    You should have received a copy of the GNU Library General Public License
++    along with this library; see the file COPYING.LIB.  If not, write to
++    the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
++    Boston, MA 02110-1301, USA.
++
++*/
++
++#include "serialinterface.h"
++
++Solid::Ifaces::SerialInterface::~SerialInterface()
++{
++}
++
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/ifaces/serialinterface.h solid-libs-export/solid/ifaces/serialinterface.h
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/ifaces/serialinterface.h	1970-01-01 02:00:00.000000000 +0200
++++ solid/solid/ifaces/serialinterface.h	2009-01-20 23:47:50.614760000 +0200
+@@ -0,0 +1,78 @@
++/*  This file is part of the KDE project
++    Copyright (C) 2009 Harald Fernengel <harry@kdevelop.org>
++
++    This library is free software; you can redistribute it and/or
++    modify it under the terms of the GNU Library General Public
++    License version 2 as published by the Free Software Foundation.
++
++    This library is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++    Library General Public License for more details.
++
++    You should have received a copy of the GNU Library General Public License
++    along with this library; see the file COPYING.LIB.  If not, write to
++    the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
++    Boston, MA 02110-1301, USA.
++
++*/
++
++#ifndef SOLID_IFACE_SERIALINTERFACE_H
++#define SOLID_IFACE_SERIALINTERFACE_H
++
++#include <solid/ifaces/deviceinterface.h>
++#include <solid/serialinterface.h>
++
++namespace Solid
++{
++namespace Ifaces
++{
++    /**
++     * This device interface is available on serial interfaces,
++     * like modems.
++     * @since 4.3
++     */
++    class SerialInterface : virtual public DeviceInterface
++    {
++    public:
++        /**
++         * Destroys a SerialInterface object.
++         * @since 4.3
++         */
++        virtual ~SerialInterface();
++
++
++        /**
++         * Retrieves the name of the interface in the system.
++         * This name is system dependent, it allows to identify the interface
++         * in the system. For example it can be of the form "/dev/ttyS0" under Linux.
++         *
++         * @return the interface name
++         * @since 4.3
++         */
++        virtual QVariant driverHandle() const = 0;
++
++        /**
++         * Retrieves the type of the serial device.
++         * Examples for Linux are "usb" for USB based serial devices,
++         * or "platform" for built-in serial ports.
++         *
++         * @return the type of the serial device
++         * @since 4.3
++         */
++        virtual Solid::SerialInterface::SerialType serialType() const = 0;
++
++        /**
++         * Retrieves the port number, e.g. 0 for the first COM port.
++         *
++         * @return The port number of the serial device, or -1 if unknown.
++         * @since 4.3
++         */
++        virtual int port() const = 0;
++    };
++}
++}
++
++Q_DECLARE_INTERFACE(Solid::Ifaces::SerialInterface, "org.kde.Solid.Ifaces.SerialInterface/0.1")
++
++#endif // SOLID_IFACE_SERIALINTERFACE_H
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/ifaces/smartcardreader.cpp solid-libs-export/solid/ifaces/smartcardreader.cpp
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/ifaces/smartcardreader.cpp	1970-01-01 02:00:00.000000000 +0200
++++ solid/solid/ifaces/smartcardreader.cpp	2009-04-26 15:06:28.577813000 +0300
+@@ -0,0 +1,25 @@
++/*  This file is part of the KDE project
++    Copyright (C) 2009 Christopher Blauvelt <cblauvelt@gmail.com>
++
++    This library is free software; you can redistribute it and/or
++    modify it under the terms of the GNU Library General Public
++    License version 3 as published by the Free Software Foundation.
++
++    This library is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++    Library General Public License for more details.
++
++    You should have received a copy of the GNU Library General Public License
++    along with this library; see the file COPYING.LIB.  If not, write to
++    the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
++    Boston, MA 02110-1301, USA.
++
++*/
++
++#include "smartcardreader.h"
++
++Solid::Ifaces::SmartCardReader::~SmartCardReader()
++{
++}
++
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/ifaces/smartcardreader.h solid-libs-export/solid/ifaces/smartcardreader.h
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/ifaces/smartcardreader.h	1970-01-01 02:00:00.000000000 +0200
++++ solid/solid/ifaces/smartcardreader.h	2009-04-26 15:06:28.577813000 +0300
+@@ -0,0 +1,55 @@
++/*  This file is part of the KDE project
++    Copyright (C) 2009 Christopher Blauvelt <cblauvelt@gmail.com>
++
++    This library is free software; you can redistribute it and/or
++    modify it under the terms of the GNU Library General Public
++    License version 3 as published by the Free Software Foundation.
++
++    This library is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++    Library General Public License for more details.
++
++    You should have received a copy of the GNU Library General Public License
++    along with this library; see the file COPYING.LIB.  If not, write to
++    the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
++    Boston, MA 02110-1301, USA.
++
++*/
++
++#ifndef SOLID_IFACES_SMARTCARDREADER_H
++#define SOLID_IFACES_SMARTCARDREADER_H
++
++#include <solid/ifaces/deviceinterface.h>
++#include <solid/smartcardreader.h>
++
++namespace Solid
++{
++namespace Ifaces
++{
++    /**
++     * This device interface is available on smart card readers.
++     */
++    class SmartCardReader : virtual public DeviceInterface
++    {
++    public:
++        /**
++         * Destroys a SmartCardReader object.
++         */
++        virtual ~SmartCardReader();
++
++
++        /**
++         * Retrieves the type of this smart card reader.
++         *
++         * @return the reader type
++         * @see Solid::SmartCardReader::ReaderType
++         */
++        virtual Solid::SmartCardReader::ReaderType readerType() const = 0;
++    };
++}
++}
++
++Q_DECLARE_INTERFACE(Solid::Ifaces::SmartCardReader, "org.kde.Solid.Ifaces.SmartCardReader/0.1")
++
++#endif // SOLID_IFACES_SMARTCARDREADER_H
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/managerbase.cpp solid-libs-export/solid/managerbase.cpp
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/managerbase.cpp	2008-05-29 14:20:07.000000000 +0300
++++ solid/solid/managerbase.cpp	2009-03-08 19:40:38.049055000 +0200
+@@ -24,6 +24,7 @@
+ #include "backends/fakehw/fakemanager.h"
+ 
+ #if defined (Q_OS_MAC)
++#include "backends/iokit/iokitmanager.h"
+ #elif defined (Q_OS_UNIX)
+ #include "backends/hal/halmanager.h"
+ #elif defined (_MSC_VER) // TODO: mingw
+@@ -47,12 +48,13 @@
+     if (!solidFakeXml.isEmpty()) {
+         m_backend = new Solid::Backends::Fake::FakeManager(0, solidFakeXml);
+     } else {
+-        #if defined (Q_OS_MAC)
+-        #elif defined (Q_OS_UNIX)
++#        if defined (Q_OS_MAC)
++            m_backend = new Solid::Backends::IOKit::IOKitManager(0);
++#        elif defined (Q_OS_UNIX)
+             m_backend = new Solid::Backends::Hal::HalManager(0);
+-        #elif defined (_MSC_VER) // TODO: mingw
++#        elif defined (_MSC_VER) // TODO: mingw
+             m_backend = new Solid::Backends::Wmi::WmiManager(0);
+-        #endif		
++#        endif
+     }
+ }
+ 
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/predicate_lexer.c solid-libs-export/solid/predicate_lexer.c
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/predicate_lexer.c	2008-05-21 14:07:39.000000000 +0300
++++ solid/solid/predicate_lexer.c	2009-02-27 17:03:15.945163000 +0200
+@@ -6,10 +6,29 @@
+ 
+ /* A lexical scanner generated by flex */
+ 
++#define yy_create_buffer Solid_create_buffer
++#define yy_delete_buffer Solid_delete_buffer
++#define yy_flex_debug Solid_flex_debug
++#define yy_init_buffer Solid_init_buffer
++#define yy_flush_buffer Solid_flush_buffer
++#define yy_load_buffer_state Solid_load_buffer_state
++#define yy_switch_to_buffer Solid_switch_to_buffer
++#define yyin Solidin
++#define yyleng Solidleng
++#define yylex Solidlex
++#define yylineno Solidlineno
++#define yyout Solidout
++#define yyrestart Solidrestart
++#define yytext Solidtext
++#define yywrap Solidwrap
++#define yyalloc Solidalloc
++#define yyrealloc Solidrealloc
++#define yyfree Solidfree
++
+ #define FLEX_SCANNER
+ #define YY_FLEX_MAJOR_VERSION 2
+ #define YY_FLEX_MINOR_VERSION 5
+-#define YY_FLEX_SUBMINOR_VERSION 33
++#define YY_FLEX_SUBMINOR_VERSION 35
+ #if YY_FLEX_SUBMINOR_VERSION > 0
+ #define FLEX_BETA
+ #endif
+@@ -31,7 +50,7 @@
+ 
+ /* C99 systems have <inttypes.h>. Non-C99 systems may or may not. */
+ 
+-#if __STDC_VERSION__ >= 199901L
++#if defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
+ 
+ /* C99 says to define __STDC_LIMIT_MACROS before including stdint.h,
+  * if you want the limit (max/min) macros for int types. 
+@@ -94,11 +113,12 @@
+ 
+ #else	/* ! __cplusplus */
+ 
+-#if __STDC__
++/* C99 requires __STDC__ to be defined as 1. */
++#if defined (__STDC__)
+ 
+ #define YY_USE_CONST
+ 
+-#endif	/* __STDC__ */
++#endif	/* defined (__STDC__) */
+ #endif	/* ! __cplusplus */
+ 
+ #ifdef YY_USE_CONST
+@@ -178,14 +198,9 @@
+ 
+ #define unput(c) yyunput( c, (yytext_ptr)  )
+ 
+-/* The following is because we cannot portably get our hands on size_t
+- * (without autoconf's help, which isn't available because we want
+- * flex-generated scanners to compile on their own).
+- */
+-
+ #ifndef YY_TYPEDEF_YY_SIZE_T
+ #define YY_TYPEDEF_YY_SIZE_T
+-typedef unsigned int yy_size_t;
++typedef size_t yy_size_t;
+ #endif
+ 
+ #ifndef YY_STRUCT_YY_BUFFER_STATE
+@@ -490,7 +505,7 @@
+ char *PredicateParse_putSymbol( char *_name );
+ char *PredicateParse_putString( char *_str );
+ 
+-#line 494 "predicate_lexer.c"
++#line 509 "predicate_lexer.c"
+ 
+ #define INITIAL 0
+ 
+@@ -508,6 +523,35 @@
+ 
+ static int yy_init_globals (void );
+ 
++/* Accessor methods to globals.
++   These are made visible to non-reentrant scanners for convenience. */
++
++int Solidlex_destroy (void );
++
++int Solidget_debug (void );
++
++void Solidset_debug (int debug_flag  );
++
++YY_EXTRA_TYPE Solidget_extra (void );
++
++void Solidset_extra (YY_EXTRA_TYPE user_defined  );
++
++FILE *Solidget_in (void );
++
++void Solidset_in  (FILE * in_str  );
++
++FILE *Solidget_out (void );
++
++void Solidset_out  (FILE * out_str  );
++
++int Solidget_leng (void );
++
++char *Solidget_text (void );
++
++int Solidget_lineno (void );
++
++void Solidset_lineno (int line_number  );
++
+ /* Macros after this point can all be overridden by user definitions in
+  * section 1.
+  */
+@@ -550,7 +594,7 @@
+ /* This used to be an fputs(), but since the string might contain NUL's,
+  * we now use fwrite().
+  */
+-#define ECHO (void) fwrite( Solidtext, Solidleng, 1, Solidout )
++#define ECHO fwrite( Solidtext, Solidleng, 1, Solidout )
+ #endif
+ 
+ /* Gets input and stuffs it into "buf".  number of characters read, or YY_NULL,
+@@ -561,7 +605,7 @@
+ 	if ( YY_CURRENT_BUFFER_LVALUE->yy_is_interactive ) \
+ 		{ \
+ 		int c = '*'; \
+-		size_t n; \
++		int n; \
+ 		for ( n = 0; n < max_size && \
+ 			     (c = getc( Solidin )) != EOF && c != '\n'; ++n ) \
+ 			buf[n] = (char) c; \
+@@ -646,7 +690,7 @@
+ #line 16 "predicate_lexer.l"
+ 
+ 
+-#line 650 "predicate_lexer.c"
++#line 694 "predicate_lexer.c"
+ 
+ 	if ( !(yy_init) )
+ 		{
+@@ -811,7 +855,7 @@
+ #line 43 "predicate_lexer.l"
+ ECHO;
+ 	YY_BREAK
+-#line 815 "predicate_lexer.c"
++#line 859 "predicate_lexer.c"
+ case YY_STATE_EOF(INITIAL):
+ 	yyterminate();
+ 
+@@ -1066,6 +1110,14 @@
+ 	else
+ 		ret_val = EOB_ACT_CONTINUE_SCAN;
+ 
++	if ((yy_size_t) ((yy_n_chars) + number_to_move) > YY_CURRENT_BUFFER_LVALUE->yy_buf_size) {
++		/* Extend the array by 50%, plus the number we really need. */
++		yy_size_t new_size = (yy_n_chars) + number_to_move + ((yy_n_chars) >> 1);
++		YY_CURRENT_BUFFER_LVALUE->yy_ch_buf = (char *) Solidrealloc((void *) YY_CURRENT_BUFFER_LVALUE->yy_ch_buf,new_size  );
++		if ( ! YY_CURRENT_BUFFER_LVALUE->yy_ch_buf )
++			YY_FATAL_ERROR( "out of dynamic memory in yy_get_next_buffer()" );
++	}
++
+ 	(yy_n_chars) += number_to_move;
+ 	YY_CURRENT_BUFFER_LVALUE->yy_ch_buf[(yy_n_chars)] = YY_END_OF_BUFFER_CHAR;
+ 	YY_CURRENT_BUFFER_LVALUE->yy_ch_buf[(yy_n_chars) + 1] = YY_END_OF_BUFFER_CHAR;
+@@ -1481,7 +1533,9 @@
+ 		(yy_buffer_stack) = (struct yy_buffer_state**)Solidalloc
+ 								(num_to_alloc * sizeof(struct yy_buffer_state*)
+ 								);
+-		
++		if ( ! (yy_buffer_stack) )
++			YY_FATAL_ERROR( "out of dynamic memory in Solidensure_buffer_stack()" );
++								  
+ 		memset((yy_buffer_stack), 0, num_to_alloc * sizeof(struct yy_buffer_state*));
+ 				
+ 		(yy_buffer_stack_max) = num_to_alloc;
+@@ -1499,6 +1553,8 @@
+ 								((yy_buffer_stack),
+ 								num_to_alloc * sizeof(struct yy_buffer_state*)
+ 								);
++		if ( ! (yy_buffer_stack) )
++			YY_FATAL_ERROR( "out of dynamic memory in Solidensure_buffer_stack()" );
+ 
+ 		/* zero only the new slots.*/
+ 		memset((yy_buffer_stack) + (yy_buffer_stack_max), 0, grow_size * sizeof(struct yy_buffer_state*));
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/predicateparse.cpp solid-libs-export/solid/predicateparse.cpp
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/predicateparse.cpp	2008-05-21 14:07:39.000000000 +0300
++++ solid/solid/predicateparse.cpp	2009-04-24 19:22:47.747441000 +0300
+@@ -57,10 +57,14 @@
+ 
+ void PredicateParse_errorDetected()
+ {
+-    if (s_result != 0)
+-    {
+-        delete s_result;
+-        s_result = 0;
++    s_result = 0;
++}
++
++void PredicateParse_destroy(void *pred)
++{
++    Solid::Predicate *p = (Solid::Predicate *) pred;
++    if (p != s_result) {
++        delete p;
+     }
+ }
+ 
+@@ -114,7 +118,11 @@
+     Solid::Predicate *p1 = (Solid::Predicate *)pred1;
+     Solid::Predicate *p2 = (Solid::Predicate *)pred2;
+ 
+-    *result = *p1  & *p2;
++    if (p1==s_result || p2==s_result) {
++        s_result = 0;
++    }
++
++    *result = *p1 & *p2;
+ 
+     delete p1;
+     delete p2;
+@@ -130,6 +138,10 @@
+     Solid::Predicate *p1 = (Solid::Predicate *)pred1;
+     Solid::Predicate *p2 = (Solid::Predicate *)pred2;
+ 
++    if (p1==s_result || p2==s_result) {
++        s_result = 0;
++    }
++
+     *result = *p1 | *p2;
+ 
+     delete p1;
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/predicateparse.h solid-libs-export/solid/predicateparse.h
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/predicateparse.h	2008-05-21 14:07:39.000000000 +0300
++++ solid/solid/predicateparse.h	2009-02-27 17:03:15.945163000 +0200
+@@ -22,6 +22,7 @@
+ 
+ void PredicateParse_setResult(void *result);
+ void PredicateParse_errorDetected();
++void PredicateParse_destroy(void *pred);
+ 
+ void *PredicateParse_newAtom(char *interface, char *property, void *value);
+ void *PredicateParse_newMaskAtom(char *interface, char *property, void *value);
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/predicate_parser.c solid-libs-export/solid/predicate_parser.c
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/predicate_parser.c	2008-05-21 14:07:39.000000000 +0300
++++ solid/solid/predicate_parser.c	2009-02-27 17:03:15.945163000 +0200
+@@ -110,6 +110,7 @@
+ 
+ void Soliderror(const char *s);
+ int Solidlex();
++int Solidlex_destroy();
+ void PredicateParse_initLexer( const char *s );
+ void PredicateParse_mainParse( const char *_code );
+ 
+@@ -135,7 +136,7 @@
+ 
+ #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
+ typedef union YYSTYPE
+-#line 14 "predicate_parser.y"
++#line 15 "predicate_parser.y"
+ {
+      char valb;
+      int vali;
+@@ -144,7 +145,7 @@
+      void *ptr;
+ }
+ /* Line 187 of yacc.c.  */
+-#line 148 "predicate_parser.tab.c"
++#line 149 "predicate_parser.tab.c"
+ 	YYSTYPE;
+ # define yystype YYSTYPE /* obsolescent; will be withdrawn */
+ # define YYSTYPE_IS_DECLARED 1
+@@ -157,7 +158,7 @@
+ 
+ 
+ /* Line 216 of yacc.c.  */
+-#line 161 "predicate_parser.tab.c"
++#line 162 "predicate_parser.tab.c"
+ 
+ #ifdef short
+ # undef short
+@@ -445,8 +446,8 @@
+ /* YYRLINE[YYN] -- source line where rule number YYN was defined.  */
+ static const yytype_uint8 yyrline[] =
+ {
+-       0,    45,    45,    46,    47,    49,    50,    51,    53,    55,
+-      57,    58,    59,    60,    61,    63,    65,    66,    67
++       0,    51,    51,    52,    53,    55,    56,    57,    59,    61,
++      63,    64,    65,    66,    67,    69,    71,    72,    73
+ };
+ #endif
+ 
+@@ -1055,6 +1056,26 @@
+ 
+   switch (yytype)
+     {
++      case 20: /* "predicate" */
++#line 44 "predicate_parser.y"
++	{ PredicateParse_destroy( (yyvaluep->ptr) ); };
++#line 1063 "predicate_parser.tab.c"
++	break;
++      case 21: /* "predicate_atom" */
++#line 45 "predicate_parser.y"
++	{ PredicateParse_destroy( (yyvaluep->ptr) ); };
++#line 1068 "predicate_parser.tab.c"
++	break;
++      case 22: /* "predicate_or" */
++#line 46 "predicate_parser.y"
++	{ PredicateParse_destroy( (yyvaluep->ptr) ); };
++#line 1073 "predicate_parser.tab.c"
++	break;
++      case 23: /* "predicate_and" */
++#line 47 "predicate_parser.y"
++	{ PredicateParse_destroy( (yyvaluep->ptr) ); };
++#line 1078 "predicate_parser.tab.c"
++	break;
+ 
+       default:
+ 	break;
+@@ -1362,93 +1383,93 @@
+   switch (yyn)
+     {
+         case 2:
+-#line 45 "predicate_parser.y"
++#line 51 "predicate_parser.y"
+     { PredicateParse_setResult( (yyvsp[(1) - (1)].ptr) ); (yyval.ptr) = (yyvsp[(1) - (1)].ptr); ;}
+     break;
+ 
+   case 3:
+-#line 46 "predicate_parser.y"
++#line 52 "predicate_parser.y"
+     { PredicateParse_setResult( (yyvsp[(2) - (3)].ptr) ); (yyval.ptr) = (yyvsp[(2) - (3)].ptr); ;}
+     break;
+ 
+   case 4:
+-#line 47 "predicate_parser.y"
++#line 53 "predicate_parser.y"
+     { PredicateParse_setResult( (yyvsp[(2) - (3)].ptr) ); (yyval.ptr) = (yyvsp[(2) - (3)].ptr); ;}
+     break;
+ 
+   case 5:
+-#line 49 "predicate_parser.y"
++#line 55 "predicate_parser.y"
+     { (yyval.ptr) = PredicateParse_newAtom( (yyvsp[(1) - (5)].name), (yyvsp[(3) - (5)].name), (yyvsp[(5) - (5)].ptr) ); ;}
+     break;
+ 
+   case 6:
+-#line 50 "predicate_parser.y"
++#line 56 "predicate_parser.y"
+     { (yyval.ptr) = PredicateParse_newMaskAtom( (yyvsp[(1) - (5)].name), (yyvsp[(3) - (5)].name), (yyvsp[(5) - (5)].ptr) ); ;}
+     break;
+ 
+   case 7:
+-#line 51 "predicate_parser.y"
++#line 57 "predicate_parser.y"
+     { (yyval.ptr) = PredicateParse_newIsAtom( (yyvsp[(2) - (2)].name) ); ;}
+     break;
+ 
+   case 8:
+-#line 53 "predicate_parser.y"
++#line 59 "predicate_parser.y"
+     { (yyval.ptr) = PredicateParse_newOr( (yyvsp[(1) - (3)].ptr), (yyvsp[(3) - (3)].ptr) ); ;}
+     break;
+ 
+   case 9:
+-#line 55 "predicate_parser.y"
++#line 61 "predicate_parser.y"
+     { (yyval.ptr) = PredicateParse_newAnd( (yyvsp[(1) - (3)].ptr), (yyvsp[(3) - (3)].ptr) ); ;}
+     break;
+ 
+   case 10:
+-#line 57 "predicate_parser.y"
++#line 63 "predicate_parser.y"
+     { (yyval.ptr) = PredicateParse_newStringValue( (yyvsp[(1) - (1)].name) ); ;}
+     break;
+ 
+   case 11:
+-#line 58 "predicate_parser.y"
++#line 64 "predicate_parser.y"
+     { (yyval.ptr) = PredicateParse_newBoolValue( (yyvsp[(1) - (1)].valb) ); ;}
+     break;
+ 
+   case 12:
+-#line 59 "predicate_parser.y"
++#line 65 "predicate_parser.y"
+     { (yyval.ptr) = PredicateParse_newNumValue( (yyvsp[(1) - (1)].vali) ); ;}
+     break;
+ 
+   case 13:
+-#line 60 "predicate_parser.y"
++#line 66 "predicate_parser.y"
+     { (yyval.ptr) = PredicateParse_newDoubleValue( (yyvsp[(1) - (1)].vald) ); ;}
+     break;
+ 
+   case 14:
+-#line 61 "predicate_parser.y"
++#line 67 "predicate_parser.y"
+     { (yyval.ptr) = (yyvsp[(1) - (1)].ptr); ;}
+     break;
+ 
+   case 15:
+-#line 63 "predicate_parser.y"
++#line 69 "predicate_parser.y"
+     { (yyval.ptr) = (yyvsp[(1) - (3)].ptr); ;}
+     break;
+ 
+   case 16:
+-#line 65 "predicate_parser.y"
++#line 71 "predicate_parser.y"
+     { (yyval.ptr) = PredicateParse_newEmptyStringListValue(); ;}
+     break;
+ 
+   case 17:
+-#line 66 "predicate_parser.y"
++#line 72 "predicate_parser.y"
+     { (yyval.ptr) = PredicateParse_newStringListValue( (yyvsp[(1) - (1)].ptr) ); ;}
+     break;
+ 
+   case 18:
+-#line 67 "predicate_parser.y"
++#line 73 "predicate_parser.y"
+     { (yyval.ptr) = PredicateParse_appendStringListValue( (yyvsp[(1) - (3)].name), (yyvsp[(3) - (3)].ptr) ); ;}
+     break;
+ 
+ 
+ /* Line 1267 of yacc.c.  */
+-#line 1452 "predicate_parser.tab.c"
++#line 1473 "predicate_parser.tab.c"
+       default: break;
+     }
+   YY_SYMBOL_PRINT ("-> $$ =", yyr1[yyn], &yyval, &yyloc);
+@@ -1662,7 +1683,7 @@
+ }
+ 
+ 
+-#line 69 "predicate_parser.y"
++#line 75 "predicate_parser.y"
+ 
+ 
+ void Soliderror ( const char *s )  /* Called by Solidparse on error */
+@@ -1675,6 +1696,7 @@
+ {
+     PredicateParse_initLexer( _code );
+     Solidparse();
++    Solidlex_destroy();
+ }
+ 
+ 
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/predicate_parser.h solid-libs-export/solid/predicate_parser.h
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/predicate_parser.h	2008-05-21 14:07:39.000000000 +0300
++++ solid/solid/predicate_parser.h	2009-02-27 17:03:15.945163000 +0200
+@@ -68,7 +68,7 @@
+ 
+ #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
+ typedef union YYSTYPE
+-#line 14 "predicate_parser.y"
++#line 15 "predicate_parser.y"
+ {
+      char valb;
+      int vali;
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/predicate_parser.y solid-libs-export/solid/predicate_parser.y
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/predicate_parser.y	2008-05-21 14:07:39.000000000 +0300
++++ solid/solid/predicate_parser.y	2009-02-27 17:03:15.945163000 +0200
+@@ -5,6 +5,7 @@
+ 
+ void Soliderror(const char *s);
+ int Solidlex();
++int Solidlex_destroy();
+ void PredicateParse_initLexer( const char *s );
+ void PredicateParse_mainParse( const char *_code );
+ 
+@@ -40,6 +41,11 @@
+ %type <ptr> string_list_rec
+ %type <ptr> value
+ 
++%destructor { PredicateParse_destroy( $$ ); } predicate
++%destructor { PredicateParse_destroy( $$ ); } predicate_atom
++%destructor { PredicateParse_destroy( $$ ); } predicate_or
++%destructor { PredicateParse_destroy( $$ ); } predicate_and
++
+ %%
+ 
+ predicate: predicate_atom { PredicateParse_setResult( $<ptr>1 ); $$ = $<ptr>1; }
+@@ -78,5 +84,6 @@
+ {
+     PredicateParse_initLexer( _code );
+     Solidparse();
++    Solidlex_destroy();
+ }
+ 
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/processor.h solid-libs-export/solid/processor.h
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/processor.h	2008-05-21 14:07:39.000000000 +0300
++++ solid/solid/processor.h	2009-04-17 11:45:55.848374000 +0300
+@@ -100,7 +100,8 @@
+         /**
+          * Retrieves the maximum speed of the processor.
+          *
+-         * @return the maximum speed in MHz
++         * @return the maximum speed in MHz, or 0 if the device can't be queried for this
++         * information.
+          */
+         int maxSpeed() const;
+ 
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/serialinterface.cpp solid-libs-export/solid/serialinterface.cpp
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/serialinterface.cpp	1970-01-01 02:00:00.000000000 +0200
++++ solid/solid/serialinterface.cpp	2009-01-20 23:47:50.614760000 +0200
+@@ -0,0 +1,56 @@
++/*  This file is part of the KDE project
++    Copyright (C) 2009 Harald Fernengel <harry@kdevelop.org>
++
++    This library is free software; you can redistribute it and/or
++    modify it under the terms of the GNU Library General Public
++    License version 2 as published by the Free Software Foundation.
++
++    This library is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++    Library General Public License for more details.
++
++    You should have received a copy of the GNU Library General Public License
++    along with this library; see the file COPYING.LIB.  If not, write to
++    the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
++    Boston, MA 02110-1301, USA.
++
++*/
++
++#include "serialinterface.h"
++#include "serialinterface_p.h"
++
++#include <QtCore/qvariant.h>
++
++#include "soliddefs_p.h"
++#include <solid/ifaces/serialinterface.h>
++
++Solid::SerialInterface::SerialInterface(QObject *backendObject)
++    : DeviceInterface(*new SerialInterfacePrivate(), backendObject)
++{
++}
++
++Solid::SerialInterface::~SerialInterface()
++{
++
++}
++
++QVariant Solid::SerialInterface::driverHandle() const
++{
++    Q_D(const SerialInterface);
++    return_SOLID_CALL(Ifaces::SerialInterface *, d->backendObject(), QVariant(), driverHandle());
++}
++
++Solid::SerialInterface::SerialType Solid::SerialInterface::serialType() const
++{
++    Q_D(const SerialInterface);
++    return_SOLID_CALL(Ifaces::SerialInterface *, d->backendObject(), Unknown, serialType());
++}
++
++int Solid::SerialInterface::port() const
++{
++    Q_D(const SerialInterface);
++    return_SOLID_CALL(Ifaces::SerialInterface *, d->backendObject(), -1, port());
++}
++
++#include "serialinterface.moc"
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/serialinterface.h solid-libs-export/solid/serialinterface.h
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/serialinterface.h	1970-01-01 02:00:00.000000000 +0200
++++ solid/solid/serialinterface.h	2009-01-21 09:54:35.854447000 +0200
+@@ -0,0 +1,117 @@
++/*  This file is part of the KDE project
++    Copyright (C) 2009 Harald Fernengel <harry@kdevelop.org>
++
++    This library is free software; you can redistribute it and/or
++    modify it under the terms of the GNU Library General Public
++    License version 2 as published by the Free Software Foundation.
++
++    This library is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++    Library General Public License for more details.
++
++    You should have received a copy of the GNU Library General Public License
++    along with this library; see the file COPYING.LIB.  If not, write to
++    the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
++    Boston, MA 02110-1301, USA.
++
++*/
++
++#ifndef SOLID_SERIALINTERFACE_H
++#define SOLID_SERIALINTERFACE_H
++
++#include <solid/solid_export.h>
++
++#include <solid/deviceinterface.h>
++
++namespace Solid
++{
++    class SerialInterfacePrivate;
++    class Device;
++
++    /**
++     * This device interface is available on serial interfaces.
++     * @since 4.3
++     */
++    class SOLID_EXPORT SerialInterface : public DeviceInterface
++    {
++        Q_OBJECT
++        Q_PROPERTY(QVariant driverHandle READ driverHandle)
++        Q_PROPERTY(QString serialType READ serialType)
++        Q_PROPERTY(int port READ port)
++        Q_ENUMS(SerialType)
++        Q_DECLARE_PRIVATE(SerialInterface)
++        friend class Device;
++
++    private:
++        /**
++         * Creates a new SerialInterface object.
++         * You generally won't need this. It's created when necessary using
++         * Device::as().
++         *
++         * @param backendObject the device interface object provided by the backend
++         * @see Solid::Device::as()
++         * @since 4.3
++         */
++        explicit SerialInterface(QObject *backendObject);
++
++    public:
++        /**
++         * Destroys a SerialInterface object.
++         * @since 4.3
++         */
++        virtual ~SerialInterface();
++
++
++        /**
++         * Get the Solid::DeviceInterface::Type of the SerialInterface device interface.
++         *
++         * @return the SerialInterface device interface type
++         * @see Solid::Ifaces::Enums::DeviceInterface::Type
++         * @since 4.3
++         */
++        static Type deviceInterfaceType() { return DeviceInterface::SerialInterface; }
++
++
++        /**
++         * Retrieves the name of the interface in the system.
++         * This name is system dependent, it allows to identify the interface
++         * in the system. For example it can be of the form "/dev/ttyS0" under Linux.
++         *
++         * @return the interface name
++         * @since 4.3
++         */
++        virtual QVariant driverHandle() const;
++
++        /**
++         * This enum type defines the type of a serial interface.
++         *
++         * - Unknown : The type could not be determined
++         * - Platform : A built-in serial port
++         * - USB : A USB serial port
++         *
++         * @since 4.3
++         */
++        enum SerialType { Unknown = 0, Platform, Usb };
++
++        /**
++         * Retrieves the type of the serial device.
++         * Examples for Linux are "usb" for USB based serial devices,
++         * or "platform" for built-in serial ports.
++         *
++         * @return the type of the serial device
++         * @since 4.3
++         */
++        virtual SerialType serialType() const;
++
++        /**
++         * Retrieves the port number, e.g. 0 for the first COM port.
++         *
++         * @return The port number of the serial device, or -1 if unknown.
++         * @since 4.3
++         */
++        virtual int port() const;
++    };
++}
++
++#endif // SOLID_SERIALINTERFACE_H
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/serialinterface_p.h solid-libs-export/solid/serialinterface_p.h
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/serialinterface_p.h	1970-01-01 02:00:00.000000000 +0200
++++ solid/solid/serialinterface_p.h	2009-01-20 23:47:50.614760000 +0200
+@@ -0,0 +1,70 @@
++/*  This file is part of the KDE project
++    Copyright (C) 2009 Harald Fernengel <harry@kdevelop.org>
++
++    This library is free software; you can redistribute it and/or
++    modify it under the terms of the GNU Library General Public
++    License version 2 as published by the Free Software Foundation.
++
++    This library is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++    Library General Public License for more details.
++
++    You should have received a copy of the GNU Library General Public License
++    along with this library; see the file COPYING.LIB.  If not, write to
++    the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
++    Boston, MA 02110-1301, USA.
++
++*/
++
++#ifndef SOLID_SERIALINTERFACE_P_H
++#define SOLID_SERIALINTERFACE_P_H
++
++#include "deviceinterface_p.h"
++
++namespace Solid
++{
++    class SerialInterfacePrivate : public DeviceInterfacePrivate
++    {
++    public:
++        SerialInterfacePrivate()
++            : DeviceInterfacePrivate() { }
++    };
++}
++
++#endif // SOLID_SERIALINTERFACE_P_H
++/*  This file is part of the KDE project
++    Copyright (C) 2009 Harald Fernengel <harry@kdevelop.org>
++
++    This library is free software; you can redistribute it and/or
++    modify it under the terms of the GNU Library General Public
++    License version 2 as published by the Free Software Foundation.
++
++    This library is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++    Library General Public License for more details.
++
++    You should have received a copy of the GNU Library General Public License
++    along with this library; see the file COPYING.LIB.  If not, write to
++    the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
++    Boston, MA 02110-1301, USA.
++
++*/
++
++#ifndef SOLID_SERIALINTERFACE_P_H
++#define SOLID_SERIALINTERFACE_P_H
++
++#include "deviceinterface_p.h"
++
++namespace Solid
++{
++    class SerialInterfacePrivate : public DeviceInterfacePrivate
++    {
++    public:
++        SerialInterfacePrivate()
++            : DeviceInterfacePrivate() { }
++    };
++}
++
++#endif // SOLID_SERIALINTERFACE_P_H
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/smartcardreader.cpp solid-libs-export/solid/smartcardreader.cpp
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/smartcardreader.cpp	1970-01-01 02:00:00.000000000 +0200
++++ solid/solid/smartcardreader.cpp	2009-04-26 15:06:28.577813000 +0300
+@@ -0,0 +1,43 @@
++/*  This file is part of the KDE project
++    Copyright (C) 2009 Christopher Blauvelt <cblauvelt@gmail.com>
++
++    This library is free software; you can redistribute it and/or
++    modify it under the terms of the GNU Library General Public
++    License version 3 as published by the Free Software Foundation.
++
++    This library is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++    Library General Public License for more details.
++
++    You should have received a copy of the GNU Library General Public License
++    along with this library; see the file COPYING.LIB.  If not, write to
++    the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
++    Boston, MA 02110-1301, USA.
++
++*/
++
++#include "smartcardreader.h"
++#include "smartcardreader_p.h"
++
++#include "soliddefs_p.h"
++#include <solid/ifaces/smartcardreader.h>
++
++Solid::SmartCardReader::SmartCardReader(QObject *backendObject)
++    : DeviceInterface(*new SmartCardReaderPrivate(), backendObject)
++{
++}
++
++Solid::SmartCardReader::~SmartCardReader()
++{
++
++}
++
++Solid::SmartCardReader::ReaderType Solid::SmartCardReader::readerType() const
++{
++    Q_D(const SmartCardReader);
++    return_SOLID_CALL(Ifaces::SmartCardReader *, d->backendObject(), CardReader, readerType());
++}
++
++#include "smartcardreader.moc"
++
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/smartcardreader.h solid-libs-export/solid/smartcardreader.h
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/smartcardreader.h	1970-01-01 02:00:00.000000000 +0200
++++ solid/solid/smartcardreader.h	2009-04-26 15:06:28.577813000 +0300
+@@ -0,0 +1,89 @@
++/*  This file is part of the KDE project
++    Copyright (C) 2009 Christopher Blauvelt <cblauvelt@gmail.com>
++
++    This library is free software; you can redistribute it and/or
++    modify it under the terms of the GNU Library General Public
++    License version 3 as published by the Free Software Foundation.
++
++    This library is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++    Library General Public License for more details.
++
++    You should have received a copy of the GNU Library General Public License
++    along with this library; see the file COPYING.LIB.  If not, write to
++    the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
++    Boston, MA 02110-1301, USA.
++
++*/
++
++#ifndef SOLID_SMARTCARDREADER_H
++#define SOLID_SMARTCARDREADER_H
++
++#include <solid/solid_export.h>
++
++#include <solid/deviceinterface.h>
++
++namespace Solid
++{
++    class SmartCardReaderPrivate;
++    class Device;
++
++    /**
++     * This device interface is available on smart card readers.
++     */
++    class SOLID_EXPORT SmartCardReader : public DeviceInterface
++    {
++        Q_OBJECT
++        Q_ENUMS(ReaderType)
++        Q_PROPERTY(ReaderType readerType READ readerType)
++        Q_DECLARE_PRIVATE(SmartCardReader)
++        friend class Device;
++
++    public:
++        /**
++         * This enum type defines the type of smart card reader attached
++         *
++         * - CardReader : A generic smart card reader
++         * - CryptoToken : A smart card reader with a card built into the device
++         */
++        enum ReaderType { UnknownReaderType = -1,
++                          CardReader, CryptoToken };
++
++    private:
++        /**
++         * Creates a new SmartCardReader object.
++         * You generally won't need this. It's created when necessary using
++         * Device::as().
++         *
++         * @param backendObject the device interface object provided by the backend
++         * @see Solid::Device::as()
++         */
++        explicit SmartCardReader(QObject *backendObject);
++
++    public:
++        /**
++         * Destroys a SmartCardReader object.
++         */
++        virtual ~SmartCardReader();
++
++
++        /**
++         * Get the Solid::DeviceInterface::Type of the SmartCardReader device interface.
++         *
++         * @return the SmartCardReader device interface type
++         * @see Solid::DeviceInterface::Type
++         */
++        static Type deviceInterfaceType() { return DeviceInterface::SmartCardReader; }
++
++        /**
++         * Retrieves the type of this smart card reader.
++         *
++         * @return the smart card reader type
++         * @see Solid::Ifaces::Enums::SmartCardReader::ReaderType
++         */
++        ReaderType readerType() const;
++    };
++}
++
++#endif
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/smartcardreader_p.h solid-libs-export/solid/smartcardreader_p.h
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/solid/smartcardreader_p.h	1970-01-01 02:00:00.000000000 +0200
++++ solid/solid/smartcardreader_p.h	2009-04-26 15:06:28.577813000 +0300
+@@ -0,0 +1,35 @@
++/*  This file is part of the KDE project
++    Copyright (C) 2009 Christopher Blauvelt <cblauvelt@gmail.com>
++
++    This library is free software; you can redistribute it and/or
++    modify it under the terms of the GNU Library General Public
++    License version 3 as published by the Free Software Foundation.
++
++    This library is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++    Library General Public License for more details.
++
++    You should have received a copy of the GNU Library General Public License
++    along with this library; see the file COPYING.LIB.  If not, write to
++    the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
++    Boston, MA 02110-1301, USA.
++
++*/
++
++#ifndef SOLID_SMARTCARDREADER_P_H
++#define SOLID_SMARTCARDREADER_P_H
++
++#include "deviceinterface_p.h"
++
++namespace Solid
++{
++    class SmartCardReaderPrivate : public DeviceInterfacePrivate
++    {
++    public:
++        SmartCardReaderPrivate()
++            : DeviceInterfacePrivate() { }
++    };
++}
++
++#endif
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/tests/networkingclientview.ui solid-libs-export/tests/networkingclientview.ui
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/tests/networkingclientview.ui	2008-05-21 14:07:35.000000000 +0300
++++ solid/tests/networkingclientview.ui	2009-04-22 00:57:25.513555000 +0300
+@@ -140,8 +140,6 @@
+    </item>
+   </layout>
+  </widget>
+- <layoutdefault spacing="6" margin="11" />
+- <pixmapfunction>qPixmapFromMimeSource</pixmapfunction>
+  <resources/>
+  <connections/>
+ </ui>
+diff -Naur /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/tests/solidhwtest.cpp solid-libs-export/tests/solidhwtest.cpp
+--- /var/pisi/kdelibs-4.2.3-41/work/kdelibs-4.2.3/solid/tests/solidhwtest.cpp	2008-07-22 03:05:39.000000000 +0300
++++ solid/tests/solidhwtest.cpp	2009-02-27 17:03:15.945163000 +0200
+@@ -359,6 +359,9 @@
+     // Since str_pred is canonicalized, fromString().toString() should be invariant
+     QCOMPARE(Solid::Predicate::fromString(str_pred).toString(), str_pred);
+ 
++    // Invalid predicate
++    str_pred = "[StorageVolume.ignored == false AND OpticalDisc.isBlank == true AND OpticalDisc.discType & 'CdRecordable|CdRewritable']";
++    QVERIFY(!Solid::Predicate::fromString(str_pred).isValid());
+ 
+     QString parentUdi = "/org/kde/solid/fakehw/storage_model_solid_reader";
+     Solid::DeviceInterface::Type ifaceType = Solid::DeviceInterface::Unknown;

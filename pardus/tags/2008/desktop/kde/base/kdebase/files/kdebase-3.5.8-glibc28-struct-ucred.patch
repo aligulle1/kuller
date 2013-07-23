@@ -1,0 +1,14 @@
+diff -ur kdebase-3.5.8/kdesu/configure.in.in kdebase-3.5.8-glibc28/kdesu/configure.in.in
+--- kdebase-3.5.8/kdesu/configure.in.in 2006-10-05 18:24:50.000000000 +0200
++++ kdebase-3.5.8-glibc28/kdesu/configure.in.in 2008-02-09 08:20:31.000000000 +0100
+@@ -1,6 +1,9 @@
+ dnl Check for "struct ucred"
+ AC_MSG_CHECKING("struct ucred")
+-AC_EGREP_HEADER([struct ucred], [sys/socket.h], have_ucred=yes)
++AC_EGREP_CPP([struct ucred], [
++    #define _GNU_SOURCE
++    #include <sys/socket.h>
++], have_ucred=yes)
+ if test "$have_ucred" = "yes"; then
+     AC_DEFINE(HAVE_STRUCT_UCRED, 1, [Define if you have the struct ucred])
+     AC_MSG_RESULT(yes)

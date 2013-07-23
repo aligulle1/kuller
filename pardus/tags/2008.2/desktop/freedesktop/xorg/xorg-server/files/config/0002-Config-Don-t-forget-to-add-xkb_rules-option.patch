@@ -1,0 +1,25 @@
+From 009f1e4e55200425de2fe0dbc1f0ac0f431fb4cf Mon Sep 17 00:00:00 2001
+From: =?utf-8?q?Fatih=20A=C5=9F=C4=B1c=C4=B1?= <fatih@pardus.org.tr>
+Date: Tue, 25 Dec 2007 23:09:49 +0200
+Subject: [PATCH] Config: Don't forget to add xkb_rules option
+
+---
+ config/hal.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
+
+diff --git a/config/hal.c b/config/hal.c
+index 45238c0..af96fc2 100644
+--- xorg-server-1.4.2/config/hal.c
++++ xorg-server-1.4.2/config/hal.c
+@@ -221,6 +221,8 @@ device_added(LibHalContext *hal_ctx, const char *udi)
+         goto unwind;
+     sprintf(config_info, "hal:%s", udi);
+ 
++    if (xkb_rules)
++        add_option(&options, "xkb_rules", xkb_rules);
+     if (xkb_model)
+         add_option(&options, "xkb_model", xkb_model);
+     if (xkb_layout)
+-- 
+1.5.3.7
+

@@ -1,0 +1,142 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>module-init-tools</Name>
+        <Homepage>http://www.kernel.org/pub/linux/kernel/people/rusty/modules</Homepage>
+        <Packager>
+            <Name>A. Murat Eren</Name>
+            <Email>meren@pardus.org.tr</Email>
+        </Packager>
+        <License>GPLv2</License>
+        <IsA>app:console</IsA>
+        <Summary>Kernel module tools for 2.6.* series kernels</Summary>
+        <Description>The module-init-tools are a set of programs for loading, inserting, and removing Kernel Modules for Linux (versions 2.5.48 and above).It serves the same function that the modutils package serves for Linux 2.4.They are necessary because starting with 2.5.51, modules are handled differently.</Description>
+        <Archive sha1sum="aba5611334fa0c9930ac43def97a740980aa28f5" type="tarbz2">http://www.kerneltools.org/pub/downloads/module-init-tools/module-init-tools-3.3-pre11.tar.bz2</Archive>
+        <BuildDependencies>
+            <Dependency>zlib</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <Patch level="1">01-module-init-tools-0.9.15-legacy-modext-support.patch</Patch>
+            <Patch level="1">link_zlib.patch</Patch>
+            <Patch>bug-6045.patch</Patch>
+            <!-- Fedora patches -->
+            <Patch level="1">module-init-tools-allconf.patch</Patch>
+            <!--
+            <Patch level="1">module-init-tools-noescape.patch</Patch>
+            -->
+            <Patch level="1">module-init-tools-dump_modversions.patch</Patch>
+            <!-- ignore ~|.|.newconfig files, modified version of OpenSuse patch -->
+            <Patch level="1">module-init-tools-config_filter.diff</Patch>
+            <Patch level="1">no-man.patch</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>module-init-tools</Name>
+        <RuntimeDependencies>
+            <Dependency versionFrom="1.15">comar</Dependency>
+        </RuntimeDependencies>
+        <Conflicts>
+            <Package>modutils</Package>
+        </Conflicts>
+        <Files>
+            <Path fileType="executable">/bin</Path>
+            <Path fileType="executable">/sbin</Path>
+            <Path fileType="config">/etc</Path>
+            <Path fileType="doc">/usr/share/doc</Path>
+            <Path fileType="man">/usr/share/man</Path>
+        </Files>
+        <AdditionalFiles>
+            <!-- Grabbed from Fedora -->
+            <AdditionalFile owner="root" permission="0644" target="/etc/modprobe.d/modprobe.conf.dist">modprobe.conf.dist</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/etc/modprobe.d/blacklist-compat">blacklist-compat</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/etc/depmod.d/depmod.conf.dist">depmod.conf.dist</AdditionalFile>
+            <!-- pregenerated man pages, update if necessary. -->
+            <AdditionalFile owner="root" permission="0644" target="/usr/share/man/man5/depmod.conf.5">man/depmod.conf.5</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/usr/share/man/man5/modprobe.conf.5">man/modprobe.conf.5</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/usr/share/man/man5/modules.dep.5">man/modules.dep.5</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/usr/share/man/man8/depmod.8">man/depmod.8</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/usr/share/man/man8/insmod.8">man/insmod.8</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/usr/share/man/man8/modinfo.8">man/modinfo.8</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/usr/share/man/man8/modprobe.8">man/modprobe.8</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/usr/share/man/man8/rmmod.8">man/rmmod.8</AdditionalFile>
+        </AdditionalFiles>
+        <Provides>
+            <COMAR script="bootmodules.py">Boot.Modules</COMAR>
+        </Provides>
+    </Package>
+
+    <History>
+        <Update release="10">
+            <Date>2008-06-16</Date>
+            <Version>3.3_pre11</Version>
+            <Comment>Probe lp and parport_pc</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="9">
+            <Date>2008-03-03</Date>
+            <Version>3.3_pre11</Version>
+            <Comment>COMAR script ported to 2.0</Comment>
+            <Name>Bahadır Kandemir</Name>
+            <Email>bahadir@pardus.org.tr</Email>
+        </Update>
+        <Update release="8">
+            <Date>2008-02-09</Date>
+            <Version>3.3_pre11</Version>
+            <Comment>Added pregenerated man pages</Comment>
+            <Name>Ekin Meroğlu</Name>
+            <Email>ekin@pardus.org.tr</Email>
+        </Update>
+        <Update release="7">
+            <Date>2007-07-12</Date>
+            <Version>3.3_pre11</Version>
+            <Comment>Fix bug #6045</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="6">
+            <Date>2007-06-25</Date>
+            <Version>3.3_pre11</Version>
+            <Comment>Boot.Modules script</Comment>
+            <Name>Bahadır Kandemir</Name>
+            <Email>bahadir@pardus.org.tr</Email>
+        </Update>
+        <Update release="5">
+            <Date>2007-03-22</Date>
+            <Version>3.3_pre11</Version>
+            <Comment>Version bump</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="4">
+            <Date>2007-02-22</Date>
+            <Version>3.3_pre10</Version>
+            <Comment>Version bump</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="3">
+            <Date>2007-02-12</Date>
+            <Version>3.3_pre6</Version>
+            <Comment>Version bump</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="2">
+            <Date>2006-08-18</Date>
+            <Version>3.2.2</Version>
+            <Comment>Version bump</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="1">
+            <Date>2005-08-12</Date>
+            <Version>3.0</Version>
+            <Comment>First release.</Comment>
+            <Name>A. Murat Eren</Name>
+            <Email>meren@pardus.org.tr</Email>
+        </Update>
+    </History>
+</PISI>

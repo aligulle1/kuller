@@ -1,0 +1,147 @@
+Insufficient sanitization can lead to Vim executing arbitrary commands
+when performing the ``keywordprg'' functionality.  Ben Schmidt
+discovered this vulnerability[1].
+
+Attack vectors:
+
+    (1) K -- arbitrary shell command execution via additional shell
+        commands (insufficient sanitization of a shell command string)
+    (2) K -- arbitrary shell command execution via man(1) command line
+        switches (argument for man can be a command line switch, man
+	arguments can execute programs)
+    (3) <C-]>, g] -- arbitrary Vim Script command execution via additional
+        Ex statements (insufficient escaping of an argument)
+    (4) Unknown vulnerabilities stemming from using unknown shell, and,
+        by extension, an unknown man command
+
+This patch solves (1) and (3), and partially solves (2).  Unfortunately,
+the fix for (2) is a hardcoded double-dash (--) inserted between the
+program name and the command line arguments.  This will break for man
+commands that do not understand double-dash.  A more clever solution is
+needed.
+
+The discussion of (the feasibility of) a fix for (4) has been going on
+for some time.  All proposed solutions seem to have irreconcilable
+downsides.
+
+
+[1] Ben Schmidt discovered this vulnerability in:
+    Message-Id: <48AB91B3.9000709@yahoo.com.au>
+    http://groups.google.com/group/vim_dev/msg/6ad2d5b50a96668e
+
+
+
+	
+*** vim-7.2/src/normal.c	2008-07-31 21:03:08.000000000 +0100
+--- src/normal.c	2008-08-24 08:27:57.000000000 +0100
+***************
+*** 5487,5492 ****
+--- 5487,5496 ----
+  		    sprintf((char *)buf + STRLEN(buf), "%ld", cap->count0);
+  		    STRCAT(buf, " ");
+  		}
++ 		/* XXX Find out what kind of sanitization this
++ 		 * particular 'kp' needs */
++ 		/* End-of-options */
++ 		STRCAT(buf, "-- ");
+  	    }
+  	    break;
+  
+***************
+*** 5511,5547 ****
+      /*
+       * Now grab the chars in the identifier
+       */
+!     if (cmdchar == '*')
+! 	aux_ptr = (char_u *)(p_magic ? "/.*~[^$\\" : "/^$\\");
+!     else if (cmdchar == '#')
+! 	aux_ptr = (char_u *)(p_magic ? "/?.*~[^$\\" : "/?^$\\");
+!     else if (cmdchar == 'K' && !kp_help)
+! 	aux_ptr = (char_u *)" \t\\\"|!";
+      else
+- 	/* Don't escape spaces and Tabs in a tag with a backslash */
+- 	aux_ptr = (char_u *)"\\|\"";
+- 
+-     p = buf + STRLEN(buf);
+-     while (n-- > 0)
+      {
+! 	/* put a backslash before \ and some others */
+! 	if (vim_strchr(aux_ptr, *ptr) != NULL)
+! 	    *p++ = '\\';
+! #ifdef FEAT_MBYTE
+! 	/* When current byte is a part of multibyte character, copy all bytes
+! 	 * of that character. */
+! 	if (has_mbyte)
+  	{
+! 	    int i;
+! 	    int len = (*mb_ptr2len)(ptr) - 1;
+  
+! 	    for (i = 0; i < len && n >= 1; ++i, --n)
+! 		*p++ = *ptr++;
+! 	}
+  #endif
+! 	*p++ = *ptr++;
+      }
+!     *p = NUL;
+  
+      /*
+       * Execute the command.
+--- 5515,5572 ----
+      /*
+       * Now grab the chars in the identifier
+       */
+!     if (cmdchar == 'K' && !kp_help)
+!     {
+! 	/* Sanitize properly */
+! 	if ((p = vim_strsave_shellescape(ptr, TRUE)) == NULL)
+! 	    /* Out of memory */
+! 	    return;
+! 	if ((buf = (char_u *)vim_realloc(buf, STRLEN(buf) + STRLEN(p) + 1))
+! 		== NULL)
+! 	{
+! 	    /* Out of memory */
+! 	    /* XXX Print an Out of Memory error message here */
+! 	    vim_free(p);
+! 	    return;
+! 	}
+! 	STRCAT(buf, p);
+! 	vim_free(p);
+!     }
+      else
+      {
+! 	if (cmdchar == '*')
+! 	    aux_ptr = (char_u *)(p_magic ? "/.*~[^$\\" : "/^$\\");
+! 	else if (cmdchar == '#')
+! 	    aux_ptr = (char_u *)(p_magic ? "/?.*~[^$\\" : "/?^$\\");
+! 	else
+! 	    /* Don't escape spaces and Tabs in a tag with a backslash */
+! 	    /* XXX The characters to escape should be defined in one
+! 	     * central place */
+! 	    aux_ptr = (char_u *)"\\|\"\n*?[";
+! 
+! 	p = buf + STRLEN(buf);
+! 	while (n-- > 0)
+  	{
+! 	    /* put a backslash before \ and some others */
+! 	    if (vim_strchr(aux_ptr, *ptr) != NULL)
+! 		*p++ = '\\';
+! #ifdef FEAT_MBYTE
+! 	    /* When current byte is a part of multibyte character, copy
+! 	     * all bytes of that character. */
+! 	    if (has_mbyte)
+! 	    {
+! 		int i;
+! 		int len = (*mb_ptr2len)(ptr) - 1;
+  
+! 		for (i = 0; i < len && n >= 1; ++i, --n)
+! 		    *p++ = *ptr++;
+! 	    }
+  #endif
+! 	    *p++ = *ptr++;
+! 	}
+! 	*p = NUL;
+      }
+! 
+  
+      /*
+       * Execute the command.

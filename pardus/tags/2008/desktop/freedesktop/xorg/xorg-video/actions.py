@@ -1,0 +1,39 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+#
+# Copyright 2006-2008 TUBITAK/UEKAE
+# Licensed under the GNU General Public License, version 2.
+# See the file http://www.gnu.org/licenses/old-licenses/gpl-2.0.txt
+
+from pisi.actionsapi import autotools
+from pisi.actionsapi import pisitools
+from pisi.actionsapi import shelltools
+from pisi.actionsapi import get
+
+WorkDir = "."
+
+def setup():
+    for package in shelltools.ls("xf86-video-*"):
+        print "\nConfiguring %s ...\n" % package
+
+        shelltools.cd(package)
+
+        if "unichrome" in package:
+            shelltools.system("./autogen.sh")
+
+        autotools.configure()
+        shelltools.cd("../")
+
+def build():
+    for package in shelltools.ls("xf86-video-*"):
+        shelltools.cd(package)
+        autotools.make()
+        shelltools.cd("../")
+
+def install():
+    for package in shelltools.ls("xf86-video-*"):
+        shelltools.cd(package)
+        autotools.rawInstall("DESTDIR=%s" % get.installDIR())
+        shelltools.cd("../")
+
+    pisitools.remove("/usr/lib/xorg/modules/drivers/*.la")

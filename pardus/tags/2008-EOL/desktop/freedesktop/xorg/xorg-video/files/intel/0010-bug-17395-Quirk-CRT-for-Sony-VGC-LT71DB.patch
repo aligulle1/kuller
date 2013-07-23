@@ -1,0 +1,66 @@
+From dcc45b34f69b463a7c367486a0b2b4a1778b910e Mon Sep 17 00:00:00 2001
+From: Zhenyu Wang <zhenyu.z.wang@intel.com>
+Date: Wed, 10 Dec 2008 10:36:07 +0800
+Subject: [PATCH 10/20] bug #17395: Quirk CRT for Sony VGC-LT71DB
+ (cherry picked from commit f5f67e1b54e67b4bfc3db3482b2693211be81d63)
+
+---
+ src/i830.h        |    1 +
+ src/i830_crt.c    |    3 +++
+ src/i830_quirks.c |    7 +++++++
+ 3 files changed, 11 insertions(+), 0 deletions(-)
+
+diff --git xf86-video-intel-2.4.3/src/i830.h xf86-video-intel-2.4.3/src/i830.h
+index 07f2b69..ef9738a 100644
+--- xf86-video-intel-2.4.3/src/i830.h
++++ xf86-video-intel-2.4.3/src/i830.h
+@@ -940,6 +940,7 @@ extern const int I830CopyROP[16];
+ #define QUIRK_IVCH_NEED_DVOB		0x00000010
+ #define QUIRK_RESET_MODES		0x00000020
+ #define QUIRK_PFIT_SAFE			0x00000040
++#define QUIRK_IGNORE_CRT		0x00000080
+ extern void i830_fixup_devices(ScrnInfoPtr);
+ 
+ #endif /* _I830_H_ */
+diff --git xf86-video-intel-2.4.3/src/i830_crt.c xf86-video-intel-2.4.3/src/i830_crt.c
+index 8274c0c..03cf11c 100644
+--- xf86-video-intel-2.4.3/src/i830_crt.c
++++ xf86-video-intel-2.4.3/src/i830_crt.c
+@@ -434,6 +434,9 @@ i830_crt_init(ScrnInfoPtr pScrn)
+     I830OutputPrivatePtr    i830_output;
+     I830Ptr		    pI830 = I830PTR(pScrn);
+ 
++    if (pI830->quirk_flag & QUIRK_IGNORE_CRT)
++	return;
++
+     output = xf86OutputCreate (pScrn, &i830_crt_output_funcs, "VGA");
+     if (!output)
+ 	return;
+diff --git xf86-video-intel-2.4.3/src/i830_quirks.c xf86-video-intel-2.4.3/src/i830_quirks.c
+index 7708133..e465f37 100644
+--- xf86-video-intel-2.4.3/src/i830_quirks.c
++++ xf86-video-intel-2.4.3/src/i830_quirks.c
+@@ -194,6 +194,11 @@ static void quirk_ignore_lvds (I830Ptr pI830)
+     pI830->quirk_flag |= QUIRK_IGNORE_LVDS;
+ }
+ 
++static void quirk_ignore_crt (I830Ptr pI830)
++{
++    pI830->quirk_flag |= QUIRK_IGNORE_CRT;
++}
++
+ static void quirk_mac_mini (I830Ptr pI830)
+ {
+     pI830->quirk_flag |= QUIRK_IGNORE_MACMINI_LVDS;
+@@ -335,6 +340,8 @@ static i830_quirk i830_quirk_list[] = {
+     { PCI_CHIP_I830_M, 0x104d, 0x8100, quirk_ivch_dvob },
+     /* Sony vaio VGN-SZ4MN (See LP: #212163) */
+     { PCI_CHIP_I830_M, 0x104d, 0x81e6, quirk_pipea_force },
++    /* Sony VGC-LT71DB has no VGA output (bug #17395) */
++    { PCI_CHIP_I965_GM, 0x104d, 0x9018, quirk_ignore_crt },
+ 
+     /* Ordi Enduro UW31 (See LP: #152416) */
+     { PCI_CHIP_I945_GM, 0x1584, 0x9900, quirk_ignore_tv },
+-- 
+1.6.2
+

@@ -1,0 +1,31 @@
+--- src/libnet_cq.c
++++ src/libnet_cq.c
+@@ -114,7 +114,7 @@
+ 
+         /* label the context with the user specified string */
+         strncpy(l->label, label, LIBNET_LABEL_SIZE);
+-        l->label[LIBNET_LABEL_SIZE] = '\0';
++        l->label[LIBNET_LABEL_SIZE - 1] = '\0';
+ 
+         l_cq->next = NULL;
+         l_cq->prev = NULL;
+@@ -145,7 +145,7 @@
+ 
+     /* label the context with the user specified string */
+     strncpy(l->label, label, LIBNET_LABEL_SIZE);
+-    l->label[LIBNET_LABEL_SIZE] = '\0';
++    l->label[LIBNET_LABEL_SIZE - 1] = '\0';
+ 
+     new->next = l_cq;
+     new->prev = NULL;
+--- src/libnet_init.c
++++ src/libnet_init.c
+@@ -77,7 +77,7 @@
+     l->device           = (device ? strdup(device) : NULL);
+ 
+     strncpy(l->label, LIBNET_LABEL_DEFAULT, LIBNET_LABEL_SIZE);
+-    l->label[sizeof(l->label)] = '\0';
++    l->label[sizeof(l->label) - 1] = '\0';
+ 
+     switch (l->injection_type)
+     {

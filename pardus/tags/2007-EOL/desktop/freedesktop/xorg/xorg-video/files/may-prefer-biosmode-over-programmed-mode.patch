@@ -1,0 +1,67 @@
+Index: xorg-video-7.2/xf86-video-intel-2.1.1/src/i830_lvds.c
+===================================================================
+--- xorg-video-7.2.orig/xf86-video-intel-2.1.1/src/i830_lvds.c
++++ xorg-video-7.2/xf86-video-intel-2.1.1/src/i830_lvds.c
+@@ -848,7 +848,7 @@ i830_lvds_init(ScrnInfoPtr pScrn)
+     I830Ptr		    pI830 = I830PTR(pScrn);
+     xf86OutputPtr	    output;
+     I830OutputPrivatePtr    intel_output;
+-    DisplayModePtr	    modes, scan, bios_mode;
++    DisplayModePtr	    modes, scan, bios_mode, programmed_mode = NULL;
+     struct i830_lvds_priv   *dev_priv;
+ 
+     if (pI830->quirk_flag & QUIRK_IGNORE_LVDS)
+@@ -913,9 +913,9 @@ i830_lvds_init(ScrnInfoPtr pScrn)
+ 	xf86CrtcPtr crtc = xf86_config->crtc[pipe];
+ 
+ 	if (lvds & LVDS_PORT_EN) {
+-	    dev_priv->panel_fixed_mode = i830_crtc_mode_get(pScrn, crtc);
+-	    if (dev_priv->panel_fixed_mode != NULL)
+-		dev_priv->panel_fixed_mode->type |= M_T_PREFERRED;
++	    programmed_mode = i830_crtc_mode_get(pScrn, crtc);
++	    if (programmed_mode != NULL)
++		programmed_mode->type |= M_T_PREFERRED;
+ 	}
+     }
+ 
+@@ -952,9 +952,38 @@ i830_lvds_init(ScrnInfoPtr pScrn)
+ 		xf86PrintModeline(pScrn->scrnIndex, bios_mode);
+ 		xf86DrvMsg(pScrn->scrnIndex, X_INFO, "probed mode:\n");
+ 		xf86PrintModeline(pScrn->scrnIndex, dev_priv->panel_fixed_mode);
+-		xfree(bios_mode->name);
+-		xfree(bios_mode);
+ 	    }
++	}  else if (programmed_mode) {
++	    int prefer_programmed = 1;
++	    char *msg = NULL;
++	    if (xf86ModesEqual(programmed_mode, bios_mode)) {
++	        /* easy :) */
++	    } else if (bios_mode->HDisplay < 800 || bios_mode->HDisplay > 4096
++		       || bios_mode->VDisplay < 600 || bios_mode->VDisplay > 3072) {
++	        msg = "BIOS panel mode data is wrong";
++	    } else if (bios_mode->HDisplay >= programmed_mode->HDisplay &&
++		       bios_mode->VDisplay >= programmed_mode->VDisplay) {
++	        prefer_programmed = 0;
++	        msg = "BIOS panel mode is bigger than probed programmed mode";
++	    } else if ((bios_mode->HDisplay >= programmed_mode->HDisplay ||
++			bios_mode->VDisplay >= programmed_mode->VDisplay)
++		       && bios_mode->HDisplay >= bios_mode->VDisplay /* aspect ratio at least 1 */
++		       && bios_mode->HDisplay <= 4 * bios_mode->VDisplay /* aspect ratio below 4 */
++		       ) {
++	        prefer_programmed = 0;
++		msg = "BIOS panel mode seems better than probed programmed mode";
++	    } else {
++		msg = "do not know which mode to prefer";
++	    }
++
++	    if (msg) {
++	        xf86DrvMsg(pScrn->scrnIndex, X_WARNING, "%s, continuing with %s mode.\n", msg, prefer_programmed ? "probed" : "BIOS");
++		xf86DrvMsg(pScrn->scrnIndex, X_INFO, "BIOS mode:\n");
++		xf86PrintModeline(pScrn->scrnIndex, bios_mode);
++		xf86DrvMsg(pScrn->scrnIndex, X_INFO, "probed programmed mode:\n");
++		xf86PrintModeline(pScrn->scrnIndex, programmed_mode);
++	    }
++	    dev_priv->panel_fixed_mode = prefer_programmed ? programmed_mode : bios_mode;
+ 	}  else {
+ 	    dev_priv->panel_fixed_mode = bios_mode;
+ 	}

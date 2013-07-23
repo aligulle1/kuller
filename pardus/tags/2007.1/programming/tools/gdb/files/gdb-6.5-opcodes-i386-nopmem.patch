@@ -1,0 +1,54 @@
+This is already upstream, past GDB 6.5.
+
+include/opcode/
+
+2006-06-09  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* i386.h (i386_optab): Add "nop" with memory reference.
+
+opcodes/
+
+2006-06-09  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* i386-dis.c (dis386_twobyte): Use "nopQ" for 0x1f.
+	(twobyte_has_modrm): Set 1 for 0x1f.
+
+Index: gdb-6.5/include/opcode/i386.h
+===================================================================
+--- gdb-6.5.orig/include/opcode/i386.h	2006-08-24 02:55:59.000000000 -0300
++++ gdb-6.5/include/opcode/i386.h	2006-08-24 02:56:36.000000000 -0300
+@@ -563,7 +563,11 @@ static const template i386_optab[] =
+ {"bound",  2,	0x62, X, Cpu186|CpuNo64, wl_Suf|Modrm,		{ WordReg, WordMem, 0} },
+ 
+ {"hlt",	   0,	0xf4, X, 0,	 NoSuf,			{ 0, 0, 0} },
+-/* nop is actually 'xchgl %eax, %eax'.  */
++
++{"nop",    1, 0x0f1f, X, Cpu686, wl_Suf|Modrm,		{ WordMem, 0, 0} },
++
++/* nop is actually "xchg %ax,%ax" in 16bit mode, "xchg %eax,%eax" in
++   32bit mode and "xchg %rax,%rax" in 64bit mode.  */
+ {"nop",	   0,	0x90, X, 0,	 NoSuf,			{ 0, 0, 0} },
+ 
+ /* Protection control.  */
+Index: gdb-6.5/opcodes/i386-dis.c
+===================================================================
+--- gdb-6.5.orig/opcodes/i386-dis.c	2006-08-24 02:55:59.000000000 -0300
++++ gdb-6.5/opcodes/i386-dis.c	2006-08-24 02:56:36.000000000 -0300
+@@ -842,7 +842,7 @@ static const struct dis386 dis386_twobyt
+   { "(bad)",		XX, XX, XX },
+   { "(bad)",		XX, XX, XX },
+   { "(bad)",		XX, XX, XX },
+-  { "(bad)",		XX, XX, XX },
++  { "nopQ",		Ev, XX, XX },
+   /* 20 */
+   { "movZ",		Rm, Cm, XX },
+   { "movZ",		Rm, Dm, XX },
+@@ -1124,7 +1124,7 @@ static const unsigned char twobyte_has_m
+   /*       0 1 2 3 4 5 6 7 8 9 a b c d e f        */
+   /*       -------------------------------        */
+   /* 00 */ 1,1,1,1,0,0,0,0,0,0,0,0,0,1,0,1, /* 0f */
+-  /* 10 */ 1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0, /* 1f */
++  /* 10 */ 1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,1, /* 1f */
+   /* 20 */ 1,1,1,1,1,0,1,0,1,1,1,1,1,1,1,1, /* 2f */
+   /* 30 */ 0,0,0,0,0,0,0,0,1,0,1,0,0,0,0,0, /* 3f */
+   /* 40 */ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, /* 4f */

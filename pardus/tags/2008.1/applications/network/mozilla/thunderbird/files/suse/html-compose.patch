@@ -1,0 +1,50 @@
+Index: mail/base/content/mailWindowOverlay.js
+===================================================================
+RCS file: /cvsroot/mozilla/mail/base/content/mailWindowOverlay.js,v
+retrieving revision 1.95.2.55
+diff -u -p -6 -r1.95.2.55 mailWindowOverlay.js
+--- mail/base/content/mailWindowOverlay.js	12 Feb 2007 21:07:34 -0000	1.95.2.55
++++ mail/base/content/mailWindowOverlay.js	15 Feb 2007 19:46:05 -0000
+@@ -1064,12 +1064,19 @@ function MsgNewMessage(event)
+   if (event && event.shiftKey)
+     ComposeMessage(msgComposeType.New, msgComposeFormat.OppositeOfDefault, loadedFolder, messageArray);
+   else
+     ComposeMessage(msgComposeType.New, msgComposeFormat.Default, loadedFolder, messageArray);
+ }
+ 
++function MsgNewHtmlMessage()
++{
++  var loadedFolder = GetFirstSelectedMsgFolder();
++  var messageArray = GetSelectedMessages();
++  ComposeMessage(msgComposeType.New, msgComposeFormat.HTML, loadedFolder, messageArray);
++}
++
+ function MsgReplyMessage(event)
+ {
+   var loadedFolder = GetLoadedMsgFolder();
+   if (loadedFolder)
+   {
+     var server = loadedFolder.server;
+Index: mail/base/content/mailWindowOverlay.xul
+===================================================================
+RCS file: /cvsroot/mozilla/mail/base/content/mailWindowOverlay.xul,v
+retrieving revision 1.116.2.72
+diff -u -p -6 -r1.116.2.72 mailWindowOverlay.xul
+--- mail/base/content/mailWindowOverlay.xul	10 Feb 2007 22:56:29 -0000	1.116.2.72
++++ mail/base/content/mailWindowOverlay.xul	15 Feb 2007 19:46:55 -0000
+@@ -1511,12 +1511,15 @@
+         <menu id="messageMenu" label="&msgMenu.label;" accesskey="&msgMenu.accesskey;">
+           <menupopup id="messageMenuPopup" onpopupshowing="InitMessageMenu();">
+             <menuitem id="newMsgCmd" label="&newMsgCmd.label;"
+               accesskey="&newMsgCmd.accesskey;"
+               key="key_newMessage2"
+               oncommand="MsgNewMessage(null);"/>
++	    <menuitem id="newHtmlMsgCmd" label="New HTML Message"
++	      accesskey="H"
++	      oncommand="MsgNewHtmlMessage();"/>
+             <menuitem id="replyMainMenu" label="&replyMsgCmd.label;" 
+               accesskey="&replyMsgCmd.accesskey;"
+               key="key_reply"
+               command="cmd_reply"/>
+             <menuitem id="replySenderMainMenu" label="&replySenderCmd.label;" 
+               accesskey="&replySenderCmd.accesskey;"

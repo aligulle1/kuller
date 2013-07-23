@@ -1,0 +1,1134 @@
+diff -Naur kdebindings-4.0.80/cmake/modules/FindPHP5.cmake kdebindings/cmake/modules/FindPHP5.cmake
+--- kdebindings-4.0.80/cmake/modules/FindPHP5.cmake	2008-05-21 10:32:32.000000000 +0200
++++ kdebindings/cmake/modules/FindPHP5.cmake	2008-05-25 14:38:47.000000000 +0200
+@@ -37,7 +37,6 @@
+ FIND_PROGRAM(PHP5_EXECUTABLE
+   NAMES php5 php
+   PATHS
+-  /usr/bin
+   /usr/local/bin
+   )
+ 
+diff -Naur kdebindings-4.0.80/csharp/CMakeLists.txt kdebindings/csharp/CMakeLists.txt
+--- kdebindings-4.0.80/csharp/CMakeLists.txt	2008-05-21 10:32:32.000000000 +0200
++++ kdebindings/csharp/CMakeLists.txt	2008-05-25 14:38:46.000000000 +0200
+@@ -9,11 +9,11 @@
+ if(ENABLE_QYOTO)
+     FIND_PACKAGE (Mono)
+     IF (NOT GMCS_EXECUTABLE)
+-        MESSAGE (FATAL_ERROR "gmcs was not found on your system but is needed for Qyoto.")
++        MESSAGE (STATUS "gmcs was not found on your system but is needed for Qyoto.")
+     ENDIF (NOT GMCS_EXECUTABLE)
+ 
+     IF (NOT GACUTIL_EXECUTABLE)
+-        MESSAGE (FATAL_ERROR "gacutil was not found on your system but is needed for Qyoto.")
++        MESSAGE (STATUS "gacutil was not found on your system but is needed for Qyoto.")
+     ENDIF (NOT GACUTIL_EXECUTABLE)
+ 
+     IF (GMCS_EXECUTABLE AND GACUTIL_EXECUTABLE)
+diff -Naur kdebindings-4.0.80/csharp/qyoto/src/qyotosmokebinding.cpp kdebindings/csharp/qyoto/src/qyotosmokebinding.cpp
+--- kdebindings-4.0.80/csharp/qyoto/src/qyotosmokebinding.cpp	2008-05-15 20:37:07.000000000 +0200
++++ kdebindings/csharp/qyoto/src/qyotosmokebinding.cpp	2008-05-25 23:11:04.000000000 +0200
+@@ -16,6 +16,7 @@
+ #include "qyotosmokebinding.h"
+ #include "qyoto.h"
+ #include "virtualmethodcall.h"
++#include <stdlib.h>
+ 
+ QyotoSmokeBinding::QyotoSmokeBinding(Smoke *s, QHash<int, char*> *classname) : SmokeBinding(s), _classname(classname) {}
+ 
+diff -Naur kdebindings-4.0.80/csharp/qyoto/src/qyotosmokebinding.cpp~ kdebindings/csharp/qyoto/src/qyotosmokebinding.cpp~
+--- kdebindings-4.0.80/csharp/qyoto/src/qyotosmokebinding.cpp~	1970-01-01 01:00:00.000000000 +0100
++++ kdebindings/csharp/qyoto/src/qyotosmokebinding.cpp~	2008-05-25 23:01:46.000000000 +0200
+@@ -0,0 +1,114 @@
++/***************************************************************************
++    begin                : Wed Jun 16 2004
++    copyright            : (C) 2004 by Richard Dale
++    email                : Richard_Dale@tipitina.demon.co.uk
++ ***************************************************************************/
++
++/***************************************************************************
++ *                                                                         *
++ *   This program is free software; you can redistribute it and/or modify  *
++ *   it under the terms of the GNU General Public License as published by  *
++ *   the Free Software Foundation; either version 2 of the License, or     *
++ *   (at your option) any later version.                                   *
++ *                                                                         *
++ ***************************************************************************/
++
++#include "qyotosmokebinding.h"
++#include "qyoto.h"
++#include "virtualmethodcall.h"
++#include <stdio.h>
++#include <stdlib.h>
++
++QyotoSmokeBinding::QyotoSmokeBinding(Smoke *s, QHash<int, char*> *classname) : SmokeBinding(s), _classname(classname) {}
++
++void
++QyotoSmokeBinding::deleted(Smoke::Index classId, void *ptr)
++{
++	void * obj = (*GetInstance)(ptr, true);
++	if (obj == 0) {
++		return;
++	}
++
++	smokeqyoto_object *o = (smokeqyoto_object*) (*GetSmokeObject)(obj);
++
++	if (do_debug & qtdb_gc) {
++		printf("%p->~%s()\n", ptr, smoke->className(classId));
++		fflush(stdout);
++	}
++
++	if (o == 0 || o->ptr == 0) {
++		(*FreeGCHandle)(obj);
++		return;
++	}
++	unmapPointer(o, o->classId, 0);
++	(*SetSmokeObject)(obj, 0);
++	free_smokeqyoto_object(o);
++	(*FreeGCHandle)(obj);
++}
++
++bool
++QyotoSmokeBinding::callMethod(Smoke::Index method, void *ptr, Smoke::Stack args, bool isAbstract)
++{
++	// don't call anything if the application has already terminated
++	if (application_terminated) return false;
++	void * obj = (*GetInstance)(ptr, false);
++
++	if (obj == 0 && !isAbstract) {
++		return false;
++	}
++
++	Smoke::Method & meth = smoke->methods[method];
++	QByteArray signature(smoke->methodNames[meth.name]);
++	signature += "(";
++
++	for (int i = 0; i < meth.numArgs; i++) {
++		if (i != 0) signature += ", ";
++		signature += smoke->types[smoke->argumentList[meth.args + i]].name;
++	}
++
++	signature += ")";
++	if (meth.flags & Smoke::mf_const) {
++		signature += " const";
++	}
++
++	if (obj == 0) {
++		printf(	"Fatal error: C# instance has been wrongly GC'd for virtual %p->%s::%s call\n", 
++					ptr,
++					smoke->classes[smoke->methods[method].classId].className,
++					(const char *) signature );
++			exit(1);
++	}
++		if (do_debug & qtdb_virtual) {
++		printf(	"virtual %p->%s::%s called\n", 
++					ptr,
++					smoke->classes[smoke->methods[method].classId].className,
++					(const char *) signature );
++		fflush(stdout);
++	}
++
++	if (strcmp(signature, "qt_metacall(QMetaObject::Call, int, void**)") == 0) {
++		QMetaObject::Call _c = (QMetaObject::Call)args[1].s_int;
++		int _id = args[2].s_int;
++		void** _o = (void**)args[3].s_voidp;
++		
++		args[0].s_int = qt_metacall(obj, _c, _id, _o);
++
++		(*FreeGCHandle)(obj);
++		return true;
++	}
++	void * overridenMethod = (*OverridenMethod)(obj, (const char *) signature);
++	if (overridenMethod == 0) {
++		(*FreeGCHandle)(obj);
++		return false;
++	}
++
++	VirtualMethodCall c(smoke, method, args, obj, overridenMethod);
++	c.next();
++	return true;
++}
++
++char*
++QyotoSmokeBinding::className(Smoke::Index classId)
++{
++	return _classname->value((int) classId);
++}
+diff -Naur kdebindings-4.0.80/kalyptus/kalyptusCxxToSmoke.pm kdebindings/kalyptus/kalyptusCxxToSmoke.pm
+--- kdebindings-4.0.80/kalyptus/kalyptusCxxToSmoke.pm	2008-05-21 10:32:37.000000000 +0200
++++ kdebindings/kalyptus/kalyptusCxxToSmoke.pm	2008-05-25 14:39:18.000000000 +0200
+@@ -581,6 +581,8 @@
+ 			|| ($classNode->{astNodeName} eq 'KStandardShortcut' and $name eq 'insert')
+ 			|| ($classNode->{astNodeName} eq 'KTzfileTimeZoneSource' and $name eq 'location')
+ 			|| ($classNode->{astNodeName} eq 'Wallet' and $name eq 'Wallet')
++			|| ($className eq 'DOM::Element' and $name eq 'contentEditable')
++			|| ($className eq 'DOM::Element' and $name eq 'setContentEditable')
+ 			|| ($className eq 'Soprano::Server::ServerCore' and $name eq 'backendSettings')
+ 			|| ($className eq 'Soprano::Index::CLuceneIndex' and $name eq 'search')
+ 			|| ($className eq 'Soprano::NodeIterator' and $name eq 'NodeIterator' && $#{$m->{ParamList}} == 0 && $m->{ParamList}[0]->{ArgType} =~ /Backend/)
+diff -Naur kdebindings-4.0.80/php/CMakeLists.txt kdebindings/php/CMakeLists.txt
+--- kdebindings-4.0.80/php/CMakeLists.txt	2008-05-21 10:32:37.000000000 +0200
++++ kdebindings/php/CMakeLists.txt	2008-05-25 14:39:16.000000000 +0200
+@@ -1,9 +1,12 @@
+ OPTION(ENABLE_PHP-QT "build PHP-Qt" OFF)
+ 
+-include(FindPHP5)
++if( ENABLE_PHP-QT)
+ 
+-IF(NOT PHP5_FOUND)
+-    MESSAGE(FATAL_ERROR "PHP5 could not be found!")
+-ENDIF(NOT PHP5_FOUND)
++   include(FindPHP5)
+ 
+-add_subdirectory(phpqt)
+\ No newline at end of file
++   if( PHP5_FOUND)
++      add_subdirectory(phpqt)
++   else(PHP5_FOUND)
++      MESSAGE(STATUS "PHP5 could not be found! phpqt will not build")
++   endif(PHP5_FOUND)
++endif( ENABLE_PHP-QT)
+diff -Naur kdebindings-4.0.80/php/phpqt/src/CMakeLists.txt kdebindings/php/phpqt/src/CMakeLists.txt
+--- kdebindings-4.0.80/php/phpqt/src/CMakeLists.txt	2008-05-21 10:32:36.000000000 +0200
++++ kdebindings/php/phpqt/src/CMakeLists.txt	2008-05-25 14:39:15.000000000 +0200
+@@ -2,7 +2,6 @@
+ OPTION(MOC_DEBUG "debug moc" OFF)
+ 
+ OPTION(DEBUG "" OFF)
+-OPTION(MOC_DEBUG "" OFF)
+ OPTION(CONSTRUCT_DEBUG "" OFF)
+ OPTION(DESTRUCT_DEBUG "" OFF)
+ OPTION(METHOD_DEBUG "" OFF)
+diff -Naur kdebindings-4.0.80/python/krosspython/CMakeLists.txt kdebindings/python/krosspython/CMakeLists.txt
+--- kdebindings-4.0.80/python/krosspython/CMakeLists.txt	2008-03-25 18:21:58.000000000 +0100
++++ kdebindings/python/krosspython/CMakeLists.txt	2008-05-25 14:38:58.000000000 +0200
+@@ -1,9 +1,5 @@
+ PROJECT(KROSSPYTHON)
+ 
+-find_package(KDE4 REQUIRED)
+-find_package(Qt4 REQUIRED)
+-include(KDE4Defaults)
+-include(MacroLibrary)
+ find_package(PythonLibrary REQUIRED)
+ include(PythonMacros)
+ 
+diff -Naur kdebindings-4.0.80/python/pykde4/CMakeLists.txt kdebindings/python/pykde4/CMakeLists.txt
+--- kdebindings-4.0.80/python/pykde4/CMakeLists.txt	2008-01-05 00:52:57.000000000 +0100
++++ kdebindings/python/pykde4/CMakeLists.txt	2008-05-25 14:38:57.000000000 +0200
+@@ -4,10 +4,6 @@
+ 
+ SET(CMAKE_MODULE_PATH ${pykde4_SOURCE_DIR}/cmake/modules )
+ 
+-FIND_PACKAGE(KDE4 REQUIRED)
+-FIND_PACKAGE(Qt4 REQUIRED)
+-INCLUDE(KDE4Defaults)
+-INCLUDE(MacroLibrary)
+ FIND_PACKAGE(PythonLibrary REQUIRED)
+ INCLUDE(PythonMacros)
+ 
+diff -Naur kdebindings-4.0.80/python/pykde4/INSTALL kdebindings/python/pykde4/INSTALL
+--- kdebindings-4.0.80/python/pykde4/INSTALL	2008-01-05 00:52:57.000000000 +0100
++++ kdebindings/python/pykde4/INSTALL	2008-05-25 14:38:57.000000000 +0200
+@@ -3,11 +3,11 @@
+ 
+ * A recent Python (2.5.1 is what I've been using)
+ 
+-* SIP version 4.7.1 or later. Get the development snapshot
++* SIP version 4.7.6 or later. Get the development snapshot
+   from Riverbank Computing.
+   http://www.riverbankcomputing.co.uk/sip/index.php
+ 
+-* PyQt 4.3.1 or later. Also available at Riverbank Computing.
++* PyQt 4.4.2 or later. Also available at Riverbank Computing.
+ 
+ * KDE 4 libs and development headers etc.
+ 
+diff -Naur kdebindings-4.0.80/python/pykde4/docs/html/creative commons_files/.svn/entries kdebindings/python/pykde4/docs/html/creative commons_files/.svn/entries
+--- kdebindings-4.0.80/python/pykde4/docs/html/creative commons_files/.svn/entries	2008-05-21 13:20:34.000000000 +0200
++++ kdebindings/python/pykde4/docs/html/creative commons_files/.svn/entries	2008-05-25 14:38:48.000000000 +0200
+@@ -1,9 +1,9 @@
+-9
++8
+ 
+ dir
+-810705
+-svn+ssh://mueller@svn.kde.org/home/kde/tags/KDE/4.0.80/kdebindings/python/pykde4/docs/html/creative%20commons_files
+-svn+ssh://mueller@svn.kde.org/home/kde
++812321
++svn://anonsvn.kde.org/home/kde/trunk/KDE/kdebindings/python/pykde4/docs/html/creative%20commons_files
++svn://anonsvn.kde.org/home/kde
+ 
+ 
+ 
+diff -Naur kdebindings-4.0.80/python/pykde4/docs/html/creative commons_files/.svn/format kdebindings/python/pykde4/docs/html/creative commons_files/.svn/format
+--- kdebindings-4.0.80/python/pykde4/docs/html/creative commons_files/.svn/format	2008-01-05 00:52:52.000000000 +0100
++++ kdebindings/python/pykde4/docs/html/creative commons_files/.svn/format	2008-05-25 14:38:48.000000000 +0200
+@@ -1 +1 @@
+-9
++8
+diff -Naur kdebindings-4.0.80/python/pykde4/sip/kdecore/kcharsets.sip kdebindings/python/pykde4/sip/kdecore/kcharsets.sip
+--- kdebindings-4.0.80/python/pykde4/sip/kdecore/kcharsets.sip	2008-04-10 11:29:51.000000000 +0200
++++ kdebindings/python/pykde4/sip/kdecore/kcharsets.sip	2008-05-25 14:38:56.000000000 +0200
+@@ -53,6 +53,9 @@
+     QString                 languageForEncoding (const QString& encoding) const;
+     QString                 descriptionForEncoding (const QString& encoding) const;
+     QString                 encodingForName (const QString& descriptiveName) const;
++
++private:
++                            KCharsets(const KCharsets &other);
+ };   // KCharsets
+ 
+ 
+diff -Naur kdebindings-4.0.80/python/pykde4/sip/kdecore/kcmdlineargs.sip kdebindings/python/pykde4/sip/kdecore/kcmdlineargs.sip
+--- kdebindings-4.0.80/python/pykde4/sip/kdecore/kcmdlineargs.sip	2008-04-10 11:29:51.000000000 +0200
++++ kdebindings/python/pykde4/sip/kdecore/kcmdlineargs.sip	2008-05-25 14:38:56.000000000 +0200
+@@ -136,6 +136,9 @@
+ protected:
+                             KCmdLineArgs (const KCmdLineOptions& _options, const KLocalizedString& _name, const QByteArray& _id);
+                             ~KCmdLineArgs ();
++
++private:
++                            KCmdLineArgs (const KCmdLineArgs  &other);
+ };   // KCmdLineArgs
+ 
+ 
+diff -Naur kdebindings-4.0.80/python/pykde4/sip/kdecore/kcoreconfigskeleton.sip kdebindings/python/pykde4/sip/kdecore/kcoreconfigskeleton.sip
+--- kdebindings-4.0.80/python/pykde4/sip/kdecore/kcoreconfigskeleton.sip	2008-04-10 11:29:51.000000000 +0200
++++ kdebindings/python/pykde4/sip/kdecore/kcoreconfigskeleton.sip	2008-05-25 14:38:56.000000000 +0200
+@@ -137,7 +137,8 @@
+ #include <kcoreconfigskeleton.h>
+ %End
+ 
+-
++private:
++                            KConfigSkeletonItem (const KConfigSkeletonItem &other);
+ public:
+     typedef QList<KConfigSkeletonItem*> List;
+ 
+@@ -315,7 +316,8 @@
+                                 ItemBool (const QString& _group, const QString& _key, bool reference, bool defaultValue = 1) [(const QString& _group, const QString& _key, bool& reference, bool defaultValue = 1)];
+ %MethodCode
+     Py_BEGIN_ALLOW_THREADS
+-    sipCpp = new sipKCoreConfigSkeleton_ItemBool (PyItemBool (*a0, *a1, a2, a3));
++//    sipCpp = new sipKCoreConfigSkeleton_ItemBool (PyItemBool (*a0, *a1, a2, a3));
++    sipCpp = new sipKCoreConfigSkeleton_ItemBool (*a0, *a1, a2, a3);
+     Py_END_ALLOW_THREADS
+ 
+ %End
+@@ -404,7 +406,8 @@
+                                 ItemInt (const QString& _group, const QString& _key, qint32 reference, qint32 defaultValue = 0) [(const QString& _group, const QString& _key, qint32& reference, qint32 defaultValue = 0)];
+ %MethodCode
+     Py_BEGIN_ALLOW_THREADS
+-    sipCpp = new sipKCoreConfigSkeleton_ItemInt (PyItemInt (*a0, *a1, a2, a3));
++//    sipCpp = new sipKCoreConfigSkeleton_ItemInt (PyItemInt (*a0, *a1, a2, a3));
++    sipCpp = new sipKCoreConfigSkeleton_ItemInt (*a0, *a1, a2, a3);
+     Py_END_ALLOW_THREADS
+ 
+ %End
+@@ -440,7 +443,8 @@
+                                 ItemLongLong (const QString& _group, const QString& _key, qint64 reference, qint64 defaultValue = 0) [(const QString& _group, const QString& _key, qint64& reference, qint64 defaultValue = 0)];
+ %MethodCode
+     Py_BEGIN_ALLOW_THREADS
+-    sipCpp = new sipKCoreConfigSkeleton_ItemLongLong (PyItemLongLong (*a0, *a1, a2, a3));
++//    sipCpp = new sipKCoreConfigSkeleton_ItemLongLong (PyItemLongLong (*a0, *a1, a2, a3));
++    sipCpp = new sipKCoreConfigSkeleton_ItemLongLong (*a0, *a1, a2, a3);
+     Py_END_ALLOW_THREADS
+ %End
+ 
+@@ -489,7 +493,8 @@
+                                 ItemEnum (const QString& _group, const QString& _key, qint32 reference, const QList<KCoreConfigSkeleton::ItemEnum::Choice> choices, qint32 defaultValue = 0) [(const QString& _group, const QString& _key, qint32& reference, const QList<KCoreConfigSkeleton::ItemEnum::Choice>& choices, qint32 defaultValue = 0)];
+ %MethodCode
+     Py_BEGIN_ALLOW_THREADS
+-    sipCpp = new sipKCoreConfigSkeleton_ItemEnum (PyItemEnum (*a0, *a1, a2, *a3, a4));
++    sipCpp = new sipKCoreConfigSkeleton_ItemEnum (*a0, *a1, a2, *a3, a4);
++//    sipCpp = new sipKCoreConfigSkeleton_ItemEnum (PyItemEnum (*a0, *a1, a2, *a3, a4));
+     Py_END_ALLOW_THREADS
+ %End
+ 
+@@ -517,7 +522,8 @@
+                                 ItemUInt (const QString& _group, const QString& _key, quint32 reference, quint32 defaultValue = 0) [(const QString& _group, const QString& _key, quint32& reference, quint32 defaultValue = 0)];
+ %MethodCode
+     Py_BEGIN_ALLOW_THREADS
+-    sipCpp = new sipKCoreConfigSkeleton_ItemUInt (PyItemUInt (*a0, *a1, a2, a3));
++//    sipCpp = new sipKCoreConfigSkeleton_ItemUInt (PyItemUInt (*a0, *a1, a2, a3));
++    sipCpp = new sipKCoreConfigSkeleton_ItemUInt (*a0, *a1, a2, a3);
+     Py_END_ALLOW_THREADS
+ %End
+ 
+@@ -552,7 +558,8 @@
+                                 ItemULongLong (const QString& _group, const QString& _key, quint64 reference, quint64 defaultValue = 0) [(const QString& _group, const QString& _key, quint64& reference, quint64 defaultValue = 0)];
+ %MethodCode
+     Py_BEGIN_ALLOW_THREADS
+-    sipCpp = new sipKCoreConfigSkeleton_ItemULongLong (PyItemULongLong (*a0, *a1, a2, a3));
++//    sipCpp = new sipKCoreConfigSkeleton_ItemULongLong (PyItemULongLong (*a0, *a1, a2, a3));
++    sipCpp = new sipKCoreConfigSkeleton_ItemULongLong (*a0, *a1, a2, a3);
+     Py_END_ALLOW_THREADS
+ %End
+ 
+@@ -589,7 +596,8 @@
+                                 ItemDouble (const QString& _group, const QString& _key, double reference, double defaultValue = 0) [(const QString& _group, const QString& _key, double& reference, double defaultValue = 0)];
+ %MethodCode
+     Py_BEGIN_ALLOW_THREADS
+-    sipCpp = new sipKCoreConfigSkeleton_ItemDouble (PyItemDouble (*a0, *a1, a2, a3));
++//    sipCpp = new sipKCoreConfigSkeleton_ItemDouble (PyItemDouble (*a0, *a1, a2, a3));
++    sipCpp = new sipKCoreConfigSkeleton_ItemDouble (*a0, *a1, a2, a3);
+     Py_END_ALLOW_THREADS
+ %End
+ 
+diff -Naur kdebindings-4.0.80/python/pykde4/sip/kdecore/kencodingdetector.sip kdebindings/python/pykde4/sip/kdecore/kencodingdetector.sip
+--- kdebindings-4.0.80/python/pykde4/sip/kdecore/kencodingdetector.sip	2008-04-10 11:29:51.000000000 +0200
++++ kdebindings/python/pykde4/sip/kdecore/kencodingdetector.sip	2008-05-25 14:38:56.000000000 +0200
+@@ -85,6 +85,8 @@
+     bool                    errorsIfUtf8 (const char* data, int length);
+     bool                    analyze (const char* data, int len);
+     QTextDecoder*           decoder ();
++private:
++                            KEncodingDetector (const KEncodingDetector &other);
+ };   // KEncodingDetector
+ 
+ 
+diff -Naur kdebindings-4.0.80/python/pykde4/sip/kdecore/klocalizedstring.sip kdebindings/python/pykde4/sip/kdecore/klocalizedstring.sip
+--- kdebindings-4.0.80/python/pykde4/sip/kdecore/klocalizedstring.sip	2008-04-10 11:29:51.000000000 +0200
++++ kdebindings/python/pykde4/sip/kdecore/klocalizedstring.sip	2008-05-25 14:38:56.000000000 +0200
+@@ -61,7 +61,25 @@
+ 
+ //ig class I18nTypeCheck;
+ 
+-QString                 i18n (const char* text);
++//QString                 i18n (const char* text);
++QString                 i18n (const char* text,...);
++%MethodCode
++    KLocalizedString result = ki18n(a0);
++    QString arg;
++    int iserr = 0;
++    for (int i=0; i < PyTuple_Size(a1); i++) {
++        PyObject *pyarg = PyTuple_GET_ITEM (a1, i);
++        arg = *(QString *)sipForceConvertTo_QString (pyarg, &iserr);
++        if (iserr) {
++            sipIsErr = 1;
++            return 0;
++        }
++
++        result = result.subs(arg);
++    }
++    *sipRes = result.toString();
++%End
++
+ QString                 i18nc (const char* ctxt, const char* text);
+ %ModuleHeaderCode
+ #include <klocalizedstring.h>
+diff -Naur kdebindings-4.0.80/python/pykde4/sip/kdecore/klockfile.sip kdebindings/python/pykde4/sip/kdecore/klockfile.sip
+--- kdebindings-4.0.80/python/pykde4/sip/kdecore/klockfile.sip	2008-04-10 11:29:51.000000000 +0200
++++ kdebindings/python/pykde4/sip/kdecore/klockfile.sip	2008-05-25 14:38:56.000000000 +0200
+@@ -56,6 +56,9 @@
+     int                     staleTime () const;
+     void                    setStaleTime (int _staleTime);
+     bool                    getLockInfo (int& pid /Out/, QString& hostname /Out/, QString& appname /Out/);
++
++private:
++                            KLockFile (const KLockFile &other);
+ };   // KLockFile
+ 
+ 
+diff -Naur kdebindings-4.0.80/python/pykde4/sip/kdecore/kmacroexpander.sip kdebindings/python/pykde4/sip/kdecore/kmacroexpander.sip
+--- kdebindings-4.0.80/python/pykde4/sip/kdecore/kmacroexpander.sip	2008-04-10 11:29:51.000000000 +0200
++++ kdebindings/python/pykde4/sip/kdecore/kmacroexpander.sip	2008-05-25 14:38:56.000000000 +0200
+@@ -33,6 +33,8 @@
+ #include <kmacroexpander.h>
+ %End
+ 
++private:
++                            KMacroExpanderBase (const KMacroExpanderBase &other);
+ 
+ public:
+     explicit                KMacroExpanderBase (QChar c = QLatin1Char('%'));
+@@ -45,6 +47,7 @@
+ protected:
+     virtual int             expandPlainMacro (const QString& str, int pos, QStringList& ret);
+     virtual int             expandEscapedMacro (const QString& str, int pos, QStringList& ret);
++
+ };   // KMacroExpanderBase
+ 
+ %ModuleHeaderCode
+@@ -66,6 +69,9 @@
+     virtual int             expandPlainMacro (const QString& str, int pos, QStringList& ret);
+     virtual int             expandEscapedMacro (const QString& str, int pos, QStringList& ret);
+     virtual bool            expandMacro (const QString& str, QStringList& ret) = 0;
++private:
++                            KWordMacroExpander (const KWordMacroExpander &other);
++
+ };   // KWordMacroExpander
+ 
+ %ModuleHeaderCode
+@@ -83,6 +89,9 @@
+ public:
+     explicit                KCharMacroExpander (QChar c = QLatin1Char('%'));
+ 
++private:
++                            KCharMacroExpander (const KCharMacroExpander &other);
++
+ protected:
+     virtual int             expandPlainMacro (const QString& str, int pos, QStringList& ret);
+     virtual int             expandEscapedMacro (const QString& str, int pos, QStringList& ret);
+diff -Naur kdebindings-4.0.80/python/pykde4/sip/kdecore/kmimetypetrader.sip kdebindings/python/pykde4/sip/kdecore/kmimetypetrader.sip
+--- kdebindings-4.0.80/python/pykde4/sip/kdecore/kmimetypetrader.sip	2008-04-10 11:29:51.000000000 +0200
++++ kdebindings/python/pykde4/sip/kdecore/kmimetypetrader.sip	2008-05-25 14:38:56.000000000 +0200
+@@ -35,6 +35,7 @@
+ 
+ private:
+                             KMimeTypeTrader ();
++                            KMimeTypeTrader (const KMimeTypeTrader &other);
+ };   // KMimeTypeTrader
+ 
+ 
+diff -Naur kdebindings-4.0.80/python/pykde4/sip/kdecore/ktimezone.sip kdebindings/python/pykde4/sip/kdecore/ktimezone.sip
+--- kdebindings-4.0.80/python/pykde4/sip/kdecore/ktimezone.sip	2008-04-10 11:29:51.000000000 +0200
++++ kdebindings/python/pykde4/sip/kdecore/ktimezone.sip	2008-05-25 14:38:56.000000000 +0200
+@@ -199,6 +199,9 @@
+ 
+ protected:
+     explicit                KTimeZoneSource (bool useZoneParse);
++private:
++                            KTimeZoneSource (const KTimeZoneSource &other);
++
+ };   // KTimeZoneSource
+ 
+ 
+diff -Naur kdebindings-4.0.80/python/pykde4/sip/kdecore/typedefs.sip kdebindings/python/pykde4/sip/kdecore/typedefs.sip
+--- kdebindings-4.0.80/python/pykde4/sip/kdecore/typedefs.sip	2008-04-10 11:29:51.000000000 +0200
++++ kdebindings/python/pykde4/sip/kdecore/typedefs.sip	2008-05-25 14:38:56.000000000 +0200
+@@ -258,7 +258,7 @@
+ %End
+ };
+ 
+-
++/*
+ template <TYPE1,TYPE2>
+ %MappedType QHash<TYPE1,TYPE2>
+ {
+@@ -361,7 +361,7 @@
+     return sipGetState(sipTransferObj);
+ %End
+ };
+-
++*/
+ 
+ template <TYPE1,TYPE2*>
+ %MappedType QHash<TYPE1,TYPE2*>
+diff -Naur kdebindings-4.0.80/python/pykde4/sip/kdeui/kiconeffect.sip kdebindings/python/pykde4/sip/kdeui/kiconeffect.sip
+--- kdebindings-4.0.80/python/pykde4/sip/kdeui/kiconeffect.sip	2008-04-10 11:29:49.000000000 +0200
++++ kdebindings/python/pykde4/sip/kdeui/kiconeffect.sip	2008-05-25 14:38:55.000000000 +0200
+@@ -27,6 +27,8 @@
+ #include <kiconeffect.h>
+ %End
+ 
++private:
++                            KIconEffect (const KIconEffect &other);
+ 
+ public:
+                             KIconEffect ();
+diff -Naur kdebindings-4.0.80/python/pykde4/sip/kdeui/kicontheme.sip kdebindings/python/pykde4/sip/kdeui/kicontheme.sip
+--- kdebindings-4.0.80/python/pykde4/sip/kdeui/kicontheme.sip	2008-04-10 11:29:49.000000000 +0200
++++ kdebindings/python/pykde4/sip/kdeui/kicontheme.sip	2008-05-25 14:38:55.000000000 +0200
+@@ -26,7 +26,8 @@
+ %TypeHeaderCode
+ #include <kicontheme.h>
+ %End
+-
++private:
++                            KIconTheme (const KIconTheme &other);
+ 
+ public:
+     explicit                KIconTheme (const QString& name, const QString& appName = QString());
+diff -Naur kdebindings-4.0.80/python/pykde4/sip/kdeui/kpixmapcache.sip kdebindings/python/pykde4/sip/kdeui/kpixmapcache.sip
+--- kdebindings-4.0.80/python/pykde4/sip/kdeui/kpixmapcache.sip	2008-04-10 11:29:49.000000000 +0200
++++ kdebindings/python/pykde4/sip/kdeui/kpixmapcache.sip	2008-05-25 14:38:55.000000000 +0200
+@@ -27,6 +27,8 @@
+ #include <kpixmapcache.h>
+ %End
+ 
++private:
++                            KPixmapCache (const KPixmapCache& other);
+ 
+ public:
+     explicit                KPixmapCache (const QString& name);
+diff -Naur kdebindings-4.0.80/python/pykde4/sip/kdeui/kxmlguibuilder.sip kdebindings/python/pykde4/sip/kdeui/kxmlguibuilder.sip
+--- kdebindings-4.0.80/python/pykde4/sip/kdeui/kxmlguibuilder.sip	2008-04-10 11:29:49.000000000 +0200
++++ kdebindings/python/pykde4/sip/kdeui/kxmlguibuilder.sip	2008-05-25 14:38:55.000000000 +0200
+@@ -26,7 +26,8 @@
+ %TypeHeaderCode
+ #include <kxmlguibuilder.h>
+ %End
+-
++private:
++                            KXMLGUIBuilder (const KXMLGUIBuilder &other);
+ 
+ public:
+     explicit                KXMLGUIBuilder (QWidget* widget);
+diff -Naur kdebindings-4.0.80/python/pykde4/sip/kdeui/kxmlguiclient.sip kdebindings/python/pykde4/sip/kdeui/kxmlguiclient.sip
+--- kdebindings-4.0.80/python/pykde4/sip/kdeui/kxmlguiclient.sip	2008-04-10 11:29:49.000000000 +0200
++++ kdebindings/python/pykde4/sip/kdeui/kxmlguiclient.sip	2008-05-25 14:38:55.000000000 +0200
+@@ -26,7 +26,8 @@
+ %TypeHeaderCode
+ #include <kxmlguiclient.h>
+ %End
+-
++private:
++                            KXMLGUIClient (const KXMLGUIClient &other);
+ 
+ public:
+                             KXMLGUIClient ();
+diff -Naur kdebindings-4.0.80/python/pykde4/sip/khtml/dom_element.sip kdebindings/python/pykde4/sip/khtml/dom_element.sip
+--- kdebindings-4.0.80/python/pykde4/sip/khtml/dom_element.sip	2008-04-10 11:29:49.000000000 +0200
++++ kdebindings/python/pykde4/sip/khtml/dom_element.sip	2008-05-25 14:38:55.000000000 +0200
+@@ -73,8 +73,6 @@
+     bool                    hasAttribute (const DOM::DOMString& name);
+     bool                    hasAttributeNS (const DOM::DOMString& namespaceURI, const DOM::DOMString& localName);
+     DOM::CSSStyleDeclaration  style ();
+-    bool                    contentEditable () const;
+-    void                    setContentEditable (bool enabled);
+     bool                    isHTMLElement () const;
+     DOM::Element            form () const;
+     static bool             khtmlValidAttrName (const DOM::DOMString& name);
+diff -Naur kdebindings-4.0.80/python/pykde4/sip/khtml/khtml_settings.sip kdebindings/python/pykde4/sip/khtml/khtml_settings.sip
+--- kdebindings-4.0.80/python/pykde4/sip/khtml/khtml_settings.sip	2008-04-10 11:29:49.000000000 +0200
++++ kdebindings/python/pykde4/sip/khtml/khtml_settings.sip	2008-05-25 14:38:55.000000000 +0200
+@@ -83,7 +83,7 @@
+     };
+ 
+                             KHTMLSettings ();
+-                            KHTMLSettings (const KHTMLSettings& other);
++//                            KHTMLSettings (const KHTMLSettings& other);
+     void                    init ();
+     void                    init (KConfig* config, bool reset = 1);
+     bool                    changeCursor () const;
+@@ -142,6 +142,9 @@
+     QList<QPair<QString,QChar>>  fallbackAccessKeysAssignments () const;
+     void                    setJSPopupBlockerPassivePopup (bool enabled);
+     bool                    jsPopupBlockerPassivePopup () const;
++
++private:
++    KHTMLSettings(const KHTMLSettings &);
+ };   // KHTMLSettings
+ 
+ 
+diff -Naur kdebindings-4.0.80/python/pykde4/sip/kio/authinfo.sip kdebindings/python/pykde4/sip/kio/authinfo.sip
+--- kdebindings-4.0.80/python/pykde4/sip/kio/authinfo.sip	2008-04-10 11:29:50.000000000 +0200
++++ kdebindings/python/pykde4/sip/kio/authinfo.sip	2008-05-25 14:38:56.000000000 +0200
+@@ -94,6 +94,7 @@
+ private:
+                             NetRC ();
+                             ~NetRC ();
++                            NetRC (const KIO::NetRC &other);
+ };   // NetRC
+ 
+ };   // KIO
+diff -Naur kdebindings-4.0.80/python/pykde4/sip/kio/kar.sip kdebindings/python/pykde4/sip/kio/kar.sip
+--- kdebindings-4.0.80/python/pykde4/sip/kio/kar.sip	2008-04-10 11:29:50.000000000 +0200
++++ kdebindings/python/pykde4/sip/kio/kar.sip	2008-05-25 14:38:56.000000000 +0200
+@@ -48,6 +48,8 @@
+     virtual bool            openArchive (QIODevice::OpenMode mode);
+     virtual bool            closeArchive ();
+ //ig     virtual void       virtual_hook (int id, void* data);
++private:
++                            KAr (const KAr &other);
+ 
+ public:
+ 
+diff -Naur kdebindings-4.0.80/python/pykde4/sip/kio/karchive.sip kdebindings/python/pykde4/sip/kio/karchive.sip
+--- kdebindings-4.0.80/python/pykde4/sip/kio/karchive.sip	2008-04-10 11:29:50.000000000 +0200
++++ kdebindings/python/pykde4/sip/kio/karchive.sip	2008-05-25 14:38:56.000000000 +0200
+@@ -38,6 +38,8 @@
+ protected:
+                             KArchive (const QString& fileName);
+                             KArchive (QIODevice* dev);
++private:
++                            KArchive (const KArchive &other);
+ 
+ public:
+     virtual bool            open (QIODevice::OpenMode mode);
+@@ -100,6 +102,8 @@
+ protected:
+     KArchive*               archive () const;
+ //ig     virtual void       virtual_hook (int id, void* data);
++private:
++                            KArchiveEntry (const KArchiveEntry &other);
+ };   // KArchiveEntry
+ 
+ 
+@@ -122,6 +126,8 @@
+ 
+ protected:
+ //ig     virtual void       virtual_hook (int id, void* data);
++private:
++                            KArchiveFile (const KArchiveFile &other);
+ };   // KArchiveFile
+ 
+ 
+@@ -160,7 +166,8 @@
+                 sipClass = sipClass_KZipFileEntry;
+         }
+ %End
+-
++private:
++                            KArchiveDirectory (const KArchiveDirectory &other);
+ };   // KArchiveDirectory
+ 
+ 
+diff -Naur kdebindings-4.0.80/python/pykde4/sip/kio/kemailsettings.sip kdebindings/python/pykde4/sip/kio/kemailsettings.sip
+--- kdebindings-4.0.80/python/pykde4/sip/kio/kemailsettings.sip	2008-04-10 11:29:50.000000000 +0200
++++ kdebindings/python/pykde4/sip/kio/kemailsettings.sip	2008-05-25 14:38:56.000000000 +0200
+@@ -68,6 +68,9 @@
+     void                    setDefault (const QString& def);
+     QString                 getSetting (KEMailSettings::Setting s) const;
+     void                    setSetting (KEMailSettings::Setting s, const QString& v);
++private:
++                            KEMailSettings (const KEMailSettings &other);
++
+ };   // KEMailSettings
+ 
+ 
+diff -Naur kdebindings-4.0.80/python/pykde4/sip/kio/kmountpoint.sip kdebindings/python/pykde4/sip/kio/kmountpoint.sip
+--- kdebindings-4.0.80/python/pykde4/sip/kio/kmountpoint.sip	2008-04-10 11:29:50.000000000 +0200
++++ kdebindings/python/pykde4/sip/kio/kmountpoint.sip	2008-05-25 14:38:56.000000000 +0200
+@@ -75,6 +75,7 @@
+ 
+ private:
+                             KMountPoint ();
++                            KMountPoint (const KMountPoint &other);
+ };   // KMountPoint
+ 
+ 
+diff -Naur kdebindings-4.0.80/python/pykde4/sip/kio/ktar.sip kdebindings/python/pykde4/sip/kio/ktar.sip
+--- kdebindings-4.0.80/python/pykde4/sip/kio/ktar.sip	2008-04-10 11:29:50.000000000 +0200
++++ kdebindings/python/pykde4/sip/kio/ktar.sip	2008-05-25 14:38:56.000000000 +0200
+@@ -42,6 +42,8 @@
+     virtual bool            closeArchive ();
+     virtual bool            createDevice (QIODevice::OpenMode mode);
+ //ig     virtual void       virtual_hook (int id, void* data);
++private:
++                            KTar(const KTar &other);
+ };   // KTar
+ 
+ 
+diff -Naur kdebindings-4.0.80/python/pykde4/sip/kio/kurlpixmapprovider.sip kdebindings/python/pykde4/sip/kio/kurlpixmapprovider.sip
+--- kdebindings-4.0.80/python/pykde4/sip/kio/kurlpixmapprovider.sip	2008-04-10 11:29:50.000000000 +0200
++++ kdebindings/python/pykde4/sip/kio/kurlpixmapprovider.sip	2008-05-25 14:38:56.000000000 +0200
+@@ -52,7 +52,8 @@
+     if (dynamic_cast<KUrlPixmapProvider*>(sipCpp))
+         sipClass = sipClass_KUrlPixmapProvider;
+ %End
+-
++private:
++                            KUrlPixmapProvider (const KUrlPixmapProvider &other);
+ };   // KUrlPixmapProvider
+ 
+ 
+diff -Naur kdebindings-4.0.80/python/pykde4/sip/kio/kzip.sip kdebindings/python/pykde4/sip/kio/kzip.sip
+--- kdebindings-4.0.80/python/pykde4/sip/kio/kzip.sip	2008-04-10 11:29:50.000000000 +0200
++++ kdebindings/python/pykde4/sip/kio/kzip.sip	2008-05-25 14:38:56.000000000 +0200
+@@ -60,6 +60,8 @@
+     virtual bool            closeArchive ();
+     virtual bool            doWriteDir (const QString& name, const QString& user, const QString& group, mode_t perm, time_t atime, time_t mtime, time_t ctime);
+ //ig     virtual void       virtual_hook (int id, void* data);
++private:
++                            KZip (const KZip &other);
+ };   // KZip
+ 
+ 
+@@ -82,6 +84,9 @@
+     const QString&          path () const;
+     virtual QByteArray      data () const;
+     virtual QIODevice*      createDevice () const;
++
++private:
++                            KZipFileEntry (const KZipFileEntry &other);
+ };   // KZipFileEntry
+ 
+ 
+diff -Naur kdebindings-4.0.80/python/pykde4/sip/kio/renamedialogplugin.sip kdebindings/python/pykde4/sip/kio/renamedialogplugin.sip
+--- kdebindings-4.0.80/python/pykde4/sip/kio/renamedialogplugin.sip	2008-04-10 11:29:50.000000000 +0200
++++ kdebindings/python/pykde4/sip/kio/renamedialogplugin.sip	2008-05-25 14:38:56.000000000 +0200
+@@ -42,6 +42,8 @@
+         KIO::filesize_t         fileSize () const;
+         time_t                  cTime () const;
+         time_t                  mTime () const;
++    private:
++                                FileItem (const KIO::RenameDialogPlugin::FileItem &other);
+     };   // FileItem
+ 
+ 
+@@ -49,6 +51,10 @@
+                             RenameDialogPlugin (QDialog* dialog);
+     virtual bool            wantToHandle (KIO::RenameDialog_Mode mode, const KIO::RenameDialogPlugin::FileItem& srcFile, const KIO::RenameDialogPlugin::FileItem& dstFile) const = 0;
+     virtual void            handle (KIO::RenameDialog_Mode mode, const KIO::RenameDialogPlugin::FileItem& srcFile, const KIO::RenameDialogPlugin::FileItem& dstFile) = 0;
++
++//private:
++//                                RenameDialogPlugin (const KIO::RenameDialogPlugin &other);
++
+ };   // RenameDialogPlugin
+ 
+ };   // KIO
+diff -Naur kdebindings-4.0.80/python/pykde4/sip/kio/slavebase.sip kdebindings/python/pykde4/sip/kio/slavebase.sip
+--- kdebindings-4.0.80/python/pykde4/sip/kio/slavebase.sip	2008-04-10 11:29:50.000000000 +0200
++++ kdebindings/python/pykde4/sip/kio/slavebase.sip	2008-05-25 14:38:56.000000000 +0200
+@@ -126,6 +126,8 @@
+ 
+ protected:
+ //ig     virtual void       virtual_hook (int id, void* data);
++private:
++                            SlaveBase (const KIO::SlaveBase &other);
+ };   // SlaveBase
+ 
+ };   // KIO
+diff -Naur kdebindings-4.0.80/python/pykde4/sip/kio/tcpslavebase.sip kdebindings/python/pykde4/sip/kio/tcpslavebase.sip
+--- kdebindings-4.0.80/python/pykde4/sip/kio/tcpslavebase.sip	2008-04-10 11:29:50.000000000 +0200
++++ kdebindings/python/pykde4/sip/kio/tcpslavebase.sip	2008-05-25 14:38:56.000000000 +0200
+@@ -26,10 +26,9 @@
+ class TCPSlaveBase : KIO::SlaveBase
+ {
+ %TypeHeaderCode
+-#include <tcpslavebase.h>
++#include <kio/tcpslavebase.h>
+ %End
+ 
+-
+ public:
+                             TCPSlaveBase (const QByteArray& protocol, const QByteArray& poolSocket, const QByteArray& appSocket, bool autoSsl = 0);
+ 
+@@ -57,6 +56,8 @@
+     void                    setBlocking (bool b);
+     QIODevice*              socket () const;
+ //ig     virtual void       virtual_hook (int id, void* data);
++private:
++                            TCPSlaveBase (const KIO::TCPSlaveBase &other);
+ };   // TCPSlaveBase
+ 
+ };   // KIO
+diff -Naur kdebindings-4.0.80/python/pykde4/sip/kparts/event.sip kdebindings/python/pykde4/sip/kparts/event.sip
+--- kdebindings-4.0.80/python/pykde4/sip/kparts/event.sip	2008-04-10 11:29:50.000000000 +0200
++++ kdebindings/python/pykde4/sip/kparts/event.sip	2008-05-25 14:38:56.000000000 +0200
+@@ -64,7 +64,8 @@
+                 sipClass = sipClass_KParts_PartSelectEvent;
+         }
+ %End
+-
++private:
++                            Event (const KParts::Event &other);
+ };   // Event
+ 
+ 
+@@ -79,6 +80,8 @@
+                             GUIActivateEvent (bool activated);
+     bool                    activated () const;
+     static bool             test (const QEvent* event);
++private:
++                            GUIActivateEvent (const KParts::GUIActivateEvent &other);
+ };   // GUIActivateEvent
+ 
+ 
+@@ -95,6 +98,8 @@
+     KParts::Part*           part () const;
+     QWidget*                widget () const;
+     static bool             test (const QEvent* event);
++private:
++                            PartActivateEvent (const KParts::PartActivateEvent &other);
+ };   // PartActivateEvent
+ 
+ 
+@@ -111,6 +116,8 @@
+     KParts::Part*           part () const;
+     QWidget*                widget () const;
+     static bool             test (const QEvent* event);
++private:
++                            PartSelectEvent (const KParts::PartSelectEvent &other);
+ };   // PartSelectEvent
+ 
+ };   // KParts
+diff -Naur kdebindings-4.0.80/python/pykde4/sip/ktexteditor/configinterface.sip kdebindings/python/pykde4/sip/ktexteditor/configinterface.sip
+--- kdebindings-4.0.80/python/pykde4/sip/ktexteditor/configinterface.sip	2008-01-05 00:52:55.000000000 +0100
++++ kdebindings/python/pykde4/sip/ktexteditor/configinterface.sip	2008-05-25 14:38:56.000000000 +0200
+@@ -39,7 +39,8 @@
+     virtual QStringList  configKeys () const = 0;
+     virtual QVariant     configValue (const QString&)  = 0;
+     virtual void         setConfigValue (const QString&, const QVariant&)  = 0;
+-
++private:
++                         ConfigInterface (const KTextEditor::ConfigInterface &other);
+ };  // class ConfigInterface
+ 
+ };  // namespace KTextEditor
+diff -Naur kdebindings-4.0.80/python/pykde4/sip/ktexteditor/markinterface.sip kdebindings/python/pykde4/sip/ktexteditor/markinterface.sip
+--- kdebindings-4.0.80/python/pykde4/sip/ktexteditor/markinterface.sip	2008-01-05 00:52:56.000000000 +0100
++++ kdebindings/python/pykde4/sip/ktexteditor/markinterface.sip	2008-05-25 14:38:56.000000000 +0200
+@@ -123,7 +123,8 @@
+ 
+ public:
+     virtual void         markChanged (KTextEditor::Document*, KTextEditor::Mark, KTextEditor::MarkInterface::MarkChangeAction)  = 0;
+-
++private:
++                         MarkInterface (const KTextEditor::MarkInterface &other);
+ };  // class MarkInterface
+ 
+ };  // namespace KTextEditor
+diff -Naur kdebindings-4.0.80/python/pykde4/sip/ktexteditor/modificationinterface.sip kdebindings/python/pykde4/sip/ktexteditor/modificationinterface.sip
+--- kdebindings-4.0.80/python/pykde4/sip/ktexteditor/modificationinterface.sip	2008-01-05 00:52:55.000000000 +0100
++++ kdebindings/python/pykde4/sip/ktexteditor/modificationinterface.sip	2008-05-25 14:38:56.000000000 +0200
+@@ -55,7 +55,8 @@
+ 
+ public:
+     virtual void         modifiedOnDisk (KTextEditor::Document*, bool, KTextEditor::ModificationInterface::ModifiedOnDiskReason)  = 0;
+-
++private:
++                         ModificationInterface (const KTextEditor::ModificationInterface &other);
+ };  // class ModificationInterface
+ 
+ };  // namespace KTextEditor
+diff -Naur kdebindings-4.0.80/python/pykde4/sip/ktexteditor/searchinterface.sip kdebindings/python/pykde4/sip/ktexteditor/searchinterface.sip
+--- kdebindings-4.0.80/python/pykde4/sip/ktexteditor/searchinterface.sip	2008-01-05 00:52:55.000000000 +0100
++++ kdebindings/python/pykde4/sip/ktexteditor/searchinterface.sip	2008-05-25 14:38:56.000000000 +0200
+@@ -60,7 +60,8 @@
+ public:
+     virtual QVector<KTextEditor::Range> searchText (const KTextEditor::Range&, const QString&, const KTextEditor::Search::SearchOptions = KTextEditor::Search::Default )  = 0;
+     virtual KTextEditor::Search::SearchOptions supportedSearchOptions () const = 0;
+-
++private:
++                        SearchInterface (const KTextEditor::SearchInterface &other);
+ };  // class SearchInterface
+ 
+ };  // namespace KTextEditor
+diff -Naur kdebindings-4.0.80/python/pykde4/sip/ktexteditor/sessionconfiginterface.sip kdebindings/python/pykde4/sip/ktexteditor/sessionconfiginterface.sip
+--- kdebindings-4.0.80/python/pykde4/sip/ktexteditor/sessionconfiginterface.sip	2008-01-05 00:52:55.000000000 +0100
++++ kdebindings/python/pykde4/sip/ktexteditor/sessionconfiginterface.sip	2008-05-25 14:38:56.000000000 +0200
+@@ -38,6 +38,8 @@
+ public:
+     virtual void         readSessionConfig (const KConfigGroup&)  = 0;
+     virtual void         writeSessionConfig (KConfigGroup&)  = 0;
++private:
++                         SessionConfigInterface (const KTextEditor::SessionConfigInterface &other);
+ 
+ };  // class SessionConfigInterface
+ 
+diff -Naur kdebindings-4.0.80/python/pykde4/sip/ktexteditor/smartinterface.sip kdebindings/python/pykde4/sip/ktexteditor/smartinterface.sip
+--- kdebindings-4.0.80/python/pykde4/sip/ktexteditor/smartinterface.sip	2008-01-05 00:52:56.000000000 +0100
++++ kdebindings/python/pykde4/sip/ktexteditor/smartinterface.sip	2008-05-25 14:38:56.000000000 +0200
+@@ -73,6 +73,8 @@
+ protected:
+     virtual void         attributeDynamic (KTextEditor::Attribute::Ptr)  = 0;
+     virtual void         attributeNotDynamic (KTextEditor::Attribute::Ptr)  = 0;
++private:
++                         SmartInterface (const KTextEditor::SmartInterface &other);
+ 
+ };  // class SmartInterface
+ 
+diff -Naur kdebindings-4.0.80/python/pykde4/sip/ktexteditor/templateinterface.sip kdebindings/python/pykde4/sip/ktexteditor/templateinterface.sip
+--- kdebindings-4.0.80/python/pykde4/sip/ktexteditor/templateinterface.sip	2008-01-05 00:52:55.000000000 +0100
++++ kdebindings/python/pykde4/sip/ktexteditor/templateinterface.sip	2008-05-25 14:38:56.000000000 +0200
+@@ -41,7 +41,8 @@
+ 
+ protected:
+     virtual bool         insertTemplateTextImplementation (const KTextEditor::Cursor&, const QString&, const QMap<QString, QString>&)  = 0;
+-
++private:
++                          TemplateInterface (const KTextEditor::TemplateInterface &other);
+ };  // class TemplateInterface
+ 
+ };  // namespace KTextEditor
+diff -Naur kdebindings-4.0.80/python/pykde4/sip/ktexteditor/texthintinterface.sip kdebindings/python/pykde4/sip/ktexteditor/texthintinterface.sip
+--- kdebindings-4.0.80/python/pykde4/sip/ktexteditor/texthintinterface.sip	2008-01-05 00:52:55.000000000 +0100
++++ kdebindings/python/pykde4/sip/ktexteditor/texthintinterface.sip	2008-05-25 14:38:56.000000000 +0200
+@@ -37,6 +37,8 @@
+     virtual void         enableTextHints (int)  = 0;
+     virtual void         disableTextHints ()  = 0;
+     virtual void         needTextHint (const KTextEditor::Cursor&, QString&)  = 0;
++private:
++                         TextHintInterface (const KTextEditor::TextHintInterface &other);
+ 
+ };  // class TextHintInterface
+ 
+diff -Naur kdebindings-4.0.80/python/pykde4/sip/ktexteditor/variableinterface.sip kdebindings/python/pykde4/sip/ktexteditor/variableinterface.sip
+--- kdebindings-4.0.80/python/pykde4/sip/ktexteditor/variableinterface.sip	2008-01-05 00:52:56.000000000 +0100
++++ kdebindings/python/pykde4/sip/ktexteditor/variableinterface.sip	2008-05-25 14:38:56.000000000 +0200
+@@ -38,6 +38,8 @@
+ 
+ public:
+     virtual void         variableChanged (KTextEditor::Document*, const QString&, const QString&)  = 0;
++private:
++                         VariableInterface (const KTextEditor::VariableInterface &other);
+ 
+ };  // class VariableInterface
+ 
+diff -Naur kdebindings-4.0.80/ruby/korundum/ChangeLog kdebindings/ruby/korundum/ChangeLog
+--- kdebindings-4.0.80/ruby/korundum/ChangeLog	2008-05-07 11:05:08.000000000 +0200
++++ kdebindings/ruby/korundum/ChangeLog	2008-05-25 14:39:03.000000000 +0200
+@@ -1,3 +1,7 @@
++2008-05-22  Arno Rehn  <arno@arnorehn.de>
++
++	* Remove the remaining soprano parts from korundum.
++
+ 2008-05-05  Richard Dale  <richard.j.dale@gmail.com>
+ 
+ 	* When a Ruby class called MyApp::FooBar is instantiated it is put in a
+diff -Naur kdebindings-4.0.80/ruby/korundum/src/lib/KDE/korundum4.rb kdebindings/ruby/korundum/src/lib/KDE/korundum4.rb
+--- kdebindings-4.0.80/ruby/korundum/src/lib/KDE/korundum4.rb	2008-05-15 20:37:07.000000000 +0200
++++ kdebindings/ruby/korundum/src/lib/KDE/korundum4.rb	2008-05-25 14:39:02.000000000 +0200
+@@ -475,8 +475,6 @@
+ 					m = KWallet
+ 				elsif classname =~ /^SafeSite/
+ 					m = SafeSite
+-				elsif classname =~ /^Soprano/
+-					m = Soprano
+ 				elsif classname =~ /^Nepomuk/
+ 					m = Nepomuk
+ 				else
+diff -Naur kdebindings-4.0.80/ruby/krossruby/CMakeLists.txt kdebindings/ruby/krossruby/CMakeLists.txt
+--- kdebindings-4.0.80/ruby/krossruby/CMakeLists.txt	2008-04-02 14:18:03.000000000 +0200
++++ kdebindings/ruby/krossruby/CMakeLists.txt	2008-05-25 14:39:01.000000000 +0200
+@@ -1,4 +1,4 @@
+-include_directories( ${RUBY_INCLUDE_PATH} ${CMAKE_SOURCE_DIR}/libs/kross )
++include_directories( ${RUBY_INCLUDE_PATH} )
+ 
+ set(krossruby_PART_SRCS
+    rubyvariant.cpp
+diff -Naur kdebindings-4.0.80/ruby/qtruby/ChangeLog kdebindings/ruby/qtruby/ChangeLog
+--- kdebindings-4.0.80/ruby/qtruby/ChangeLog	2008-05-21 10:32:32.000000000 +0200
++++ kdebindings/ruby/qtruby/ChangeLog	2008-05-25 14:39:11.000000000 +0200
+@@ -1,3 +1,7 @@
++2008-05-22  Arno Rehn  <arno@arnorehn.de>
++
++	* Fixed dumpCandidates().
++
+ 2008-05-19  Richard Dale  <richard.j.dale@gmail.com>
+ 
+ 	* The method selector cache function had an off by one error, which meant
+diff -Naur kdebindings-4.0.80/ruby/qtruby/src/Qt.cpp kdebindings/ruby/qtruby/src/Qt.cpp
+--- kdebindings-4.0.80/ruby/qtruby/src/Qt.cpp	2008-05-21 10:32:32.000000000 +0200
++++ kdebindings/ruby/qtruby/src/Qt.cpp	2008-05-25 14:39:06.000000000 +0200
+@@ -100,7 +100,7 @@
+ #endif
+ 
+ typedef QHash<void *, VALUE *> PointerMap;
+-Q_GLOBAL_STATIC(PointerMap, pointer_map);
++Q_GLOBAL_STATIC(PointerMap, pointer_map)
+ int object_count = 0;
+ 
+ // FIXME:
+diff -Naur kdebindings-4.0.80/ruby/qtruby/src/marshall.h kdebindings/ruby/qtruby/src/marshall.h
+--- kdebindings-4.0.80/ruby/qtruby/src/marshall.h	2008-05-15 20:37:07.000000000 +0200
++++ kdebindings/ruby/qtruby/src/marshall.h	2008-05-25 14:39:06.000000000 +0200
+@@ -1,3 +1,12 @@
++/***************************************************************************
++ *                                                                         *
++ *   This program is free software; you can redistribute it and/or modify  *
++ *   it under the terms of the GNU General Public License as published by  *
++ *   the Free Software Foundation; either version 2 of the License, or     *
++ *   (at your option) any later version.                                   *
++ *                                                                         *
++ ***************************************************************************/
++
+ #ifndef MARSHALL_H
+ #define MARSHALL_H
+ 
+diff -Naur kdebindings-4.0.80/ruby/qtruby/src/qtruby.cpp kdebindings/ruby/qtruby/src/qtruby.cpp
+--- kdebindings-4.0.80/ruby/qtruby/src/qtruby.cpp	2008-05-21 10:32:32.000000000 +0200
++++ kdebindings/ruby/qtruby/src/qtruby.cpp	2008-05-25 14:39:06.000000000 +0200
+@@ -1678,20 +1678,21 @@
+ 	int count = RARRAY(rmeths)->len;
+         for(int i = 0; i < count; i++) {
+ 	    rb_str_catf(errmsg, "\t");
+-	    int id = NUM2INT(rb_ary_entry(rmeths, i));
+-	    Smoke::Method &meth = qt_Smoke->methods[id];
+-	    const char *tname = qt_Smoke->types[meth.ret].name;
++	    int id = NUM2INT(rb_funcall(rb_ary_entry(rmeths, i), rb_intern("index"), 0));
++	    Smoke* smoke = smokeList[NUM2INT(rb_funcall(rb_ary_entry(rmeths, i), rb_intern("smoke"), 0))];
++	    Smoke::Method &meth = smoke->methods[id];
++	    const char *tname = smoke->types[meth.ret].name;
+ 	    if(meth.flags & Smoke::mf_enum) {
+ 			rb_str_catf(errmsg, "enum ");
+-			rb_str_catf(errmsg, "%s::%s", qt_Smoke->classes[meth.classId].className, qt_Smoke->methodNames[meth.name]);
++			rb_str_catf(errmsg, "%s::%s", smoke->classes[meth.classId].className, smoke->methodNames[meth.name]);
+ 			rb_str_catf(errmsg, "\n");
+ 	    } else {
+ 			if(meth.flags & Smoke::mf_static) rb_str_catf(errmsg, "static ");
+ 			rb_str_catf(errmsg, "%s ", (tname ? tname:"void"));
+-			rb_str_catf(errmsg, "%s::%s(", qt_Smoke->classes[meth.classId].className, qt_Smoke->methodNames[meth.name]);
++			rb_str_catf(errmsg, "%s::%s(", smoke->classes[meth.classId].className, smoke->methodNames[meth.name]);
+ 			for(int i = 0; i < meth.numArgs; i++) {
+ 			if(i) rb_str_catf(errmsg, ", ");
+-			tname = qt_Smoke->types[qt_Smoke->argumentList[meth.args+i]].name;
++			tname = smoke->types[smoke->argumentList[meth.args+i]].name;
+ 			rb_str_catf(errmsg, "%s", (tname ? tname:"void"));
+ 			}
+ 			rb_str_catf(errmsg, ")");
+diff -Naur kdebindings-4.0.80/ruby/qtruby/src/smokeruby.h kdebindings/ruby/qtruby/src/smokeruby.h
+--- kdebindings-4.0.80/ruby/qtruby/src/smokeruby.h	2008-05-15 20:37:07.000000000 +0200
++++ kdebindings/ruby/qtruby/src/smokeruby.h	2008-05-25 14:39:06.000000000 +0200
+@@ -1,3 +1,12 @@
++/***************************************************************************
++ *                                                                         *
++ *   This program is free software; you can redistribute it and/or modify  *
++ *   it under the terms of the GNU General Public License as published by  *
++ *   the Free Software Foundation; either version 2 of the License, or     *
++ *   (at your option) any later version.                                   *
++ *                                                                         *
++ ***************************************************************************/
++
+ #ifndef SMOKERUBY_H
+ #define SMOKERUBY_H
+ 
+diff -Naur kdebindings-4.0.80/smoke/CMakeLists.txt kdebindings/smoke/CMakeLists.txt
+--- kdebindings-4.0.80/smoke/CMakeLists.txt	2008-05-21 10:32:37.000000000 +0200
++++ kdebindings/smoke/CMakeLists.txt	2008-05-25 14:39:19.000000000 +0200
+@@ -1,3 +1,4 @@
++FIND_PACKAGE(QScintilla)
+ OPTION(ENABLE_SMOKE "build Smoke" ON)
+ OPTION(ENABLE_SMOKEQSCI "build SmokeQsci" ON)
+ OPTION(ENABLE_SMOKEQWT "build SmokeQwt" OFF)
+@@ -5,16 +6,18 @@
+ OPTION(ENABLE_SMOKEPLASMA "build SmokePlasma" OFF)
+ OPTION(ENABLE_SMOKEKDE "build SmokeKDE" ON)
+ 
+-add_subdirectory(plasma)
+-
+ set(SMOKE_ENABLED "no")
+ if(ENABLE_SMOKE OR ENABLE_SMOKEQSCI OR ENABLE_SMOKEQWT OR ENABLE_SMOKESOPRANO OR ENABLE_SMOKEPLASMA OR ENABLE_SMOKEKDE)
+     add_subdirectory(qt)
+     set(SMOKE_ENABLED "yes - Qt")
+ 
+     if(ENABLE_SMOKEQSCI)
+-        add_subdirectory(qsci)
+-        set(SMOKE_ENABLED "${SMOKE_ENABLED}, QScintilla2")
++        if( QSCINTILLA_FOUND)
++           add_subdirectory(qsci)
++           set(SMOKE_ENABLED "${SMOKE_ENABLED}, QScintilla2")
++        else(QSCINTILLA_FOUND)
++           MESSAGE(STATUS "QScintilla was not found, SmokeQsci will not build")
++        endif(QSCINTILLA_FOUND)
+     endif(ENABLE_SMOKEQSCI)
+ 
+     if(ENABLE_SMOKEQWT)
+diff -Naur kdebindings-4.0.80/smoke/kde/classlist kdebindings/smoke/kde/classlist
+--- kdebindings-4.0.80/smoke/kde/classlist	2008-05-15 20:37:08.000000000 +0200
++++ kdebindings/smoke/kde/classlist	2008-05-25 14:39:18.000000000 +0200
+@@ -575,10 +575,6 @@
+ Sonnet::Dialog
+ Sonnet::Highlighter
+ Sonnet::Speller
+-Soprano
+-Soprano::LiteralValue
+-Soprano::Node
+-Soprano::Statement
+ WebCore
+ khtml
+ khtml::DrawContentsEvent
+diff -Naur kdebindings-4.0.80/smoke/kde/kde_header_list kdebindings/smoke/kde/kde_header_list
+--- kdebindings-4.0.80/smoke/kde/kde_header_list	2008-04-30 15:58:12.000000000 +0200
++++ kdebindings/smoke/kde/kde_header_list	2008-05-25 14:39:18.000000000 +0200
+@@ -386,6 +386,3 @@
+ sonnet/dialog.h
+ sonnet/highlighter.h
+ sonnet/speller.h
+-soprano/literalvalue.h
+-soprano/node.h
+-soprano/statement.h

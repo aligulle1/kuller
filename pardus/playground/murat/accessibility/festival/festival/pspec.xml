@@ -1,0 +1,91 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>festival</Name>
+        <Homepage>http://www.festvox.org/festival</Homepage>
+        <Packager>
+            <Name>Murat Şenel</Name>
+            <Email>muratasenel@gmail.com</Email>
+        </Packager>
+        <License>BSD</License>
+        <IsA>app:console</IsA>
+        <IsA>library</IsA>
+        <Summary>A free speech synthesizer</Summary>
+        <Description>University of Edinburgh's  Festival Speech Synthesis Systems is a free software multi-lingual speech synthesis workbench that runs on multiple-platforms offering black box text to speech, as well as an open architecture for research in speech synthesis. It designed as a component of large speech technology systems.</Description>
+        <Archive sha1sum="ffb1a7f8a587cee942de7722f9b7a58e4fd0a8e2" type="targz">http://www.festvox.org/packed/festival/latest/festival-1.96-beta.tar.gz</Archive>
+        <BuildDependencies>
+            <Dependency versionFrom="1.2.96_beta1">speech_tools</Dependency>
+            <Dependency versionFrom="1.0.15">alsa-lib</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <Patch level="1" compressionType="bz2">speech_tools-base_class.patch.bz2</Patch>
+            <Patch level="1" compressionType="bz2">festival-c++.patch.bz2</Patch>
+            <Patch level="1">festival-config.patch</Patch>
+            <Patch level="1">festival-fsstnd.patch</Patch>
+            <Patch level="1">festival-1.96-etcsiteinit.patch</Patch>
+            <Patch level="1">doc-fix.patch</Patch>
+            <Patch level="1">voices-dicts.patch</Patch>
+            <Patch level="1">festival_1.4.3-no-lib-etc.diff</Patch>
+            <Patch level="1">festival-1.96-american.patch</Patch>
+            <Patch level="1">festival-1.95-buildroot-fedora.patch</Patch>
+            <Patch>festival-1.96_beta.patch</Patch>
+            <Patch>festival-1.95-audsp.patch</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>festival</Name>
+        <RuntimeDependencies>
+            <Dependency versionFrom="1.2.96_beta1">speech_tools</Dependency>
+            <Dependency versionFrom="1.0.15">alsa-lib</Dependency>
+            <Dependency>festlex_CMU</Dependency>
+            <Dependency>festlex_OALD</Dependency>
+            <Dependency>festlex_POSLEX</Dependency>
+            <Dependency>festvox_awb</Dependency>
+            <Dependency>festvox_bdl</Dependency>
+            <Dependency>festvox_jmk</Dependency>
+            <Dependency>festvox_kallpc</Dependency>
+            <Dependency>festvox_kedlpc</Dependency>
+            <Dependency>festvox_slt</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="executable">/usr/bin</Path>
+            <Path fileType="config">/etc</Path>
+            <Path fileType="header">/usr/include</Path>
+            <Path fileType="library">/usr/lib</Path>
+            <Path fileType="data">/usr/share/festival</Path>
+            <Path fileType="data">/usr/share/emacs</Path>
+            <Path fileType="data">/var/log/festival</Path>
+            <Path fileType="data">/var/run/festival</Path>
+            <Path fileType="doc">/usr/share/doc</Path>
+            <Path fileType="man">/usr/share/man</Path>
+        </Files>
+        <AdditionalFiles>
+            <AdditionalFile owner="root" permission="0644" target="/etc/festival/sitevars.scm">sitevars.scm</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/etc/festival/siteinit.scm">siteinit.scm</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/etc/festival/server.scm">server.scm</AdditionalFile>
+
+            <!-- Man pages -->
+            <AdditionalFile owner="root" permission="0644" target="/usr/share/man/man1/festival.1">man/festival.1</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/usr/share/man/man1/festival_client.1">man/festival_client.1</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/usr/share/man/man1/text2wave.1">man/text2wave.1</AdditionalFile>
+
+            <AdditionalFile owner="root" permission="0644" target="/etc/emacs/site-lisp/50festival.el">50festival.el</AdditionalFile>
+        </AdditionalFiles>
+        <Provides>
+             <COMAR script="package.py">System.Package</COMAR>
+             <COMAR script="service.py">System.Service</COMAR>
+        </Provides>
+    </Package>
+
+    <History>
+        <Update release="1">
+            <Date>2007-10-25</Date>
+            <Version>1.96_beta1</Version>
+            <Comment>First release</Comment>
+            <Name>Murat Şenel</Name>
+            <Email>muratasenel@gmail.com</Email>
+        </Update>
+    </History>
+</PISI>

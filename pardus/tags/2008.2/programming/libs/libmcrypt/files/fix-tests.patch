@@ -1,0 +1,45 @@
+--- modules/algorithms/des.c
++++ modules/algorithms/des.c
+@@ -35,9 +35,12 @@
+ 
+ /* #define	NULL	0 */
+ 
+-static void permute_ip(), permute_fp(), perminit_ip(), spinit(),
+-perminit_fp();
+-static word32 f();
++static void permute_ip(char *, DES_KEY *, char *);
++static void permute_fp(char *, DES_KEY *, char *);
++static void perminit_ip(DES_KEY *);
++static void spinit(DES_KEY *);
++static void perminit_fp(DES_KEY *);
++static word32 f(DES_KEY *, register word32, register char *);
+ 
+ 
+ /* Tables defined in the Data Encryption Standard documents */
+--- modules/algorithms/tripledes.c
++++ modules/algorithms/tripledes.c
+@@ -36,8 +36,10 @@
+ 
+ /* #define	NULL	0 */
+ 
+-static void permute(), perminit(), spinit();
+-static word32 f();
++static void permute(char *, char[16][16][8], char *);
++static void perminit(char[16][16][8], char[64]);
++static void spinit(TRIPLEDES_KEY *, int);
++static word32 f(TRIPLEDES_KEY *, int, register word32, register char *);
+ 
+ 
+ /* Tables defined in the Data Encryption Standard documents */
+--- modules/algorithms/twofish.c
++++ modules/algorithms/twofish.c
+@@ -499,7 +499,7 @@
+ /* encrypt a block of text  */
+ WIN32DLL_DEFINE void _mcrypt_encrypt(TWI * pkey, word32 * in_blk)
+ {
+-	word32 t0, t1, blk[4];
++	word32 t0 = 0, t1 = 0, blk[4];
+ #ifdef WORDS_BIGENDIAN
+ 	blk[0] = byteswap32(in_blk[0]) ^ pkey->l_key[0];
+ 	blk[1] = byteswap32(in_blk[1]) ^ pkey->l_key[1];
+

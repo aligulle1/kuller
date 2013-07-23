@@ -1,0 +1,21 @@
+--- ntp-4.2.2/ntpdate/ntpdate.c.manycast	2006-06-26 12:43:04.000000000 +0200
++++ ntp-4.2.2/ntpdate/ntpdate.c	2006-06-26 12:43:04.000000000 +0200
+@@ -1601,7 +1601,7 @@
+ 		server = (struct server *)emalloc(sizeof(struct server));
+ 		memset((char *)server, 0, sizeof(struct server));
+ 
+-		memcpy(&server->srcadr, &addr, sizeof(struct sockaddr_storage));
++		memcpy(&server->srcadr, addr, sizeof(struct sockaddr_storage));
+ 
+ 		server->event_time = ++sys_numservers;
+ 
+--- ntp-4.2.2/ntpd/ntp_io.c.manycast	2006-06-06 22:16:41.000000000 +0200
++++ ntp-4.2.2/ntpd/ntp_io.c	2006-06-26 12:46:10.000000000 +0200
+@@ -1373,6 +1373,7 @@
+ 		return;
+ 	}
+ 
++	inter_list[ind].addr_refid = addr2refid(&inter_list[ind].sin);
+ 	jstatus = socket_multicast_enable(&inter_list[ind], ind, lscope, &addr);
+ 
+ 	if (jstatus == ISC_TRUE)

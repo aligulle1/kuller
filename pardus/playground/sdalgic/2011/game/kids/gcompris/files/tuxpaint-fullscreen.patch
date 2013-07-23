@@ -1,0 +1,51 @@
+diff -up gcompris-8.3.2/src/boards/python/tuxpaint.py~ gcompris-8.3.2/src/boards/python/tuxpaint.py
+--- gcompris-8.3.2/src/boards/python/tuxpaint.py~	2007-07-12 10:27:46.000000000 +0200
++++ gcompris-8.3.2/src/boards/python/tuxpaint.py	2007-07-12 10:27:46.000000000 +0200
+@@ -120,9 +120,10 @@ class Gcompris_tuxpaint:
+     gcompris.sound.close()
+ 
+     # release pointergrab if running fullscreen, tuxpaint wants to grab the
+-    # pointer itself
++    # pointer itself, no need to leave fullscreen on focus out
+     if (Prop.fullscreen and not Prop.noxf86vm):
+       gtk.gdk.pointer_ungrab()
++      gcompris.ignore_next_focus_out()
+ 
+     #self.window.set_property("accept-focus", 0)
+     #self.window.set_keep_below(False)
+diff -up gcompris-8.3.2/src/boards/py-mod-gcompris.c~ gcompris-8.3.2/src/boards/py-mod-gcompris.c
+--- gcompris-8.3.2/src/boards/py-mod-gcompris.c~	2007-07-12 10:26:03.000000000 +0200
++++ gcompris-8.3.2/src/boards/py-mod-gcompris.c	2007-07-12 10:26:03.000000000 +0200
+@@ -271,6 +271,23 @@ py_gc_get_window(PyObject* self, PyObjec
+ }
+ 
+ 
++/* void gc_ignore_next_focus_out(void); */
++static PyObject*
++py_gc_ignore_next_focus_out(PyObject* self, PyObject* args)
++{
++  /* Parse arguments */
++  if(!PyArg_ParseTuple(args, ":gc_ignore_next_focus_out"))
++    return NULL;
++
++  /* Call the corresponding C function */
++  gc_ignore_next_focus_out();
++
++  /* Create and return the result */
++  Py_INCREF(Py_None);
++  return Py_None;
++}
++
++
+ /* gchar *gc_locale_get(void); */
+ static PyObject*
+ py_gc_locale_get(PyObject* self, PyObject* args)
+@@ -1504,6 +1521,8 @@ static PyMethodDef PythonGcomprisModule[
+   { "bar_hide",  py_gc_bar_hide, METH_VARARGS, "gc_bar_hide" },
+   { "get_canvas",  py_gc_get_canvas, METH_VARARGS, "gc_get_canvas" },
+   { "get_window",  py_gc_get_window, METH_VARARGS, "gc_get_window" },
++  { "ignore_next_focus_out",  py_gc_ignore_next_focus_out, METH_VARARGS,
++    "gc_ignore_next_focus_out" },
+   { "get_locale",  py_gc_locale_get, METH_VARARGS, "gc_locale_get" },
+   { "get_user_default_locale",  py_gc_locale_get_user_default, METH_VARARGS, "gc_locale_get_user_default" },
+   { "set_locale",  py_gc_locale_set, METH_VARARGS, "gc_locale_set" },

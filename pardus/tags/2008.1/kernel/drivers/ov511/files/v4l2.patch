@@ -1,0 +1,73 @@
+diff -Nur ov511-2.32-old/ov511.h ov511-2.32/ov511.h
+--- ov511-2.32-old/ov511.h	2007-01-19 16:42:29.257315221 +0200
++++ ov511-2.32/ov511.h	2007-01-19 16:42:55.652302571 +0200
+@@ -10,15 +10,21 @@
+ #ifndef __LINUX_OV511_H
+ #define __LINUX_OV511_H
+ 
++#if defined(CONFIG_VIDEO_V4L2) && !defined(HAVE_V4L2)
++#define HAVE_V4L2
++#endif
++
+ #include <linux/config.h>
+ #include <asm/uaccess.h>
+ #include <linux/videodev.h>
+ #include <linux/smp_lock.h>
+ #include <linux/usb.h>
+ #include <linux/i2c.h>
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 15)
+ #if defined (HAVE_V4L2)
+ #  include <media/v4l2-common.h>
+ #endif
++#endif
+ 
+ #include "ovcamchip.h"
+ 
+diff -Nur ov511-2.32-old/ovcamchip.h ov511-2.32/ovcamchip.h
+--- ov511-2.32-old/ovcamchip.h	2007-01-19 16:42:29.259314912 +0200
++++ ov511-2.32/ovcamchip.h	2007-01-19 16:42:55.653302419 +0200
+@@ -14,11 +14,19 @@
+ #ifndef __LINUX_OVCAMCHIP_H
+ #define __LINUX_OVCAMCHIP_H
+ 
++#if defined(CONFIG_VIDEO_V4L2) && !defined(HAVE_V4L2)
++#define HAVE_V4L2
++#endif
++
+ #include <linux/videodev.h>
+ #include <linux/i2c.h>
+ #include "id.h"
+ #include "compat.h"
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 15) && defined (HAVE_V4L2)
++#include <media/v4l2-common.h>
++#endif
++
+ /* --------------------------------- */
+ /*           ENUMERATIONS            */
+ /* --------------------------------- */
+diff -Nur ov511-2.32-old/ovfx2.h ov511-2.32/ovfx2.h
+--- ov511-2.32-old/ovfx2.h	2007-01-19 16:42:29.258315067 +0200
++++ ov511-2.32/ovfx2.h	2007-01-19 16:42:55.653302419 +0200
+@@ -10,15 +10,21 @@
+ #ifndef __LINUX_OVFX2_H
+ #define __LINUX_OVFX2_H
+ 
++#if defined(CONFIG_VIDEO_V4L2) && !defined(HAVE_V4L2)
++#define HAVE_V4L2
++#endif
++
+ #include <linux/config.h>
+ #include <asm/uaccess.h>
+ #include <linux/videodev.h>
+ #include <linux/smp_lock.h>
+ #include <linux/usb.h>
+ #include <linux/i2c.h>
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 15)
+ #if defined (HAVE_V4L2)
+ #  include <media/v4l2-common.h>
+ #endif
++#endif
+ 
+ #include "ovcamchip.h"
+ 

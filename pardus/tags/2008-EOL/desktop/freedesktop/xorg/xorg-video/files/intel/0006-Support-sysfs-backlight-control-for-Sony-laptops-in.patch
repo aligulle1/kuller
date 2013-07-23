@@ -1,0 +1,32 @@
+From 0317205a09aacaca0e335bd02fa6bac1ac29c050 Mon Sep 17 00:00:00 2001
+From: Kshitij Kulshreshtha <kkhere.geo@gmail.com>
+Date: Tue, 20 Jan 2009 11:35:36 +0800
+Subject: [PATCH 06/20] Support sysfs backlight control for Sony laptops in xf86-video-intel
+
+The sony_laptop kernel module (since v2.6.23) supports backlight control
+via the sysfs interface:
+/sys/class/backlight/sony
+
+This patch will enable xf86-video-intel to use this backlight control method
+for Sony VAIO Laptops with Intel integrated video.
+---
+ src/i830_lvds.c |    3 +--
+ 1 files changed, 1 insertions(+), 2 deletions(-)
+
+diff --git xf86-video-intel-2.4.3/src/i830_lvds.c xf86-video-intel-2.4.3/src/i830_lvds.c
+index 81e37f6..dee8531 100644
+--- xf86-video-intel-2.4.3/src/i830_lvds.c
++++ xf86-video-intel-2.4.3/src/i830_lvds.c
+@@ -83,8 +83,7 @@ static char *backlight_interfaces[] = {
+     "acpi_video1",
+     "acpi_video0",
+     "fujitsu-laptop",
+-    "asus-laptop",
+-    "eeepc",
++    "sony",
+     NULL,
+ };
+ 
+-- 
+1.6.2
+

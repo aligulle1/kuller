@@ -1,0 +1,55 @@
+--- Makefile~	2009-01-03 17:04:38.000000000 +0200
++++ Makefile	2009-01-03 17:09:22.000000000 +0200
+@@ -50,7 +50,7 @@
+ 
+ AR = ar
+ INSTALL = install
+-STRIP = strip
++STRIP =
+ RM = rm -f
+ LN = ln -sf
+ ifeq ($(MAKECMDGOALS), debug)
+@@ -59,7 +59,7 @@
+ OPT = $(POPT)
+ endif
+ INCLUDE = -Iinclude
+-CFLAGS = $(OPT) $(WARN) $(INCLUDE) $(CFLAGS.EXTRA)
++CFLAGS += $(OPT) $(WARN) $(INCLUDE) $(CFLAGS.EXTRA)
+ 
+ LIB.SRCS = src/glew.c
+ LIB.OBJS = $(LIB.SRCS:.c=.o)
+@@ -75,14 +75,11 @@
+ VISUALINFO.BIN.OBJS = $(VISUALINFO_BIN.SRCS:.c=.o)
+ BIN.LIBS = -Llib $(LDFLAGS.DYNAMIC) -l$(NAME) $(LDFLAGS.EXTRA) $(LDFLAGS.GL)
+ 
+-all debug: lib/$(LIB.SHARED) lib/$(LIB.STATIC) bin/$(GLEWINFO.BIN) bin/$(VISUALINFO.BIN)
++all debug: lib/$(LIB.SHARED) bin/$(GLEWINFO.BIN) bin/$(VISUALINFO.BIN)
+ 
+ lib:
+ 	mkdir lib
+ 
+-lib/$(LIB.STATIC): $(LIB.OBJS)
+-	$(AR) cr $@ $^
+-
+ lib/$(LIB.SHARED): $(LIB.SOBJS)
+ 	$(LD) $(LDFLAGS.SO) -o $@ $^ $(LIB.LDFLAGS) $(LIB.LIBS)
+ ifeq ($(patsubst mingw%,mingw,$(SYSTEM)), mingw)
+@@ -116,8 +113,7 @@
+ 	$(STRIP) -x lib/$(LIB.SHARED)
+ 	$(INSTALL) -m 0644 lib/$(LIB.SHARED) $(BINDIR)/
+ else
+-	$(STRIP) -x lib/$(LIB.SHARED)
+-	$(INSTALL) -m 0644 lib/$(LIB.SHARED) $(LIBDIR)/
++	$(INSTALL) -m 0755 lib/$(LIB.SHARED) $(LIBDIR)/
+ 	$(LN) $(LIB.SHARED) $(LIBDIR)/$(LIB.SONAME)
+ endif
+ # development files
+@@ -127,8 +123,6 @@
+ ifeq ($(patsubst mingw%,mingw,$(SYSTEM)), mingw)
+ 	$(INSTALL) -m 0644 lib/$(LIB.DEVLNK) $(LIBDIR)/
+ else
+-	strip -x lib/$(LIB.STATIC)
+-	$(INSTALL) -m 0644 lib/$(LIB.STATIC) $(LIBDIR)/
+ 	$(LN) $(LIB.SHARED) $(LIBDIR)/$(LIB.DEVLNK)
+ endif
+ # utilities

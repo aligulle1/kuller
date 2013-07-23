@@ -1,0 +1,49 @@
+qt-bugs@ issue : none
+Trolltech task ID : 128859
+applied: yes
+author: David Faure <faure@kde.org>
+
+A qt3-format .ui file with
+                  <property name="alignment">
+                        <set>AlignTop|AlignLeft</set>
+                    </property>
+                    <property name="wordWrap">
+                        <bool>true</bool>
+                    </property>
+ended up with
+   label->setWordWrap(true);
+   label->setWordWrap(false);
+
+The added setWordWrap(false) due to no WordBreak in the alignment, should only be added if wordWrap wasn't set already.
+
+Index: converter.cpp
+===================================================================
+--- src/tools/uic3/converter.cpp	(revision 579340)
++++ src/tools/uic3/converter.cpp	(working copy)
+@@ -913,6 +913,7 @@
+     QString objectName;
+ 
+     bool wordWrapFound = false;
++    bool hadWordWrapAttribute = false;
+ 
+     for (QDomElement e=n.firstChild().toElement(); !e.isNull(); e = e.nextSibling().toElement()) {
+         if (e.tagName().toLower() == QLatin1String("property")) {
+@@ -1031,6 +1032,9 @@
+                 if (v.contains(QRegExp("\\bWordBreak\\b")))
+                     wordWrapFound = true;
+             }
++            if (className == QLatin1String("QLabel") && name == QLatin1String("wordWrap")) {
++                hadWordWrapAttribute = true;
++            }
+ 
+ 
+             // resolve the flags and enumerator
+@@ -1090,7 +1094,7 @@
+             }
+         }
+     }
+-    if (className == QLatin1String("QLabel")) {
++    if (className == QLatin1String("QLabel") && !hadWordWrapAttribute) {
+         DomProperty *wordWrap = new DomProperty();
+         wordWrap->setAttributeName(QLatin1String("wordWrap"));
+         if (wordWrapFound)

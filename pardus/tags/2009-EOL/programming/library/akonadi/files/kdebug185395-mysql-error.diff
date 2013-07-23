@@ -1,0 +1,85 @@
+Index: server/src/storage/dbconfig.h
+===================================================================
+--- server/src/storage/dbconfig.h	(revision 1111601)
++++ server/src/storage/dbconfig.h	(revision 1112846)
+@@ -76,6 +76,12 @@
+    * exists.
+    */
+   QString cleanServerShutdownCommand();
++
++  /**
++   * Returns the path where mysql binaries are searched
++   */
++  QStringList mysqldSearchPath() ;
++
+ }
+ 
+ #endif
+Index: server/src/storage/dbconfig.cpp
+===================================================================
+--- server/src/storage/dbconfig.cpp	(revision 1111601)
++++ server/src/storage/dbconfig.cpp	(revision 1112846)
+@@ -299,3 +299,15 @@
+     return sInstance()->mCleanServerShutdownCommand;
+ }
+ 
++QStringList DbConfig::mysqldSearchPath()
++{
++const QStringList mysqldSearchPath = QStringList()
++  << QLatin1String("/usr/sbin")
++  << QLatin1String("/usr/local/sbin")
++  << QLatin1String("/usr/local/libexec")
++  << QLatin1String("/usr/libexec")
++  << QLatin1String("/opt/mysql/libexec")
++  << QLatin1String("/opt/local/lib/mysql5/bin");
++
++    return mysqldSearchPath ;
++}
+Index: server/src/akonadi.cpp
+===================================================================
+--- server/src/akonadi.cpp	(revision 1111601)
++++ server/src/akonadi.cpp	(revision 1112846)
+@@ -368,12 +368,18 @@
+ void AkonadiServer::startMysqlDatabaseProcess()
+ {
+   const QString mysqldPath = DbConfig::serverPath();
++  const QStringList mysqldSearchPath = DbConfig::mysqldSearchPath();
+ 
+   const QString dataDir = XdgBaseDirs::saveDir( "data", QLatin1String( "akonadi/db_data" ) );
+   const QString akDir   = XdgBaseDirs::saveDir( "data", QLatin1String( "akonadi/" ) );
+   const QString miscDir = XdgBaseDirs::saveDir( "data", QLatin1String( "akonadi/db_misc" ) );
+   const QString fileDataDir = XdgBaseDirs::saveDir( "data", QLatin1String( "akonadi/file_db_data" ) );
++  const QString mMysqlInstallDbPath = XdgBaseDirs::findExecutableFile( QLatin1String( "mysql_install_db" ), mysqldSearchPath );
++  akDebug() << "Found mysql_install_db: " << mMysqlInstallDbPath;
++  const QString mMysqlUpgradeDBPath = XdgBaseDirs::findExecutableFile( QLatin1String( "mysql_upgrade" ), mysqldSearchPath );
++  akDebug() << "Found mysql_upgrade: " << mMysqlUpgradeDBPath;
+ 
++
+   // generate config file
+   const QString globalConfig = XdgBaseDirs::findResourceFile( "config", QLatin1String( "akonadi/mysql-global.conf" ) );
+   const QString localConfig  = XdgBaseDirs::findResourceFile( "config", QLatin1String( "akonadi/mysql-local.conf" ) );
+@@ -443,6 +449,12 @@
+     }
+   }
+ 
++  // first run, some MySQL versions need a mysql_install_db run for that
++  if ( QDir( dataDir ).entryList( QDir::NoDotAndDotDot | QDir::AllEntries ).isEmpty() && !mMysqlInstallDbPath.isEmpty() ) {
++    const QStringList arguments = QStringList() << QString::fromLatin1( "--force" ) << QString::fromLatin1( "--defaults-file=/etc/akonadi/mysql-global.conf") <<  QString::fromLatin1( "--datadir=%1/" ).arg( dataDir ); 
++    QProcess::execute( mMysqlInstallDbPath, arguments );
++  } 
++
+   // clear mysql ib_logfile's in case innodb_log_file_size option changed in last confUpdate
+   if ( confUpdate ) {
+       QFile(dataDir + QDir::separator() + QString::fromLatin1( "ib_logfile0" )).remove();
+@@ -464,6 +476,11 @@
+     akFatal() << "process error:" << mDatabaseProcess->errorString();
+   }
+ 
++  if ( !mMysqlUpgradeDBPath.isEmpty() ) {
++    const QStringList arguments = QStringList() << QString::fromLatin1( "--socket=%1/mysql.socket" ).arg( miscDir );
++    QProcess::execute( mMysqlUpgradeDBPath, arguments );
++  }
++
+   const QLatin1String initCon( "initConnection" );
+   {
+     QSqlDatabase db = QSqlDatabase::addDatabase( DbConfig::driverName(), initCon );

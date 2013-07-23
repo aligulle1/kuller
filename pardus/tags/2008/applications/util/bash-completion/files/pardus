@@ -1,0 +1,149 @@
+_pisi()
+{
+  local cur commands options
+
+  COMPREPLY=()
+  cur=${COMP_WORDS[COMP_CWORD]}
+
+  commands="add-repo build check clean configure-pending delete-cache \
+            emerge graph help index info install list-available \
+            list-components list-installed list-pending list-repo \
+            list-sources list-upgrades rebuild-db remove remove-repo \
+            search search-file update-repo upgrade"
+
+  options="--destdir --yes-all --username --password --verbose --debug \
+           --no-color"
+
+  if [[ $COMP_CWORD -eq 1 ]] ; then
+    if [[ "$cur" == -* ]]; then
+      COMPREPLY=($(compgen -W "--version --help" -- $cur))
+    else
+      COMPREPLY=($(compgen -W "$commands --version --help" -- $cur))
+    fi
+    return 0;
+  else
+    command=${COMP_WORDS[1]}
+
+    if [[ "$cur" == -* ]]; then
+      case $command in
+        @(add-repo|ar))
+          options="${options} --at"
+          ;;
+        @(build|bi))
+          options="${options} --fetch --unpack --setup --build \
+                   --install --package --ignore-build-no \
+                   --ignore-dependency --output-dir \
+                   --ignore-action-errors --ignore-safety \
+                   --create-static --no-install --package-format"
+          ;;
+        @(check))
+          options="${options} "
+          ;;
+        @(clean))
+          options="${options} "
+          ;;
+        @(configure-pending|cp))
+          options="${options} --ignore-dependency --ignore-comar \
+                   --ignore-safety --dry-run"
+          ;;
+        @(delete-cache|dc))
+          options="${options} "
+          ;;
+        @(emerge|em))
+          options="${options} --ignore-build-no --ignore-dependency \
+                   --output-dir --ignore-action-errors --ignore safety \
+                   --create-static --no-install --package-format \
+                   --ignore-file-conflicts --ignore-package-conflicts \
+                   --ignore-comar"
+          ;;
+        @(graph))
+          options="${options} --reporsitory --installed \
+                   --ignore-installed --output"
+          ;;
+        @(help|--help))
+          options="${commands}"
+          ;;
+        @(index|ix))
+          options="${options} --absolute-urls --output --skip-sources \
+                   --skip-signing"
+          ;;
+        @(info))
+          options="${options} --files --files-path --short --xml"
+          ;;
+        @(install|it))
+          options="${options} --ignore-dependency --ignore-comar \
+                   --ignore-safety --dry-run --ignore-build-no \
+                   --reinstall --ignore-file-conflicts \
+                   --ignore-package-conflicts --fetch-only"
+          ;;
+        @(list-available|la))
+          options="${options} --long --component --uninstalled"
+          ;;
+        @(list-components|lc))
+          options="${options} --long"
+          ;;
+        @(list-installed|li))
+          options="${options} --long --component --install-info"
+          ;;
+        @(list-pending|lp))
+          options="${options} "
+          ;;
+        @(list-repo|lr))
+          options="${options} "
+          ;;
+        @(list-sources|ls))
+          options="${options} --long"
+          ;;
+        @(list-upgrades|lu))
+          options="${options} --ignore-build-no --long --component \
+                   --install-info"
+          ;;
+        @(rebuild-db|rdb))
+          options="${options} --files"
+          ;;
+        @(remove|rm))
+          options="${options} --ignore-dependency --ignore-comar \
+                   --ignore-safety --dry-run"
+          ;;
+        @(remove-repo|rr))
+          options="${options} "
+          ;;
+        @(search|sr))
+          options="${options} --files --files-path --language --long"
+          ;;
+        @(update-repo|ur))
+          options="${options} --force"
+          ;;
+        @(upgrade|up))
+          options="${options} --ignore-dependency --ignore-comar \
+                   --ignore-safety --dry-run --ignore-build-no \
+                   --security-only --bypass-update-repo \
+                   --ignore-file-conflicts --ignore-package-conflicts \
+                   --eager --fetch-only --exclude --exclude-from"
+          ;;
+      esac
+      COMPREPLY=($(compgen -W "$options" -- $cur))
+      return 0;
+    fi
+  fi
+  _filedir
+}
+complete -F _pisi -o filenames pisi
+
+
+_service()
+{
+  local list
+
+  COMPREPLY=()
+  cur="${COMP_WORDS[COMP_CWORD]}"
+  cur_num=${#COMP_WORDS[*]}
+
+  if [[ ${cur_num} == 2 ]]; then
+    list=$(hav call System.Service.info | awk '/pak/ {print substr($3, index($3, "[") + 1, index($3, "]") - index($3, "[") - 1)}')
+    COMPREPLY=($(compgen -W "${list} comar" -- ${cur}))
+  elif [[ ${cur_num} -ge 3 ]]; then
+    COMPREPLY=($(compgen -W "on off start stop restart reload" -- ${cur}))
+  fi
+}
+complete -F _service service

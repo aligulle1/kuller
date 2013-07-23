@@ -1,0 +1,66 @@
+diff -ur smb4k-0.7.3.orig/smb4k/core/smb4kcore.cpp smb4k-0.7.3/smb4k/core/smb4kcore.cpp
+--- smb4k-0.7.3.orig/smb4k/core/smb4kcore.cpp	2006-10-17 14:16:25.000000000 +0300
++++ smb4k-0.7.3/smb4k/core/smb4kcore.cpp	2006-10-17 14:19:01.000000000 +0300
+@@ -326,7 +326,7 @@
+       // only modify, if the user does *not* use super or sudo.
+ 
+       config()->setGroup( "Samba" );
+-      QString filesystem = config()->readEntry( "Mount Filesystem", "smbfs" );
++      QString filesystem = config()->readEntry( "Mount Filesystem", "cifs" );
+ 
+       config()->setGroup( "Super User Privileges" );
+       bool run_suid = config()->readBoolEntry( "Run SUID", false );
+diff -ur smb4k-0.7.3.orig/smb4k/core/smb4kmounter.cpp smb4k-0.7.3/smb4k/core/smb4kmounter.cpp
+--- smb4k-0.7.3.orig/smb4k/core/smb4kmounter.cpp	2006-10-17 14:16:25.000000000 +0300
++++ smb4k-0.7.3/smb4k/core/smb4kmounter.cpp	2006-10-17 14:20:35.000000000 +0300
+@@ -576,7 +576,7 @@
+   QString suid_program = config()->readEntry( "SUID Program", QString::null );
+ 
+   config()->setGroup( "Samba" );
+-  mp.data->setFilesystem( config()->readEntry( "Mount Filesystem", "smbfs" ) );
++  mp.data->setFilesystem( config()->readEntry( "Mount Filesystem", "cifs" ) );
+ 
+   config()->setGroup( "Mount Options" );
+   QString mount_prefix = config()->readPathEntry( "Default Path", QDir::homeDirPath().append( "/smb4k/" ) );
+@@ -1471,7 +1471,7 @@
+ 
+ #ifndef __FreeBSD__
+ 
+-  QString filesystem = config()->readEntry( "Mount Filesystem", "smbfs" );
++  QString filesystem = config()->readEntry( "Mount Filesystem", "cifs" );
+ 
+   if ( QString::compare( filesystem, "smbfs" ) == 0 )
+   {
+diff -ur smb4k-0.7.3.orig/smb4k/widgets/smb4koptionsdlg.cpp smb4k-0.7.3/smb4k/widgets/smb4koptionsdlg.cpp
+--- smb4k-0.7.3.orig/smb4k/widgets/smb4koptionsdlg.cpp	2006-10-17 14:16:25.000000000 +0300
++++ smb4k-0.7.3/smb4k/widgets/smb4koptionsdlg.cpp	2006-10-17 14:17:21.000000000 +0300
+@@ -866,7 +866,7 @@
+   m_sambaPage->m_unicode->setChecked( config()->readBoolEntry( "Mount Unicode", false ) );
+   m_sambaPage->m_lfs->setChecked( config()->readBoolEntry( "Mount LFS", false ) );
+ 
+-  QString filesystem = config()->readEntry( "Mount Filesystem", "smbfs" );
++  QString filesystem = config()->readEntry( "Mount Filesystem", "cifs" );
+ 
+   if ( QString::compare( filesystem, "smbfs" ) == 0 || mount_cifs.isEmpty() )
+   {
+diff -ur smb4k-0.7.3.orig/smb4k/widgets/smb4ksambaoptions.cpp smb4k-0.7.3/smb4k/widgets/smb4ksambaoptions.cpp
+--- smb4k-0.7.3.orig/smb4k/widgets/smb4ksambaoptions.cpp	2006-10-17 14:16:25.000000000 +0300
++++ smb4k-0.7.3/smb4k/widgets/smb4ksambaoptions.cpp	2006-10-17 14:17:03.000000000 +0300
+@@ -148,7 +148,7 @@
+   m_filesystem = new KComboBox( filesystem );
+   m_filesystem->insertItem( "SMBFS", 0 );
+   m_filesystem->insertItem( "CIFS", 1 );
+-  m_filesystem->setCurrentText( "SMBFS" );
++  m_filesystem->setCurrentText( "CIFS" );
+   QLabel *note = new QLabel( i18n( "NOTE: If you choose the CIFS file system, you might need to enable support for either <i>super</i> or <i>sudo</i> in the Super User tab." ), filesystem );
+   note->setTextFormat( QLabel::RichText );
+ 
+@@ -251,6 +251,7 @@
+ 
+   connect( m_filesystem, SIGNAL( activated( const QString & ) ),
+            this,         SLOT( slotSambaFileSystem( const QString & ) ) );
++  slotSambaFileSystem("CIFS");
+ }
+ 
+ 
+

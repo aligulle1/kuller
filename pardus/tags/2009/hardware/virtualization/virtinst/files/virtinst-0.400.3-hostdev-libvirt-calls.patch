@@ -1,0 +1,39 @@
+# HG changeset patch
+# User Cole Robinson <crobinso@redhat.com>
+# Date 1237302675 14400
+# Node ID 1288ff456cdb1a387771624594300ab6be324181
+# Parent  143cad71a2a6e83bfff7f46a0f7105e3eeb43ab2
+Fix node device dettach/reset libvirt calls
+
+diff -r 143cad71a2a6 -r 1288ff456cdb virtinst/NodeDeviceParser.py
+--- a/virtinst/NodeDeviceParser.py	Mon Mar 09 23:31:51 2009 -0400
++++ b/virtinst/NodeDeviceParser.py	Tue Mar 17 11:11:15 2009 -0400
+@@ -405,10 +405,11 @@
+     if not isinstance(conn, libvirt.virConnect):
+         raise ValueError(_("'conn' must be a virConnect instance."))
+ 
+-    if dir(libvirt).count("virNodeDeviceDettach") == 0:
+-        return False
++    if (hasattr(libvirt, "virNodeDevice") and
++        hasattr(libvirt.virNodeDevice, "dettach")):
++        return True
+ 
+-    return True
++    return False
+ 
+ def lookupNodeName(conn, name):
+     """
+diff -r 143cad71a2a6 -r 1288ff456cdb virtinst/VirtualHostDevice.py
+--- a/virtinst/VirtualHostDevice.py	Mon Mar 09 23:31:51 2009 -0400
++++ b/virtinst/VirtualHostDevice.py	Tue Mar 17 11:11:15 2009 -0400
+@@ -201,8 +201,8 @@
+         try:
+             # Do this as a sanity check, so that we don't fail at domain
+             # start time
+-            self._nodedev.deviceDetach()
+-            self._nodedev.deviceReset()
++            self._nodedev.dettach()
++            self._nodedev.reset()
+         except Exception, e:
+             raise RuntimeError(_("Could not detach PCI device: %s" % str(e)))
+ 

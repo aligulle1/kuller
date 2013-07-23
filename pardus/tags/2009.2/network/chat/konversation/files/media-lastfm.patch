@@ -1,0 +1,39 @@
+diff -Naur konvi-kde4.orig/data/scripts/media konvi-kde4/data/scripts/media
+--- konvi-kde4.orig/data/scripts/media	2009-01-31 22:17:14.000000000 +0200
++++ konvi-kde4/data/scripts/media	2009-02-01 01:16:19.000000000 +0200
+@@ -44,7 +44,7 @@
+ ## If you add a new player, you must add it here or it won't get checked when in audio-only or video-only modes.
+ playerRankings= {
+     'video' :['kaffeine','kmplayer', 'kplayer', 'noatun', 'kdetv'],
+-    'audio' :['amarok', 'juk', 'noatun', 'kscd', 'kaffeine', 'kmplayer', 'amarok2', 'yammi', 'Audacious', 'xmms', 'MPD']
++    'audio' :['amarok', 'juk', 'noatun', 'kscd', 'kaffeine', 'kmplayer', 'amarok2', 'yammi', 'Audacious', 'xmms', 'MPD', 'LastFM']
+ }
+ 
+ ## Title, album and artist fields to be quoted depending on contents
+@@ -376,6 +376,16 @@
+         else:
+             return ''
+ 
++class LastFMPlayer(Player):
++    def __init__(self):
++        Player.__init__(self,"last.fm")
++
++    def getData(self):
++        title = subprocess.Popen(["qdbus","com.lastfm.DBusInterface","/","currentTrack"], stdout=subprocess.PIPE).communicate()[0].rstrip()
++        artist = subprocess.Popen(["qdbus","com.lastfm.DBusInterface","/","currentArtist"], stdout=subprocess.PIPE).communicate()[0].rstrip()
++        album = subprocess.Popen(["qdbus","com.lastfm.DBusInterface","/","currentAlbum"], stdout=subprocess.PIPE).communicate()[0].rstrip()
++        return (title,artist,album)
++
+ 
+ def playing(playerList, mode=None):
+     for i in playerList:
+@@ -442,7 +452,8 @@
+ Amarok2Player(),
+ DCOPPlayer("Yammi","yammi","YammiPlayer songTitle","YammiPlayer songArtist","YammiPlayer songAlbum"),
+ AudaciousPlayer('Audacious'), XmmsPlayer('XMMS'),
+-MPD('MPD')
++MPD('MPD'),
++LastFMPlayer()
+ ]
+ 
+ # Get rid of players that didn't get subclassed so they don't appear in the available players list

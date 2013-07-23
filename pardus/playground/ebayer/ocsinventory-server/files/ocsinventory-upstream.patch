@@ -1,0 +1,159 @@
+force install.php for first install, tx to Remi
+	http://bazaar.launchpad.net/~ocsinventory-dev/ocsinventory-ocsreports/stable/diff/57
+
+When opening the Date Time Picker in the administrative data for an inventoried computer,
+the year comes up as 2005. I tracked down the problem to the file
+/usr/share/ocsinventory-reports/ocsreports/js/datetimepicker.js on line 108 the date is
+being reset to 2005. I fixed this problem in my own installation by adding a line 109
+that reads "Cal.Year = dtToday.getFullYear();", however it would be nice if it were
+fixed in subsequent versions. Thanks, tx to Natrinicle
+	https://bugs.launchpad.net/bugs/585077
+	http://bazaar.launchpad.net/~ocsinventory-dev/ocsinventory-ocsreports/stable/diff/58
+
+Fix bug with old cookies when you update OCSREPORT, tx to Remi!!!
+	http://bazaar.launchpad.net/~ocsinventory-dev/ocsinventory-ocsreports/stable/diff/59
+	http://bazaar.launchpad.net/~ocsinventory-dev/ocsinventory-ocsreports/stable/diff/59
+
+=== modified file 'dbconfig.inc.php'
+--- OCSNG_UNIX_SERVER-1.3.2/ocsreports/dbconfig.inc.php	2009-11-03 19:45:02 +0000
++++ OCSNG_UNIX_SERVER-1.3.2/ocsreports/dbconfig.inc.php	2010-05-19 18:36:54 +0000
+@@ -1,5 +1,5 @@
+ <?php 
+-$_SESSION["SERVEUR_SQL"]="";
++//$_SESSION["SERVEUR_SQL"]="";
+ $_SESSION["COMPTE_BASE"]="ocs";
+ $_SESSION["PSWD_BASE"]="ocs";
+ ?>
+\ No newline at end of file
+
+=== modified file 'js/datetimepicker.js'
+--- OCSNG_UNIX_SERVER-1.3.2/ocsreports/js/datetimepicker.js	2009-06-29 11:51:53 +0000
++++ OCSNG_UNIX_SERVER-1.3.2/ocsreports/js/datetimepicker.js	2010-05-26 06:36:17 +0000
+@@ -105,7 +105,7 @@
+ 		if (YearPattern.test(strYear))
+ 			Cal.Year=parseInt(strYear,10);
+ 			
+-		if( Cal.Year == 0 ) Cal.Year = 2005;
++		if( Cal.Year == 0 ) Cal.Year = dtToday.getFullYear();
+ 		//end parse year
+ 		//parse time
+ 		if (Cal.ShowTime==true)
+
+=== modified file 'preferences.php'
+--- OCSNG_UNIX_SERVER-1.3.2/ocsreports/preferences.php	2010-05-03 15:15:39 +0000
++++ OCSNG_UNIX_SERVER-1.3.2/ocsreports/preferences.php	2010-06-17 10:03:38 +0000
+@@ -57,6 +57,19 @@
+ 		$_SESSION["queryString"] .= "&".$key."=".$val;
+ }
+ 
++
++//Delete all cookies if GUI_VER change
++if ($_COOKIE["VERS"] != GUI_VER){
++	if( isset( $_COOKIE["col"] ) ) {		
++		foreach( $_COOKIE["col"] as $key=>$val ) {
++			setcookie( "col[$key][value]", FALSE, time() - 3600 ); // deleting corresponding cookie
++			setcookie( "col[$key][rang]", FALSE, time() - 3600 ); // deleting corresponding cookie			
++		}
++		unset( $_COOKIE["col"] );
++		setcookie( "VERS", GUI_VER, time() + 3600 * 24 * 365 ); //expires in 365 days			
++	}
++}
++
+ if( isset($_GET["uid"]) ) {
+ 	setcookie( "DefNetwork", $_GET["uid"], time() + 3600 * 24 * 15 );
+ }
+@@ -369,7 +382,7 @@
+ 				$_POST[$var]=0+$_POST[$var];// si un nombre est attendu, on transforme en nombre
+ 			
+ 			$req->where=str_replace("option$ind",$_POST[$var],$req->where); 
+-			// on remplace les strings "optionX" de la requete par leurs valeurs présentes dans les variables en POST
++			// on remplace les strings "optionX" de la requete par leurs valeurs prï¿½sentes dans les variables en POST
+ 			$ind++;
+ 			$var="option".$ind;			
+ 		}
+@@ -575,7 +588,7 @@
+ 		if( $req->countId == "h.id" ) //computer in devices
+ 			echo "<td width='15px'>&nbsp;</td>";*/
+ 			
+-		while($colname=mysql_fetch_field($result)) // On récupère le nom de toutes les colonnes		
++		while($colname=mysql_fetch_field($result)) // On rï¿½cupï¿½re le nom de toutes les colonnes		
+ 		{
+ 			if($colname->name!="h.id"&&$colname->name!="deviceid")
+ 			{							
+@@ -691,7 +704,7 @@
+ 				$listIdGroup .= $valIdGroup['ID'].",";
+ 			}
+ 			$listIdGroup=substr($listIdGroup,0,-1);
+-		while($item = mysql_fetch_array($result)) // Parcour de toutes les lignes résultat
++		while($item = mysql_fetch_array($result)) // Parcour de toutes les lignes rï¿½sultat
+ 		{	
+ 			flush();
+ 			echo "<TR height=20px ". ($x == 1 ? "bgcolor='#FFFFFF'" : "bgcolor='#F2F2F2'") .">";	// on alterne les couleurs de ligne
+@@ -734,7 +747,7 @@
+ 						echo "<td>&nbsp;</td>";
+ 			}*/			
+ 
+-			foreach($tabChamps as $chmp) {// Affichage de toutes les valeurs résultats
++			foreach($tabChamps as $chmp) {// Affichage de toutes les valeurs rï¿½sultats
+                 echo "<td align='center'>";
+                 $isLink = FALSE;
+ 				if($chmp==TAG_LBL)
+@@ -795,14 +808,14 @@
+ //affichage des statistiques pour l'activation de paquet
+ 			if( $teledeploy ) {
+ 				$statResult="";
+-				//recherche tous les ID dans download_enable qui correspondent à ce timestamp
++				//recherche tous les ID dans download_enable qui correspondent ï¿½ ce timestamp
+ 				$sqlStat="SELECT ID 
+ 							FROM download_enable 
+ 							WHERE fileid='".$item["Timestamp"]."'";
+ 				$resStat = mysql_query( $sqlStat, $_SESSION["readServer"] );
+ 				$listIdstat="";
+ 				while( $valStat = mysql_fetch_array( $resStat ) ) {
+-					//création de la list pour effectuer un "in"
++					//crï¿½ation de la list pour effectuer un "in"
+ 					$listIdstat .= $valStat["ID"].",";
+ 				}
+ 				$listIdstat=substr($listIdstat,0,-1);
+@@ -1402,7 +1415,7 @@
+ 		echo "<p align='center'>";
+ 		if( $numPages > 1 ) {			
+ 			if( $_SESSION["pageCur"] == 1) {				
+-				echo "&nbsp;&nbsp;";//voir grisé
++				echo "&nbsp;&nbsp;";//voir grisï¿½
+ 				echo "&nbsp;&nbsp;1&nbsp;..";							
+ 			} else {
+ 				echo "&nbsp;&nbsp;{$prefG}-1><img src='image/prec24.png'></a>";
+@@ -1415,7 +1428,7 @@
+ 			
+ 			if( $_SESSION["pageCur"] >= $numPages) {
+ 				echo "..&nbsp;&nbsp;$numPages&nbsp;";
+-				//echo "<img src='image/proch24.png'>&nbsp;&nbsp;"; voir grisé
++				//echo "<img src='image/proch24.png'>&nbsp;&nbsp;"; voir grisï¿½
+ 			} else {
+ 				echo "..&nbsp;{$prefG}$numPages>$numPages</a>&nbsp;";
+ 				echo "{$prefG}-2><img src='image/proch24.png'></a>&nbsp;&nbsp;";
+
+=== modified file 'preferences.php'
+--- OCSNG_UNIX_SERVER-1.3.2/ocsreports/preferences.php	2010-06-17 10:03:38 +0000
++++ OCSNG_UNIX_SERVER-1.3.2/ocsreports/preferences.php	2010-06-17 10:08:54 +0000
+@@ -59,15 +59,15 @@
+ 
+ 
+ //Delete all cookies if GUI_VER change
+-if ($_COOKIE["VERS"] != GUI_VER){
++if (!isset($_COOKIE["VERS"]) or  $_COOKIE["VERS"] != GUI_VER){
+ 	if( isset( $_COOKIE["col"] ) ) {		
+ 		foreach( $_COOKIE["col"] as $key=>$val ) {
+ 			setcookie( "col[$key][value]", FALSE, time() - 3600 ); // deleting corresponding cookie
+ 			setcookie( "col[$key][rang]", FALSE, time() - 3600 ); // deleting corresponding cookie			
+ 		}
+-		unset( $_COOKIE["col"] );
+-		setcookie( "VERS", GUI_VER, time() + 3600 * 24 * 365 ); //expires in 365 days			
++		unset( $_COOKIE["col"] );	
+ 	}
++	setcookie( "VERS", GUI_VER, time() + 3600 * 24 * 365 ); //expires in 365 days		
+ }
+ 
+ if( isset($_GET["uid"]) ) {
+

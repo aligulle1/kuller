@@ -1,0 +1,24 @@
+--- build/lib/gcc.mak.orig	2006-09-04 12:43:20.000000000 +0200
++++ build/lib/gcc.mak	2006-09-04 12:43:35.000000000 +0200
+@@ -8,7 +8,7 @@
+ include ${SRCROOT}/Makefiles/top.mak
+ 
+ ifeq ($(OSNAME),linux)
+-DEFS += -D_STLP_REAL_LOCALE_IMPLEMENTED -D_GNU_SOURCE
++DEFS += -D_STLP_REAL_LOCALE_IMPLEMENTED -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64
+ endif
+ 
+ # options for build with boost support
+--- build/test/unit/gcc.mak.orig	2006-09-04 12:44:04.000000000 +0200
++++ build/test/unit/gcc.mak	2006-09-04 12:46:12.000000000 +0200
+@@ -10,6 +10,10 @@
+ 
+ DEFS += -D_STLP_NO_CUSTOM_IO
+ 
++ifeq ($(OSNAME), linux)
++DEFS += -D_FILE_OFFSET_BITS=64
++endif
++
+ dbg-shared:	DEFS += -D_STLP_DEBUG_UNINITIALIZED 
+ stldbg-shared:	DEFS += -D_STLP_DEBUG_UNINITIALIZED 
+ 

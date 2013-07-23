@@ -1,0 +1,42 @@
+diff -pur inkscape-0.46.orig/src/style.cpp inkscape-0.46/src/style.cpp
+--- inkscape-0.46.orig/src/style.cpp	2008-03-11 05:19:45.000000000 +0100
++++ inkscape-0.46/src/style.cpp	2008-03-28 12:35:52.000000000 +0100
+@@ -2125,7 +2125,9 @@ static void
+ sp_style_merge_ipaint(SPStyle *style, SPIPaint *paint, SPIPaint const *parent)
+ {
+     if ((paint->set && paint->currentcolor) || parent->currentcolor) {
++        bool isset = paint->set;
+         paint->clear();
++        paint->set = isset;
+         paint->currentcolor = TRUE;
+         paint->setColor(style->color.value.color);
+         return;
+@@ -3001,6 +3003,7 @@ sp_style_read_icolor(SPIPaint *paint, gc
+         guint32 const rgb0 = sp_svg_read_color(str, 0xff);
+         if (rgb0 != 0xff) {
+             paint->setColor(rgb0);
++            paint->set = TRUE;
+             paint->inherit = FALSE;
+         }
+     }
+diff -pur --exclude='*~' inkscape-0.46.p1/src/style.cpp inkscape-0.46/src/style.cpp
+--- inkscape-0.46.p1/src/style.cpp	2008-04-08 09:23:25.000000000 +0200
++++ inkscape-0.46/src/style.cpp	2008-04-08 12:30:35.000000000 +0200
+@@ -3614,7 +3614,7 @@ sp_style_write_ipaint(gchar *b, gint con
+                 css << "currentColor";
+             }
+ 
+-            if ( paint->colorSet ) {
++            if ( paint->colorSet && !paint->currentcolor ) {
+                 if ( !css.str().empty() ) {
+                     css << " ";
+                 }
+@@ -3623,7 +3623,7 @@ sp_style_write_ipaint(gchar *b, gint con
+                 css << color_buf;
+             }
+ 
+-            if (paint->value.color.icc) {
++            if (paint->value.color.icc && !paint->currentcolor) {
+                 if ( !css.str().empty() ) {
+                     css << " ";
+                 }

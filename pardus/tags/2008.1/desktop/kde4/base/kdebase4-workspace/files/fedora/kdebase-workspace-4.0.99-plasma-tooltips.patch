@@ -1,0 +1,2221 @@
+diff -Nur kdebase-workspace-4.0.99/libs/plasma/applet.cpp kdebase-workspace-4.0.99-plasma-tooltips/libs/plasma/applet.cpp
+--- kdebase-workspace-4.0.99/libs/plasma/applet.cpp	2008-07-17 23:32:49.000000000 +0200
++++ kdebase-workspace-4.0.99-plasma-tooltips/libs/plasma/applet.cpp	2008-07-19 17:34:22.000000000 +0200
+@@ -27,7 +27,6 @@
+ 
+ #include <QAction>
+ #include <QApplication>
+-#include <QDesktopWidget>
+ #include <QEvent>
+ #include <QFile>
+ #include <QGraphicsGridLayout>
+@@ -76,6 +75,7 @@
+ #include "plasma/view.h"
+ #include "plasma/widgets/label.h"
+ #include "plasma/widgets/pushbutton.h"
++#include "plasma/tooltipmanager.h"
+ 
+ //#define DYNAMIC_SHADOWS
+ namespace Plasma
+@@ -411,13 +411,16 @@
+         return 0;
+     }
+ 
++    QGraphicsView *found = 0;
+     foreach (QGraphicsView *view, scene()->views()) {
+         if (view->sceneRect().intersects(sceneBoundingRect()) ||
+             view->sceneRect().contains(scenePos())) {
+-            return view;
++            if (!found || view->isActiveWindow()) {
++                found = view;
++            }
+         }
+     }
+-    return 0;
++    return found;
+ }
+ 
+ QRectF Applet::mapFromView(const QGraphicsView *view, const QRect &rect) const
+@@ -434,55 +437,7 @@
+ 
+ QPoint Applet::popupPosition(const QSize &s) const
+ {
+-    QGraphicsView *v = view();
+-    Q_ASSERT(v);
+-
+-    QPoint pos = v->mapFromScene(scenePos());
+-    pos = v->mapToGlobal(pos);
+-    //kDebug() << "==> position is" << scenePos() << v->mapFromScene(scenePos()) << pos;
+-    Plasma::View *pv = dynamic_cast<Plasma::View *>(v);
+-
+-    Plasma::Location loc = Floating;
+-    if (pv) {
+-        loc = pv->containment()->location();
+-    }
+-
+-    switch (loc) {
+-    case BottomEdge:
+-        pos = QPoint(pos.x(), pos.y() - s.height());
+-        break;
+-    case TopEdge:
+-        pos = QPoint(pos.x(), pos.y() + (int)size().height());
+-        break;
+-    case LeftEdge:
+-        pos = QPoint(pos.x() + (int)size().width(), pos.y());
+-        break;
+-    case RightEdge:
+-        pos = QPoint(pos.x() - s.width(), pos.y());
+-        break;
+-    default:
+-        if (pos.y() - s.height() > 0) {
+-             pos = QPoint(pos.x(), pos.y() - s.height());
+-        } else {
+-             pos = QPoint(pos.x(), pos.y() + (int)size().height());
+-        }
+-    }
+-
+-    //are we out of screen?
+-
+-    QRect screenRect = QApplication::desktop()->screenGeometry(pv ? pv->containment()->screen() : -1);
+-    //kDebug() << "==> rect for" << (pv ? pv->containment()->screen() : -1) << "is" << screenRect;
+-
+-    if (pos.rx() + s.width() > screenRect.right()) {
+-        pos.rx() -= ((pos.rx() + s.width()) - screenRect.right());
+-    }
+-
+-    if (pos.ry() + s.height() > screenRect.bottom()) {
+-        pos.ry() -= ((pos.ry() + s.height()) - screenRect.bottom());
+-    }
+-    pos.rx() = qMax(0, pos.rx());
+-
+-    return pos;
++    return Plasma::popupPosition(this, s);
+ }
+ 
+ void Applet::updateConstraints(Plasma::Constraints constraints)
+diff -Nur kdebase-workspace-4.0.99/libs/plasma/CMakeLists.txt kdebase-workspace-4.0.99-plasma-tooltips/libs/plasma/CMakeLists.txt
+--- kdebase-workspace-4.0.99/libs/plasma/CMakeLists.txt	2008-07-17 23:32:49.000000000 +0200
++++ kdebase-workspace-4.0.99-plasma-tooltips/libs/plasma/CMakeLists.txt	2008-07-19 17:33:19.000000000 +0200
+@@ -58,6 +58,8 @@
+     svg.cpp
+     theme.cpp
+     toolbox.cpp
++    tooltipmanager.cpp
++    tooltip.cpp
+     uiloader.cpp
+     version.cpp
+     view.cpp
+@@ -140,7 +142,9 @@
+     servicejob.h
+     svg.h
+     theme.h
++    tooltipmanager.h
+     uiloader.h
++    tooltipmanager.h
+     version.h
+     view.h)
+ 
+@@ -225,6 +229,7 @@
+ includes/SignalPlotter
+ includes/Svg
+ includes/TextEdit
++includes/ToolTipManager
+ includes/Theme
+ includes/UiLoader
+ includes/View
+diff -Nur kdebase-workspace-4.0.99/libs/plasma/containment.cpp kdebase-workspace-4.0.99-plasma-tooltips/libs/plasma/containment.cpp
+--- kdebase-workspace-4.0.99/libs/plasma/containment.cpp	2008-07-17 23:32:49.000000000 +0200
++++ kdebase-workspace-4.0.99-plasma-tooltips/libs/plasma/containment.cpp	2008-07-19 17:34:22.000000000 +0200
+@@ -1280,6 +1280,9 @@
+     // point anymore since we are in the qobject dtor. we don't actually
+     // try and do anything with it, we just need the value of the pointer
+     // so this unsafe looking code is actually just fine.
++    //
++    // NOTE: DO NOT USE THE applet VARIABLE FOR ANYTHING OTHER THAN COMPARING
++    //       THE ADDRESS! ACTUALLY USING THE OBJECT WILL RESULT IN A CRASH!!!
+     Applet* applet = static_cast<Plasma::Applet*>(object);
+     applets.removeAll(applet);
+     if (focusedApplet == applet) {
+diff -Nur kdebase-workspace-4.0.99/libs/plasma/includes/ToolTipManager kdebase-workspace-4.0.99-plasma-tooltips/libs/plasma/includes/ToolTipManager
+--- kdebase-workspace-4.0.99/libs/plasma/includes/ToolTipManager	1970-01-01 01:00:00.000000000 +0100
++++ kdebase-workspace-4.0.99-plasma-tooltips/libs/plasma/includes/ToolTipManager	2008-07-19 17:33:19.000000000 +0200
+@@ -0,0 +1 @@
++#include "../../plasma/tooltipmanager.h"
+diff -Nur kdebase-workspace-4.0.99/libs/plasma/plasma.cpp kdebase-workspace-4.0.99-plasma-tooltips/libs/plasma/plasma.cpp
+--- kdebase-workspace-4.0.99/libs/plasma/plasma.cpp	2008-07-08 11:26:23.000000000 +0200
++++ kdebase-workspace-4.0.99-plasma-tooltips/libs/plasma/plasma.cpp	2008-07-19 17:34:22.000000000 +0200
+@@ -17,7 +17,14 @@
+  *   51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+  */
+ 
+-#include <plasma.h>
++#include <plasma/plasma.h>
++
++#include <QDesktopWidget>
++#include <QGraphicsScene>
++#include <QGraphicsView>
++
++#include <plasma/containment.h>
++#include <plasma/view.h>
+ 
+ namespace Plasma
+ {
+@@ -62,4 +69,78 @@
+     return Down;
+ }
+ 
++QPoint popupPosition(const QGraphicsItem * item, const QSize &s)
++{
++    QGraphicsView *v = viewFor(item);
++
++    if (!v) {
++        return QPoint(0,0);
++    }
++
++    QPoint pos = v->mapFromScene(item->scenePos());
++    pos = v->mapToGlobal(pos);
++    //kDebug() << "==> position is" << scenePos() << v->mapFromScene(scenePos()) << pos;
++    Plasma::View *pv = dynamic_cast<Plasma::View *>(v);
++
++    Plasma::Location loc = Floating;
++    if (pv) {
++        loc = pv->containment()->location();
++    }
++
++    switch (loc) {
++    case BottomEdge:
++        pos = QPoint(pos.x(), pos.y() - s.height());
++        break;
++    case TopEdge:
++        pos = QPoint(pos.x(), pos.y() + (int)item->boundingRect().size().height());
++        break;
++    case LeftEdge:
++        pos = QPoint(pos.x() + (int)item->boundingRect().size().width(), pos.y());
++        break;
++    case RightEdge:
++        pos = QPoint(pos.x() - s.width(), pos.y());
++        break;
++    default:
++        if (pos.y() - s.height() > 0) {
++             pos = QPoint(pos.x(), pos.y() - s.height());
++        } else {
++             pos = QPoint(pos.x(), pos.y() + (int)item->boundingRect().size().height());
++        }
++    }
++
++    //are we out of screen?
++    QRect screenRect = QApplication::desktop()->screenGeometry(pv ? pv->containment()->screen() : -1);
++    //kDebug() << "==> rect for" << (pv ? pv->containment()->screen() : -1) << "is" << screenRect;
++
++    if (pos.rx() + s.width() > screenRect.right()) {
++        pos.rx() -= ((pos.rx() + s.width()) - screenRect.right());
++    }
++
++    if (pos.ry() + s.height() > screenRect.bottom()) {
++        pos.ry() -= ((pos.ry() + s.height()) - screenRect.bottom());
++    }
++
++    pos.rx() = qMax(0, pos.rx());
++    return pos;
++}
++
++QGraphicsView* viewFor(const QGraphicsItem * item)
++{
++    if (!item->scene()) {
++        return 0;
++    }
++
++    QGraphicsView *found = 0;
++    foreach (QGraphicsView *view, item->scene()->views()) {
++        if (view->sceneRect().intersects(item->sceneBoundingRect()) ||
++            view->sceneRect().contains(item->scenePos())) {
++            if (!found || view->isActiveWindow()) {
++                found = view;
++            }
++        }
++    }
++
++    return found;
++}
++
+ } // Plasma namespace
+diff -Nur kdebase-workspace-4.0.99/libs/plasma/plasma.h kdebase-workspace-4.0.99-plasma-tooltips/libs/plasma/plasma.h
+--- kdebase-workspace-4.0.99/libs/plasma/plasma.h	2008-07-08 11:26:22.000000000 +0200
++++ kdebase-workspace-4.0.99-plasma-tooltips/libs/plasma/plasma.h	2008-07-19 17:34:22.000000000 +0200
+@@ -25,6 +25,8 @@
+ 
+ #include <plasma/plasma_export.h>
+ 
++class QGraphicsView;
++
+ /**
+  * Namespace for everything in libplasma
+  */
+@@ -193,6 +195,22 @@
+  **/
+ PLASMA_EXPORT Direction locationToDirection(Location location);
+ 
++/**
++ * Reccomended position for a popup window like a menu or a tooltip
++ * given its size
++ * @param s size of the popup
++ * @returns reccomended position
++ */
++PLASMA_EXPORT QPoint popupPosition(const QGraphicsItem *item, const QSize &s);
++
++/**
++ * Returns the most appropriate QGraphicsView for the item.
++ *
++ * @arg item the QGraphicsItem to locate a view for
++ * @return pointer to a view, or 0 if none was found
++ */
++PLASMA_EXPORT QGraphicsView *viewFor(const QGraphicsItem *item);
++
+ } // Plasma namespace
+ 
+ Q_DECLARE_OPERATORS_FOR_FLAGS(Plasma::Constraints)
+diff -Nur kdebase-workspace-4.0.99/libs/plasma/tooltip.cpp kdebase-workspace-4.0.99-plasma-tooltips/libs/plasma/tooltip.cpp
+--- kdebase-workspace-4.0.99/libs/plasma/tooltip.cpp	1970-01-01 01:00:00.000000000 +0100
++++ kdebase-workspace-4.0.99-plasma-tooltips/libs/plasma/tooltip.cpp	2008-07-19 17:34:22.000000000 +0200
+@@ -0,0 +1,287 @@
++/*
++ *   Copyright 2007 by Dan Meltzer <hydrogen@notyetimplemented.com>
++ *   Copyright (C) 2008 by Alexis Ménard <darktears31@gmail.com>
++ *
++ *   This program is free software; you can redistribute it and/or modify
++ *   it under the terms of the GNU Library General Public License as
++ *   published by the Free Software Foundation; either version 2, or
++ *   (at your option) any later version.
++
++ *
++ *   This program is distributed in the hope that it will be useful,
++ *   but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *   GNU General Public License for more details
++ *
++ *   You should have received a copy of the GNU Library General Public
++ *   License along with this program; if not, write to the
++ *   Free Software Foundation, Inc.,
++ *   51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
++ */
++#include "tooltip_p.h"
++
++#include <QBitmap>
++#include <QHBoxLayout>
++#include <QLabel>
++#include <QMouseEvent>
++#include <QPixmap>
++#include <QTimer>
++#include <QGraphicsView>
++#ifdef Q_WS_X11
++#include <QX11Info>
++#endif
++
++#include <KDebug>
++#include <KGlobal>
++#include <KWindowSystem>
++#include <plasma/theme.h>
++#include <plasma/panelsvg.h>
++
++#ifdef Q_WS_X11
++#include <X11/Xlib.h>
++#include <fixx11h.h>
++#endif
++
++#include "plasma/plasma.h"
++
++namespace Plasma {
++
++class ToolTipPrivate
++{
++    public:
++        ToolTipPrivate(QObject *s)
++        : label(0)
++        , imageLabel(0)
++        , preview(0)
++        , windowToPreview(0)
++        , source(s)
++    { }
++
++    QLabel *label;
++    QLabel *imageLabel;
++    WindowPreview *preview;
++    WId windowToPreview;
++    PanelSvg *background;
++    QObject *source;
++};
++
++void ToolTip::showEvent(QShowEvent *e)
++{
++    QWidget::showEvent(e);
++    d->preview->setInfo();
++}
++
++void ToolTip::hideEvent(QHideEvent *e)
++{
++    QWidget::hideEvent(e);
++    if (d->source) {
++        QMetaObject::invokeMethod(d->source, SLOT(toolTipHidden()));
++    }
++}
++
++void ToolTip::mouseReleaseEvent(QMouseEvent* event)
++{
++    if (rect().contains(event->pos())) {
++        hide();
++    }
++}
++
++ToolTip::ToolTip(QObject *source)
++    : QWidget(0)
++    , d(new ToolTipPrivate(source))
++{
++    if (source) {
++        connect(source, SIGNAL(destroyed(QObject*)), this, SLOT(sourceDestroyed()));
++    }
++
++    setWindowFlags(Qt::ToolTip);
++    QGridLayout *l = new QGridLayout;
++    d->preview = new WindowPreview;
++    d->label = new QLabel;
++    d->label->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
++    d->label->setWordWrap(true);
++    d->imageLabel = new QLabel;
++    d->imageLabel->setAlignment(Qt::AlignTop | Qt::AlignLeft);
++
++    d->background = new PanelSvg(this);
++    connect(d->background, SIGNAL(repaintNeeded()), this, SLOT(update()));
++
++    l->addWidget(d->preview, 0, 0, 1, 2);
++    l->addWidget(d->imageLabel, 1, 0);
++    l->addWidget(d->label, 1, 1);
++    setLayout(l);
++}
++
++ToolTip::~ToolTip()
++{
++    delete d;
++}
++
++void ToolTip::setContent(const ToolTipManager::ToolTipContent &data)
++{
++    //reset our size
++    d->label->setText("<qt><b>" + data.mainText + "</b><br>" + data.subText + "</qt>");
++    d->imageLabel->setPixmap(data.image);
++    d->windowToPreview = data.windowToPreview;
++    d->preview->setWindowId( d->windowToPreview );
++
++    if (isVisible()) {
++        resize(sizeHint());
++    }
++}
++
++void ToolTip::prepareShowing()
++{
++    if (d->source) {
++        QMetaObject::invokeMethod(d->source, SLOT(toolTipAboutToShow()));
++    }
++
++    if (d->windowToPreview != 0) {
++        // show/hide the preview area
++        d->preview->show();
++    } else {
++        d->preview->hide();
++    }
++
++    layout()->activate();
++    resize(sizeHint());
++
++    if (isVisible()) {
++        d->preview->setInfo();
++    } else {
++        show();
++    }
++}
++
++void ToolTip::resizeEvent(QResizeEvent *e)
++{
++    QWidget::resizeEvent(e);
++    d->background->resizePanel(size());
++
++    setMask(d->background->mask());
++}
++
++void ToolTip::paintEvent(QPaintEvent *e)
++{
++    QPainter painter(this);
++    painter.setRenderHint(QPainter::Antialiasing);
++    painter.setClipRect(e->rect());
++    painter.setCompositionMode(QPainter::CompositionMode_Source );
++    painter.fillRect(rect(), Qt::transparent);
++
++    d->background->paintPanel(&painter, rect());
++}
++
++void ToolTip::sourceDestroyed()
++{
++    d->source = 0;
++}
++
++void ToolTip::updateTheme()
++{
++    d->background->setImagePath("widgets/tooltip");
++    d->background->setEnabledBorders(PanelSvg::AllBorders);
++
++    const int topHeight = d->background->marginSize(Plasma::TopMargin);
++    const int leftWidth = d->background->marginSize(Plasma::LeftMargin);
++    const int rightWidth = d->background->marginSize(Plasma::RightMargin);
++    const int bottomHeight = d->background->marginSize(Plasma::BottomMargin);
++    setContentsMargins(leftWidth, topHeight, rightWidth, bottomHeight);
++
++    // Make the tooltip use Plasma's colorscheme
++    QPalette plasmaPalette = QPalette();
++    plasmaPalette.setColor(QPalette::Window, Plasma::Theme::defaultTheme()->color(Plasma::Theme::BackgroundColor));
++    plasmaPalette.setColor(QPalette::WindowText, Plasma::Theme::defaultTheme()->color(Plasma::Theme::TextColor));
++    setAutoFillBackground(true);
++    setPalette(plasmaPalette);
++}
++
++// A widget which reserves area for window preview and sets hints on the toplevel
++// tooltip widget that tells KWin to render the preview in this area. This depends
++// on KWin's TaskbarThumbnail compositing effect (which is here detected).
++
++void WindowPreview::setWindowId(WId w)
++{
++    if (!previewsAvailable()) {
++        id = 0;
++        return;
++    }
++    id = w;
++    readWindowSize();
++}
++
++bool WindowPreview::previewsAvailable() const
++{
++    if (!KWindowSystem::compositingActive()) {
++        return false;
++    }
++#ifdef Q_WS_X11
++    // hackish way to find out if KWin has the effect enabled,
++    // TODO provide proper support
++    Display* dpy = QX11Info::display();
++    Atom atom = XInternAtom(dpy, "_KDE_WINDOW_PREVIEW", False);
++    int cnt;
++    Atom* list = XListProperties(dpy, DefaultRootWindow( dpy ), &cnt);
++    if (list != NULL) {
++        bool ret = ( qFind(list, list + cnt, atom) != list + cnt );
++        XFree(list);
++        return ret;
++    }
++#endif
++    return false;
++}
++
++QSize WindowPreview::sizeHint() const
++{
++    if (id == 0) {
++        return QSize();
++    }
++    if (!windowSize.isValid()) {
++        readWindowSize();
++    }
++    QSize s = windowSize;
++    s.scale(200, 150, Qt::KeepAspectRatio);
++    return s;
++}
++
++void WindowPreview::readWindowSize() const
++{
++#ifdef Q_WS_X11
++    Window r;
++    int x, y;
++    unsigned int w, h, b, d;
++    if (XGetGeometry(QX11Info::display(), id, &r, &x, &y, &w, &h, &b, &d)) {
++        windowSize = QSize( w, h );
++    } else {
++        windowSize = QSize();
++    }
++#else
++    windowSize = QSize();
++#endif
++}
++
++void WindowPreview::setInfo()
++{
++#ifdef Q_WS_X11
++    Display *dpy = QX11Info::display();
++    Atom atom = XInternAtom(dpy, "_KDE_WINDOW_PREVIEW", False);
++    if (id == 0) {
++        XDeleteProperty(dpy, parentWidget()->winId(), atom);
++        return;
++    }
++    if (!windowSize.isValid()) {
++        readWindowSize();
++    }
++    if (!windowSize.isValid()) {
++        XDeleteProperty(dpy, parentWidget()->winId(), atom);
++        return;
++    }
++    Q_ASSERT( parentWidget()->isWindow()); // parent must be toplevel
++    long data[] = { 1, 5, id, x(), y(), width(), height() };
++    XChangeProperty(dpy, parentWidget()->winId(), atom, atom, 32, PropModeReplace,
++        reinterpret_cast< unsigned char* >( data ), sizeof( data ) / sizeof( data[ 0 ] ));
++#endif
++}
++
++}
++#include "tooltip_p.moc"
+diff -Nur kdebase-workspace-4.0.99/libs/plasma/tooltipmanager.cpp kdebase-workspace-4.0.99-plasma-tooltips/libs/plasma/tooltipmanager.cpp
+--- kdebase-workspace-4.0.99/libs/plasma/tooltipmanager.cpp	1970-01-01 01:00:00.000000000 +0100
++++ kdebase-workspace-4.0.99-plasma-tooltips/libs/plasma/tooltipmanager.cpp	2008-07-19 17:35:20.000000000 +0200
+@@ -0,0 +1,359 @@
++/***************************************************************************
++ *   Copyright 2007 by Dan Meltzer <hydrogen@notyetimplemented.com>        *
++ *   Copyright 2008 by Aaron Seigo <aseigo@kde.org>                        *
++ *   Copyright 2008 by Alexis Ménard <darktears31@gmail.com>               *
++ *                                                                         *
++ *   This program is free software; you can redistribute it and/or modify  *
++ *   it under the terms of the GNU General Public License as published by  *
++ *   the Free Software Foundation; either version 2 of the License, or     *
++ *   (at your option) any later version.                                   *
++ *                                                                         *
++ *   This program is distributed in the hope that it will be useful,       *
++ *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
++ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
++ *   GNU General Public License for more details.                          *
++ *                                                                         *
++ *   You should have received a copy of the GNU General Public License     *
++ *   along with this program; if not, write to the                         *
++ *   Free Software Foundation, Inc.,                                       *
++ *   51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA .        *
++ ***************************************************************************/
++
++#include "tooltipmanager.h"
++
++//Qt
++#include <QLabel>
++#include <QTimer>
++#include <QGridLayout>
++#include <QGraphicsView>
++#include <QDesktopWidget>
++
++//KDE
++#include <KWindowSystem>
++
++//X11
++#ifdef Q_WS_X11
++#include <QtGui/QX11Info>
++#include <X11/Xlib.h>
++#include <fixx11h.h>
++#endif
++
++
++//Plasma
++#include <plasma/applet.h>
++#include <plasma/containment.h>
++#include <plasma/panelsvg.h>
++#include <plasma/theme.h>
++#include <plasma/tooltip_p.h>
++#include <plasma/view.h>
++
++namespace Plasma
++{
++
++class ToolTipManagerPrivate
++{
++public :
++    ToolTipManagerPrivate()
++        : currentWidget(0)
++        , showTimer(0)
++        , hideTimer(0)
++    {
++
++    }
++    ~ToolTipManagerPrivate()
++    {
++
++    }
++
++    void showToolTip();
++    void resetShownState();
++
++    /**
++      * called when the theme of plasma has change
++      */
++    void themeUpdated();
++    /**
++      * called when a widget inside the tooltip manager is deleted
++      */
++    void onWidgetDestroyed(QObject * object);
++
++
++    QGraphicsWidget *currentWidget;
++    bool isShown;
++    bool delayedHide;
++    QTimer *showTimer;
++    QTimer *hideTimer;
++    QMap<QGraphicsWidget *, ToolTip *> tooltips;
++};
++
++//TOOLTIP IMPLEMENTATION
++class ToolTipManagerSingleton
++{
++    public:
++    ToolTipManagerSingleton()
++    {
++    }
++    ToolTipManager self;
++};
++K_GLOBAL_STATIC( ToolTipManagerSingleton, privateInstance )
++
++ToolTipManager *ToolTipManager::self()
++{
++    return &privateInstance->self;
++}
++
++ToolTipManager::ToolTipContent::ToolTipContent()
++    : windowToPreview(0)
++{
++}
++
++bool ToolTipManager::ToolTipContent::isEmpty() const
++{
++    return mainText.isEmpty() && subText.isEmpty() && image.isNull() && windowToPreview == 0;
++}
++
++ToolTipManager::ToolTipManager(QObject* parent)
++  : QObject(parent),
++    d(new ToolTipManagerPrivate)
++{
++    connect(Plasma::Theme::defaultTheme(), SIGNAL(themeChanged()), this, SLOT(themeUpdated()));
++    d->themeUpdated();
++
++    d->showTimer = new QTimer(this);
++    d->showTimer->setSingleShot(true);
++    d->hideTimer = new QTimer(this);
++    d->hideTimer->setSingleShot(true);
++
++    connect(d->showTimer, SIGNAL(timeout()), SLOT(showToolTip()));
++    connect(d->hideTimer, SIGNAL(timeout()), SLOT(resetShownState()));
++}
++
++ToolTipManager::~ToolTipManager()
++{
++    if (d) delete d;
++}
++
++void ToolTipManager::showToolTip(QGraphicsWidget *widget)
++{
++   ToolTip *tooltip = d->tooltips.value(widget);
++   if (tooltip) {
++      if (d->currentWidget) {
++          hideToolTip(d->currentWidget);
++      }
++      d->hideTimer->stop();
++      d->delayedHide = false;
++      d->showTimer->stop();
++      d->currentWidget = widget;
++      if (d->isShown) {
++          // small delay to prevent unnecessary showing when the mouse is moving quickly across items
++          // which can be too much for less powerful CPUs to keep up with
++          d->showTimer->start(200);
++      } else {
++          d->showTimer->start(500);
++      }
++   }
++}
++
++bool ToolTipManager::isWidgetToolTipDisplayed(QGraphicsWidget *widget)
++{
++   ToolTip *tooltip = d->tooltips.value(widget);
++   if (tooltip) {
++      return tooltip->isVisible();
++   } else {
++      return false;
++   }
++}
++
++void ToolTipManager::delayedHideToolTip()
++{
++    d->showTimer->stop();  // stop the timer to show the tooltip
++    d->delayedHide = true;
++    d->hideTimer->start(250);
++}
++
++void ToolTipManager::hideToolTip(QGraphicsWidget *widget)
++{
++    ToolTip *tooltip = d->tooltips.value(widget);
++    if (tooltip) {
++        d->showTimer->stop();  // stop the timer to show the tooltip
++        d->delayedHide = false;
++        d->currentWidget = 0;
++        tooltip->hide();
++    }
++}
++
++void ToolTipManager::registerWidget(QGraphicsWidget *widget)
++{
++    if (!d->tooltips.contains(widget)) {
++        //the tooltip is not registered we add it in our map of tooltips
++        d->tooltips.insert(widget, 0);
++        widget->installEventFilter(this);
++        //connect to object destruction
++        connect(widget, SIGNAL(destroyed(QObject *)),this,SLOT(onWidgetDestroyed(QObject *)));
++    }
++}
++
++void ToolTipManager::unregisterWidget(QGraphicsWidget *widget)
++{
++    if (!d->tooltips.contains(widget)) {
++        return;
++    }
++    widget->removeEventFilter(this);
++    ToolTip *tooltip = d->tooltips.take(widget);
++    if (tooltip) {
++        delete tooltip;
++    }
++}
++
++void ToolTipManager::setToolTipContent(QGraphicsWidget *widget, const ToolTipContent &data)
++{
++    if (!d->tooltips.contains(widget)) {
++        registerWidget(widget);
++    }
++
++    ToolTip *tooltip = d->tooltips.value(widget);
++
++    if (data.isEmpty()) {
++        delete tooltip;
++        d->tooltips.insert(widget, 0);
++        return;
++    }
++
++    if (!tooltip) {
++        tooltip = new ToolTip(widget);
++        d->tooltips.insert(widget, tooltip);
++    }
++
++    tooltip->setContent(data);
++    tooltip->updateTheme();
++}
++
++bool ToolTipManager::widgetHasToolTip(QGraphicsWidget *widget) const
++{
++    return d->tooltips.contains(widget);
++}
++
++void ToolTipManagerPrivate::themeUpdated()
++{
++    QMapIterator<QGraphicsWidget*, ToolTip *> iterator(tooltips);
++    while (iterator.hasNext()) {
++        iterator.next();
++        iterator.value()->updateTheme();
++    }
++}
++
++void ToolTipManagerPrivate::onWidgetDestroyed(QObject *object)
++{
++    if (!object) {
++        return;
++    }
++
++    // we do a static_cast here since it really isn't a QGraphicsWidget by this
++    // point anymore since we are in the QObject dtor. we don't actually
++    // try and do anything with it, we just need the value of the pointer
++    // so this unsafe looking code is actually just fine.
++    //
++    // NOTE: DO NOT USE THE w VARIABLE FOR ANYTHING OTHER THAN COMPARING
++    //       THE ADDRESS! ACTUALLY USING THE OBJECT WILL RESULT IN A CRASH!!!
++    QGraphicsWidget *w = static_cast<QGraphicsWidget*>(object);
++
++    if (currentWidget == w) {
++        currentWidget = 0;
++        showTimer->stop();  // stop the timer to show the tooltip
++        delayedHide = false;
++    }
++
++    QMapIterator<QGraphicsWidget*, ToolTip *> iterator(tooltips);
++    while (iterator.hasNext()) {
++        iterator.next();
++        if (iterator.key() == w) {
++            ToolTip *tooltip = iterator.value();
++            tooltips.remove(iterator.key());
++            if (tooltip) {
++                tooltip->hide();
++                delete tooltip;
++            }
++        }
++    }
++}
++
++void ToolTipManagerPrivate::resetShownState()
++{
++    if (currentWidget) {
++        ToolTip * tooltip = tooltips.value(currentWidget);
++        if (tooltip && (!tooltip->isVisible() || delayedHide)) {
++            //One might have moused out and back in again
++            delayedHide = false;
++            isShown = false;
++            tooltip->hide();
++            currentWidget = 0;
++      }
++    }
++}
++
++void ToolTipManagerPrivate::showToolTip()
++{
++    if (!currentWidget) {
++        return;
++    }
++
++    ToolTip *tooltip = tooltips.value(currentWidget);
++    if (tooltip) {
++        tooltip->prepareShowing();
++        tooltip->move(popupPosition(currentWidget, tooltip->size()));
++        isShown = true;  //ToolTip is visible
++    }
++}
++
++bool ToolTipManager::eventFilter(QObject *watched, QEvent *event)
++{
++    QGraphicsWidget * widget = dynamic_cast<QGraphicsWidget *>(watched);
++    if (!widget) { 
++      return QObject::eventFilter(watched,event);
++    }
++
++    switch (event->type()) {
++        case QEvent::GraphicsSceneHoverMove:
++            // If the tooltip isn't visible, run through showing the tooltip again
++            // so that it only becomes visible after a stationary hover
++            if (Plasma::ToolTipManager::self()->isWidgetToolTipDisplayed(widget)) {
++                break;
++            }
++
++        case QEvent::GraphicsSceneHoverEnter:
++        {
++            // Check that there is a tooltip to show
++            if (!widgetHasToolTip(widget)) {
++                break;
++            }
++
++            // If the mouse is in the widget's area at the time that it is being
++            // created the widget can receive a hover event before it is fully
++            // initialized, in which case view() will return 0.
++            QGraphicsView *parentView = viewFor(widget);
++            if (parentView) {
++                showToolTip(widget);
++            }
++
++            break;
++        }
++
++        case QEvent::GraphicsSceneHoverLeave:
++            delayedHideToolTip();
++            break;
++
++        case QEvent::GraphicsSceneMousePress:
++        case QEvent::GraphicsSceneWheel:
++            hideToolTip(widget);
++
++        default:
++            break;
++    }
++
++    return QObject::eventFilter(watched,event);
++}
++
++} // Plasma namespace
++
++#include "tooltipmanager.moc"
++
+diff -Nur kdebase-workspace-4.0.99/libs/plasma/tooltipmanager.h kdebase-workspace-4.0.99-plasma-tooltips/libs/plasma/tooltipmanager.h
+--- kdebase-workspace-4.0.99/libs/plasma/tooltipmanager.h	1970-01-01 01:00:00.000000000 +0100
++++ kdebase-workspace-4.0.99-plasma-tooltips/libs/plasma/tooltipmanager.h	2008-07-19 17:35:20.000000000 +0200
+@@ -0,0 +1,151 @@
++/***************************************************************************
++ *   Copyright 2008 by Alexis Ménard <darktears31@gmail.com>               *
++ *   Copyright 2008 by Aaron Seigo <aseigo@kde.org>                        *
++ *   Copyright 2007 by Dan Meltzer <hydrogen@notyetimplemented.com>        *
++ *                                                                         *
++ *   This program is free software; you can redistribute it and/or modify  *
++ *   it under the terms of the GNU General Public License as published by  *
++ *   the Free Software Foundation; either version 2 of the License, or     *
++ *   (at your option) any later version.                                   *
++ *                                                                         *
++ *   This program is distributed in the hope that it will be useful,       *
++ *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
++ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
++ *   GNU General Public License for more details.                          *
++ *                                                                         *
++ *   You should have received a copy of the GNU General Public License     *
++ *   along with this program; if not, write to the                         *
++ *   Free Software Foundation, Inc.,                                       *
++ *   51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA .        *
++ ***************************************************************************/
++
++#ifndef PLASMA_TOOLTIP_MANAGER_H
++#define PLASMA_TOOLTIP_MANAGER_H
++
++//plasma
++#include <plasma/plasma.h>
++#include <plasma/plasma_export.h>
++
++namespace Plasma
++{
++
++class ToolTipManagerPrivate;
++class Applet;
++
++  /**
++  * @short The class to manage tooltips on QGraphicsWidget in Plasma
++  *
++  * Manage tooltips on QGraphicsWidget. First you have to register your widget by calling
++  * registerWidget on the ToolTipManager singleton. After this you have to set the content of
++  * the tooltip by calling setToolTipContent using the struct ToolTipContent. Calling
++  * setToolTipContent on a widget that is not registered will cause it to be registered.
++  *
++  * The tooltip manager unregister automatically the widget when it is destroyed but if 
++  * you want to do it manually call unregisterWidget. 
++  *
++  * When a tooltip for a widget is about to be shown, the widget's toolTipAboutToShow slot will be
++  * invoked if it exists. Similarly, when a tooltip is hidden, the widget's toolTipHidden() slow
++  * will be invoked if it exists. This allows widgets to provide on-demand tooltip data.
++  */
++
++class PLASMA_EXPORT ToolTipManager  : public QObject
++{
++      Q_OBJECT
++  public:
++
++     /**
++      * Content of a tooltip
++      */
++      struct PLASMA_EXPORT ToolTipContent
++      {
++          ToolTipContent();
++          bool isEmpty() const;
++
++          QString mainText; /**Important information, e.g. the title*/
++          QString subText; /** Elaborates on the Main Text */
++          QPixmap image; /** Icon to show */
++          WId windowToPreview; /** Id of a window if you want to show a preview */
++      };
++
++      /**
++        *
++        * @return The singleton instance of the manager.
++        **/
++      static ToolTipManager *self();
++      
++      /**
++        * Default constructor. Usually you want to use the singleton instead.
++        */
++      explicit ToolTipManager(QObject* parent = 0);
++
++      /**
++        * Default destructor.
++        */
++      ~ToolTipManager();
++
++      /**
++      * Function to show a tooltip of a widget registered in the tooltip manager
++      * @param widget the widget on which the tooltip will be displayed
++      */
++      void showToolTip(QGraphicsWidget *widget);
++
++      /**
++      * Function to know if a tooltip of a widget is displayed
++      * @param widget the desired widget
++      * @return true if te tooltip of the widget is currently displayed, otherwhise no
++      */
++      bool isWidgetToolTipDisplayed(QGraphicsWidget *widget);
++
++      /**
++      * Function to launch a delayed hide of the current displayed tooltip
++      * @param widget the desired widget
++      */
++      void delayedHideToolTip();
++
++      /**
++      * Function to hide the tooltip of the desired widget
++      * @param widget the desired widget
++      */
++      void hideToolTip(QGraphicsWidget *widget);
++
++      /**
++      * Function to register a widget to the tooltip manager, after this a setWidgetToolTipContent
++      * must be called
++      * @param widget the desired widget
++      */
++      void registerWidget(QGraphicsWidget *widget);
++
++      /**
++      * Function to unregister a widget in the tooltip manager, i.e. means that memory will be free
++      * @param widget the desired widget to delete
++      */
++      void unregisterWidget(QGraphicsWidget *widget);
++
++      /**
++       * Function to set the content of a tooltip on a desired widget.
++       * 
++       * @param widget the desired widget
++       * @param data the content of the tooltip. If an empty ToolTipContent is passed in,
++       *        the tooltip content will be reset.
++       */
++      void setToolTipContent(QGraphicsWidget *widget, const ToolTipContent &data);
++
++      /**
++      * Function to know if widget has a tooltip registered in the tooltip manager
++      * @param widget the widget
++      * @return true if this widget has a tooltip
++      */
++      bool widgetHasToolTip(QGraphicsWidget *widget) const;
++
++  private:
++      friend class ToolTipManagerSingleton;
++      bool eventFilter(QObject * watched, QEvent * event);
++
++      ToolTipManagerPrivate* const d;
++      Q_PRIVATE_SLOT(d, void showToolTip())
++      Q_PRIVATE_SLOT(d, void resetShownState())
++      Q_PRIVATE_SLOT(d, void onWidgetDestroyed(QObject*))
++      Q_PRIVATE_SLOT(d, void themeUpdated())
++  };
++}
++#endif
+diff -Nur kdebase-workspace-4.0.99/libs/plasma/tooltip_p.h kdebase-workspace-4.0.99-plasma-tooltips/libs/plasma/tooltip_p.h
+--- kdebase-workspace-4.0.99/libs/plasma/tooltip_p.h	1970-01-01 01:00:00.000000000 +0100
++++ kdebase-workspace-4.0.99-plasma-tooltips/libs/plasma/tooltip_p.h	2008-07-19 17:34:22.000000000 +0200
+@@ -0,0 +1,79 @@
++/*
++ *   Copyright 2007 by Dan Meltzer <hydrogen@notyetimplemented.com>
++ *   Copyright (C) 2008 by Alexis Ménard <darktears31@gmail.com>
++ *
++ *   This program is free software; you can redistribute it and/or modify
++ *   it under the terms of the GNU Library General Public License as
++ *   published by the Free Software Foundation; either version 2, or
++ *   (at your option) any later version.
++
++ *
++ *   This program is distributed in the hope that it will be useful,
++ *   but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *   GNU General Public License for more details
++ *
++ *   You should have received a copy of the GNU Library General Public
++ *   License along with this program; if not, write to the
++ *   Free Software Foundation, Inc.,
++ *   51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
++ */
++
++#ifndef PLASMA_TOOLTIP_P_H
++#define PLASMA_TOOLTIP_P_H
++
++#include <QWidget>  // base class
++#include <QPixmap> // stack allocated
++#include <QPoint>  // stack allocated
++#include <QString> // stack allocated
++#include <QGraphicsWidget>
++
++#include <plasma/tooltipmanager.h> //ToolTipContent struct
++
++namespace Plasma {
++
++    class ToolTipPrivate;
++
++class ToolTip : public QWidget
++{
++    Q_OBJECT
++public:
++    ToolTip(QObject *source);
++    ~ToolTip();
++    void updateTheme();
++    void setContent(const ToolTipManager::ToolTipContent &data);
++    void prepareShowing();
++
++protected:
++    void showEvent(QShowEvent *);
++    void hideEvent(QHideEvent *);
++    void mouseReleaseEvent(QMouseEvent *);
++
++    void resizeEvent(QResizeEvent *);
++    void paintEvent(QPaintEvent *);
++
++private Q_SLOTS:
++    void sourceDestroyed();
++
++private:
++    ToolTipPrivate *const d;
++};
++
++class WindowPreview : public QWidget
++{
++    Q_OBJECT
++public:
++    void setWindowId(WId w);
++    void setInfo();
++    virtual QSize sizeHint() const;
++    bool previewsAvailable() const;
++private:
++    void readWindowSize() const;
++    WId id;
++    mutable QSize windowSize;
++};
++
++}
++
++#endif
++
+diff -Nur kdebase-workspace-4.0.99/libs/plasma/widgets/tooltip.cpp kdebase-workspace-4.0.99-plasma-tooltips/libs/plasma/widgets/tooltip.cpp
+--- kdebase-workspace-4.0.99/libs/plasma/widgets/tooltip.cpp	2008-07-03 07:05:35.000000000 +0200
++++ kdebase-workspace-4.0.99-plasma-tooltips/libs/plasma/widgets/tooltip.cpp	2008-07-19 17:33:19.000000000 +0200
+@@ -1,380 +0,0 @@
+-/*
+- *   Copyright 2007 by Dan Meltzer <hydrogen@notyetimplemented.com>
+- *
+- *   This program is free software; you can redistribute it and/or modify
+- *   it under the terms of the GNU Library General Public License as
+- *   published by the Free Software Foundation; either version 2, or
+- *   (at your option) any later version.
+-
+- *
+- *   This program is distributed in the hope that it will be useful,
+- *   but WITHOUT ANY WARRANTY; without even the implied warranty of
+- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- *   GNU General Public License for more details
+- *
+- *   You should have received a copy of the GNU Library General Public
+- *   License along with this program; if not, write to the
+- *   Free Software Foundation, Inc.,
+- *   51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+- */
+-#include "tooltip_p.h"
+-
+-#include <QBitmap>
+-#include <QHBoxLayout>
+-#include <QLabel>
+-#include <QMouseEvent>
+-#include <QPixmap>
+-#include <QTimer>
+-#include <QGraphicsView>
+-#ifdef Q_WS_X11
+-#include <QX11Info>
+-#endif
+-
+-#include <KDebug>
+-#include <KGlobal>
+-#include <KWindowSystem>
+-#include <plasma/theme.h>
+-#include <plasma/panelsvg.h>
+-
+-#ifdef Q_WS_X11
+-#include <X11/Xlib.h>
+-#include <fixx11h.h>
+-#endif
+-
+-#include "plasma/plasma.h"
+-
+-namespace Plasma {
+-
+-class ToolTipPrivate
+-{
+-    public:
+-        ToolTipPrivate()
+-        : label(0)
+-        , imageLabel(0)
+-        , preview(0)
+-        , windowToPreview(0)
+-        , currentWidget(0)
+-        , isShown(false)
+-        , delayedHide(false)
+-        , showTimer(0)
+-        , hideTimer(0)
+-    { }
+-
+-    QLabel *label;
+-    QLabel *imageLabel;
+-    WindowPreview *preview;
+-    WId windowToPreview;
+-    Plasma::Widget *currentWidget;
+-    bool isShown;
+-    bool delayedHide;
+-    QTimer *showTimer;
+-    QTimer *hideTimer;
+-
+-    PanelSvg *background;
+-
+-};
+-
+-class ToolTipSingleton
+-{
+-    public:
+-        ToolTip self;
+-};
+-K_GLOBAL_STATIC( ToolTipSingleton, privateInstance )
+-
+-ToolTip *ToolTip::self()
+-{
+-    return &privateInstance->self;
+-}
+-
+-void ToolTip::show(Plasma::Widget *widget)
+-{
+-    d->hideTimer->stop();
+-    d->delayedHide = false;
+-    if (d->isShown && d->currentWidget) {
+-        // we let know widget which had tooltip up to now that it's tooltip
+-        // is not longer displayed
+-        d->currentWidget->updateToolTip(false);
+-    }
+-    d->currentWidget = widget;
+-    d->showTimer->stop();
+-
+-    if (d->isShown) {
+-        // small delay to prevent unnecessary showing when the mouse is moving quickly across items
+-        // which can be too much for less powerful CPUs to keep up with
+-        d->showTimer->start(200);
+-    } else {
+-        d->showTimer->start(500);
+-    }
+-}
+-
+-void ToolTip::delayedHide()
+-{
+-    d->showTimer->stop();  // stop the timer to show the tooltip
+-    d->delayedHide = true;
+-    d->hideTimer->start(250);
+-}
+-
+-void ToolTip::hide()
+-{
+-    d->currentWidget = 0;
+-    d->showTimer->stop();  //Mouse out, stop the timer to show the tooltip
+-    d->delayedHide = false;
+-    setVisible(false);
+-    d->hideTimer->start(250);  //250 ms delay before we are officially "gone" to allow for the time to move between widgets
+-}
+-
+-Plasma::Widget *ToolTip::currentWidget() const
+-{
+-    return d->currentWidget;
+-}
+-
+-//PRIVATE FUNCTIONS
+-void ToolTip::showToolTip()
+-{
+-    if (!d->currentWidget || !d->currentWidget->toolTip()) {
+-        return;
+-    }
+-
+-    QGraphicsView *v = d->currentWidget->view();
+-    if (v && v->mouseGrabber()) {
+-        return;
+-    }
+-
+-    d->currentWidget->updateToolTip(true);
+-    setData(*d->currentWidget->toolTip());
+-
+-    if( d->windowToPreview != 0 ) {
+-        // show/hide the preview area
+-        d->preview->show();
+-    } else {
+-        d->preview->hide();
+-    }
+-    layout()->activate();
+-
+-    resize(sizeHint());
+-    move(d->currentWidget->popupPosition(size()));
+-
+-    if (isVisible()) {
+-        d->preview->setInfo();
+-    } else {
+-        setVisible(true);
+-    }
+-
+-    d->isShown = true;  //ToolTip is visible
+-}
+-
+-void ToolTip::resetShownState()
+-{
+-    if (!isVisible() || //One might have moused out and back in again
+-        d->delayedHide) {
+-        d->delayedHide = false;
+-        d->isShown = false;
+-        setVisible(false);
+-        if (d->currentWidget) {
+-            d->currentWidget->updateToolTip(false);
+-        }
+-        d->currentWidget = 0;
+-    }
+-}
+-
+-void ToolTip::showEvent(QShowEvent *e)
+-{
+-    QWidget::showEvent(e);
+-    d->preview->setInfo();
+-}
+-
+-void ToolTip::mouseReleaseEvent(QMouseEvent* event)
+-{
+-    if (rect().contains(event->pos())) {
+-        hide();
+-    }
+-}
+-
+-ToolTip::ToolTip()
+-    : QWidget(0)
+-    , d( new ToolTipPrivate )
+-{
+-    setWindowFlags(Qt::ToolTip);
+-    QGridLayout *l = new QGridLayout;
+-    d->preview = new WindowPreview;
+-    d->label = new QLabel;
+-    d->label->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
+-    d->label->setWordWrap(true);
+-    d->imageLabel = new QLabel;
+-    d->imageLabel->setAlignment(Qt::AlignTop | Qt::AlignLeft);
+-
+-    d->background = new PanelSvg("widgets/tooltip", this);
+-    d->background->setBorderFlags(PanelSvg::DrawAllBorders);
+-
+-    connect(d->background, SIGNAL(repaintNeeded()), this, SLOT(update()));
+-
+-    l->addWidget(d->preview, 0, 0, 1, 2);
+-    l->addWidget(d->imageLabel, 1, 0);
+-    l->addWidget(d->label, 1, 1);
+-    setLayout(l);
+-
+-    d->showTimer = new QTimer(this);
+-    d->showTimer->setSingleShot(true);
+-    d->hideTimer = new QTimer(this);
+-    d->hideTimer->setSingleShot(true);
+-
+-    connect(d->showTimer, SIGNAL(timeout()), SLOT(showToolTip()));
+-    connect(d->hideTimer, SIGNAL(timeout()), SLOT(resetShownState()));
+-
+-    connect(Plasma::Theme::self(), SIGNAL(themeChanged()), this, SLOT(themeUpdated()));
+-    themeUpdated();
+-}
+-
+-ToolTip::~ToolTip()
+-{
+-    delete d;
+-}
+-
+-void ToolTip::setData(Plasma::Widget *widget, const Plasma::ToolTipData &data)
+-{
+-    if (d->currentWidget && d->currentWidget == widget) {
+-        setData(data);
+-    }
+-}
+-
+-void ToolTip::setData(const Plasma::ToolTipData &data)
+-{
+-    //reset our size
+-    d->label->setText("<qt><b>" + data.mainText + "</b><br>" + data.subText + "</qt>");
+-    d->imageLabel->setPixmap(data.image);
+-    d->windowToPreview = data.windowToPreview;
+-    d->preview->setWindowId( d->windowToPreview );
+-
+-    if (isVisible()) {
+-        resize(sizeHint());
+-
+-        if (d->currentWidget) {
+-            move(d->currentWidget->popupPosition(size()));
+-        }
+-    }
+-}
+-
+-void ToolTip::themeUpdated()
+-{
+-    const int topHeight = d->background->marginSize(Plasma::TopMargin);
+-    const int leftWidth = d->background->marginSize(Plasma::LeftMargin);
+-    const int rightWidth = d->background->marginSize(Plasma::RightMargin);
+-    const int bottomHeight = d->background->marginSize(Plasma::BottomMargin);
+-    setContentsMargins(leftWidth, topHeight, rightWidth, bottomHeight);
+-
+-    // Make the tooltip use Plasma's colorscheme
+-    QPalette plasmaPalette = QPalette();
+-    plasmaPalette.setColor(QPalette::Window, Plasma::Theme::self()->backgroundColor());
+-    plasmaPalette.setColor(QPalette::WindowText, Plasma::Theme::self()->textColor());
+-    setAutoFillBackground(true);
+-    setPalette(plasmaPalette);
+-}
+-
+-// A widget which reserves area for window preview and sets hints on the toplevel
+-// tooltip widget that tells KWin to render the preview in this area. This depends
+-// on KWin's TaskbarThumbnail compositing effect (which is here detected).
+-
+-void WindowPreview::setWindowId(WId w)
+-{
+-    if (!previewsAvailable()) {
+-        id = 0;
+-        return;
+-    }
+-    id = w;
+-    readWindowSize();
+-}
+-
+-bool WindowPreview::previewsAvailable() const
+-{
+-    if (!KWindowSystem::compositingActive()) {
+-        return false;
+-    }
+-#ifdef Q_WS_X11
+-    // hackish way to find out if KWin has the effect enabled,
+-    // TODO provide proper support
+-    Display* dpy = QX11Info::display();
+-    Atom atom = XInternAtom(dpy, "_KDE_WINDOW_PREVIEW", False);
+-    int cnt;
+-    Atom* list = XListProperties(dpy, DefaultRootWindow( dpy ), &cnt);
+-    if (list != NULL) {
+-        bool ret = ( qFind(list, list + cnt, atom) != list + cnt );
+-        XFree(list);
+-        return ret;
+-    }
+-#endif
+-    return false;
+-}
+-
+-QSize WindowPreview::sizeHint() const
+-{
+-    if (id == 0) {
+-        return QSize();
+-    }
+-    if (!windowSize.isValid()) {
+-        readWindowSize();
+-    }
+-    QSize s = windowSize;
+-    s.scale(200, 150, Qt::KeepAspectRatio);
+-    return s;
+-}
+-
+-void WindowPreview::readWindowSize() const
+-{
+-#ifdef Q_WS_X11
+-    Window r;
+-    int x, y;
+-    unsigned int w, h, b, d;
+-    if (XGetGeometry(QX11Info::display(), id, &r, &x, &y, &w, &h, &b, &d)) {
+-        windowSize = QSize( w, h );
+-    } else {
+-        windowSize = QSize();
+-    }
+-#else
+-    windowSize = QSize();
+-#endif
+-}
+-
+-void WindowPreview::setInfo()
+-{
+-#ifdef Q_WS_X11
+-    Display *dpy = QX11Info::display();
+-    Atom atom = XInternAtom(dpy, "_KDE_WINDOW_PREVIEW", False);
+-    if (id == 0) {
+-        XDeleteProperty(dpy, parentWidget()->winId(), atom);
+-        return;
+-    }
+-    if (!windowSize.isValid()) {
+-        readWindowSize();
+-    }
+-    if (!windowSize.isValid()) {
+-        XDeleteProperty(dpy, parentWidget()->winId(), atom);
+-        return;
+-    }
+-    Q_ASSERT( parentWidget()->isWindow()); // parent must be toplevel
+-    long data[] = { 1, 5, id, x(), y(), width(), height() };
+-    XChangeProperty(dpy, parentWidget()->winId(), atom, atom, 32, PropModeReplace,
+-        reinterpret_cast< unsigned char* >( data ), sizeof( data ) / sizeof( data[ 0 ] ));
+-#endif
+-}
+-
+-void ToolTip::resizeEvent(QResizeEvent *e)
+-{
+-    QWidget::resizeEvent(e);
+-    d->background->resize(size());
+-
+-    setMask(d->background->mask());
+-}
+-
+-void ToolTip::paintEvent(QPaintEvent *e)
+-{
+-    QPainter painter(this);
+-    painter.setRenderHint(QPainter::Antialiasing);
+-    painter.setClipRect(e->rect());
+-    painter.setCompositionMode(QPainter::CompositionMode_Source );
+-    painter.fillRect(rect(), Qt::transparent);
+-
+-    d->background->paint(&painter, rect());
+-}
+-
+-}
+-#include "tooltip_p.moc"
+diff -Nur kdebase-workspace-4.0.99/libs/plasma/widgets/tooltip_p.h kdebase-workspace-4.0.99-plasma-tooltips/libs/plasma/widgets/tooltip_p.h
+--- kdebase-workspace-4.0.99/libs/plasma/widgets/tooltip_p.h	2008-07-03 07:05:35.000000000 +0200
++++ kdebase-workspace-4.0.99-plasma-tooltips/libs/plasma/widgets/tooltip_p.h	2008-07-19 17:33:19.000000000 +0200
+@@ -1,91 +0,0 @@
+-/*
+- *   Copyright 2007 by Dan Meltzer <hydrogen@notyetimplemented.com>
+- *
+- *   This program is free software; you can redistribute it and/or modify
+- *   it under the terms of the GNU Library General Public License as
+- *   published by the Free Software Foundation; either version 2, or
+- *   (at your option) any later version.
+-
+- *
+- *   This program is distributed in the hope that it will be useful,
+- *   but WITHOUT ANY WARRANTY; without even the implied warranty of
+- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- *   GNU General Public License for more details
+- *
+- *   You should have received a copy of the GNU Library General Public
+- *   License along with this program; if not, write to the
+- *   Free Software Foundation, Inc.,
+- *   51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+- */
+-
+-#ifndef PLASMA_TOOLTIP_P_H
+-#define PLASMA_TOOLTIP_P_H
+-
+-#include <plasma/widgets/widget.h> //ToolTipData struct
+-
+-#include <QWidget>  // base class
+-#include <QPixmap> // stack allocated
+-#include <QPoint>  // stack allocated
+-#include <QString> // stack allocated
+-
+-namespace Plasma {
+-
+-    class ToolTipData;
+-    class ToolTipPrivate;
+-
+-/**
+-    @author Dan Meltzer
+-*   A Singleton tooltip.  Before calling show it is necessary to
+-*   call setLocation and setData
+-*/
+-class ToolTip : public QWidget
+-{
+-    Q_OBJECT
+-public:
+-    ToolTip();
+-    ~ToolTip();
+-
+-    static ToolTip *self();
+-    void show(Plasma::Widget *widget);
+-    void delayedHide();
+-    void hide();
+-
+-    Plasma::Widget *currentWidget() const;
+-    void setData(Plasma::Widget *widget, const Plasma::ToolTipData &data);
+-
+-protected:
+-    void showEvent(QShowEvent *);
+-    void mouseReleaseEvent(QMouseEvent *);
+-
+-    void resizeEvent(QResizeEvent *);
+-    void paintEvent(QPaintEvent *);
+-
+-private Q_SLOTS:
+-    void resetShownState();
+-    void showToolTip();
+-    void themeUpdated();
+-
+-private:
+-    void setData(const Plasma::ToolTipData &data);
+-
+-    ToolTipPrivate *const d;
+-};
+-
+-class WindowPreview : public QWidget
+-{
+-    Q_OBJECT
+-public:
+-    void setWindowId(WId w);
+-    void setInfo();
+-    virtual QSize sizeHint() const;
+-    bool previewsAvailable() const;
+-private:
+-    void readWindowSize() const;
+-    WId id;
+-    mutable QSize windowSize;
+-};
+-
+-}
+-
+-#endif
+-
+diff -Nur kdebase-workspace-4.0.99/libs/plasma/widgets/widget.cpp kdebase-workspace-4.0.99-plasma-tooltips/libs/plasma/widgets/widget.cpp
+--- kdebase-workspace-4.0.99/libs/plasma/widgets/widget.cpp	2008-07-03 07:05:35.000000000 +0200
++++ kdebase-workspace-4.0.99-plasma-tooltips/libs/plasma/widgets/widget.cpp	2008-07-19 17:33:19.000000000 +0200
+@@ -1,177 +0,0 @@
+-/*
+- *   Copyright 2007 by Alexander Wiedenbruch <mail@wiedenbruch.de>
+- *                      and Matias Valdenegro <mvaldenegro@informatica.utem.cl>
+- *
+- *   This program is free software; you can redistribute it and/or modify
+- *   it under the terms of the GNU Library General Public License as
+- *   published by the Free Software Foundation; either version 2, or
+- *   (at your option) any later version.
+- *
+- *   This program is distributed in the hope that it will be useful,
+- *   but WITHOUT ANY WARRANTY; without even the implied warranty of
+- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- *   GNU General Public License for more details
+- *
+- *   You should have received a copy of the GNU Library General Public
+- *   License along with this program; if not, write to the
+- *   Free Software Foundation, Inc.,
+- *   51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+- */
+-
+-
+-#include "widget.h"
+-
+-#include <cmath>
+-#include <limits>
+-
+-#include <QApplication>
+-#include <QGraphicsScene>
+-#include <QGraphicsSceneHoverEvent>
+-#include <QGraphicsView>
+-#include <QHelpEvent>
+-#include <QList>
+-#include <QPainter>
+-#include <QStyleOptionGraphicsItem>
+-#include <QGraphicsLayout>
+-#include <QGraphicsLinearLayout>
+-
+-#include <KDebug>
+-
+-#include "plasma/applet.h"
+-
+-#include "plasma/plasma.h"
+-#include "plasma/view.h"
+-#include "plasma/containment.h"
+-
+-namespace Plasma
+-{
+-
+-class WidgetPrivate
+-{
+-    public:
+-        WidgetPrivate()
+-            : minimumSize(0,0),
+-              maximumSize(std::numeric_limits<qreal>::infinity(),
+-                          std::numeric_limits<qreal>::infinity()),
+-              wasMovable(false)
+-              //toolTip(0)
+-        { }
+-
+-        ~WidgetPrivate()
+-        {
+-            //delete toolTip;
+-        }
+-
+-        QSizeF minimumSize;
+-        QSizeF maximumSize;
+-
+-        bool wasMovable;
+-
+-        bool shouldPaint(QPainter *painter, const QTransform &transform);
+-        //ToolTipData *toolTip;
+-};
+-
+-bool WidgetPrivate::shouldPaint(QPainter *painter, const QTransform &transform)
+-{
+-    Q_UNUSED(painter)
+-    Q_UNUSED(transform)
+-    //qreal zoomLevel = painter->transform().m11() / transform.m11();
+-    //return (fabs(zoomLevel - scalingFactor(Plasma::DesktopZoom))) < std::numeric_limits<double>::epsilon();
+-    return true;
+-}
+-
+-Widget::Widget(QGraphicsItem *parent, QObject* parentObject)
+-  : QGraphicsWidget(parent),
+-    d(new WidgetPrivate)
+-{
+-    setFlag(QGraphicsItem::ItemClipsToShape, true);
+-    setFlag(QGraphicsItem::ItemClipsChildrenToShape, true);
+-}
+-
+-Widget::~Widget()
+-{
+-    #ifdef TOOLTIPMANAGER
+-    if (ToolTip::self()->currentWidget() == this) {
+-        ToolTip::self()->hide();
+-    }
+-    #endif
+-    delete d;
+-}
+-
+-
+-#ifdef TOOLTIPMANAGER
+-const ToolTipData* Widget::toolTip() const
+-{
+-    return d->toolTip;
+-}
+-
+-void Widget::setToolTip(const ToolTipData &tip)
+-{
+-    if (tip.image.isNull() &&
+-        tip.subText.isEmpty() &&
+-        tip.mainText.isEmpty()) {
+-        delete d->toolTip;
+-        d->toolTip = 0;
+-        return;
+-    }
+-
+-    if (!d->toolTip) {
+-        d->toolTip = new ToolTipData;
+-    }
+-
+-    *d->toolTip = tip;
+-
+-    // this does a check to ensure the current widget is us
+-    ToolTip::self()->setData(this, *d->toolTip);
+-}
+-
+-void Widget::updateToolTip(bool update)
+-{
+-    Q_UNUSED(update)
+-}
+-
+-bool Widget::sceneEvent(QEvent *event)
+-{
+-    switch (event->type()) {
+-    case QEvent::GraphicsSceneHoverMove:
+-        // If the tooltip isn't visible, run through showing the tooltip again
+-        // so that it only becomes visible after a stationary hover
+-        if (ToolTip::self()->isVisible()) {
+-            break;
+-        }
+-
+-    case QEvent::GraphicsSceneHoverEnter:
+-    {
+-        // Check that there is a tooltip to show
+-        if (!d->toolTip) {
+-            break;
+-        }
+-
+-        // If the mouse is in the widget's area at the time that it is being
+-        // created the widget can receive a hover event before it is fully
+-        // initialized, in which case view() will return 0.
+-        QGraphicsView *parentView = view();
+-        if (parentView) {
+-            ToolTip::self()->show(this);
+-        }
+-
+-        break;
+-    }
+-
+-    case QEvent::GraphicsSceneHoverLeave:
+-        ToolTip::self()->delayedHide();
+-        break;
+-
+-    case QEvent::GraphicsSceneMousePress:
+-    case QEvent::GraphicsSceneWheel:
+-        ToolTip::self()->hide();
+-
+-    default:
+-        break;
+-    }
+-
+-    return QGraphicsItem::sceneEvent(event);
+-}
+-#endif
+-} // Plasma namespace
+-
+diff -Nur kdebase-workspace-4.0.99/libs/plasma/widgets/widget.h kdebase-workspace-4.0.99-plasma-tooltips/libs/plasma/widgets/widget.h
+--- kdebase-workspace-4.0.99/libs/plasma/widgets/widget.h	2008-07-03 07:05:35.000000000 +0200
++++ kdebase-workspace-4.0.99-plasma-tooltips/libs/plasma/widgets/widget.h	2008-07-19 17:33:19.000000000 +0200
+@@ -1,117 +0,0 @@
+-/*
+- *   Copyright 2007 by Alexander Wiedenbruch <mail@wiedenbruch.de>
+- *                      and Matias Valdenegro <mvaldenegro@informatica.utem.cl>
+- *
+- *   This program is free software; you can redistribute it and/or modify
+- *   it under the terms of the GNU Library General Public License as
+- *   published by the Free Software Foundation; either version 2, or
+- *   (at your option) any later version.
+-
+- *
+- *   This program is distributed in the hope that it will be useful,
+- *   but WITHOUT ANY WARRANTY; without even the implied warranty of
+- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- *   GNU General Public License for more details
+- *
+- *   You should have received a copy of the GNU Library General Public
+- *   License along with this program; if not, write to the
+- *   Free Software Foundation, Inc.,
+- *   51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+- */
+-
+-#ifndef WIDGET_H_
+-#define WIDGET_H_
+-
+-#include <QtGui/QGraphicsWidget>
+-#include <QtGui/QPixmap>
+-
+-#include <QtCore/QRectF>
+-#include <QtCore/QSizeF>
+-#include <QtCore/QString>
+-
+-#include <plasma/plasma_export.h>
+-
+-class QGraphicsView;
+-class QGraphicsSceneHoverEvent;
+-
+-namespace Plasma
+-{
+-
+-struct PLASMA_EXPORT ToolTipData
+-{
+-    ToolTipData() : windowToPreview( 0 ) {}
+-    QString mainText; //Important information
+-    QString subText; //Elaborates on the Main Text
+-    QPixmap image; // Icon to show;
+-    WId windowToPreview; // Id of window to show preview
+-};
+-
+-class Layout;
+-class WidgetPrivate;
+-
+-/**
+- * Base class for all Widgets in Plasma.
+- *
+- * @author Alexander Wiedenbruch
+- * @author Matias Valdenegro
+- *
+- * Widgets are the basis for User Interfaces inside Plasma.
+- * Widgets are rectangular, but can be in any visible shape by just using transparency to mask
+- * out non-rectangular areas.
+- *
+- * To implement a Widget, just subclass Plasma::Widget and implement at minimum,
+- * sizeHint() and paintWidget()
+- */
+-class PLASMA_EXPORT Widget  : public QGraphicsWidget
+-{
+-    Q_OBJECT
+-public:
+-    /**
+-     * Creates a new Plasma::Widget.
+-     * @param parent the QGraphicsItem this icon is parented to.
+-     */
+-    explicit Widget(QGraphicsItem *parent = 0 , QObject *parentObject = 0);
+-
+-    /**
+-     * Destroys a Plasma::Widget.
+-     */
+-    virtual ~Widget();
+-
+-    
+-    #ifdef TOOLTIPMANAGER
+-    /**
+-    * The Data from the tooltip
+-    * @returns A ToolTip::Data object with current information
+-    */
+-    const ToolTipData* toolTip() const;
+-
+-    /**
+-    * Setter for data shown in tooltip
+-    * @param data a ToolTip::Data object containing icon and text
+-    */
+-    void setToolTip(const ToolTipData &dt);
+-
+-    /**
+-     * Called when the tooltip is going to be shown or just after hiding
+-     * it. This lets updating data right before a tooltip is shown or
+-     * tracking current visibility. That allows e.g. tips that are more
+-     * expensive to create ahead of time to be set at the last possible
+-     * moment.
+-     * @param update visibility of tooltip
+-     */
+-    virtual void updateToolTip(bool update);
+-
+-    #endif
+-
+-protected:
+-    #ifdef TOOLTIPMANAGER
+-       virtual bool sceneEvent(QEvent *event);
+-    #endif
+-private:
+-    
+-    WidgetPrivate *const d;
+-};
+-
+-} // Plasma namespace
+-
+-#endif
+diff -Nur kdebase-workspace-4.0.99/plasma/applets/digital-clock/clock.cpp kdebase-workspace-4.0.99-plasma-tooltips/plasma/applets/digital-clock/clock.cpp
+--- kdebase-workspace-4.0.99/plasma/applets/digital-clock/clock.cpp	2008-07-15 21:48:49.000000000 +0200
++++ kdebase-workspace-4.0.99-plasma-tooltips/plasma/applets/digital-clock/clock.cpp	2008-07-19 17:34:22.000000000 +0200
+@@ -43,6 +43,7 @@
+ #include <KDatePicker>
+ #include <plasma/theme.h>
+ #include <plasma/dialog.h>
++#include <plasma/tooltipmanager.h>
+ 
+ 
+ Clock::Clock(QObject *parent, const QVariantList &args)
+@@ -65,6 +66,8 @@
+ 
+ void Clock::init()
+ {
++    Plasma::ToolTipManager::self()->registerWidget(this);
++
+     KConfigGroup cg = config();
+     setCurrentTimezone(cg.readEntry("currentTimezone", localTimezone()));
+     m_timeZones = cg.readEntry("timeZones", QStringList());
+@@ -124,15 +127,13 @@
+     }
+ }
+ 
+-void Clock::updateToolTipContent() {
+-    //FIXME Port to future tooltip manager
+-    /*Plasma::ToolTipData tipData;
+-
++void Clock::updateToolTipContent() 
++{
++    Plasma::ToolTipManager::ToolTipContent tipData;
+     tipData.mainText = KGlobal::locale()->formatTime(m_time, m_showSeconds);
+     tipData.subText = m_date.toString();
+     tipData.image = m_toolTipIcon;
+-
+-    setToolTip(tipData);*/
++    Plasma::ToolTipManager::self()->setToolTipContent(this,tipData);
+ }
+ 
+ void Clock::dataUpdated(const QString &source, const Plasma::DataEngine::Data &data)
+diff -Nur kdebase-workspace-4.0.99/plasma/applets/icon/icon.cpp kdebase-workspace-4.0.99-plasma-tooltips/plasma/applets/icon/icon.cpp
+--- kdebase-workspace-4.0.99/plasma/applets/icon/icon.cpp	2008-07-09 13:03:50.000000000 +0200
++++ kdebase-workspace-4.0.99-plasma-tooltips/plasma/applets/icon/icon.cpp	2008-07-19 17:34:22.000000000 +0200
+@@ -44,6 +44,7 @@
+ #include <plasma/theme.h>
+ #include <plasma/widgets/icon.h>
+ #include <plasma/containment.h>
++#include <plasma/tooltipmanager.h>
+ 
+ IconApplet::IconApplet(QObject *parent, const QVariantList &args)
+     : Plasma::Applet(parent, args),
+@@ -66,6 +67,8 @@
+ 
+ void IconApplet::init()
+ {
++    Plasma::ToolTipManager::self()->registerWidget(this);
++
+     QGraphicsLinearLayout *layout = new QGraphicsLinearLayout(this);
+     layout->setContentsMargins(0, 0, 0, 0);
+     layout->setSpacing(0);
+@@ -157,12 +160,11 @@
+             //in the panel the icon behaves like a button
+             connect(m_icon, SIGNAL(clicked()), this, SLOT(openUrl()));
+             m_icon->setText(QString());
+-            //FIXME PORT TO TOOL TIP MANAGER
+-            /*Plasma::ToolTipData data;
++            Plasma::ToolTipManager::ToolTipContent data;
+             data.mainText = m_text;
+             data.subText = m_genericName;
+             data.image = m_icon->icon().pixmap(IconSize(KIconLoader::Desktop));
+-            m_icon->setToolTip(data);*/
++            Plasma::ToolTipManager::self()->setToolTipContent(this, data);
+             m_icon->setDrawBackground(false);
+         }
+     }
+diff -Nur kdebase-workspace-4.0.99/plasma/applets/tasks/windowtaskitem.cpp kdebase-workspace-4.0.99-plasma-tooltips/plasma/applets/tasks/windowtaskitem.cpp
+--- kdebase-workspace-4.0.99/plasma/applets/tasks/windowtaskitem.cpp	2008-07-15 21:48:49.000000000 +0200
++++ kdebase-workspace-4.0.99-plasma-tooltips/plasma/applets/tasks/windowtaskitem.cpp	2008-07-19 17:34:22.000000000 +0200
+@@ -41,6 +41,7 @@
+ #include "plasma/theme.h"
+ #include "plasma/paintutils.h"
+ #include "plasma/panelsvg.h"
++#include "plasma/tooltipmanager.h"
+ 
+ #include "tasks.h"
+ 
+@@ -61,12 +62,18 @@
+     setAcceptsHoverEvents(true);
+     setAcceptDrops(true);
+ 
++    Plasma::ToolTipManager::self()->registerWidget(this);
++
+     QFontMetrics fm(KGlobalSettings::taskbarFont());
+     QSize mSize = fm.size(0, "M");
+     setPreferredSize(QSize(mSize.width()*15 + m_applet->itemLeftMargin() + m_applet->itemRightMargin() + IconSize(KIconLoader::Panel),
+                            mSize.height()*3 + m_applet->itemTopMargin() + m_applet->itemBottomMargin()));
+ }
+ 
++WindowTaskItem::~WindowTaskItem()
++{
++}
++
+ void WindowTaskItem::activate()
+ {
+     // the Task class has a method called activateRaiseOrIconify() which
+@@ -552,19 +559,18 @@
+     taskIcon.addPixmap(m_task->icon(KIconLoader::SizeMedium, KIconLoader::SizeMedium, false));
+     taskIcon.addPixmap(m_task->icon(KIconLoader::SizeLarge, KIconLoader::SizeLarge, false));
+ 
+-#ifdef TOOLTIP_MANAGER
+     if (m_showTooltip) {
+-      Plasma::ToolTipData data;
++      Plasma::ToolTipManager::ToolTipContent data;
+       data.mainText = m_task->visibleName();
+       data.subText = i18nc("Which virtual desktop a window is currently on", "On %1", KWindowSystem::desktopName(m_task->desktop()));
+-      data.image = iconPixmap;
++      data.image = m_task->icon(KIconLoader::SizeSmall, KIconLoader::SizeSmall, false);
+       data.windowToPreview = m_task->window();
+-      setToolTip(data);
+-    } else {
+-        Plasma::ToolTipData data;
+-        setToolTip(data); // Clear
++
++      Plasma::ToolTipManager::self()->setToolTipContent(this,data);
++    }
++    else {
++      Plasma::ToolTipManager::self()->unregisterWidget(this);
+     }
+-#endif
+     setIcon(taskIcon);
+     setText(m_task->visibleName());
+     //redraw
+@@ -722,4 +728,5 @@
+                                      size, bounds.toRect());
+ }
+ 
++
+ #include "windowtaskitem.moc"
+diff -Nur kdebase-workspace-4.0.99/plasma/applets/tasks/windowtaskitem.h kdebase-workspace-4.0.99-plasma-tooltips/plasma/applets/tasks/windowtaskitem.h
+--- kdebase-workspace-4.0.99/plasma/applets/tasks/windowtaskitem.h	2008-06-18 14:41:39.000000000 +0200
++++ kdebase-workspace-4.0.99-plasma-tooltips/plasma/applets/tasks/windowtaskitem.h	2008-07-19 17:34:22.000000000 +0200
+@@ -57,6 +57,9 @@
+     /** Constructs a new representation for a window task. */
+     WindowTaskItem(Tasks *parent, const bool showTooltip);
+ 
++    /**Destruct the representation of the window task */
++    ~WindowTaskItem();
++
+     /** Sets the starting task represented by this item. */
+     void setStartupTask(TaskManager::StartupPtr task);
+ 
+diff -Nur kdebase-workspace-4.0.99/plasma/applets/trash/trash.cpp kdebase-workspace-4.0.99-plasma-tooltips/plasma/applets/trash/trash.cpp
+--- kdebase-workspace-4.0.99/plasma/applets/trash/trash.cpp	2008-07-15 21:48:49.000000000 +0200
++++ kdebase-workspace-4.0.99-plasma-tooltips/plasma/applets/trash/trash.cpp	2008-07-19 17:35:30.000000000 +0200
+@@ -45,6 +45,7 @@
+ //Plasma
+ #include <plasma/widgets/icon.h>
+ #include <plasma/containment.h>
++#include <plasma/tooltipmanager.h>
+ 
+ //Solid
+ #include <solid/devicenotifier.h>
+@@ -100,10 +101,6 @@
+ 
+     registerAsDragHandle(m_icon);
+ 
+-    //setMinimumSize(m_icon->sizeFromIconSize(IconSize(KIconLoader::Small)));
+-    //FIXME PORT TO TOOLTIP MANAGER
+-    //m_data.mainText = i18n("Trash");
+-
+     connect(m_icon, SIGNAL(activated()), this, SLOT(slotOpen()));
+     connect(&m_menu, SIGNAL(aboutToHide()),
+             m_icon, SLOT(setUnpressed()));
+@@ -201,17 +198,20 @@
+ 
+ void Trash::setIcon()
+ {
++    Plasma::ToolTipManager::ToolTipContent data;
++    data.mainText = i18n("Trash");
++
+     if (m_count > 0) {
+         m_icon->setIcon(KIcon("user-trash-full"));
+-	//FIXME PORT TO TOOLTIP MANAGER
+-        //m_data.subText = i18np("One item", "%1 items", m_count);
++
++        data.subText = i18np("One item", "%1 items", m_count);
+         if (m_showText) {
+             m_icon->setInfoText(i18np("One item", "%1 items", m_count));
+         }
+     } else {
+         m_icon->setIcon(KIcon("user-trash"));
+-        //FIXME PORT TO TOOLTIP MANAGER
+-	//m_data.subText = i18nc("The trash is empty. This is not an action, but a state", "Empty");
++
++        data.subText = i18nc("The trash is empty. This is not an action, but a state", "Empty");
+         if (m_showText){
+             m_icon->setInfoText(i18nc("The trash is empty. This is not an action, but a state", "Empty"));
+         }
+@@ -219,14 +219,13 @@
+ 
+     m_icon->update();
+     
+-    //FIXME TOOLTIP MANAGER
+-    /*m_data.image = m_icon->icon().pixmap(IconSize(KIconLoader::Desktop));
++    data.image = m_icon->icon().pixmap(IconSize(KIconLoader::Desktop));
+ 
+     if (!m_showText) {
+-        m_icon->setToolTip(m_data);
++        Plasma::ToolTipManager::self()->setToolTipContent(this, data);
+     } else {
+-        m_icon->setToolTip(Plasma::ToolTipData());
+-    }*/
++        Plasma::ToolTipManager::self()->setToolTipContent(this, Plasma::ToolTipManager::ToolTipContent());
++    }
+ 
+     emptyTrash->setEnabled(m_count>0);
+ }
+diff -Nur kdebase-workspace-4.0.99/plasma/applets/trash/trash.h kdebase-workspace-4.0.99-plasma-tooltips/plasma/applets/trash/trash.h
+--- kdebase-workspace-4.0.99/plasma/applets/trash/trash.h	2008-04-30 15:58:26.000000000 +0200
++++ kdebase-workspace-4.0.99-plasma-tooltips/plasma/applets/trash/trash.h	2008-07-19 17:35:30.000000000 +0200
+@@ -75,8 +75,6 @@
+         QAction *emptyTrash;
+         int m_count;
+         bool m_showText;
+-        //FIXME PORT TO TOOLTIP MANAGER
+-	//Plasma::ToolTipData m_data;
+         KFilePlacesModel *m_places;
+ };
+ 
+diff -Nur kdebase-workspace-4.0.99/plasma/design/tooltips kdebase-workspace-4.0.99-plasma-tooltips/plasma/design/tooltips
+--- kdebase-workspace-4.0.99/plasma/design/tooltips	1970-01-01 01:00:00.000000000 +0100
++++ kdebase-workspace-4.0.99-plasma-tooltips/plasma/design/tooltips	2008-07-19 17:34:22.000000000 +0200
+@@ -0,0 +1,39 @@
++Tooltips
++==========
++
++Overview
++--------
++libplasma provides facilities to manage tooltips that display extended information in a visually pleasing and consistent manner for QGraphicsWidgets. These tooltip windows are themed using Plasma::Theme.
++
++Timeline
++--------
++Introduced in: libplasma 2.1 (KDE 4.2.0)
++
++Component Type
++--------------
++ToolTipManager is a QObject subclass in libplasma.
++ToolTip is an internal QWidget subclass in libplasma.
++
++Registering Tooltips
++--------------------
++ToolTipManger is quite simple to use: simply call setWidgetToolTipContent using the struct ToolTipContent. This causes the widget to be registered if it isn't already. Alternatively, for widgets that fill the data on demand, call registerWidget directly.
++
++Widgets are unregistered automatically upon destruction, but can also be manually unregsitered by calling ToolTipMnager::unregisterWidget.
++
++An event filter is registered on each registered widget and hover events that occur trigger calls to showToolTip and hideToolTip. The hover events are not, however, filtered out. 
++
++Note: If another event filter is placed on registered widget that filters out these events, it may be necessary to manually call showToolTip and hideToolTip.
++
++ToolTip Updates
++---------------
++Updating tooltip data is supported by means of invoking slots on the associated widget if they exist. In particular, just prior to being shown the toolTipAboutToShow method is invoked and when hiding the toolTipHidden method is invoked.
++
++ToolTip Visualization
++---------------------
++The internal (non-exported) ToolTip class is used to actually display the tooltips. These are associated with widgets and created as necessary.
++
++ToolTip displays are only created when data is set, and are deleted if an empty ToolTipData struct is passed in. This keeps memory usage due to ToolTip objects down.
++
++Future Work
++-----------
++N/A

@@ -1,0 +1,50 @@
+# for vixie cron
+
+# Global variables
+SHELL=/bin/bash
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+MAILTO=root@pardus.org.tr
+HOME=/root
+
+# check scripts in cron.hourly, cron.daily, cron.weekly and cron.monthly
+*/15 * * * *	root	test -x /usr/sbin/run-crons && /usr/sbin/run-crons
+0  *  * * *	root	rm -f /var/spool/cron/lastrun/cron.hourly
+0  3  * * *	root	rm -f /var/spool/cron/lastrun/cron.daily
+15 4  * * 6	root	rm -f /var/spool/cron/lastrun/cron.weekly
+30 5  1 * *	root	rm -f /var/spool/cron/lastrun/cron.monthly
+
+#rdate
+59  0  * * *    root    rdate -s time.mit.edu
+
+# Bugzilla
+*/30 * * * * root /etc/cron.hourly/bugzilla
+
+# Bugzilla cron jobs
+55 0 * * * cd /var/www/bugzilla.pardus.org.tr/bugzilla; ./whineatnews.pl
+*/15 * * * * cd /var/www/bugzilla.pardus.org.tr/bugzilla; ./whine.pl
+5 0 * * * cd /var/www/bugzilla.pardus.org.tr/bugzilla; ./collectstats.pl
+
+# Bugzilla package owner sync
+30 3 * * *	root	/var/www/bugzilla.pardus.org.tr/scripts/bugzilla/package-owners/bzilla-paketler.sh > /tmp/bzilla.log
+
+# Bugzilla: close bugs marked as NEEDINFO
+30 6 * * *	root    /var/www/bugzilla.pardus.org.tr/scripts/bugzilla/close-outdated-needinfo-bugs.py > /dev/null
+
+# PISI Ismail
+*/15 * * * * root /etc/cron.hourly/ismail
+
+# web  pages
+#*/10  *  * * *  root    /var/www/pardus.org.tr/www-update
+#*/10  *  * * *  root    /var/www/security.pardus.org.tr/security-update
+#*/5  *  * * *  root    cd /home/chiq/www/chiq ; sudo -u chiq svn update > /dev/null
+#*/30  *  * * *  root    cd /home/chiq/pisi ; sudo -u chiq svn update > /dev/null
+#*/5  *  * * *  root    cd /home/chiq/www/eng/chiq ; sudo -u chiq svn update > /dev/null
+
+#backup
+30  1  * * *	root	/etc/pisi-backup.sh
+
+#planet
+0  *  * * *	root	/etc/cron.scripts/planet.cron
+
+#Monitor
+*/3  *  * * *  root    /etc/cron.scripts/monitor.sh

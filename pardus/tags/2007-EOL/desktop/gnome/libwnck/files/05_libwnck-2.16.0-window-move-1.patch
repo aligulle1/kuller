@@ -1,0 +1,96 @@
+diff -ruN libwnck-2.16.0-1/libwnck/window.c libwnck-2.16.0-2/libwnck/window.c
+--- libwnck-2.16.0-1/libwnck/window.c	2006-09-17 20:31:59.000000000 +1000
++++ libwnck-2.16.0-2/libwnck/window.c	2006-09-17 22:06:31.000000000 +1000
+@@ -1180,6 +1180,20 @@
+                        window->priv->xwindow);
+ }
+ 
++void
++wnck_window_move (WnckWindow *window, int x, int y)
++{
++  g_return_if_fail (WNCK_IS_WINDOW (window));
++
++  _wnck_move_resize (WNCK_SCREEN_XSCREEN (window->priv->screen),
++		     window->priv->xwindow,
++		     TRUE,
++		     FALSE,
++		     x, y,
++		     0, 0);
++}
++
++
+ /**
+  * wnck_window_get_workspace:
+  * @window: a #WnckWindow
+diff -ruN libwnck-2.16.0-1/libwnck/window.h libwnck-2.16.0-2/libwnck/window.h
+--- libwnck-2.16.0-1/libwnck/window.h	2006-09-17 20:31:59.000000000 +1000
++++ libwnck-2.16.0-2/libwnck/window.h	2006-09-17 22:06:31.000000000 +1000
+@@ -220,6 +220,7 @@
+ void wnck_window_unstick                 (WnckWindow *window);
+ void wnck_window_keyboard_move           (WnckWindow *window);
+ void wnck_window_keyboard_size           (WnckWindow *window);
++void wnck_window_move                    (WnckWindow *window, int x, int y);
+ 
+ WnckWorkspace* wnck_window_get_workspace     (WnckWindow    *window);
+ void           wnck_window_move_to_workspace (WnckWindow    *window,
+diff -ruN libwnck-2.16.0-1/libwnck/xutils.c libwnck-2.16.0-2/libwnck/xutils.c
+--- libwnck-2.16.0-1/libwnck/xutils.c	2006-09-17 20:31:59.000000000 +1000
++++ libwnck-2.16.0-2/libwnck/xutils.c	2006-09-17 22:06:31.000000000 +1000
+@@ -919,6 +919,38 @@
+ }
+ 
+ void
++_wnck_move_resize (Screen	*screen,
++		   Window	xwindow,
++		   gboolean	move,
++		   gboolean	resize,
++		   int		x,
++		   int		y,
++		   unsigned int width,
++		   unsigned int height)
++{
++  XEvent xev;
++  
++  xev.xclient.type = ClientMessage;
++  xev.xclient.serial = 0;
++  xev.xclient.send_event = True;
++  xev.xclient.display = gdk_display;
++  xev.xclient.window = xwindow;
++  xev.xclient.message_type = _wnck_atom_get ("_NET_MOVERESIZE_WINDOW");
++  xev.xclient.format = 32;
++  xev.xclient.data.l[0] = ((move) ? 3 << 7 : 0) | ((resize) ? 3 << 9 : 0);
++  xev.xclient.data.l[1] = x;
++  xev.xclient.data.l[2] = y;
++  xev.xclient.data.l[3] = width;
++  xev.xclient.data.l[4] = height;
++
++  XSendEvent (gdk_display,
++              RootWindowOfScreen (screen),
++              False,
++              SubstructureRedirectMask | SubstructureNotifyMask,
++              &xev); 
++}
++
++void
+ _wnck_change_state (Screen  *screen,
+ 		    Window   xwindow,
+                     gboolean add,
+diff -ruN libwnck-2.16.0-1/libwnck/xutils.h libwnck-2.16.0-2/libwnck/xutils.h
+--- libwnck-2.16.0-1/libwnck/xutils.h	2006-09-17 20:31:59.000000000 +1000
++++ libwnck-2.16.0-2/libwnck/xutils.h	2006-09-17 22:06:31.000000000 +1000
+@@ -132,6 +132,15 @@
+ void   _wnck_keyboard_size    (Screen *screen,
+                                Window  xwindow);
+ 
++void _wnck_move_resize (Screen	     *screen,
++			Window	     xwindow,
++			gboolean     move,
++			gboolean     resize,
++			int	     x,
++			int	     y,
++			unsigned int width,
++			unsigned int height);
++
+ void _wnck_toggle_showing_desktop (Screen  *screen,
+                                    gboolean show);
+ 

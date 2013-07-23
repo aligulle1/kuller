@@ -1,0 +1,572 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>kernel-debug</Name>
+        <Homepage>http://www.pardus.org.tr/</Homepage>
+        <Packager>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Packager>
+        <License>GPL-2</License>
+        <IsA>kernel</IsA>
+        <Summary>Debug enabled Uniprocessor Linux kernel for Pardus Linux</Summary>
+        <Summary xml:lang="tr">Pardus için debug seçenekleri açık Linux çekirdeği</Summary>
+        <Archive sha1sum="178f7d5bb3af0978d42b37651b8753323c7129c2" type="tarbz2">http://www.kernel.org/pub/linux/kernel/v2.6/linux-2.6.18.tar.bz2</Archive>
+        <BuildDependencies>
+            <Dependency>unifdef</Dependency>
+            <Dependency>cpio</Dependency>
+            <Dependency>mkinitramfs</Dependency>
+            <Dependency>diffutils</Dependency>
+            <Dependency>splashutils</Dependency>
+            <Dependency>splashutils-misc</Dependency>
+            <Dependency versionFrom="0.3">splash-theme</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <!-- kernel.org -->
+            <Patch level="1" compressionType="bz2">kernel/patch-2.6.18.8.bz2</Patch>
+
+            <!-- Subset of Gentoo Kernel Patches -->
+            <Patch level="1">gentoo/deprecate-sk98lin.patch</Patch>
+            <Patch level="1">gentoo/fbsplash-0.9.2-r5.patch</Patch>
+            <Patch level="1">gentoo/vesafb-tng-1.0-rc2.patch</Patch>
+            <Patch level="1">gentoo/vesafb-tng-mtrr.patch</Patch>
+            <Patch level="1">gentoo/squashfs-3.1.patch</Patch>
+            <Patch level="1">gentoo/via-irq-quirk-revert.patch</Patch>
+            <Patch level="1">gentoo/r8169-8168.patch</Patch>
+            <Patch level="1">gentoo/libata-status.patch</Patch>
+
+            <!-- Subset of OpenSuse Kernel Patches -->
+            <Patch level="1">suse/acpi_export_syms.patch</Patch>
+            <Patch level="1">suse/acpi_ibm_notify.patch</Patch>
+            <Patch level="1">suse/acpipnp-dma-resource-setup-fix.patch</Patch>
+            <Patch level="1">suse/acpi_processor_exit_acpi_off.patch</Patch>
+            <Patch level="1">suse/always-announce-new-usb-devices.patch</Patch>
+            <Patch level="1">suse/connector-read-mostly.patch</Patch>
+            <Patch level="1">suse/disable-apic-error.patch</Patch>
+            <Patch level="1">suse/do_anonymous_page-race.patch</Patch>
+            <Patch level="1">suse/error-implicit-function-declaration.patch</Patch>
+            <Patch level="1">suse/ext2-fsync-err.patch</Patch>
+            <Patch level="1">suse/ext3-barrier-default.patch</Patch>
+            <Patch level="1">suse/fat-o-flush.patch</Patch>
+            <Patch level="1">suse/filp-slab-rcu.patch</Patch>
+            <Patch level="1">suse/grab-swap-token-oops.patch</Patch>
+            <Patch level="1">suse/i386-apic-auto.patch</Patch>
+            <Patch level="1">suse/ide-acpi-support.patch</Patch>
+            <Patch level="1">suse/ide-probe-delay.patch</Patch>
+            <Patch level="1">suse/ipmi-unload-crash.patch</Patch>
+            <Patch level="1">suse/nameif-track-rename.patch</Patch>
+            <Patch level="1">suse/osync-error.patch</Patch>
+            <Patch level="1">suse/parport-mutex.patch</Patch>
+            <Patch level="1">suse/prism-defaultmac.patch</Patch>
+            <Patch level="1">suse/sd-fix-unknown-size.patch</Patch>
+            <Patch level="1">suse/security-cap-def.patch</Patch>
+            <Patch level="1">suse/setuid-dumpable-wrongdir.patch</Patch>
+            <Patch level="1">suse/shmall-bigger.patch</Patch>
+            <Patch level="1">suse/smtnice-disable.patch</Patch>
+            <Patch level="1">suse/sysctl-add-affinity_load_balancing.patch</Patch>
+            <Patch level="1">suse/unmap_vmas-lat.patch</Patch>
+            <Patch level="1">suse/cpufreq_PPC_zero.patch</Patch>
+            <Patch level="1">suse/965-drm.patch</Patch>
+            <Patch level="1">suse/965-agp.patch</Patch>
+            <Patch level="1">suse/965-agp-suspend.patch</Patch>
+
+            <!-- AppArmor -->
+            <Patch level="1">suse/apparmor.patch</Patch>
+            <Patch level="1">suse/apparmor_audit.patch</Patch>
+            <Patch level="1">suse/apparmor_namespacesem.patch</Patch>
+            <Patch level="1">suse/apparmor-mmapexec.patch</Patch>
+            <Patch level="1">suse/apparmor-secureexec.patch</Patch>
+
+            <!-- Subset of Con Kolivas's patches -->
+            <Patch level="1">ck/kconfig-expose_vmsplit_option.patch</Patch>
+            <Patch level="1">ck/cfq-ioprio_inherit_rt_class.patch</Patch>
+            <Patch level="1">ck/mm-background_scan.patch</Patch>
+            <Patch level="1">ck/mm-convert_swappiness_to_mapped.patch</Patch>
+            <Patch level="1">ck/mm-decrease_minimum_dirty_ratio.patch</Patch>
+            <Patch level="1">ck/mm-kswapd_inherit_prio-1.patch</Patch>
+            <Patch level="1">ck/mm-lots_watermark.diff</Patch>
+            <Patch level="1">ck/mm-set_zero_dirty_ratio.patch</Patch>
+            <Patch level="1">ck/sched-add-above-background-load-function.patch</Patch>
+
+            <!-- http://www.kernel.org/git/?p=linux/kernel/git/axboe/linux-2.6-block.git;a=shortlog;h=fcache -->
+            <Patch level="1">fs-cache.patch</Patch>
+
+            <!-- Intel based Mac's support
+                http://svn.sourceforge.net/viewvc/mactel-linux/trunk/kernel/mactel-patches-2.6.18/ -->
+            <Patch level="1">mactel/acpi-blacklist-fix.patch</Patch>
+            <Patch level="1">mactel/applesmc.patch</Patch>
+            <Patch level="1">mactel/ir.patch</Patch>
+            <Patch level="1">mactel/mouseemu.patch</Patch>
+            <Patch level="1">mactel/piix.ich7.patch</Patch>
+            <Patch level="1">mactel/s3.patch</Patch>
+            <Patch level="1">mactel/sci_en.patch</Patch>
+            <Patch level="1">mactel/sigmatel_audio.patch</Patch>
+            <Patch level="1">mactel/usb-storage-zerowait.patch</Patch>
+            <Patch level="1">mactel/appletouch-geyser4.patch</Patch>
+            <Patch level="1">mactel/efi_e820_all_mapped_fix.patch</Patch>
+            <Patch level="1">mactel/usbhid.patch</Patch>
+
+            <!-- Security related patches -->
+
+            <!-- Linux 2.6.x squashfs double free (CVE-2006-5701) -->
+            <Patch level="1">CVE/CVE-2006-5701.patch</Patch>
+            <!-- Linux 2.6.x ext3fs_dirhash denial of service (CVE-2006-6053) -->
+            <Patch level="1">CVE/CVE-2006-6053.patch</Patch>
+            <!-- Linux 2.6.x ext2_check_page denial of service (CVE-2006-6054) -->
+            <Patch level="1">CVE/CVE-2006-6054.patch</Patch>
+            <!-- Linux 2.6.x zlib_inflate memory corruption (CVE-2006-5823) -->
+            <Patch level="1">CVE/CVE-2006-5823.patch</Patch>
+            <!-- Unspecified vulnerability in the listxattr system call in Linux kernel, when a "bad inode" is present, allows local users to cause a denial of service (data corruption) and possibly gain privileges via unknown vectors. (CVE-2006-5753) -->
+            <Patch level="1">CVE/CVE-2006-5753.patch</Patch>
+            <!-- The isdn_ppp_ccp_reset_alloc_state function in drivers/isdn/isdn_ppp.c in the Linux 2.4 kernel before 2.4.34-rc4 does not call the init_timer function for the ISDN PPP CCP reset state timer, which has unknown attack vectors and results in a system crash -->
+            <Patch level="1">CVE/CVE-2006-5749.patch</Patch>
+            <!-- The tr_rx function in ibmtr.c for Linux kernel 2.6.19 assigns the wrong flag to the ip_summed field, which allows remote attackers to cause a denial of service (memory corruption) via crafted packets that cause the kernel to interpret another field as an offset. -->
+            <Patch level="1">CVE/CVE-2006-6333.patch</Patch>
+            <!-- The key serial number collision avoidance code in the key_alloc_serial function in Linux kernel 2.6.9 up to 2.6.20 allows local users to cause a denial of service (crash) via vectors that trigger a null dereference, as originally reported as "spinlock CPU recursion." -->
+            <Patch level="1">CVE/CVE-2007-0006.patch</Patch>
+            <!-- Boundary errors within the read() and write() functions of the Omnikey CardMan 4040 driver have an exploitable buffer overflow -->
+            <Patch level="1">CVE/CVE-2007-0005.patch</Patch>
+            <!-- nfnetlink_log in netfilter in the Linux kernel before 2.6.20.3 allows attackers to cause a denial of service (crash) via unspecified vectors involving the (1) nfulnl_recv_config function, (2) using "multiple packets per netlink message", and (3) bridged packets, which trigger a NULL pointer dereference. -->
+            <Patch level="1">CVE/CVE-2007-1496.patch</Patch>
+            <!-- nf_conntrack in netfilter in the Linux kernel before 2.6.20.3 does not set nfctinfo during reassembly of fragmented packets, which leaves the default value as IP_CT_ESTABLISHED and might allow remote attackers to bypass certain rulesets using IPv6 fragments. -->
+            <Patch level="1">CVE/CVE-2007-1497.patch</Patch>
+            <!-- [IPV6]: Handle np->opt being NULL in ipv6_getsockopt_sticky() -->
+            <Patch level="1">CVE/CVE-2007-1000.patch</Patch>
+            <!-- NULL pointer dereference in do_ipv6_setsockopt -->
+            <Patch level="1">CVE/CVE-2007-1388.patch</Patch>
+            <!-- Linux kernel 2.6.x before 2.6.20 allows local users to read unreadable binaries by using the interpreter (PT_INTERP) functionality and triggering a core dump, a variant of CVE-2004-1073. -->
+            <Patch level="1">CVE/CVE-2007-0958.patch</Patch>
+            <!-- The ipv6_fl_socklist from listening socket is inadvertently shared with new socket created for connection.  This leads to a variety of
+interesting, but fatal, bugs. -->
+            <Patch level="1">CVE/CVE-2007-1592.patch</Patch>
+            <!-- [APPLETALK]: Fix a remotely triggerable crash -->
+            <Patch level="1">CVE/CVE-2007-1357.patch</Patch>
+            <!-- [IPv4] fib: Fix out of bound access of fib_props[] -->
+            <Patch level="1">CVE/CVE-2007-2172.patch</Patch>
+            <!-- Infinite recursion in netlink -->
+            <Patch level="1">CVE/CVE-2007-1861.patch</Patch>
+            <!-- Do not process Routing Header Type 0 -->
+            <Patch level="1">CVE/CVE-2007-2242.patch</Patch>
+            <!--  capi_{cmsg,message}2str not thread-safe; vulnerable to buffer overflow -->
+            <Patch level="1">CVE/CVE-2007-1217.patch</Patch>
+            <!-- [PPPOE]: memory leak when socket is release()d before PPPIOCGCHAN has been called on it -->
+            <Patch level="1">CVE/CVE-2007-2525.patch</Patch>
+            <!-- random: fix error in entropy extraction && random: fix seeding with zero entropy -->
+            <Patch level="1">CVE/CVE-2007-2453.patch</Patch>
+            <!-- cpuset: prevent information leak in cpuset_tasks_read -->
+            <Patch level="1">CVE/CVE-2007-2875.patch</Patch>
+            <!-- NETFILTER: {ip, nf}_conntrack_sctp: fix remotely triggerable NULL ptr dereference -->
+            <Patch level="1">CVE/CVE-2007-2876.patch</Patch>
+            <!-- Bluetooth setsockopt calls could leak kernel memory contents via an uninitialized stack buffer. A local attacker could exploit this flaw to view sensitive kernel information. (CVE-2007-1353) -->
+            <Patch level="1">CVE/CVE-2007-1353.patch</Patch>
+            <!-- [TIPC]: Fix infinite loop in netlink handler -->
+            <Patch level="1">tipc-infinite-loop.patch</Patch>
+            <!-- The lcd_write function in drivers/usb/misc/usblcd.c in the Linux kernel before 2.6.22-rc7 does not limit the amount of memory used by a caller, which allows local users to cause a denial of service (memory consumption). -->
+            <Patch level="1">CVE/CVE-2007-3513.patch</Patch>
+            <!-- [NETFILTER]: nf_conntrack_h323: add checking of out-of-range on choices' index values -->
+            <Patch level="1">CVE/nf-conntrack-h323.patch</Patch>
+
+            <!-- Subset of RHEL Kernel Patches -->
+
+            <Patch level="1">rhel/linux-2.6-build-deprecate-configh-include.patch</Patch>
+
+            <!-- The ipw driver sometimes takes a long time to load its firmware. -->
+            <Patch level="1">rhel/linux-2.6-defaults-firmware-loader-timeout.patch</Patch>
+
+            <!-- mm-tracking-dirty-pages and mm-fix-race-in-shared-mmap-ed-page-writeback -->
+            <Patch level="1">rhel/mm.patch</Patch>
+            <!-- Backports of lockdep fixes -->
+            <Patch level="1">rhel/linux-2.6-lockdep-fixes.patch</Patch>
+            <!-- lockdep: fix ide/proc interaction -->
+            <Patch level="1">rhel/linux-2.6-lockdep-ide-proc-interaction-fix.patch</Patch>
+
+            <!-- handle races w/ truncate in journal_dirty_data() -->
+            <Patch level="1">rhel/linux-2.6-ext3-check-for-unmapped-buffer.patch</Patch>
+            <!-- a race condition between ext3_link/unlink that could create an orphan inode list corruption. -->
+            <Patch level="1">rhel/linux-2.6-ext3-return-enoent-from-ext3_link-race-with-unlink.patch</Patch>
+            <!-- buffer: memorder fix -->
+            <Patch level="1">rhel/linux-2.6-ext3-buffer-memorder-fix.patch</Patch>
+
+            <!-- use semaphores instead of mutexes -->
+            <Patch level="1">rhel/linux-2.6-fs-bd_mount_mutex-to-sem.patch</Patch>
+
+            <!-- mm: fix statistics in vmscan.c -->
+            <Patch level="1">rhel/linux-2.6-mm-fix-statistics-in-vmscan-c.patch</Patch>
+            <!-- mm: Keep O_DIRECT I/O from populating the page cache -->
+            <Patch level="1">rhel/linux-2.6-mm-dio-prevent-populating-page-cache.patch</Patch>
+            <!-- mm: oom killer fixes backported from 2.6.19-->
+            <Patch level="1">rhel/linux-2.6-mm-prevent-oom-fixes.patch</Patch>
+            <!-- mm: reject corrupt swapfiles earlier -->
+            <Patch level="1">rhel/linux-2.6-mm-reject-corrupt-swapfiles-earlier.patch</Patch>
+            <!-- mm: NFS data corruption -->
+            <Patch level="1">rhel/linux-2.6-mm-release-page-with-non-zero-gfp-mask.patch</Patch>
+            <!-- mm: handle mapping of memory without a struct page backing it -->
+            <Patch level="1">rhel/linux-2.6-mm-handle-map-of-memory-without-page-backing.patch</Patch>
+            <!-- mm: write failure on swapout could corrupt data -->
+            <Patch level="1">rhel/linux-2.6-mm-write-failure-on-swapout-could-corrupt-data.patch</Patch>
+            <!-- mm: optimize kill_bdev() -->
+            <Patch level="1">rhel/linux-2.6-mm-optimize-kill_bdev.patch</Patch>
+            <!-- mm: Prevent OOM-kill of unkillable children or siblings -->
+            <Patch level="1">rhel/linux-2.6-mm-prevent-oom-kill-of-unkillable-children.patch</Patch>
+
+            <!-- x86: handle _PSS object range corectly in speedstep-centrino -->
+            <Patch level="1">rhel/linux-2.6-x86-handle-_pss-object-range-speedstep-centrino.patch</Patch>
+            <!-- x86: /proc/mtrr interface MTRR bug fix -->
+            <Patch level="1">rhel/linux-2.6-x86-proc-mtrr-interface-mtrr-bug-fix.patch</Patch>
+            <!-- x86 :vga video fail fix -->
+            <Patch level="1">rhel/linux-2.6-x86-vga-vidfail.patch</Patch>
+            <!-- x86: Fix CPUID calls to support GH processors -->
+            <Patch level="1">rhel/linux-2.6-x86-fix-cpuid-calls-to-support-gh-processors.patch</Patch>
+            <!-- x86: Fix to nmi to support GH processors -->
+            <Patch level="1">rhel/linux-2.6-x86-fix-to-nmi-to-support-gh-processors.patch</Patch>
+            <!-- x86: Use CPUID calls to check for mce -->
+            <Patch level="1">rhel/linux-2.6-x86-use-cpuid-calls-to-check-for-mce.patch</Patch>
+            <!-- x86: Greyhound cpuinfo output cleanups -->
+            <Patch level="1">rhel/linux-2.6-x86-greyhound-cpuinfo-output-cleanups.patch</Patch>
+            <!-- x86: ICH9 device IDs -->
+            <Patch level="1">rhel/linux-2.6-x86-ich9-device-ids.patch</Patch>
+
+            <!-- e100: fix error recovery -->
+            <Patch level="1">rhel/linux-2.6-net-e100-error-recovery-fix.patch</Patch>
+            <!-- e1000: updated driver, backported from 2.6.19 -->
+            <Patch level="1">rhel/linux-2.6-net-e1000-updates.patch</Patch>
+            <Patch level="1">rhel/linux-2.6-net-e1000-compile.patch</Patch>
+            <!-- a bug in the e1000 driver that could lead to a watchdog timeout panic. -->
+            <Patch level="1">rhel/linux-2.6-e1000-fix-watchdog-timeout-panics.patch</Patch>
+            <!-- e1000: Add missing ids to e1000 -->
+            <Patch level="1">rhel/linux-2.6-net-e1000-add-device-ids.patch</Patch>
+            <!-- e1000: Reset all functions after a PCI error -->
+            <Patch level="1">rhel/linux-2.6-net-e1000-reset-all-functions-after-a-pci-error.patch</Patch>
+            <!-- e1000: truncated TSO TCP header with 82544, workaround -->
+            <Patch level="1">rhel/linux-2.6-e1000-truncated-tso-tcp-header-with-82544-workaround.patch</Patch>
+            <!-- tg3: BCM5752M crippled after reset -->
+            <Patch level="1">rhel/linux-2.6-net-tg3-bcm5752m-crippled-after-reset.patch</Patch>
+            <!-- tg3: TG3 support Broadcom 5756M/5756ME  Controller -->
+            <Patch level="1">rhel/linux-2.6-net-tg3-support-broadcom-5756m-5756me-controller.patch</Patch>
+            <!-- ipw2200: ipw2200: update to version 1.2.0 from ipw2200.sf.net -->
+            <Patch level="1">rhel/linux-2.6-wireless-ipw2200-1_2_0-update.patch</Patch>
+            <!-- netfilter: iptables stop fails because ip_conntrack cannot unload. -->
+            <Patch level="1">rhel/linux-2.6-netfilter-ip_conntrack-fails-to-unload.patch</Patch>
+
+            <!-- proc: readdir race fix, When many processes are created and destroyed frequently, ps may fail to show some procceses which existed before ps command is exectuted and still exist after ps is done. Backported from 2.6.20 -->
+            <Patch level="1">rhel/linux-2.6-proc-readdir-race-fix.patch</Patch>
+            <!-- fbcon: every time the console cursor blinks, we do a kmalloc/kfree pair. Turn that into a single allocation. -->
+            <Patch level="1">rhel/linux-2.6-softcursor-persistent-alloc.patch</Patch>
+            <!-- nmi: change watchdog timeout to 30 seconds -->
+            <Patch level="1">rhel/linux-2.6-nmi-change-watchdog-timeout-to-30-seconds.patch</Patch>
+
+            <!-- SATA AHCI: support AHCI class code -->
+            <Patch level="1">rhel/linux-2.6-sata-ahci-support-ahci-class-code.patch</Patch>
+            <!-- SATA AHCI: The redefinition of ahci_start_engine() and ahci_stop_engine() -->
+            <Patch level="1">rhel/linux-2.6-sata-ahci-suspend.patch</Patch>
+            <!-- SATA ata_piix: This patch corrects the ICH8 map values for sata ata_piix. This fixes a problem where SATA devices are not detected on some of the SATA ports on an ICH8 motherboard when the BIOS is set to IDE mode. -->
+            <Patch level="1">rhel/linux-2.6-sata-ata_piix-map-values.patch</Patch>
+            <!-- SATA sata_promise: support PATA ports on SATA controllers -->
+            <Patch level="1">rhel/linux-2.6-sata-promise-pata-ports.patch</Patch>
+            <!-- SATA: support legacy IDE mode of SB600 SATA -->
+            <Patch level="1">rhel/linux-2.6-sata-support-legacy-ide-mode-of-sb600-sata.patch</Patch>
+
+            <!-- SHPCHP: driver doesn't work in poll mode -->
+            <Patch level="1">rhel/linux-2.6-shpchp-driver-does-not-work-in-poll-mode.patch</Patch>
+            <!-- SHPCHP: driver doesn't work if the system was under heavy load -->
+            <Patch level="1">rhel/linux-2.6-shpchp-driver-fails-on-system-under-heavy-load.patch</Patch>
+            <!-- Update FC transport and Emulex lpfc Fibre Channel Driver,
+                 (Update the FC transport.)
+                - convert fc_host symbolic_name attribute to a dynamic attribute
+                - add fc_host system_hostname attribute and u64_to_wwn()
+                - add netlink support for posting of transport events
+                - Add dev_loss_tmo callbacks, and new fast_io_fail_tmo w/ callback
+                - extend event vendor id's to 64bits
+            -->
+            <Patch level="1">rhel/linux-2.6-scsi-update-transport-fc.patch</Patch>
+            <!--  Update FC transport and Emulex lpfc Fibre Channel Driver
+                  (Update the lpfc driver to  8.1.10)
+                - Add support to post events via new FC event interfaces
+                - Add support to return adapter symbolic name (now that attribute is dynamic)
+                - Add support for new dev_loss_tmo callback·
+                - Add support for the new fast_io_fail callback
+                - Add support for a new lpfc soft_wwpn sysfs attribute
+                - Change version number to 8.1.10
+            -->
+            <Patch level="1">rhel/linux-2.6-scsi-update-emulex-lpfc.patch</Patch>
+            <!-- Update FC transport and Emulex lpfc Fibre
+                 (Channel Driver)
+                - Add IOCTL to lpfc (updates rev. to 8.1.10.1)
+            -->
+            <Patch level="1">rhel/linux-2.6-scsi-emulex-ioctl-hooks.patch</Patch>
+            <!-- Emulex lpfc update to 8.1.10.2
+                This patch updates the driver from 8.1.10.1 to 8.1.10.2. It includes a
+                number of bug fixes that are important:
+
+                - Infinite loop in LUN reset
+                - Check if mlist is still initialized before dereferencing in lpfc_ct.c
+                - Added code to prevent starting discovery of a node if discovery is in progress.
+                - Make lpfc_multi_ring_support function properly
+                - Memory leak associated with mbox cmds READ_LA, READ_SPARAM, REG_LOGIN
+                - Prevent references to NULL node list element in reset routines.
+                - Update discovery logic to send RFF to Fabric on link up
+                - Reset card on Port Error 5
+                - Don't perform nport confirmation for fabric ports
+                - Add ndlp to plogi list prior to issuing the plogi els command
+
+                As usual, it also brings along some non-critical fixes. These are low
+                risk and their impact is contained within the driver:·
+
+                - Fixed sparse error in ioctl code
+                - Fix printk format warning
+                - Code improvement for lpfc_findnode_did().
+                - Handling of LOG_FCP logging
+                - Add MSI (Message Signalled Interrupts) support - module param to enable
+                - Removed lpfc driver dependency on subsystem id of HBAs
+                - Add soft_wwnn sysfs attribute, rename soft_wwn_enable
+                - sli_iocb_type_array incomplete
+                - Cosmetic changes to make multi ring support more generic
+            -->
+            <Patch level="1">rhel/linux-2.6-scsi-emulex-lpfc-update-to-8-1-10-2.patch</Patch>
+            <!-- cciss: This is a set of patches that HP considers critical for cciss. This represents some cherry picking from their latest upstream submissions. All are bug fixes.  All are in Linus' tree. -->
+            <Patch level="1">rhel/linux-2.6-cciss-bugfixes.patch</Patch>
+
+            <!-- iscsi: fix oops if iscsi connection setup fails -->
+            <Patch level="1">rhel/linux-2.6-iscsi-remove-old-code.patch</Patch>
+            <!-- iscsi: backports of iscsi fixes -->
+            <Patch level="1">rhel/linux-2.6-iscsi-update-to-2-6-19-rc1.upstream.patch</Patch>
+            <!-- iscsi: fix iscsi sense len handling -->
+            <Patch level="1">rhel/linux-2.6-scsi-iscsi-fix-sense-len-handling.patch</Patch>
+            <!-- iscsi: fix oops in iscsi packet transfer path -->
+            <Patch level="1">rhel/linux-2.6-scsi-oops-in-iscsi-packet-transfer-path.patch</Patch>
+
+
+            <!-- Pardus Part -->
+
+            <!-- load custom DSDT from initrd -->
+            <Patch level="1">acpi-dsdt-initrd-v0.8.2-2.6.18.patch</Patch>
+
+            <!-- http://svn.pardus.org.tr/projeler/vayo/kernel/ -->
+            <Patch>sony_acpi.patch</Patch>
+
+            <!-- fix #4216 -->
+            <Patch level="1">tulip_patch.diff</Patch>
+
+            <!-- see http://bugzilla.kernel.org/show_bug.cgi?id=7126  -->
+            <Patch level="1">pegasus-ii.patch</Patch>
+
+            <!-- fix #3729, see http://bugzilla.kernel.org/show_bug.cgi?id=5534 -->
+            <Patch level="1">nx6125_thermal_zone.patch</Patch>
+
+            <!-- fix #4430 , see http://lkml.org/lkml/2006/11/26/108 -->
+            <Patch level="1">AHCI_detection_pauses_excessively.patch</Patch>
+
+            <!-- fix #4842, #5274, #5431 without workaround, Input: i8042 - fix AUX port detection with some chips -->
+            <Patch level="1">i8042-aux-detection.patch</Patch>
+
+            <!-- These USB devices don't work with zc0301, but works with gspca, fixes #4326 #3704 etc. -->
+            <Patch level="1">zc0301-remove-spca-conflicts.patch</Patch>
+
+            <!-- Add USRobotics_Wireless_Adapter_Model_5423 -->
+            <Patch level="1">USRobotics_Wireless_Adapter_Model_5423.patch</Patch>
+
+            <!-- fix #4519, enable apm=power_off on uniprocessors -->
+            <Patch level="1">enable_poweroff_on_single.patch</Patch>
+
+            <!-- Use Pardus logo instead of penguin -->
+            <Patch level="1">pardus-logo.patch</Patch>
+
+            <!-- fix #5518, Realtek's 8139/810x (0x8136) PCI-E comes with a touchy PHY. A big heavy reset seems to calm it down. -->
+            <Patch level="1">reset-8169.patch</Patch>
+
+            <!-- Refactor the event processing (syslog messaging and rate limiting) into separate file therm_throt.c. This allows consistent reporting of CPU thermal throttle events. (http://git.kernel.org/?p=linux%2Fkernel%2Fgit%2Fstable%2Flinux-2.6.21.y.git;a=commitdiff_plain;h=15d5f8398311f565682959daaca30e3ca7aea600) -->
+            <Patch level="1">mce_interrupt.patch</Patch>
+
+            <!-- audit: fix oops removing watch if audit disabled -->
+            <Patch level="1">audit_fix_oops_removing_watch_if_audit_disabled.patch</Patch>
+
+            <!--  i386: fix regression, endless loop in ptrace singlestep over an int80 -->
+            <Patch level="1">ptrace.patch</Patch>
+
+            <!-- http://git.kernel.org/?p=linux/kernel/git/sfrench/cifs-backport-old-kernels.git;a=summary
+                    until http://git.kernel.org/?p=linux/kernel/git/sfrench/cifs-backport-old-kernels.git;a=commit;h=26ec7ab2332991f27bdec5277cec4bcb97c7d22d -->
+            <Patch level="1">cifs-backport-1.49.patch</Patch>
+
+            <!-- Revert all bcm4xxx related commits from 2.6.18.8-> -->
+            <Patch level="1">revert_bcm43xx_from_stable.patch</Patch>
+
+            <!-- softmac backports from 2.6.21 -->
+            <Patch level="1">rhel/linux-2.6-net-softmac-updates-from-2-6-21.patch</Patch>
+
+            <!-- bcm43xx driver backport from 2.6.22-rc1 -->
+            <Patch level="1">rhel/linux-2.6-net-bcm43xx-backport-from-2-6-22-rc1.patch</Patch>
+
+            <!-- ipw2100/ipw2200 driver backport from 2.6.22-rc1 -->
+            <Patch level="1">rhel/linux-2.6-net-ipw200-backports-from-2-6-22-rc1.patch</Patch>
+
+            <!--
+            [AGPGART] agp.h: constify struct agp_bridge_data::version
+            http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commit;h=8eb7925f93af75e66a240d148efdec212f95bcb7
+
+            [AGPGART] Const'ify the agpgart driver version.
+            http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commit;h=e7745d4e0299a3460128917ceb6b6a807fa7f9e8
+
+            [AGPGART] remove private page protection map
+            http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commit;h=804af2cf6e7af31d2e664b54e657dddd9b531dbd
+
+            [AGPGART] Rework AGPv3 modesetting fallback.
+            http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commit;h=edf03fb0575cbee2595a63374b17dc0921f2094a
+
+            [AGPGART] Fix number of aperture sizes in 830 gart structs.
+            http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commit;h=c14635eb4e591c61e419c065df1fdacf9ff90c00
+
+            [AGP] Fix intel 965 AGP memory mapping function
+            http://git.kernel.org/?p=linux/Fkernel/git/torvalds/linux-2.6.git;a=commit;h=7d915a38985d2826acbdc9dc9cca8a93e23e5278
+
+            [AGPGART] fix detection of aperture size versus GTT size on G965
+            http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commit;h=c41e0deb50c44f9d119c2268f1be05e6a6bb5772
+
+            [AGPGART] Don't try to remap i810 registers on resume.
+            http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commit;h=e4ac5e4f55f55b16e084a46b1b8e233f490ba701
+
+            [AGPGART] 945GM support for agpgart
+            http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commit;h=3b0e8eadc511eaceba6d6b8d0743359a34ee23c6
+
+            [AGPGART] intel_agp: restore graphics device's pci space early in resume
+            http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commit;h=4b95320fc4d21b0ff2f8604305dd6c851aff6096
+
+            [AGPGART] intel_agp: Add support for G33, Q33 and Q35 chipsets
+            http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commit;h=874808c6dd429f7431b906a32c7f78a68e7636af
+
+            [AGPGART] intel_agp: add support for 965GME/GLE
+            http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commit;h=c8eebfd6807f37b9a8a7ce3a64b60429788dfb54
+
+            [AGPGART] intel_agp: Add support for G33, Q33 and Q35 chipsets
+            http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commit;h=874808c6dd429f7431b906a32c7f78a68e7636af
+
+            [AGPGART] intel_agp: Add support for G33, Q33 and Q35 chipsets
+            http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commit;h=874808c6dd429f7431b906a32c7f78a68e7636af
+
+            drm: Add support for Intel i965G chipsets.
+            http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commit;h=c29b669caae4ed1630ef479e54bdde126a0378ec
+
+            drm/i915: Add 965GM pci id update
+            http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commit;h=ce7dd06372058f9e3e57ee4c0aeba694a43a80ad
+
+            i915: add new pciids for 945GME, 965GME/GLE
+            http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commit;h=2f4042b186b9bfe82f48fe801619c6c285c16bef
+
+            drm/i915: Add support for the G33, Q33, and Q35 chipsets.
+            http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commit;h=dc7a93190c21edbf3ed23e678ad04f852b9cff28
+
+            Add i915 ioctls to configure pipes for vblank interrupt.
+            http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commit;h=702880f24373dfb31edb0bcd997ff924d07decc3
+
+            drm: fixup i915 error codes
+            http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commit;h=46acbf13fb280e69c5cafe7c837d5a27c6e380c3
+            <Patch level="1">agp-backports.patch</Patch>
+            -->
+
+
+            <!-- use buildfarm.pardus.org.tr and pardus for /proc/version -->
+            <Patch level="1">buildhost.patch</Patch>
+
+            <!-- Default config -->
+            <Patch>pardus-kernel-config.patch</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>kernel-debug</Name>
+        <RuntimeDependencies>
+            <Dependency>mkinitramfs</Dependency>
+            <Dependency>splashutils</Dependency>
+            <Dependency>splashutils-misc</Dependency>
+            <Dependency>splash-theme</Dependency>
+            <Dependency releaseFrom="37">baselayout</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="executable" permanent="true">/boot</Path>
+            <Path fileType="library" permanent="true">/lib/modules/</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>kernel-debug-source</Name>
+        <Summary>Debug enabled Pardus Linux kernel source</Summary>
+        <Description>Debug enabled Pardus Linux kernel source</Description>
+        <Description xml:lang="tr">Pardus Linux çekirdeği için, hata ayıklaması yapılabilir durumda kaynak.</Description>
+        <Files>
+            <Path fileType="header">/usr/src/</Path>
+        </Files>
+    </Package>
+
+    <History>
+        <Update release="10" type="security">
+            <Date>2007-07-07</Date>
+            <Version>2.6.18.8</Version>
+            <Comment>Sync with kernel package</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="9" type="security">
+            <Date>2007-06-26</Date>
+            <Version>2.6.18.8</Version>
+            <Comment>Sync with kernel package</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="8" type="security">
+            <Date>2007-06-08</Date>
+            <Version>2.6.18.8</Version>
+            <Comment>Sync with kernel package (rhel patchset) and fix CVE-2007-2875 and CVE-2007-2876</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="7" type="security">
+            <Date>2007-04-12</Date>
+            <Version>2.6.18.8</Version>
+            <Comment>Fix CVE-2007-1357, enable RAID support</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="6" type="security">
+            <Date>2007-03-18</Date>
+            <Version>2.6.18.8</Version>
+            <Comment>Sync with kernel package</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="5">
+            <Date>2007-02-24</Date>
+            <Version>2.6.18.8</Version>
+            <Comment>Bump to stable</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="4" type="security">
+            <Date>2007-02-20</Date>
+            <Version>2.6.18.7</Version>
+            <Comment>fix CVE-2007-0772</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="3" type="security">
+            <Date>2007-02-11</Date>
+            <Version>2.6.18.6</Version>
+            <Comment>Sync with kernel to fix CVE-2006-6333 and CVE-2007-0006</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="2">
+            <Date>2007-02-08</Date>
+            <Version>2.6.18.6</Version>
+            <Comment>Sync with kernel</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="1">
+            <Date>2007-01-10</Date>
+            <Version>2.6.18.6</Version>
+            <Comment>Initial commit</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+    </History>
+</PISI>

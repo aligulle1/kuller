@@ -1,0 +1,431 @@
+Index: src/state.py
+===================================================================
+--- src/state.py	(revision 29230)
++++ src/state.py	(revision 29252)
+@@ -11,7 +11,7 @@
+ # Please read the COPYING .
+ #
+ 
+-from qt import QObject, PYSIGNAL, QTimer
++from qt import QObject, PYSIGNAL, QTimer, QStringList
+ from kdecore import i18n
+ from kdeui import KMessageBox, KGuiItem
+ 
+@@ -73,11 +73,12 @@
+ 
+     def checkObsoletes(self):
+         obsoletes = pisiiface.getObsoletedList()
+-        message = i18n("<qt>Following packages are obsoleted and are not maintained anymore in Pardus 2009 repositories. These packages are going to be removed from your system:<br><br> %1").arg(", ".join(obsoletes))
++        message = i18n("<qt>Following packages are obsoleted and are not maintained anymore in Pardus 2009 repositories. These packages are going to be removed from your system.")
+         message += i18n("<br><br>Do you want to continue?</qt>")
+ 
+-        if KMessageBox.Yes == KMessageBox.warningYesNo(self.parent,
++        if KMessageBox.Yes == KMessageBox.warningYesNoList(self.parent,
+                                                        message,
++                                                       QStringList.fromStrList(obsoletes),
+                                                        i18n("Warning"),
+                                                        KGuiItem(i18n("Continue"), "ok"),
+                                                        KGuiItem(i18n("Cancel"), "no"),
+Index: po/upgrade-manager.pot
+===================================================================
+--- po/upgrade-manager.pot	(revision 29230)
++++ po/upgrade-manager.pot	(revision 29252)
+@@ -8,7 +8,7 @@
+ msgstr ""
+ "Project-Id-Version: PACKAGE VERSION\n"
+ "Report-Msgid-Bugs-To: \n"
+-"POT-Creation-Date: 2010-03-09 11:50+0200\n"
++"POT-Creation-Date: 2010-05-10 13:17+0300\n"
+ "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+ "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+ "Language-Team: LANGUAGE <LL@li.org>\n"
+@@ -64,14 +64,14 @@
+ msgid ""
+ "<qt>Following packages are obsoleted and are not maintained anymore in "
+ "Pardus 2009 repositories. These packages are going to be removed from your "
+-"system:<br><br> %1"
++"system."
+ msgstr ""
+ 
+-#: src/state.py:77 src/maindialog.py:61
++#: src/state.py:77 src/maindialog.py:64
+ msgid "<br><br>Do you want to continue?</qt>"
+ msgstr ""
+ 
+-#: src/state.py:100
++#: src/state.py:101
+ msgid "Resolving dependencies..."
+ msgstr ""
+ 
+@@ -119,17 +119,17 @@
+ msgid "You are not authorized for this operation."
+ msgstr ""
+ 
+-#: src/maindialog.py:43
++#: src/maindialog.py:46
+ msgid "Upgrading from %1 to version 2009.1"
+ msgstr ""
+ 
+-#: src/maindialog.py:60
++#: src/maindialog.py:63
+ msgid ""
+ "<qt>Upgrade to Pardus 2009.1 completed. Upgrade-manager will now restart the "
+ "system."
+ msgstr ""
+ 
+-#: src/maindialog.py:67
++#: src/maindialog.py:70
+ msgid "Restart Later"
+ msgstr ""
+ 
+Index: po/tr.po
+===================================================================
+--- po/tr.po	(revision 29230)
++++ po/tr.po	(revision 29252)
+@@ -7,7 +7,7 @@
+ msgstr ""
+ "Project-Id-Version: tr\n"
+ "Report-Msgid-Bugs-To: \n"
+-"POT-Creation-Date: 2010-03-09 11:50+0200\n"
++"POT-Creation-Date: 2010-05-10 13:17+0300\n"
+ "PO-Revision-Date: 2009-12-01 11:11+0200\n"
+ "Last-Translator: Faik Uygur <faik@pardus.org.tr>\n"
+ "Language-Team: Türkçe <tr@li.org>\n"
+@@ -64,16 +64,16 @@
+ msgid ""
+ "<qt>Following packages are obsoleted and are not maintained anymore in "
+ "Pardus 2009 repositories. These packages are going to be removed from your "
+-"system:<br><br> %1"
++"system."
+ msgstr ""
+ "<qt>Aşağıdaki paketler eski ve artık Pardus 2009 depolarında bakımı "
+-"yapılmıyor. Bu paketler sisteminizden kaldırılacak:<br><br> %1"
++"yapılmıyor. Bu paketler sisteminizden kaldırılacak."
+ 
+-#: src/state.py:77 src/maindialog.py:61
++#: src/state.py:77 src/maindialog.py:64
+ msgid "<br><br>Do you want to continue?</qt>"
+ msgstr "<br><br>Devam etmek istiyor musunuz?</qt>"
+ 
+-#: src/state.py:100
++#: src/state.py:101
+ msgid "Resolving dependencies..."
+ msgstr "Bağımlılıklar hesaplanıyor..."
+ 
+@@ -121,11 +121,11 @@
+ msgid "You are not authorized for this operation."
+ msgstr "Bu işlem için yetkili değilsiniz."
+ 
+-#: src/maindialog.py:43
++#: src/maindialog.py:46
+ msgid "Upgrading from %1 to version 2009.1"
+ msgstr "%1 sürümünden 2009.1 sürümüne yükseltiliyor"
+ 
+-#: src/maindialog.py:60
++#: src/maindialog.py:63
+ msgid ""
+ "<qt>Upgrade to Pardus 2009.1 completed. Upgrade-manager will now restart the "
+ "system."
+@@ -133,7 +133,7 @@
+ "<qt>Pardus 2009.1 sürümüne yükseltme tamamlandı. Yükseltme-yöneticisi şimdi "
+ "sisteminizi yeniden başlatacak."
+ 
+-#: src/maindialog.py:67
++#: src/maindialog.py:70
+ msgid "Restart Later"
+ msgstr "Yeniden Başlatmayı Ertele"
+ 
+Index: po/es.po
+===================================================================
+--- po/es.po	(revision 29230)
++++ po/es.po	(revision 29252)
+@@ -7,7 +7,7 @@
+ msgstr ""
+ "Project-Id-Version: nl\n"
+ "Report-Msgid-Bugs-To: \n"
+-"POT-Creation-Date: 2010-03-09 11:50+0200\n"
++"POT-Creation-Date: 2010-05-10 13:17+0300\n"
+ "PO-Revision-Date: 2009-12-07 11:14-0400\n"
+ "Last-Translator: Klemens Häckel <click3d (at) linuxmail dot org>\n"
+ "Language-Team: Nederlands <kde-i18n-nl@kde.org>\n"
+@@ -63,20 +63,21 @@
+ "<qt>Configurando paquetes. Esta operación puede tardar algunos minutos.</qt>"
+ 
+ #: src/state.py:76
++#, fuzzy
+ msgid ""
+ "<qt>Following packages are obsoleted and are not maintained anymore in "
+ "Pardus 2009 repositories. These packages are going to be removed from your "
+-"system:<br><br> %1"
++"system."
+ msgstr ""
+ "<qt>Los siguientes paquetes son obsoletos y ya no se proveen en los "
+ "repositorios de Pardus 2009. Se removerán los siguientes paquetes del "
+ "sistema:<br><br> %1"
+ 
+-#: src/state.py:77 src/maindialog.py:61
++#: src/state.py:77 src/maindialog.py:64
+ msgid "<br><br>Do you want to continue?</qt>"
+ msgstr "<br><br>Desea continuar ?</qt>"
+ 
+-#: src/state.py:100
++#: src/state.py:101
+ msgid "Resolving dependencies..."
+ msgstr "Resolviendo dependencias..."
+ 
+@@ -125,11 +126,11 @@
+ msgid "You are not authorized for this operation."
+ msgstr "No tiene autorización para ejecutar esta operación."
+ 
+-#: src/maindialog.py:43
++#: src/maindialog.py:46
+ msgid "Upgrading from %1 to version 2009.1"
+ msgstr "Actualizando de %1 a la versión 2009.1"
+ 
+-#: src/maindialog.py:60
++#: src/maindialog.py:63
+ msgid ""
+ "<qt>Upgrade to Pardus 2009.1 completed. Upgrade-manager will now restart the "
+ "system."
+@@ -137,7 +138,7 @@
+ "<qt>Se completó la actualización a Pardus 2009.1. El Gerenciador de "
+ "actualizaciones reiniciará ahora su sistema."
+ 
+-#: src/maindialog.py:67
++#: src/maindialog.py:70
+ msgid "Restart Later"
+ msgstr "Reiniciar más adelante"
+ 
+Index: po/fr.po
+===================================================================
+--- po/fr.po	(revision 29230)
++++ po/fr.po	(revision 29252)
+@@ -7,7 +7,7 @@
+ msgstr ""
+ "Project-Id-Version: fr\n"
+ "Report-Msgid-Bugs-To: \n"
+-"POT-Creation-Date: 2010-03-09 11:50+0200\n"
++"POT-Creation-Date: 2010-05-10 13:17+0300\n"
+ "PO-Revision-Date: 2009-12-01 17:57+0100\n"
+ "Last-Translator: Philippe Svetoslavsky <philsvet@gmail.com>\n"
+ "Language-Team: French <kde-i18n-doc@kde.org>\n"
+@@ -63,19 +63,20 @@
+ "<qt>Configuration des paquets. Ceci peut prendre plusieurs minutes.</qt>"
+ 
+ #: src/state.py:76
++#, fuzzy
+ msgid ""
+ "<qt>Following packages are obsoleted and are not maintained anymore in "
+ "Pardus 2009 repositories. These packages are going to be removed from your "
+-"system:<br><br> %1"
++"system."
+ msgstr ""
+ "<qt>Les paquets suivants sont obsolètes et plus maintenus dans les dépôts de "
+ "Pardus 2009. Ces paquets vont être retirés de votre système :<br><br> %1"
+ 
+-#: src/state.py:77 src/maindialog.py:61
++#: src/state.py:77 src/maindialog.py:64
+ msgid "<br><br>Do you want to continue?</qt>"
+ msgstr "<br><br>Voulez-vous continuer ?</qt>"
+ 
+-#: src/state.py:100
++#: src/state.py:101
+ msgid "Resolving dependencies..."
+ msgstr "Résolution des dépendances..."
+ 
+@@ -124,11 +125,11 @@
+ msgid "You are not authorized for this operation."
+ msgstr "Vous n'êtes pas authorisé à effectuer cette opération."
+ 
+-#: src/maindialog.py:43
++#: src/maindialog.py:46
+ msgid "Upgrading from %1 to version 2009.1"
+ msgstr "Migration de la version %1 vers la version 2009.1"
+ 
+-#: src/maindialog.py:60
++#: src/maindialog.py:63
+ msgid ""
+ "<qt>Upgrade to Pardus 2009.1 completed. Upgrade-manager will now restart the "
+ "system."
+@@ -136,7 +137,7 @@
+ "<qt>Migration vers Pardus 2009.1 terminée. L'assistant va maintenant "
+ "redémarrer l'ordinateur."
+ 
+-#: src/maindialog.py:67
++#: src/maindialog.py:70
+ msgid "Restart Later"
+ msgstr "Redémarrer plus tard"
+ 
+Index: po/de.po
+===================================================================
+--- po/de.po	(revision 29230)
++++ po/de.po	(revision 29252)
+@@ -8,7 +8,7 @@
+ msgstr ""
+ "Project-Id-Version: nl\n"
+ "Report-Msgid-Bugs-To: \n"
+-"POT-Creation-Date: 2010-03-09 11:50+0200\n"
++"POT-Creation-Date: 2010-05-10 13:17+0300\n"
+ "PO-Revision-Date: 2010-01-11 20:16-0300\n"
+ "Last-Translator: Klemens Häckel <click3d at linuxmail (dot) org>\n"
+ "Language-Team: Spanish <kde-i18n-doc@kde.org>\n"
+@@ -64,20 +64,21 @@
+ "<qt>Konfiguration der Pakete. Dieser Vorgang kann eine Weile dauern.</qt>"
+ 
+ #: src/state.py:76
++#, fuzzy
+ msgid ""
+ "<qt>Following packages are obsoleted and are not maintained anymore in "
+ "Pardus 2009 repositories. These packages are going to be removed from your "
+-"system:<br><br> %1"
++"system."
+ msgstr ""
+ "<qt>Die folgenden Pakete sind überaltet, es gibt sie nicht mehr in den "
+ "Repositories von Pardus 2009. Die folgenden Pakete werden gleich von Ihrem "
+ "System entfernt:<br><br> %1"
+ 
+-#: src/state.py:77 src/maindialog.py:61
++#: src/state.py:77 src/maindialog.py:64
+ msgid "<br><br>Do you want to continue?</qt>"
+ msgstr "<br><br>Möchten sie fortfahren ?</qt>"
+ 
+-#: src/state.py:100
++#: src/state.py:101
+ msgid "Resolving dependencies..."
+ msgstr "Suche abhängige Pakete..."
+ 
+@@ -127,11 +128,11 @@
+ msgid "You are not authorized for this operation."
+ msgstr "Sie sind nicht autorisiert für diesen Vorgang."
+ 
+-#: src/maindialog.py:43
++#: src/maindialog.py:46
+ msgid "Upgrading from %1 to version 2009.1"
+ msgstr "Actualisiere von %1 auf Version 2009.1"
+ 
+-#: src/maindialog.py:60
++#: src/maindialog.py:63
+ msgid ""
+ "<qt>Upgrade to Pardus 2009.1 completed. Upgrade-manager will now restart the "
+ "system."
+@@ -139,7 +140,7 @@
+ "<qt>Der Upgrade auf Pardus 2009.1 ist abgeschlossen. Der Upgrade-Manager "
+ "wird jetzt Ihr System neu starten."
+ 
+-#: src/maindialog.py:67
++#: src/maindialog.py:70
+ msgid "Restart Later"
+ msgstr "Später Neustart durchführen"
+ 
+Index: po/sv.po
+===================================================================
+--- po/sv.po	(revision 29230)
++++ po/sv.po	(revision 29252)
+@@ -6,7 +6,7 @@
+ msgstr ""
+ "Project-Id-Version: upgrade-manager\n"
+ "Report-Msgid-Bugs-To: \n"
+-"POT-Creation-Date: 2010-03-09 11:50+0200\n"
++"POT-Creation-Date: 2010-05-10 13:17+0300\n"
+ "PO-Revision-Date: 2009-12-01 21:27+0100\n"
+ "Last-Translator: Patrik Karlsson <patrik@pardus.nu>\n"
+ "Language-Team: Swedish <pardus-translators@pardus.org.tr>\n"
+@@ -64,14 +64,14 @@
+ msgid ""
+ "<qt>Following packages are obsoleted and are not maintained anymore in "
+ "Pardus 2009 repositories. These packages are going to be removed from your "
+-"system:<br><br> %1"
++"system."
+ msgstr ""
+ 
+-#: src/state.py:77 src/maindialog.py:61
++#: src/state.py:77 src/maindialog.py:64
+ msgid "<br><br>Do you want to continue?</qt>"
+ msgstr "<br><br>Vill du fortsätta?</qt>"
+ 
+-#: src/state.py:100
++#: src/state.py:101
+ msgid "Resolving dependencies..."
+ msgstr "Löser beroenden..."
+ 
+@@ -120,17 +120,17 @@
+ msgid "You are not authorized for this operation."
+ msgstr ""
+ 
+-#: src/maindialog.py:43
++#: src/maindialog.py:46
+ msgid "Upgrading from %1 to version 2009.1"
+ msgstr ""
+ 
+-#: src/maindialog.py:60
++#: src/maindialog.py:63
+ msgid ""
+ "<qt>Upgrade to Pardus 2009.1 completed. Upgrade-manager will now restart the "
+ "system."
+ msgstr ""
+ 
+-#: src/maindialog.py:67
++#: src/maindialog.py:70
+ msgid "Restart Later"
+ msgstr "Starta om senare"
+ 
+Index: po/nl.po
+===================================================================
+--- po/nl.po	(revision 29230)
++++ po/nl.po	(revision 29252)
+@@ -7,7 +7,7 @@
+ msgstr ""
+ "Project-Id-Version: nl\n"
+ "Report-Msgid-Bugs-To: \n"
+-"POT-Creation-Date: 2010-03-09 11:50+0200\n"
++"POT-Creation-Date: 2010-05-10 13:17+0300\n"
+ "PO-Revision-Date: 07/12/09 12:29\n"
+ "Last-Translator: Antoon Tolboom <atolboo@gmail.com>\n"
+ "Language-Team: Nederlands <kde-i18n-nl@kde.org>\n"
+@@ -62,19 +62,20 @@
+ msgstr "<qt>Configuratie van pakketten. Dit kan meerdere minuten duren</qt>"
+ 
+ #: src/state.py:76
++#, fuzzy
+ msgid ""
+ "<qt>Following packages are obsoleted and are not maintained anymore in "
+ "Pardus 2009 repositories. These packages are going to be removed from your "
+-"system:<br><br> %1"
++"system."
+ msgstr ""
+ "<qt>De volgende pakketten zijn overbodig en worden in Pardus 2009 niet meer "
+ "ondersteund. Deze pakketten worden van het systeem verwijderd:<br><br> %1"
+ 
+-#: src/state.py:77 src/maindialog.py:61
++#: src/state.py:77 src/maindialog.py:64
+ msgid "<br><br>Do you want to continue?</qt>"
+ msgstr "<br><br>Wilt u doorgaan?</qt>"
+ 
+-#: src/state.py:100
++#: src/state.py:101
+ msgid "Resolving dependencies..."
+ msgstr "Oplossen van afhankelijkheden..."
+ 
+@@ -123,11 +124,11 @@
+ msgid "You are not authorized for this operation."
+ msgstr "U bent niet geautoriseerd voor deze handeling."
+ 
+-#: src/maindialog.py:43
++#: src/maindialog.py:46
+ msgid "Upgrading from %1 to version 2009.1"
+ msgstr "Opwaarderen van %1 naar versie 2009.1"
+ 
+-#: src/maindialog.py:60
++#: src/maindialog.py:63
+ msgid ""
+ "<qt>Upgrade to Pardus 2009.1 completed. Upgrade-manager will now restart the "
+ "system."
+@@ -135,7 +136,7 @@
+ "<qt>Opwaarderen naar Pardus 2009.1 is voltooid. Opwaardeerbeheer zal nu het "
+ "systeem herstarten."
+ 
+-#: src/maindialog.py:67
++#: src/maindialog.py:70
+ msgid "Restart Later"
+ msgstr "Later herstarten"
+ 

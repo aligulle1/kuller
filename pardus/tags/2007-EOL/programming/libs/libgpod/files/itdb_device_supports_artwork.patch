@@ -1,0 +1,83 @@
+diff -ur libgpod-0.4.2.orig/src/itdb_device.c libgpod-0.4.2/src/itdb_device.c
+--- libgpod-0.4.2.orig/src/itdb_device.c	2007-01-10 15:25:10.000000000 +0200
++++ libgpod-0.4.2/src/itdb_device.c	2008-04-15 18:03:00.000000000 +0300
+@@ -781,3 +781,53 @@
+     }
+     return NULL;
+ }
++
++/**
++ * itdb_device_supports_artwork:
++ * @device: an #Itdb_Device
++ *
++ * Indicates whether @device can display artwork or not. When dealing
++ * with a non-art capable ipod, no artwork data will be written to the
++ * iPod so you can spare calls to the artwork handling methods.
++ *
++ * Return value: true if @device can display artwork.
++ */
++gboolean itdb_device_supports_artwork (Itdb_Device *device)
++{
++	if (device == NULL) {
++		return FALSE;
++	}
++
++	return (itdb_device_get_artwork_formats (device) != NULL);
++}
++
++
++/**
++ * itdb_device_supports_photo:
++ * @device: an #Itdb_Device
++ *
++ * Indicates whether @device can display photos or not.
++ *
++ * Return value: true if @device can display photos.
++ */
++gboolean itdb_device_supports_photo (Itdb_Device *device)
++{
++	const Itdb_ArtworkFormat *formats;
++	const Itdb_ArtworkFormat *it;
++
++	if (device == NULL) {
++		return FALSE;
++	}
++
++	formats = itdb_device_get_artwork_formats (device);
++	if (formats == NULL) {
++		return FALSE;
++	}
++
++	it = formats;
++	while ((it->type != -1) && (it->type != ITDB_THUMB_PHOTO_FULL_SCREEN)) {
++		it++;
++	}
++
++	return (it->type != -1);
++}
+diff -ur libgpod-0.4.2.orig/src/itdb.h libgpod-0.4.2/src/itdb.h
+--- libgpod-0.4.2.orig/src/itdb.h	2007-01-14 17:15:50.000000000 +0200
++++ libgpod-0.4.2/src/itdb.h	2008-04-15 18:01:44.000000000 +0300
+@@ -944,6 +944,8 @@
+ 			      const gchar *field, const gchar *value);
+ const Itdb_IpodInfo *itdb_device_get_ipod_info (Itdb_Device *device);
+ const Itdb_IpodInfo *itdb_info_get_ipod_info_table (void);
++gboolean itdb_device_supports_artwork (Itdb_Device *device);
++gboolean itdb_device_supports_photo (Itdb_Device *device);
+ const gchar *itdb_info_get_ipod_model_name_string (Itdb_IpodModel model);
+ const gchar *itdb_info_get_ipod_generation_string (Itdb_IpodGeneration generation);
+ 
+diff -ur libgpod-0.4.2.orig/src/itdb_itunesdb.c libgpod-0.4.2/src/itdb_itunesdb.c
+--- libgpod-0.4.2.orig/src/itdb_itunesdb.c	2007-01-14 16:28:37.000000000 +0200
++++ libgpod-0.4.2/src/itdb_itunesdb.c	2008-04-15 18:04:04.000000000 +0300
+@@ -4363,8 +4363,9 @@
+        FIXME: figure out a way to store the artwork data when storing
+        to local directories. At the moment it's the application's task
+        to handle this. */
+-    if (itdb->device && itdb_device_get_artwork_formats(itdb->device))
++    if (itdb_device_supports_artwork (itdb->device)) {
+ 		ipod_write_artwork_db (itdb);
++    }
+ #endif
+ 
+     fexp = g_new0 (FExport, 1);

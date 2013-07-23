@@ -1,0 +1,206 @@
+diff -up wget-1.11/NEWS.rhpath wget-1.11/NEWS
+--- wget-1.11/NEWS.rhpath	2008-01-26 10:26:56.000000000 +0100
++++ wget-1.11/NEWS	2008-01-27 00:01:56.000000000 +0100
+@@ -444,7 +444,7 @@ distributed with Wget.
+ 
+ ** Compiles on pre-ANSI compilers.
+ 
+-** Global wgetrc now goes to /usr/local/etc (i.e. $sysconfdir).
++** Global wgetrc now goes to /etc (i.e. $sysconfdir).
+ 
+ ** Lots of bugfixes.
+ 
+@@ -507,7 +507,7 @@ Emacs, standalone info, or converted to 
+ ** Fixed a long-standing bug, so that Wget now works over SLIP
+ connections.
+ 
+-** You can have a system-wide wgetrc (/usr/local/lib/wgetrc by
++** You can have a system-wide wgetrc (/etc/wgetrc by
+ default). Settings in $HOME/.wgetrc override the global ones, of
+ course :-)
+ 
+diff -up wget-1.11/README.rhpath wget-1.11/README
+--- wget-1.11/README.rhpath	2008-01-27 00:02:29.000000000 +0100
++++ wget-1.11/README	2008-01-27 00:02:40.000000000 +0100
+@@ -33,7 +33,7 @@ for socks.
+ 
+ Most of the features are configurable, either through command-line
+ options, or via initialization file .wgetrc.  Wget allows you to
+-install a global startup file (/usr/local/etc/wgetrc by default) for
++install a global startup file (/etc/wgetrc by default) for
+ site settings.
+ 
+ Wget works under almost all Unix variants in use today and, unlike
+diff -up wget-1.11/doc/sample.wgetrc.rhpath wget-1.11/doc/sample.wgetrc
+--- wget-1.11/doc/sample.wgetrc.rhpath	2008-01-26 10:26:56.000000000 +0100
++++ wget-1.11/doc/sample.wgetrc	2008-01-27 00:01:56.000000000 +0100
+@@ -7,7 +7,7 @@
+ ## not contain a comprehensive list of commands -- look at the manual
+ ## to find out what you can put into this file.
+ ## 
+-## Wget initialization file can reside in /usr/local/etc/wgetrc
++## Wget initialization file can reside in /etc/wgetrc
+ ## (global, for all users) or $HOME/.wgetrc (for a single user).
+ ##
+ ## To use the settings in this file, you will have to uncomment them,
+@@ -16,7 +16,7 @@
+ 
+ 
+ ##
+-## Global settings (useful for setting up in /usr/local/etc/wgetrc).
++## Global settings (useful for setting up in /etc/wgetrc).
+ ## Think well before you change them, since they may reduce wget's
+ ## functionality, and make it behave contrary to the documentation:
+ ##
+diff -up wget-1.11/doc/wget.1.rhpath wget-1.11/doc/wget.1
+--- wget-1.11/doc/wget.1.rhpath	2008-01-26 10:56:05.000000000 +0100
++++ wget-1.11/doc/wget.1	2008-01-27 00:01:56.000000000 +0100
+@@ -1706,8 +1706,8 @@ This is a useful option, since it guaran
+ \&\fIbelow\fR a certain hierarchy will be downloaded.
+ .SH "FILES"
+ .IX Header "FILES"
+-.IP "\fB/usr/local/etc/wgetrc\fR" 4
+-.IX Item "/usr/local/etc/wgetrc"
++.IP "\fB/etc/wgetrc\fR" 4
++.IX Item "/etc/wgetrc"
+ Default location of the \fIglobal\fR startup file.
+ .IP "\fB.wgetrc\fR" 4
+ .IX Item ".wgetrc"
+diff -up wget-1.11/doc/wget.texi.rhpath wget-1.11/doc/wget.texi
+--- wget-1.11/doc/wget.texi.rhpath	2008-01-26 10:26:56.000000000 +0100
++++ wget-1.11/doc/wget.texi	2008-01-27 00:01:56.000000000 +0100
+@@ -199,12 +199,12 @@ gauge can be customized to your preferen
+ Most of the features are fully configurable, either through command line
+ options, or via the initialization file @file{.wgetrc} (@pxref{Startup
+ File}).  Wget allows you to define @dfn{global} startup files
+-(@file{/usr/local/etc/wgetrc} by default) for site settings.
++(@file{/etc/wgetrc} by default) for site settings.
+ 
+ @ignore
+ @c man begin FILES
+ @table @samp
+-@item /usr/local/etc/wgetrc
++@item /etc/wgetrc
+ Default location of the @dfn{global} startup file.
+ 
+ @item .wgetrc
+@@ -465,8 +465,6 @@ administrator may have chosen to compile
+ which case @samp{-d} will not work.  Please note that compiling with
+ debug support is always safe---Wget compiled with the debug support will
+ @emph{not} print any debug info unless requested with @samp{-d}.
+-@xref{Reporting Bugs}, for more information on how to use @samp{-d} for
+-sending bug reports.
+ 
+ @cindex quiet
+ @item -q
+@@ -909,7 +907,7 @@ When mode is set to ``windows'', Wget es
+ @samp{>}, and the control characters in the ranges 0--31 and 128--159.
+ In addition to this, Wget in Windows mode uses @samp{+} instead of
+ @samp{:} to separate host and port in local file names, and uses
+-@samp{@@} instead of @samp{?} to separate the query portion of the file
++@samp{ @@ } instead of @samp{ ? } to separate the query portion of the file
+ name from the rest.  Therefore, a URL that would be saved as
+ @samp{www.xemacs.org:4300/search.pl?input=blah} in Unix mode would be
+ saved as @samp{www.xemacs.org+4300/search.pl@@input=blah} in Windows
+@@ -1149,7 +1147,7 @@ browser sends when communicating with th
+ would send in the same situation.  Different browsers keep textual
+ cookie files in different locations:
+ 
+-@table @asis
++@table @samp
+ @item Netscape 4.x.
+ The cookies are in @file{~/.netscape/cookies.txt}.
+ 
+@@ -2450,9 +2448,7 @@ commands.
+ @cindex location of wgetrc
+ 
+ When initializing, Wget will look for a @dfn{global} startup file,
+-@file{/usr/local/etc/wgetrc} by default (or some prefix other than
+-@file{/usr/local}, if Wget was not installed there) and read commands
+-from there, if it exists.
++@file{/etc/wgetrc} by default and read commands from there, if it exists.
+ 
+ Then it will look for the user's file.  If the environmental variable
+ @code{WGETRC} is set, Wget will try to load that file.  Failing that, no
+@@ -2462,8 +2458,7 @@ If @code{WGETRC} is not set, Wget will t
+ 
+ The fact that user's settings are loaded after the system-wide ones
+ means that in case of collision user's wgetrc @emph{overrides} the
+-system-wide wgetrc (in @file{/usr/local/etc/wgetrc} by default).
+-Fascist admins, away!
++system-wide wgetrc (in @file{/etc/wgetrc} by default).
+ 
+ @node Wgetrc Syntax
+ @section Wgetrc Syntax
+@@ -2509,7 +2504,7 @@ Most of these commands have direct comma
+ wgetrc command can be specified on the command line using the
+ @samp{--execute} switch (@pxref{Basic Startup Options}.)
+ 
+-@table @asis
++@table @samp
+ @item accept/reject = @var{string}
+ Same as @samp{-A}/@samp{-R} (@pxref{Types of Files}).
+ 
+diff -up wget-1.11/doc/wget.pod.rhpath wget-1.11/doc/wget.pod
+--- wget-1.11/doc/wget.pod.rhpath	2008-01-26 10:56:05.000000000 +0100
++++ wget-1.11/doc/wget.pod	2008-01-27 00:01:56.000000000 +0100
+@@ -1829,7 +1829,7 @@ I<below> a certain hierarchy will be dow
+ =over 4
+ 
+ 
+-=item B</usr/local/etc/wgetrc>
++=item B</etc/wgetrc>
+ 
+ Default location of the I<global> startup file.
+ 
+diff -up wget-1.11/doc/wget.info.rhpath wget-1.11/doc/wget.info
+--- wget-1.11/doc/wget.info.rhpath	2008-01-26 10:56:04.000000000 +0100
++++ wget-1.11/doc/wget.info	2008-01-27 00:01:56.000000000 +0100
+@@ -112,7 +112,7 @@ retrieval through HTTP proxies.
+    * Most of the features are fully configurable, either through
+      command line options, or via the initialization file `.wgetrc'
+      (*note Startup File::).  Wget allows you to define "global"
+-     startup files (`/usr/local/etc/wgetrc' by default) for site
++     startup files (`/etc/wgetrc' by default) for site
+      settings.
+ 
+    * Finally, GNU Wget is free software.  This means that everyone may
+@@ -2144,9 +2144,7 @@ File: wget.info,  Node: Wgetrc Location,
+ ===================
+ 
+ When initializing, Wget will look for a "global" startup file,
+-`/usr/local/etc/wgetrc' by default (or some prefix other than
+-`/usr/local', if Wget was not installed there) and read commands from
+-there, if it exists.
++`/etc/wgetrc' by default and read commands from there, if it exists.
+ 
+    Then it will look for the user's file.  If the environmental variable
+ `WGETRC' is set, Wget will try to load that file.  Failing that, no
+@@ -2156,8 +2154,7 @@ further attempts will be made.
+ 
+    The fact that user's settings are loaded after the system-wide ones
+ means that in case of collision user's wgetrc _overrides_ the
+-system-wide wgetrc (in `/usr/local/etc/wgetrc' by default).  Fascist
+-admins, away!
++system-wide wgetrc (in `/etc/wgetrc' by default).
+ 
+ 
+ File: wget.info,  Node: Wgetrc Syntax,  Next: Wgetrc Commands,  Prev: Wgetrc Location,  Up: Startup File
+@@ -2625,7 +2622,7 @@ its line.
+      ## not contain a comprehensive list of commands -- look at the manual
+      ## to find out what you can put into this file.
+      ##
+-     ## Wget initialization file can reside in /usr/local/etc/wgetrc
++     ## Wget initialization file can reside in /etc/wgetrc
+      ## (global, for all users) or $HOME/.wgetrc (for a single user).
+      ##
+      ## To use the settings in this file, you will have to uncomment them,
+@@ -2634,7 +2631,7 @@ its line.
+ 
+ 
+      ##
+-     ## Global settings (useful for setting up in /usr/local/etc/wgetrc).
++     ## Global settings (useful for setting up in /etc/wgetrc).
+      ## Think well before you change them, since they may reduce wget's
+      ## functionality, and make it behave contrary to the documentation:
+      ##

@@ -1,0 +1,137 @@
+diff -Naur XBMC.orig.shared/Makefile.in XBMC.shared/Makefile.in
+--- XBMC.orig.shared/Makefile.in	2009-01-09 17:12:55.000000000 +0200
++++ XBMC.shared/Makefile.in	2009-01-09 18:31:13.000000000 +0200
+@@ -222,17 +222,17 @@
+ 	xbmc/FileSystem/VideoDatabaseDirectory/*.o \
+ 	`pkg-config --libs libcdio` \
+ 	xbmc/lib/libcmyth/*.o \
+-	xbmc/lib/libGoAhead/libGoAhead-@ARCH@.a \
++	system/libGoAhead-@ARCH@.so \
+ 	xbmc/lib/libPython/*.o \
+ 	xbmc/lib/libPython/xbmcmodule/*.o \
+ 	xbmc/lib/libRTMP/*.o \
+-	xbmc/lib/libRTV/librtv-@ARCH@.a \
++	system/librtv-@ARCH@.so \
+ 	xbmc/lib/libscrobbler/*.o \
+-	xbmc/lib/libshout/libshout-@ARCH@.a \
++	system/libshout-@ARCH@.so \
+ 	xbmc/lib/libsmb/libsmbclient-@ARCH@.a \
+-	xbmc/lib/libUPnP/libupnp-@ARCH@.a \
+-	xbmc/lib/libXBMS/libxbms-@ARCH@.a \
+-	xbmc/lib/libXDAAP/libxdaap-@ARCH@.a \
++	system/libupnp-@ARCH@.so \
++	system/libxbms-@ARCH@.so \
++	system/libxdaap-@ARCH@.so \
+ 	xbmc/lib/sqLite/*.o \
+ 	xbmc/lib/UnrarXLib/*.o \
+ 	xbmc/linux/*.o \
+diff -Naur XBMC.orig.shared/xbmc/lib/libGoAhead/Makefile.in XBMC.shared/xbmc/lib/libGoAhead/Makefile.in
+--- XBMC.orig.shared/xbmc/lib/libGoAhead/Makefile.in	2009-01-09 17:12:28.000000000 +0200
++++ XBMC.shared/xbmc/lib/libGoAhead/Makefile.in	2009-01-09 17:57:09.000000000 +0200
+@@ -19,7 +19,7 @@
+ # Digest Access switch
+ DASW	= -DDIGEST_ACCESS_SUPPORT
+ 
+-LIB=libGoAhead-@ARCH@.a
++LIB=libGoAhead-@ARCH@.so
+ 
+ #
+ #	SSL switches
+@@ -74,7 +74,8 @@
+ #	Build archive of objects
+ #
+ $(LIB): $(OBJS)
+-	$(AR) $(ARFLAGS) $(LIB) $?
++	$(CC) $(CFLAGS) -fPIC -shared -Wl -o $(LIB) $(OBJS) -lm -ldl
++	mv $(LIB) ../../../system
+ 
+ #
+ #	Primary link
+diff -Naur XBMC.orig.shared/xbmc/lib/libRTV/Makefile.in XBMC.shared/xbmc/lib/libRTV/Makefile.in
+--- XBMC.orig.shared/xbmc/lib/libRTV/Makefile.in	2009-01-09 17:12:44.000000000 +0200
++++ XBMC.shared/xbmc/lib/libRTV/Makefile.in	2009-01-09 17:57:30.000000000 +0200
+@@ -4,9 +4,10 @@
+ 
+ include ../../../Makefile.include
+ 
+-LIB= librtv-@ARCH@.a
++LIB= librtv-@ARCH@.so
+ 
+ lib: $(LIB)
+ 
+ $(LIB) : $(OBJS)
+-	ar rs $@  $(OBJS)
++	$(CC) $(CFLAGS) -fPIC -shared -Wl -o $(LIB) $(OBJS) -lm -ldl
++	mv $(LIB) ../../../system
+diff -Naur XBMC.orig.shared/xbmc/lib/libshout/Makefile.in XBMC.shared/xbmc/lib/libshout/Makefile.in
+--- XBMC.orig.shared/xbmc/lib/libshout/Makefile.in	2009-01-09 17:12:28.000000000 +0200
++++ XBMC.shared/xbmc/lib/libshout/Makefile.in	2009-01-09 17:58:01.000000000 +0200
+@@ -4,9 +4,10 @@
+ 
+ CFLAGS += -D__UNIX__ -DXBMC 
+ 
+-LIB=libshout-@ARCH@.a
++LIB=libshout-@ARCH@.so
+ 
+ lib: $(LIB)
+ 
+ $(LIB) : $(OBJS)
+-	ar rs $@  $(OBJS)
++	$(CC) $(CFLAGS) -fPIC -shared -Wl -o $(LIB) $(OBJS) -lm -ldl
++	mv $(LIB) ../../../system
+diff -Naur XBMC.orig.shared/xbmc/lib/libUPnP/Makefile.in XBMC.shared/xbmc/lib/libUPnP/Makefile.in
+--- XBMC.orig.shared/xbmc/lib/libUPnP/Makefile.in	2009-01-09 17:12:27.000000000 +0200
++++ XBMC.shared/xbmc/lib/libUPnP/Makefile.in	2009-01-09 17:58:21.000000000 +0200
+@@ -73,7 +73,7 @@
+ 
+ INCLUDES=-I./Platinum/ThirdParty/Neptune/Source/Core -I./Platinum/Source/Core -I./Platinum/Source/Devices/MediaServer -I./Platinum/ThirdParty/Neptune/Source/System/Posix
+ 
+-LIB=libupnp-@ARCH@.a
++LIB=libupnp-@ARCH@.so
+ 
+ include ../../../Makefile.include
+ -include $(filter %.P, $(OBJS:.o=.P))
+@@ -81,4 +81,5 @@
+ lib: $(LIB)
+ 
+ $(LIB): $(OBJS)
+-	$(AR) rs $@ $(OBJS)
++	$(CC) $(CFLAGS) -fPIC -shared -Wl -o $(LIB) $(OBJS) -lm -ldl
++	mv $(LIB) ../../../system
+diff -Naur XBMC.orig.shared/xbmc/lib/libXBMS/Makefile.in XBMC.shared/xbmc/lib/libXBMS/Makefile.in
+--- XBMC.orig.shared/xbmc/lib/libXBMS/Makefile.in	2009-01-09 17:12:29.000000000 +0200
++++ XBMC.shared/xbmc/lib/libXBMS/Makefile.in	2009-01-09 17:58:43.000000000 +0200
+@@ -1,13 +1,14 @@
+ CFLAGS += -D_LINUX
+ 
+-LIB=libxbms-@ARCH@.a
++LIB=libxbms-@ARCH@.so
+ 
+ OBJS := ccbuffer.o ccutil.o ccxclient.o ccxclientconnxbox.o ccxdiscover.o ccxencode.o ccxmltrans.o
+ 
+ lib: $(LIB)
+ 
+ $(LIB): $(OBJS)
+-	$(AR) $(ARFLAGS) $@ $(OBJS)
++	$(CC) $(CFLAGS) -fPIC -shared -Wl -o $(LIB) $(OBJS) -lm -ldl
++	mv $(LIB) ../../../system
+ 
+ include ../../../Makefile.include
+ 
+diff -Naur XBMC.orig.shared/xbmc/lib/libXDAAP/Makefile.in XBMC.shared/xbmc/lib/libXDAAP/Makefile.in
+--- XBMC.orig.shared/xbmc/lib/libXDAAP/Makefile.in	2009-01-09 17:12:27.000000000 +0200
++++ XBMC.shared/xbmc/lib/libXDAAP/Makefile.in	2009-01-09 17:59:36.000000000 +0200
+@@ -3,9 +3,10 @@
+ 
+ include ../../../Makefile.include
+ 
+-LIB=libxdaap-@ARCH@.a
++LIB=libxdaap-@ARCH@.so
+ 
+ lib: $(LIB)
+ 
+-libxdaap-@ARCH@.a: $(OBJS)
+-	$(AR) $(ARFLAGS) $@ $(OBJS)
++$(LIB): $(OBJS)
++	$(CC) $(CFLAGS) -fPIC -shared -Wl -o $(LIB) $(OBJS) -lm -ldl
++	mv $(LIB) ../../../system

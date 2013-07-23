@@ -1,0 +1,16 @@
+Index: linux-2.6.18/drivers/acpi/processor_perflib.c
+===================================================================
+--- linux-2.6.18.orig/drivers/acpi/processor_perflib.c
++++ linux-2.6.18/drivers/acpi/processor_perflib.c
+@@ -83,10 +83,8 @@ static int acpi_processor_ppc_notifier(s
+ 		goto out;
+ 
+ 	ppc = (unsigned int)pr->performance_platform_limit;
+-	if (!ppc)
+-		goto out;
+ 
+-	if (ppc > pr->performance->state_count)
++	if (ppc >= pr->performance->state_count)
+ 		goto out;
+ 
+ 	cpufreq_verify_within_limits(policy, 0,

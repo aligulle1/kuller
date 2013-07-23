@@ -1,0 +1,636 @@
+Index: services/strigi/config.cpp
+===================================================================
+--- nepomuk/services/strigi/config.cpp	(revision 918562)
++++ nepomuk/services/strigi/config.cpp	(revision 918563)
+@@ -1,133 +0,0 @@
+-/* This file is part of the KDE Project
+-   Copyright (c) 2008 Sebastian Trueg <trueg@kde.org>
+-
+-   This library is free software; you can redistribute it and/or
+-   modify it under the terms of the GNU Library General Public
+-   License version 2 as published by the Free Software Foundation.
+-
+-   This library is distributed in the hope that it will be useful,
+-   but WITHOUT ANY WARRANTY; without even the implied warranty of
+-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+-   Library General Public License for more details.
+-
+-   You should have received a copy of the GNU Library General Public License
+-   along with this library; see the file COPYING.LIB.  If not, write to
+-   the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+-   Boston, MA 02110-1301, USA.
+-*/
+-
+-#include "config.h"
+-
+-#include <QtCore/QStringList>
+-#include <QtCore/QDir>
+-
+-#include <kdirwatch.h>
+-#include <kstandarddirs.h>
+-#include <kconfiggroup.h>
+-
+-
+-Nepomuk::Config::Config()
+-    : QObject(),
+-      m_config( "nepomukstrigirc" )
+-{
+-    KDirWatch* dirWatch = KDirWatch::self();
+-    connect( dirWatch, SIGNAL( dirty( const QString& ) ),
+-             this, SLOT( slotConfigDirty() ) );
+-    connect( dirWatch, SIGNAL( created( const QString& ) ),
+-             this, SLOT( slotConfigDirty() ) );
+-    dirWatch->addFile( KStandardDirs::locateLocal( "config", m_config.name() ) );
+-}
+-
+-
+-Nepomuk::Config::~Config()
+-{
+-    m_config.group( "General" ).writeEntry( "first run", false );
+-}
+-
+-
+-Nepomuk::Config* Nepomuk::Config::self()
+-{
+-    K_GLOBAL_STATIC( Config, _self );
+-    return _self;
+-}
+-
+-
+-QStringList Nepomuk::Config::folders() const
+-{
+-    return m_config.group( "General" ).readPathEntry( "folders", QStringList() << QDir::homePath() );
+-}
+-
+-
+-QStringList Nepomuk::Config::excludeFolders() const
+-{
+-    return m_config.group( "General" ).readPathEntry( "exclude folders", QStringList() );
+-}
+-
+-
+-QStringList Nepomuk::Config::excludeFilters() const
+-{
+-    return m_config.group( "General" ).readEntry( "exclude filters", QStringList() << ".*/" << ".*" << "*~" << "*.part" );
+-}
+-
+-
+-QStringList Nepomuk::Config::includeFilters() const
+-{
+-    return m_config.group( "General" ).readEntry( "include filters", QStringList() );
+-}
+-
+-
+-KIO::filesize_t Nepomuk::Config::minDiskSpace() const
+-{
+-    // default: 200 MB
+-    return m_config.group( "General" ).readEntry( "min disk space", KIO::filesize_t( 200*1024*1024 ) );
+-}
+-
+-
+-void Nepomuk::Config::slotConfigDirty()
+-{
+-    m_config.reparseConfiguration();
+-    emit configChanged();
+-}
+-
+-
+-bool Nepomuk::Config::showGui() const
+-{
+-    return m_config.group( "General" ).readEntry( "show gui", true );
+-}
+-
+-
+-void Nepomuk::Config::setShowGui( bool showGui )
+-{
+-    m_config.group( "General" ).writeEntry( "show gui", showGui );
+-}
+-
+-
+-bool Nepomuk::Config::isInitialRun() const
+-{
+-    return m_config.group( "General" ).readEntry( "first run", true );
+-}
+-
+-
+-bool Nepomuk::Config::shouldFolderBeIndexed( const QString& path )
+-{
+-    QStringList inDirs = folders();
+-    QStringList exDirs = excludeFolders();
+-
+-    if( inDirs.contains( path ) ) {
+-        return true;
+-    }
+-    else if( exDirs.contains( path ) ) {
+-        return false;
+-    }
+-    else {
+-        QString parent = path.section( QDir::separator(), 0, -2, QString::SectionSkipEmpty|QString::SectionIncludeLeadingSep );
+-        if( parent.isEmpty() ) {
+-            return false;
+-        }
+-        else {
+-            return shouldFolderBeIndexed( parent );
+-        }
+-    }
+-}
+-
+-#include "config.moc"
+Index: services/strigi/config.h
+===================================================================
+--- nepomuk/services/strigi/config.h	(revision 918562)
++++ nepomuk/services/strigi/config.h	(revision 918563)
+@@ -1,89 +0,0 @@
+-/* This file is part of the KDE Project
+-   Copyright (c) 2008 Sebastian Trueg <trueg@kde.org>
+-
+-   This library is free software; you can redistribute it and/or
+-   modify it under the terms of the GNU Library General Public
+-   License version 2 as published by the Free Software Foundation.
+-
+-   This library is distributed in the hope that it will be useful,
+-   but WITHOUT ANY WARRANTY; without even the implied warranty of
+-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+-   Library General Public License for more details.
+-
+-   You should have received a copy of the GNU Library General Public License
+-   along with this library; see the file COPYING.LIB.  If not, write to
+-   the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+-   Boston, MA 02110-1301, USA.
+-*/
+-
+-#ifndef _NEPOMUK_STRIGI_CONFIG_H_
+-#define _NEPOMUK_STRIGI_CONFIG_H_
+-
+-#include <QtCore/QObject>
+-
+-#include <kconfig.h>
+-#include <kio/global.h>
+-
+-
+-namespace Nepomuk {
+-    /**
+-     * Active config class which emits signals if the config
+-     * was changed, for example if the KCM saved the config file.
+-     */
+-    class Config : public QObject
+-    {
+-        Q_OBJECT
+-
+-    public:
+-        ~Config();
+-        static Config* self();
+-
+-        /**
+-         * The folders to search for files to analyze
+-         */
+-        QStringList folders() const;
+-
+-        /**
+-         * The folders that should be excluded.
+-         * It is perfectly possible to include subfolders again.
+-         */
+-        QStringList excludeFolders() const;
+-
+-        QStringList excludeFilters() const;
+-        QStringList includeFilters() const;
+-
+-        bool showGui() const;
+-        void setShowGui( bool showGui );
+-
+-        /**
+-         * The minimal available disk space. If it drops below
+-         * indexing will be suspended.
+-         */
+-        KIO::filesize_t minDiskSpace() const;
+-
+-        /**
+-         * true the first time the service is run (or after manually
+-         * tampering with the config.
+-         */
+-        bool isInitialRun() const;
+-
+-        /**
+-         * Check if the folder should be indexed based on 
+-         * folders() and excludeFolders()
+-         */
+-        bool shouldFolderBeIndexed( const QString& );
+-
+-    Q_SIGNALS:
+-        void configChanged();
+-
+-    private Q_SLOTS:
+-        void slotConfigDirty();
+-
+-    private:
+-        Config();
+-
+-        KConfig m_config;
+-    };
+-}
+-
+-#endif
+Index: services/strigi/filesystemwatcher.cpp
+===================================================================
+--- nepomuk/services/strigi/filesystemwatcher.cpp	(revision 918562)
++++ nepomuk/services/strigi/filesystemwatcher.cpp	(revision 918563)
+@@ -127,7 +127,7 @@
+ {
+     cache.clear();
+ 
+-    foreach( QString folder, folders ) {
++    foreach( QString folder, folders ) { // krazy:exclude=foreach
+         if ( folder.endsWith( '/' ) )
+             folder.truncate( folder.length()-1 );
+         FolderEntry entry( mTime );
+Index: services/strigi/indexscheduler.cpp
+===================================================================
+--- nepomuk/services/strigi/indexscheduler.cpp	(revision 918562)
++++ nepomuk/services/strigi/indexscheduler.cpp	(revision 918563)
+@@ -20,7 +20,7 @@
+ */
+ 
+ #include "indexscheduler.h"
+-#include "config.h"
++#include "strigiserviceconfig.h"
+ 
+ #include <QtCore/QMutexLocker>
+ #include <QtCore/QList>
+@@ -106,7 +106,7 @@
+ {
+     m_analyzerConfig = new StoppableConfiguration;
+ 
+-    connect( Config::self(), SIGNAL( configChanged() ),
++    connect( StrigiServiceConfig::self(), SIGNAL( configChanged() ),
+              this, SLOT( readConfig() ) );
+ }
+ 
+@@ -206,7 +206,7 @@
+ 
+     // do the actual indexing
+     m_dirsToUpdate.clear();
+-    foreach( const QString& f, Config::self()->folders() )
++    foreach( const QString& f, StrigiServiceConfig::self()->folders() )
+         m_dirsToUpdate << qMakePair( f, UpdateRecursive|AutoUpdateFolder );
+ 
+     while ( 1 ) {
+@@ -324,7 +324,7 @@
+     // compare m_currentFolder)
+     if ( recursive ) {
+         foreach( const QString& folder, subFolders ) {
+-            if ( !Config::self()->excludeFolders().contains( folder ) &&
++            if ( !StrigiServiceConfig::self()->excludeFolders().contains( folder ) &&
+                  !updateDir( folder, analyzer, true ) )
+                 return false;
+         }
+@@ -389,7 +389,7 @@
+     }
+ 
+     // update everything again in case the folders changed
+-    foreach( const QString& f, Config::self()->folders() )
++    foreach( const QString& f, StrigiServiceConfig::self()->folders() )
+         m_dirsToUpdate << qMakePair( f, UpdateRecursive|AutoUpdateFolder );
+ 
+     m_dirsToUpdateWc.wakeAll();
+@@ -400,8 +400,8 @@
+ {
+     // load Strigi configuration
+     std::vector<std::pair<bool, std::string> > filters;
+-    QStringList excludeFilters = Config::self()->excludeFilters();
+-    QStringList includeFilters = Config::self()->includeFilters();
++    QStringList excludeFilters = StrigiServiceConfig::self()->excludeFilters();
++    QStringList includeFilters = StrigiServiceConfig::self()->includeFilters();
+     foreach( const QString& filter, excludeFilters ) {
+         filters.push_back( std::make_pair<bool, std::string>( false, filter.toUtf8().data() ) );
+     }
+Index: services/strigi/strigiserviceconfig.cpp
+===================================================================
+--- nepomuk/services/strigi/strigiserviceconfig.cpp	(revision 0)
++++ nepomuk/services/strigi/strigiserviceconfig.cpp	(revision 918563)
+@@ -0,0 +1,133 @@
++/* This file is part of the KDE Project
++   Copyright (c) 2008-2009 Sebastian Trueg <trueg@kde.org>
++
++   This library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Library General Public
++   License version 2 as published by the Free Software Foundation.
++
++   This library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Library General Public License for more details.
++
++   You should have received a copy of the GNU Library General Public License
++   along with this library; see the file COPYING.LIB.  If not, write to
++   the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
++   Boston, MA 02110-1301, USA.
++*/
++
++#include "strigiserviceconfig.h"
++
++#include <QtCore/QStringList>
++#include <QtCore/QDir>
++
++#include <kdirwatch.h>
++#include <kstandarddirs.h>
++#include <kconfiggroup.h>
++
++
++Nepomuk::StrigiServiceConfig::StrigiServiceConfig()
++    : QObject(),
++      m_config( "nepomukstrigirc" )
++{
++    KDirWatch* dirWatch = KDirWatch::self();
++    connect( dirWatch, SIGNAL( dirty( const QString& ) ),
++             this, SLOT( slotConfigDirty() ) );
++    connect( dirWatch, SIGNAL( created( const QString& ) ),
++             this, SLOT( slotConfigDirty() ) );
++    dirWatch->addFile( KStandardDirs::locateLocal( "config", m_config.name() ) );
++}
++
++
++Nepomuk::StrigiServiceConfig::~StrigiServiceConfig()
++{
++    m_config.group( "General" ).writeEntry( "first run", false );
++}
++
++
++Nepomuk::StrigiServiceConfig* Nepomuk::StrigiServiceConfig::self()
++{
++    K_GLOBAL_STATIC( StrigiServiceConfig, _self );
++    return _self;
++}
++
++
++QStringList Nepomuk::StrigiServiceConfig::folders() const
++{
++    return m_config.group( "General" ).readPathEntry( "folders", QStringList() << QDir::homePath() );
++}
++
++
++QStringList Nepomuk::StrigiServiceConfig::excludeFolders() const
++{
++    return m_config.group( "General" ).readPathEntry( "exclude folders", QStringList() );
++}
++
++
++QStringList Nepomuk::StrigiServiceConfig::excludeFilters() const
++{
++    return m_config.group( "General" ).readEntry( "exclude filters", QStringList() << ".*/" << ".*" << "*~" << "*.part" );
++}
++
++
++QStringList Nepomuk::StrigiServiceConfig::includeFilters() const
++{
++    return m_config.group( "General" ).readEntry( "include filters", QStringList() );
++}
++
++
++KIO::filesize_t Nepomuk::StrigiServiceConfig::minDiskSpace() const
++{
++    // default: 200 MB
++    return m_config.group( "General" ).readEntry( "min disk space", KIO::filesize_t( 200*1024*1024 ) );
++}
++
++
++void Nepomuk::StrigiServiceConfig::slotConfigDirty()
++{
++    m_config.reparseConfiguration();
++    emit configChanged();
++}
++
++
++bool Nepomuk::StrigiServiceConfig::showGui() const
++{
++    return m_config.group( "General" ).readEntry( "show gui", true );
++}
++
++
++void Nepomuk::StrigiServiceConfig::setShowGui( bool showGui )
++{
++    m_config.group( "General" ).writeEntry( "show gui", showGui );
++}
++
++
++bool Nepomuk::StrigiServiceConfig::isInitialRun() const
++{
++    return m_config.group( "General" ).readEntry( "first run", true );
++}
++
++
++bool Nepomuk::StrigiServiceConfig::shouldFolderBeIndexed( const QString& path )
++{
++    QStringList inDirs = folders();
++    QStringList exDirs = excludeFolders();
++
++    if( inDirs.contains( path ) ) {
++        return true;
++    }
++    else if( exDirs.contains( path ) ) {
++        return false;
++    }
++    else {
++        QString parent = path.section( QDir::separator(), 0, -2, QString::SectionSkipEmpty|QString::SectionIncludeLeadingSep );
++        if( parent.isEmpty() ) {
++            return false;
++        }
++        else {
++            return shouldFolderBeIndexed( parent );
++        }
++    }
++}
++
++#include "strigiserviceconfig.moc"
+
+Property changes on: services/strigi/strigiserviceconfig.cpp
+___________________________________________________________________
+Added: svn:mergeinfo
+   Merged /branches/KDE/4.0/kdebase/runtime/nepomuk/services/strigi/config.cpp:r758600,758610
+
+Index: services/strigi/strigiserviceconfig.h
+===================================================================
+--- nepomuk/services/strigi/strigiserviceconfig.h	(revision 0)
++++ nepomuk/services/strigi/strigiserviceconfig.h	(revision 918563)
+@@ -0,0 +1,89 @@
++/* This file is part of the KDE Project
++   Copyright (c) 2008-2009 Sebastian Trueg <trueg@kde.org>
++
++   This library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Library General Public
++   License version 2 as published by the Free Software Foundation.
++
++   This library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Library General Public License for more details.
++
++   You should have received a copy of the GNU Library General Public License
++   along with this library; see the file COPYING.LIB.  If not, write to
++   the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
++   Boston, MA 02110-1301, USA.
++*/
++
++#ifndef _NEPOMUK_STRIGI_SERVICE_CONFIG_H_
++#define _NEPOMUK_STRIGI_SERVICE_CONFIG_H_
++
++#include <QtCore/QObject>
++
++#include <kconfig.h>
++#include <kio/global.h>
++
++
++namespace Nepomuk {
++    /**
++     * Active config class which emits signals if the config
++     * was changed, for example if the KCM saved the config file.
++     */
++    class StrigiServiceConfig : public QObject
++    {
++        Q_OBJECT
++
++    public:
++        ~StrigiServiceConfig();
++        static StrigiServiceConfig* self();
++
++        /**
++         * The folders to search for files to analyze
++         */
++        QStringList folders() const;
++
++        /**
++         * The folders that should be excluded.
++         * It is perfectly possible to include subfolders again.
++         */
++        QStringList excludeFolders() const;
++
++        QStringList excludeFilters() const;
++        QStringList includeFilters() const;
++
++        bool showGui() const;
++        void setShowGui( bool showGui );
++
++        /**
++         * The minimal available disk space. If it drops below
++         * indexing will be suspended.
++         */
++        KIO::filesize_t minDiskSpace() const;
++
++        /**
++         * true the first time the service is run (or after manually
++         * tampering with the config.
++         */
++        bool isInitialRun() const;
++
++        /**
++         * Check if the folder should be indexed based on 
++         * folders() and excludeFolders()
++         */
++        bool shouldFolderBeIndexed( const QString& );
++
++    Q_SIGNALS:
++        void configChanged();
++
++    private Q_SLOTS:
++        void slotConfigDirty();
++
++    private:
++        StrigiServiceConfig();
++
++        KConfig m_config;
++    };
++}
++
++#endif
+
+Property changes on: services/strigi/strigiserviceconfig.h
+___________________________________________________________________
+Added: svn:mergeinfo
+   Merged /branches/KDE/4.0/kdebase/runtime/nepomuk/services/strigi/config.h:r758600,758610
+
+Index: services/strigi/strigiservice.cpp
+===================================================================
+--- nepomuk/services/strigi/strigiservice.cpp	(revision 918562)
++++ nepomuk/services/strigi/strigiservice.cpp	(revision 918563)
+@@ -22,7 +22,7 @@
+ #include "indexscheduler.h"
+ #include "eventmonitor.h"
+ #include "systray.h"
+-#include "config.h"
++#include "strigiserviceconfig.h"
+ #include "statuswidget.h"
+ #include "nepomukstorageinterface.h"
+ 
+Index: services/strigi/eventmonitor.cpp
+===================================================================
+--- nepomuk/services/strigi/eventmonitor.cpp	(revision 918562)
++++ nepomuk/services/strigi/eventmonitor.cpp	(revision 918563)
+@@ -17,7 +17,7 @@
+ */
+ 
+ #include "eventmonitor.h"
+-#include "config.h"
++#include "strigiserviceconfig.h"
+ #include "indexscheduler.h"
+ #include "filesystemwatcher.h"
+ 
+@@ -53,7 +53,7 @@
+              this, SLOT( slotDirDirty( QString ) ) );
+ 
+     // update the watches if the config changes
+-    connect( Config::self(), SIGNAL( configChanged() ),
++    connect( StrigiServiceConfig::self(), SIGNAL( configChanged() ),
+              this, SLOT( updateWatches() ) );
+ 
+     // start watching the index folders
+@@ -74,7 +74,7 @@
+              this, SLOT( slotCheckAvailableSpace() ) );
+     m_availSpaceTimer.start( 20*1000 ); // every 20 seconds should be enough
+ 
+-    if ( Config::self()->isInitialRun() ) {
++    if ( StrigiServiceConfig::self()->isInitialRun() ) {
+         // TODO: add actions to this notification
+ 
+         m_initialIndexTime.start();
+@@ -107,9 +107,9 @@
+ void Nepomuk::EventMonitor::updateWatches()
+ {
+     // the hard way since the KDirWatch API is too simple
+-    QStringList folders = Config::self()->folders();
++    QStringList folders = StrigiServiceConfig::self()->folders();
+     if ( folders != m_fsWatcher->folders() ) {
+-        m_fsWatcher->setFolders( Config::self()->folders() );
++        m_fsWatcher->setFolders( StrigiServiceConfig::self()->folders() );
+         m_fsWatcher->setInterval( 2*60 ); // check every 2 minutes
+         m_fsWatcher->start();
+     }
+@@ -118,7 +118,7 @@
+ 
+ void Nepomuk::EventMonitor::slotDirDirty( const QString& path )
+ {
+-    if ( Config::self()->shouldFolderBeIndexed( path ) ) {
++    if ( StrigiServiceConfig::self()->shouldFolderBeIndexed( path ) ) {
+         m_indexScheduler->updateDir( path );
+     }
+ }
+@@ -146,7 +146,7 @@
+ {
+     KDiskFreeSpaceInfo info = KDiskFreeSpaceInfo::freeSpaceInfo( KStandardDirs::locateLocal( "data", "nepomuk/repository/", false ) );
+     if ( info.isValid() ) {
+-        if ( info.available() <= Config::self()->minDiskSpace() ) {
++        if ( info.available() <= StrigiServiceConfig::self()->minDiskSpace() ) {
+             if ( m_indexScheduler->isRunning() &&
+                 !m_indexScheduler->isSuspended() ) {
+                 m_pauseState = PausedDueToAvailSpace;
+Index: services/strigi/CMakeLists.txt
+===================================================================
+--- nepomuk/services/strigi/CMakeLists.txt	(revision 918562)
++++ nepomuk/services/strigi/CMakeLists.txt	(revision 918563)
+@@ -13,7 +13,7 @@
+   strigiserviceadaptor.cpp
+   indexscheduler.cpp
+   priority.cpp
+-  config.cpp
++  strigiserviceconfig.cpp
+   eventmonitor.cpp
+   systray.cpp
+   statuswidget.cpp

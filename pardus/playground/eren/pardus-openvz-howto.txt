@@ -1,0 +1,249 @@
+Author: Eren Türkay <eren@pardus.org.tr>
+Creation Date: April 18, 2011
+Last Updated: April 18, 2011
+
+
+Creating minimal image for Pardus is relatively easy due to the PISI
+packaging system. Nearly all the work is done transparently by pisi.
+However, we should trick some of the parts to actually get the image.
+The steps are (roughly) as follows to understand the procedure. These
+will be explained in great detail.
+
+* Create an empty directory to install image
+* Add package repositories using the empty directory as a root path
+* Install system.base packages without configuring it.
+* Copy the baselayout to /etc.
+* Mount /proc and /sys directories in image directory by binding them
+to the host machine's
+* chroot into the image dir
+* Create required device nodes (/dev/{console,null,random,urandom})
+* Start dbus service
+* Configure pending packages
+* Set root password and add user.
+* Set keyboard and language
+* Clean up dirs
+* Quit from chroot.
+* Umount /proc and /sys inside image dir.
+* Kill dbus and comar processes that were started within chroot
+* Voila!
+
+Requirements
+============
+
+All the progress is done using root privileges. Please be sure that you
+have root privileges.
+
+Type "su -" and your root password th gain the privileges.
+
+Create the directory to install Pardus
+======================================
+
+First, we need a directory to install Pardus base image. For this
+document, I use "/root/pardus-img" directory.
+
+[code]
+mkdir /root/pardus-img
+[/code]
+
+Add package repositories
+========================
+
+We should add package repositories while pointing out the root dir. Pisi
+has "-D" option which allows us to specify which root directory to use
+while using PISI.
+
+The important thing here is that you should add official Pardus
+repository that you are aiming to create image for. For example, if you
+are trying to get Pardus 2011 image, you should use its repository. 
+
+Additionally, for the sake of stability, you should not create Pardus
+2011 image while you run Pardus 2009. For example, if you want to get
+Pardus 2011 image, you should be doing this operation under Pardus 2011.
+It *MAY* be possible to create a Pardus image while running different
+version but I have never tried it. So, please make sure that your image
+and your host machine is the same.
+
+Here are Pardus versions and repositories that are available.
+
+Pardus 2011 (32 bit):
+http://packages.pardus.org.tr/pardus/2011/stable/i686/pisi-index.xml.xz
+
+Pardus 2011 (64 bit):
+http://packages.pardus.org.tr/pardus/2011/stable/x86_64/pisi-index.xml.xz
+
+Pardus Corporate 2 (32 bit):
+http://packages.pardus.org.tr/pardus/kurumsal2/stable/i686/pisi-index.xml.xz
+
+Pardus Corporate 2 (64 bit):
+http://packages.pardus.org.tr/pardus/kurumsal2/stable/x86_64/pisi-index.xml.xz
+
+
+Pardus 2009 is going to be deprecated, so I am not going to cover it.
+Depending on your Pardus version, use the repositories above. As for
+this document, I will use Pardus Corporate 2, 32bit.
+
+Add the repo:
+[code]
+pisi ar pardus-corporate-stable http://packages.pardus.org.tr/pardus/kurumsal2/stable/i686/pisi-index.xml.xz
+-D /root/pardus-img
+[/code]
+
+Install Packages
+================
+
+We can now install system.base packages. However, we will omit the
+configuration phase. Only the package archives will be extracted. The
+reason is that there is no dbus and comar running inside our image, so
+it will fail to configure it. We will come to this phase later.
+
+[code]
+pisi it -c system.base --ignore-comar -D /root/pardus-img -d
+pisi it kernel --ignore-comar -D /root/pardus-img -d
+[/code]
+
+
+As you can understand, this is a collection of base packages. You can
+see the full list of which packages are included here (depending on your
+pardus version):
+
+http://svn.pardus.org.tr/pardus/corporate2/devel/system/base/
+
+
+Copy Baselayout
+===============
+
+Now we should copy baselayout to /etc. The baselayout includes default user
+and password information that will be used by daemons.
+
+[code]
+cp -Rv /root/pardus-img/usr/share/baselayout/* /root/pardus-img/etc
+[/code]
+
+Mount /proc and /sys
+====================
+
+We should mount these directories to proceed. It will be useful when
+dbus and comar is started. We will use host machine's directories.
+
+[code]
+mount --bind /proc /root/pardus-img/proc
+mount --bind /sys /root/pardus-img/sys
+[/code]
+
+
+Chroot into image dir
+=====================
+
+Now we can chroot into image dir. We will configure the image inside
+chroot. REMEMBER: The root dir will be the image's root dir, so all the
+commands you write in chroot will take affect on image dir.
+
+[code]
+chroot /root/pardus-img
+[/code]
+
+
+Create required device nodes
+============================
+
+We should create required device nodes to be able to start services
+
+[code]
+mknod /dev/console c 5 1
+mknod /dev/null c 1 3
+mknod /dev/random c 1 8
+mknod /dev/urandom c 1 9
+[/code]
+
+
+Start dbus and configure packages
+=================================
+
+We will start dbus and configure pending packages. We wouldn't do it
+before because there would be no dbus service.
+
+[code]
+service dbus start
+pisi configure-pending -d
+[code]
+
+Set root pass and add user
+==========================
+
+We copied baselayout but it does not include information about root
+password, nor it includes any additional user. We first set root
+password and add user named "pardus". IMPORTANT: Make sure your
+passwords are strong!
+
+[code]
+passwd root
+
+useradd -m -s /bin/sh -G users pardus
+passwd pardus
+[code]
+
+Set keyboard layout and language
+=========================
+
+Keyboard layout and language information is used by our system bootup
+program, called MUDUR. It sets up the keyboard and language while
+booting. We will set language to en_US and keyboard to "us". You can
+change it accordingly to your language and keyboard.
+
+Open "/etc/conf.d/mudur" file with nano or your favourite editor and
+edit the settings there
+
+Cleanup dirs
+============
+
+While we are installing packages, PISI downloaded the files and archived
+it. However, we do not need these packages later on, so they take space.
+We will delete it.
+
+[code]
+rm -fv /var/cache/pisi/packages/*
+[/code]
+
+FIXME: Write instructions on which log files under /var/log should be deleted.
+
+Quit from chroot and make last touches.
+=======================================
+
+Now we are done with our image. Let's do last touches.
+
+First, we mounted /proc and /sys from our host, lets unmount them.
+
+[code]
+umount /root/pardus-img/proc
+umount /root/pardus-img/sys
+[/code]
+
+We started dbus inside chroot. We do not need anymore so we can kill it.
+
+[code]
+kill -9 `cat /root/pardus-img/var/run/dbus/pid`
+[/code]
+
+
+Archive it
+==========
+
+Now we have an image containing minimal install. We can make an archive
+of it.
+
+[code]
+cd /root/pardus-img
+tar -cvf /root/pardus-corporate2-i686-img.tar.gz *
+[/code]
+
+You will see the image under /root
+
+Done!
+=====
+
+Now you have a minimal pardus image. Congratulations!
+
+
+
+
+

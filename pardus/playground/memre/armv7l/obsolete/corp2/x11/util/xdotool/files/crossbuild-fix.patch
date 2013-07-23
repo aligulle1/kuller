@@ -1,0 +1,24 @@
+Index: xdotool-20090710/Makefile
+===================================================================
+--- xdotool-20090710.orig/Makefile
++++ xdotool-20090710/Makefile
+@@ -8,16 +8,10 @@ WARNFLAGS+=-pedantic -Wall -W -Wundef \
+            -Wmissing-prototypes -Wnested-externs -Winline \
+            -Wdisabled-optimization -Wno-missing-field-initializers
+ 
+-CFLAGS?=-pipe -std=c99 $(WARNFLAGS)
++LIBS = `pkg-config --libs x11 xtst`
+ 
+-DEFAULT_LIBS=-L/usr/X11R6/lib -L/usr/local/lib -lX11 -lXtst
+-DEFAULT_INC=-I/usr/X11R6/include -I/usr/local/include
+-
+-LIBS=`pkg-config --libs x11 xtst 2> /dev/null || echo "$(DEFAULT_LIBS)"`
+-INC=`pkg-config --cflags x11 xtst 2> /dev/null || echo "$(DEFAULT_INC)"`
+-
+-CFLAGS+=$(INC)
+-LDFLAGS+=$(LIBS)
++CFLAGS += -pipe -std=c99 $(WARNFLAGS) $(LIBS)
++LDFLAGS += $(LIBS)
+ 
+ all: xdotool xdotool.1
+ 

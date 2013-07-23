@@ -1,0 +1,247 @@
+--- gs-gpl-8.56.dfsg.1.orig/toolbin/3way.tcl	2007-05-05 01:18:57.000000000 +0900
++++ gs-gpl-8.56.dfsg.1/toolbin/3way.tcl	2007-05-05 01:20:39.000000000 +0900
+@@ -25,7 +25,29 @@
+ # produces a report for merging the olddir/branchdir changes into maindir.
+ 
+ proc filesame {f1 f2} {
+-    set t /tmp/t
++    # There is no Tcl builtin for temporary files
++    # This is taken from http://wiki.tcl.tk/772
++    switch $tcl_platform(platform) {
++	unix {
++		set tmpdir /tmp   # or even $::env(TMPDIR), at times.
++	} macintosh {
++		set tmpdir $::env(TRASH_FOLDER)  ;# a better place?
++	} default {
++		set tmpdir [pwd]
++			catch {set tmpdir $::env(TMP)}
++		catch {set tmpdir $::env(TEMP)}
++	}
++    }
++    set t [file join $tmpdir [pid]]
++    set access [list RDWR CREAT EXCL TRUNC]
++    set perm 0600
++    if {[catch {open $t $access $perm} fid ]} {
++        # something went wrong
++        error "Could not open tempfile."
++     }
++    if {[catch {close $t} err]} {
++         error "Failed closing temporary file: $err"
++    }
+     if {![catch {exec diff $f1 $f2 > $t}]} {
+ 	return 1
+     }
+@@ -50,6 +72,9 @@
+ 	break
+     }
+     close $in
++    if {![catch {exec rm $t}]} {
++         error "Failed removing temporary file"
++    }
+     return $same
+ }
+ 
+diff -urN gs-gpl-8.56.dfsg.1.orig/toolbin/gsindent gs-gpl-8.56.dfsg.1/toolbin/gsindent
+--- gs-gpl-8.56.dfsg.1.orig/toolbin/gsindent	2007-05-05 01:18:57.000000000 +0900
++++ gs-gpl-8.56.dfsg.1/toolbin/gsindent	2007-05-05 01:22:08.000000000 +0900
+@@ -21,12 +21,13 @@
+ # The perl invocations work around a bug in GNU indent.
+ 
+ if [ $# -ne 0 ]; then
++    tempfile=`mktemp -t || tempfile` || { echo "$0: Cannot create temporary file" >&2; exit 1; }
+     for f in $*
+     do
+-	$0 < $f > /tmp/$$
++	$0 < $f > $tempfile
+ 	cp -p $f $f.bak
+ 	if ( test ! -e $f~ ) then cp -p $f $f~; fi
+-	mv /tmp/$$ $f
++	mv $tempfile $f
+     done
+     exit
+ fi
+diff -urN gs-gpl-8.56.dfsg.1.orig/toolbin/gssubst gs-gpl-8.56.dfsg.1/toolbin/gssubst
+--- gs-gpl-8.56.dfsg.1.orig/toolbin/gssubst	2007-05-05 01:18:57.000000000 +0900
++++ gs-gpl-8.56.dfsg.1/toolbin/gssubst	2007-05-05 01:23:06.000000000 +0900
+@@ -35,7 +35,27 @@
+ }
+ puts "$from => $to"
+ flush stdout
+-set tmp /tmp/[pid]
++switch $tcl_platform(platform) {
++	unix {
++		set tmpdir /tmp   # or even $::env(TMPDIR), at times.
++	} macintosh {
++		set tmpdir $::env(TRASH_FOLDER)  ;# a better place?
++	} default {
++		set tmpdir [pwd]
++			catch {set tmpdir $::env(TMP)}
++		catch {set tmpdir $::env(TEMP)}
++	}
++}
++set tmp [file join $tmpdir [pid]]
++set access [list RDWR CREAT EXCL TRUNC]
++set perm 0600
++if {[catch {open $tmp $access $perm} fid ]} {
++# something went wrong
++	error "Could not open tempfile."
++}
++if {[catch {close $tmp} err]} {
++	error "Failed closing temporary file: $err"
++}
+ foreach f [lreplace $argv 0 1] {
+     if {![file exists $f~]} {exec cp -p $f $f~}
+     exec perl -pe "s\{\\b${from}\\b\}\{${to}\}g" < $f > $tmp
+diff -urN gs-gpl-8.56.dfsg.1.orig/toolbin/makeset.tcl gs-gpl-8.56.dfsg.1/toolbin/makeset.tcl
+--- gs-gpl-8.56.dfsg.1.orig/toolbin/makeset.tcl	2007-05-05 01:18:57.000000000 +0900
++++ gs-gpl-8.56.dfsg.1/toolbin/makeset.tcl	2007-05-05 01:25:11.000000000 +0900
+@@ -157,7 +157,23 @@
+     set ogfonts $cwd/gnu-gs-fonts-other-$Dot.tar.gz
+ 
+     file delete $afonts $ofonts $agfonts $ogfonts
+-    set tmp /tmp/[pid].tmp
++    switch $tcl_platform(platform) {
++        unix {
++                set tmpdir /tmp   # or even $::env(TMPDIR), at times.
++        } macintosh {
++                set tmpdir $::env(TRASH_FOLDER)  ;# a better place?
++        } default {
++                set tmpdir [pwd]
++                        catch {set tmpdir $::env(TMP)}
++                catch {set tmpdir $::env(TEMP)}
++        }
++    }
++    set tmp [file join $tmpdir [pid]]
++    exec umask 077
++    if {[catch {exec mkdir $tmp}]} {
++        # something went wrong
++        error "Could not create temporary dir."
++     }
+ 
+     licensefonts $tmp annotURWAladdin -u
+     sh -c "\
+@@ -395,7 +411,15 @@
+ proc makehist {} {
+     global Dot
+ 
+-    set tmphname /tmp/[pid]h.htm
++    set tmpname [file join $tmpdir [pid] htm]
++    set access [list RDWR CREAT EXCL TRUNC]
++    set perm 0600
++    if {[catch {open $tmpname $access $perm} fid ]} {
++	    error "Could not open tempfile."
++    }
++    if {[catch {close $tmpname} err]} {
++	    error "Failed closing temporary file: $err"
++    }
+     set tmpdname /tmp/[pid]d.htm
+     set news [open doc/News.htm]
+     set changes [open doc/Changes.htm]
+@@ -435,7 +459,15 @@
+     set cwd [pwd]
+     set atmp $cwd/gs${Num3}.zip
+     set asetup gs${Num3}.bat
+-    set tmp /tmp/[pid].tmp
++    set tmp [file join $tmpdir [pid] tmp]
++    set access [list RDWR CREAT EXCL TRUNC]
++    set perm 0600
++    if {[catch {open $tmp $access $perm} fid ]} {
++	    error "Could not open tempfile."
++    }
++    if {[catch {close $tmp} err]} {
++	    error "Failed closing temporary file: $err"
++    }
+ 
+     file delete $atmp $asetup $Dir
+     ln-s . $Dir
+diff -urN gs-gpl-8.56.dfsg.1.orig/toolbin/many2pdf.tcl gs-gpl-8.56.dfsg.1/toolbin/many2pdf.tcl
+--- gs-gpl-8.56.dfsg.1.orig/toolbin/many2pdf.tcl	2007-05-05 01:18:57.000000000 +0900
++++ gs-gpl-8.56.dfsg.1/toolbin/many2pdf.tcl	2007-05-05 01:26:02.000000000 +0900
+@@ -24,7 +24,24 @@
+ # Define the file containing the list of input file names.
+ set LIST_FILE_NAME /gs/show.lst
+ # Define the directory where the output will be stored.
+-set PDF_DIR /gs/tmp-pdf
++switch $tcl_platform(platform) {
++   unix {
++	   set tmpdir /tmp   # or even $::env(TMPDIR), at times.
++   } macintosh {
++	   set tmpdir $::env(TRASH_FOLDER)  ;# a better place?
++   } default {
++	   set tmpdir [pwd]
++	   catch {set tmpdir $::env(TMP)}
++	   catch {set tmpdir $::env(TEMP)}
++   }
++}
++set PDF_DIR [file join $tmpdir [pid]]
++set perm 0600
++exec umask 077
++if {[catch {exec mkdir $PDF_DIR} ]} {
++    # something went wrong
++    error "Could not create temporary directory."
++}
+ 
+ proc maxwaitfor {filesize} {
+     return [expr $filesize / 5000 + 30]
+@@ -50,8 +67,22 @@
+ 	    puts "****** $ps FAILED, DOES NOT EXIST ******"
+ 	    continue
+ 	}
+-	set script /tmp/${pid}.tcl
+-	set status /tmp/${pid}.out
++	set script [file join $tmpdir [pid] .tcl ]
++	set status [file join $tmpdir [pid] .out ]
++	set access [list RDWR CREAT EXCL TRUNC]
++	set perm 0600
++	if {[catch {open $script $access $perm} fid ]} {
++		error "Could not open tempfile."
++	}
++	if {[catch {close $script} err]} {
++		error "Failed closing temporary file: $err"
++	}
++	if {[catch {open $status $access $perm} fid ]} {
++		error "Could not open tempfile."
++	}
++	if {[catch {close $status} err]} {
++		error "Failed closing temporary file: $err"
++	}
+ 	set tmp [open $script w]
+ 	puts $tmp "\
+ 	set tmp \[open $status w\]
+diff -urN gs-gpl-8.56.dfsg.1.orig/toolbin/pre.tcl gs-gpl-8.56.dfsg.1/toolbin/pre.tcl
+--- gs-gpl-8.56.dfsg.1.orig/toolbin/pre.tcl	2007-05-05 01:18:57.000000000 +0900
++++ gs-gpl-8.56.dfsg.1/toolbin/pre.tcl	2007-05-05 01:26:50.000000000 +0900
+@@ -183,12 +183,31 @@
+ 	lappend doclist $d
+     }
+ }
++switch $tcl_platform(platform) {
++     unix {
++         set tmpdir /tmp   # or even $::env(TMPDIR), at times.
++     } macintosh {
++         set tmpdir $::env(TRASH_FOLDER)  ;# a better place?
++     } default {
++         set tmpdir [pwd]
++         catch {set tmpdir $::env(TMP)}
++         catch {set tmpdir $::env(TEMP)}
++     }
++}
+ 
+ if {$argv == {update}} {
+ 	# Update dates in .htm and .1 files.
+     proc updoc {doc before after} {
+-	set tmpfile /tmp/[pid]
+-	catch {file delete $tmpfile}
++        set tmpfile [file join $tmpdir [pid]]
++        set access [list RDWR CREAT EXCL TRUNC]
++        set perm 0600
++        if {[catch {open $tempfile $access $perm} fid ]} {
++             # something went wrong
++             error "Could not open tempfile."
++        }
++        if {[catch {close $t} err]} {
++             error "Failed closing temporary file: $err"
++        }
+ 	exec perl -pwe "s{$before}{$after}" < $doc > $tmpfile
+ 	file rename -force $tmpfile $doc
+     }

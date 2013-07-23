@@ -1,0 +1,13 @@
+Index: pardus-2.6/kernel/sys.c
+===================================================================
+--- pardus-2.6.orig/kernel/sys.c
++++ pardus-2.6/kernel/sys.c
+@@ -1274,7 +1274,7 @@ asmlinkage long sys_setpgid(pid_t pid, p
+ 	if (!thread_group_leader(p))
+ 		goto out;
+ 
+-	if (p->real_parent == group_leader) {
++	if (p->real_parent->tgid == group_leader->tgid) {
+ 		err = -EPERM;
+ 		if (p->signal->session != group_leader->signal->session)
+ 			goto out;

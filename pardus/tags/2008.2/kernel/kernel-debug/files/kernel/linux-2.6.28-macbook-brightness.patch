@@ -1,0 +1,189 @@
+commit 7be35c72e6454059a33ad844153349973d22fcb7
+Author: Matthew Garrett <mjg@redhat.com>
+Date:   Mon Jun 9 21:56:16 2008 +0100
+
+    backlight: Add Nvidia-based Apple Macbook Pro backlight driver
+
+    Nvidia-based Apple Macbook Pros don't appear to handle backlight control
+    through the graphics card registers or ACPI, but instead trigger changes
+    via SMI calls. This driver registers a generic backlight device that
+    lets existing userspace deal with it. Code derived from Julien Blache's
+    Pommed application.
+
+    Signed-off-by: Julien Blache <jb@jblache.org>
+    Signed-off-by: Matthew Garrett <mjg@redhat.com>
+    Signed-off-by: Richard Purdie <rpurdie@rpsys.net>
+
+Index: linux-2.6.25/drivers/video/backlight/Kconfig
+===================================================================
+--- linux-2.6.25.orig/drivers/video/backlight/Kconfig
++++ linux-2.6.25/drivers/video/backlight/Kconfig
+@@ -112,3 +112,12 @@ config BACKLIGHT_CARILLO_RANCH
+ 	help
+ 	  If you have a Intel LE80578 (Carillo Ranch) say Y to enable the
+ 	  backlight driver.
++
++config BACKLIGHT_MBP_NVIDIA
++    tristate "MacBook Pro Nvidia Backlight Driver"
++    depends on BACKLIGHT_CLASS_DEVICE && X86
++    default n
++    help
++      If you have an Apple Macbook Pro with Nvidia graphics hardware say Y
++      to enable a driver for its backlight.
++
+Index: linux-2.6.25/drivers/video/backlight/Makefile
+===================================================================
+--- linux-2.6.25.orig/drivers/video/backlight/Makefile
++++ linux-2.6.25/drivers/video/backlight/Makefile
+@@ -10,3 +10,4 @@ obj-$(CONFIG_BACKLIGHT_LOCOMO)	+= locomo
+ obj-$(CONFIG_BACKLIGHT_OMAP1)	+= omap1_bl.o
+ obj-$(CONFIG_BACKLIGHT_PROGEAR) += progear_bl.o
+ obj-$(CONFIG_BACKLIGHT_CARILLO_RANCH) += cr_bllcd.o
++obj-$(CONFIG_BACKLIGHT_MBP_NVIDIA) += mbp_nvidia_bl.o
+
+diff --git a/drivers/video/backlight/mbp_nvidia_bl.c b/drivers/video/backlight/mbp_nvidia_bl.c
+new file mode 100644
+index 0000000..385cba4
+--- /dev/null
++++ b/drivers/video/backlight/mbp_nvidia_bl.c
+@@ -0,0 +1,116 @@
++/*
++ *  Backlight Driver for Nvidia 8600 in Macbook Pro
++ *
++ *  Copyright (c) Red Hat <mjg@redhat.com>
++ *  Based on code from Pommed:
++ *  Copyright (C) 2006 Nicolas Boichat <nicolas @boichat.ch>
++ *  Copyright (C) 2006 Felipe Alfaro Solana <felipe_alfaro @linuxmail.org>
++ *  Copyright (C) 2007 Julien BLACHE <jb@jblache.org>
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License version 2 as
++ *  published by the Free Software Foundation.
++ *
++ *  This driver triggers SMIs which cause the firmware to change the
++ *  backlight brightness. This is icky in many ways, but it's impractical to
++ *  get at the firmware code in order to figure out what it's actually doing.
++ */
++
++#include <linux/module.h>
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/platform_device.h>
++#include <linux/backlight.h>
++#include <linux/err.h>
++#include <linux/dmi.h>
++#include <linux/io.h>
++
++static struct backlight_device *mbp_backlight_device;
++
++static struct dmi_system_id __initdata mbp_device_table[] = {
++	{
++		.ident = "3,1",
++		.matches = {
++			DMI_MATCH(DMI_SYS_VENDOR, "Apple Inc."),
++			DMI_MATCH(DMI_PRODUCT_NAME, "MacBookPro3,1"),
++		},
++	},
++	{
++		.ident = "3,2",
++		.matches = {
++			DMI_MATCH(DMI_SYS_VENDOR, "Apple Inc."),
++			DMI_MATCH(DMI_PRODUCT_NAME, "MacBookPro3,2"),
++		},
++	},
++	{
++		.ident = "4,1",
++		.matches = {
++			DMI_MATCH(DMI_SYS_VENDOR, "Apple Inc."),
++			DMI_MATCH(DMI_PRODUCT_NAME, "MacBookPro4,1"),
++		},
++	},
++	{ }
++};
++
++static int mbp_send_intensity(struct backlight_device *bd)
++{
++	int intensity = bd->props.brightness;
++
++	outb(0x04 | (intensity << 4), 0xb3);
++	outb(0xbf, 0xb2);
++
++	return 0;
++}
++
++static int mbp_get_intensity(struct backlight_device *bd)
++{
++	outb(0x03, 0xb3);
++	outb(0xbf, 0xb2);
++	return inb(0xb3) >> 4;
++}
++
++static struct backlight_ops mbp_ops = {
++	.get_brightness = mbp_get_intensity,
++	.update_status  = mbp_send_intensity,
++};
++
++static int __init mbp_init(void)
++{
++	if (!dmi_check_system(mbp_device_table))
++		return -ENODEV;
++
++	if (!request_region(0xb2, 2, "Macbook Pro backlight"))
++		return -ENXIO;
++
++	mbp_backlight_device = backlight_device_register("mbp_backlight",
++							 NULL, NULL,
++							 &mbp_ops);
++	if (IS_ERR(mbp_backlight_device)) {
++		release_region(0xb2, 2);
++		return PTR_ERR(mbp_backlight_device);
++	}
++
++	mbp_backlight_device->props.max_brightness = 15;
++	mbp_backlight_device->props.brightness =
++		mbp_get_intensity(mbp_backlight_device);
++	backlight_update_status(mbp_backlight_device);
++
++	return 0;
++}
++
++static void __exit mbp_exit(void)
++{
++	backlight_device_unregister(mbp_backlight_device);
++
++	release_region(0xb2, 2);
++}
++
++module_init(mbp_init);
++module_exit(mbp_exit);
++
++MODULE_AUTHOR("Matthew Garrett <mjg@redhat.com>");
++MODULE_DESCRIPTION("Nvidia-based Macbook Pro Backlight Driver");
++MODULE_LICENSE("GPL");
++MODULE_ALIAS("svnAppleInc.:pnMacBookPro3,1");
++MODULE_ALIAS("svnAppleInc.:pnMacBookPro3,2");
++MODULE_ALIAS("svnAppleInc.:pnMacBookPro4,1");
+commit 239cfbde1f5843c4a24199f117d5f67f637d72d5
+Author: David Woodhouse <dwmw2@infradead.org>
+Date:   Tue Sep 16 16:25:24 2008 -0700
+
+    Fix autoloading of MacBook Pro backlight driver.
+
+    Use new MODULE_DEVICE_TABLE(dmi, ...) facility. There's no need for
+    every driver to screw it up for themselves, when the alias can be
+    generated automatically.
+
+    Signed-off-by: David Woodhouse <David.Woodhouse@intel.com>
+
+diff --git a/drivers/video/backlight/mbp_nvidia_bl.c b/drivers/video/backlight/mbp_nvidia_bl.c
+index 385cba4..06964af 100644
+--- a/drivers/video/backlight/mbp_nvidia_bl.c
++++ b/drivers/video/backlight/mbp_nvidia_bl.c
+@@ -111,6 +111,4 @@ module_exit(mbp_exit);
+ MODULE_AUTHOR("Matthew Garrett <mjg@redhat.com>");
+ MODULE_DESCRIPTION("Nvidia-based Macbook Pro Backlight Driver");
+ MODULE_LICENSE("GPL");
+-MODULE_ALIAS("svnAppleInc.:pnMacBookPro3,1");
+-MODULE_ALIAS("svnAppleInc.:pnMacBookPro3,2");
+-MODULE_ALIAS("svnAppleInc.:pnMacBookPro4,1");
++MODULE_DEVICE_TABLE(dmi, mbp_device_table);

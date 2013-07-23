@@ -1,0 +1,101 @@
+diff -Nur hcfpcimodem-1.10full-old/modules/GPL/oscompat.h hcfpcimodem-1.10full/modules/GPL/oscompat.h
+--- hcfpcimodem-1.10full-old/modules/GPL/oscompat.h	2006-09-27 15:17:56.835407967 +0300
++++ hcfpcimodem-1.10full/modules/GPL/oscompat.h	2006-09-27 15:18:45.709977903 +0300
+@@ -244,6 +244,10 @@
+ 
+ #endif /* LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0) */
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0) && !defined(FOUND_DEVFS)
++#define devfs_register_chrdev register_chrdev
++#endif
++
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,2)
+ #include <linux/circ_buf.h>
+ #else
+diff -Nur hcfpcimodem-1.10full-old/modules/GPL/serial_cnxt.c hcfpcimodem-1.10full/modules/GPL/serial_cnxt.c
+--- hcfpcimodem-1.10full-old/modules/GPL/serial_cnxt.c	2006-09-27 15:17:56.450466487 +0300
++++ hcfpcimodem-1.10full/modules/GPL/serial_cnxt.c	2006-09-27 15:19:26.413789983 +0300
+@@ -933,7 +933,9 @@
+ 	.port		=		cnxt_ports,
+ #else
+ 	.driver_name	=		CNXTTARGET"serial",
++#ifdef FOUND_DEVFS
+ 	.devfs_name	=		"ttyS"CNXTSERDEV,
++#endif
+ 	.dev_name	=		"ttyS"CNXTSERDEV,
+ #endif /* LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0) */
+ 	.minor		=		CNXTSERIALMINOR,
+diff -Nur hcfpcimodem-1.10full-old/modules/Makefile hcfpcimodem-1.10full/modules/Makefile
+--- hcfpcimodem-1.10full-old/modules/Makefile	2006-09-27 15:17:55.903549631 +0300
++++ hcfpcimodem-1.10full/modules/Makefile	2006-09-27 15:18:45.710977751 +0300
+@@ -69,7 +69,9 @@
+ CC := $(shell $(TOP)/modules/kernelcompiler.sh $(KERNELVER) $(CNXT_KERNELSRC))
+ 
+ FOUND_PCI_DEV_SLOT_NAME := $(shell grep -q 'slot_name' ${REAL_KERNELSRC}/include/linux/pci.h 2>/dev/null && echo -DFOUND_PCI_DEV_SLOT_NAME)
+-CFLAGS+= $(FOUND_PCI_DEV_SLOT_NAME)
++FOUND_DEVFS := $(shell [ -e "${REAL_KERNELSRC}/include/linux/devfs_fs_kernel.h" ] && echo -DFOUND_DEVFS)
++
++CFLAGS+= $(FOUND_PCI_DEV_SLOT_NAME) $(FOUND_DEVFS)
+ 
+ KBUILD_SUPPORTED := $(shell test -e ${CNXT_KERNELSRC}/scripts/kconfig && echo yes || echo no)
+ 
+diff -Nur hcfpcimodem-1.10full-old/modules/osdiag.c hcfpcimodem-1.10full/modules/osdiag.c
+--- hcfpcimodem-1.10full-old/modules/osdiag.c	2006-09-27 15:17:56.163510110 +0300
++++ hcfpcimodem-1.10full/modules/osdiag.c	2006-09-27 15:18:45.711977599 +0300
+@@ -19,7 +19,9 @@
+ #include "osdiag_dev.h"
+ 
+ #include <linux/poll.h>
++#ifdef FOUND_DEVFS
+ #include <linux/devfs_fs_kernel.h>
++#endif
+ #include <linux/kmod.h>
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,2)
+ #include <linux/device.h>
+@@ -674,9 +676,10 @@
+ 	    CLASS_DEVICE_CREATE(diag_class, MKDEV(diagmajor, pDiag->hwInstNum), hwDevLink, CNXTTARGET"diag%d", pDiag->hwInstNum);
+ 	}
+ #endif
+-
++#ifdef FOUND_DEVFS
+ 	devfs_mk_cdev(MKDEV(diagmajor, pDiag->hwInstNum), S_IFCHR | S_IRUSR | S_IWUSR, buf);
+ #endif
++#endif
+     }
+ 
+     return pDiag;
+@@ -769,11 +772,13 @@
+ #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+     devfs_unregister(pDiag->devfs_handle);
+ #else
++#ifdef FOUND_DEVFS
+     {
+ 	char buf[32];
+ 	snprintf(buf, sizeof(buf), CNXTTARGET"diag%d", pDiag->hwInstNum);
+ 	devfs_remove(buf);
+     }
++#endif
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,2)
+     if (!IS_ERR(diag_class))
+ 	CLASS_DEVICE_DESTROY(diag_class, MKDEV(diagmajor, pDiag->hwInstNum));
+@@ -843,7 +848,9 @@
+ #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+     devfs_unregister(dmp_devfs_handle);
+ #else
++#ifdef FOUND_DEVFS
+     devfs_remove(CNXTTARGET"diagdmp");
++#endif
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,2)
+     if (!IS_ERR(diag_class))
+ 	CLASS_DEVICE_DESTROY(diag_class, MKDEV(diagmajor, CNXTDIAGDMPMINOR));
+@@ -899,8 +906,10 @@
+ 	CLASS_DEVICE_CREATE(diag_class, MKDEV(diagmajor, CNXTDIAGDMPMINOR), NULL, CNXTTARGET"diagdmp", 0);
+     }
+ #endif
++#ifdef FOUND_DEVFS
+     devfs_mk_cdev(MKDEV(diagmajor, CNXTDIAGDMPMINOR), S_IFCHR | S_IRUSR | S_IWUSR, CNXTTARGET"diagdmp");
+ #endif
++#endif
+ #endif /* DMP || DMP_RETAIL */
+ 
+     return 0;

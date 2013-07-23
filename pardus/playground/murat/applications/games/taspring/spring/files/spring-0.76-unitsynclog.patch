@@ -1,0 +1,28 @@
+--- tools/unitsync/unitsync.cpp.ol	2007-12-23 19:53:37.000000000 +0200
++++ tools/unitsync/unitsync.cpp	2008-01-05 07:25:44.000000000 +0200
+@@ -25,6 +25,10 @@
+ #include <cstdio>
+ #include <cstdarg>
+ 
++#include <sys/stat.h>
++#include <sys/types.h>
++#include <errno.h>
++
+ #define ASSERT(condition, message) \
+ 	do { \
+ 		if (!(condition)) { \
+@@ -46,7 +50,13 @@
+ 
+ CLogOutput::CLogOutput()
+ {
+-	file = fopen("unitsync.log", "at");
++	/* This is rather hackish, but I'm not spring expert enough -Anssi */
++	string unitsynclocation = (string)getenv("HOME")+"/.spring";
++	/* I'm not sure the dir is there at this point, so create it -Anssi */
++	int dir_ret = mkdir(unitsynclocation.c_str(), ACCESSPERMS);
++	ASSERT(!dir_ret || errno == EEXIST, "could not create ~/.spring\n");
++	unitsynclocation += "/unitsync.log";
++	file = fopen(unitsynclocation.c_str(), "at");
+ 	ASSERT(file != NULL, "couldn't open logfile\n");
+ 	setbuf(file, NULL);
+ }

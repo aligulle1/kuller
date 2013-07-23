@@ -1,0 +1,46 @@
+Index: krusader-2.0.0/krusader/krservices.cpp
+===================================================================
+--- krusader-2.0.0.orig/krusader/krservices.cpp
++++ krusader-2.0.0/krusader/krservices.cpp
+@@ -22,6 +22,7 @@
+ #include <qtextstream.h>
+ // KDE includes
+ #include <kdebug.h>
++#include <kstandarddirs.h>
+ // Krusader includes
+ #include "krservices.h"
+ #include "krusader.h"
+@@ -38,32 +39,9 @@ bool KrServices::cmdExist(QString cmdNam
+   return !detectFullPathName( cmdName ).isEmpty();  
+ }
+ 
+-static const QStringList bin_suffixes = QStringList()
+-#ifdef Q_WS_WIN
+-  << ".cmd" << ".exe" << ".bat"
+-#else
+-  << ""
+-#endif
+-;
+-
+ QString KrServices::detectFullPathName(QString name)
+ {
+-  QStringList path = QString::fromLocal8Bit(getenv("PATH")).split(":");
+-
+-  for ( QStringList::Iterator it = path.begin(); it != path.end(); ++it )
+-  foreach( QString suffix, bin_suffixes )
+-  {
+-    if( QDir(*it).exists( name + suffix ) )
+-    {
+-      QString dir = *it;
+-      if( !dir.endsWith( "/" ) )
+-        dir+="/";
+-        
+-      return dir+name;
+-    }
+-  }
+-
+-  return "";
++  return KStandardDirs::findExe( name );
+ }
+ 
+ QString KrServices::fullPathName( QString name, QString confName )

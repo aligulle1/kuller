@@ -1,0 +1,48 @@
+Index: ext/soup/gstsouphttpsrc.c
+===================================================================
+RCS file: /cvs/gstreamer/gst-plugins-good/ext/soup/gstsouphttpsrc.c,v
+retrieving revision 1.25
+diff -u -r1.25 gstsouphttpsrc.c
+--- ext/soup/gstsouphttpsrc.c	2 Aug 2008 21:39:01 -0000	1.25
++++ ext/soup/gstsouphttpsrc.c	12 Oct 2008 14:09:19 -0000
+@@ -117,6 +117,7 @@
+ {
+   PROP_0,
+   PROP_LOCATION,
++  PROP_IS_LIVE,
+   PROP_USER_AGENT,
+   PROP_AUTOMATIC_REDIRECT,
+   PROP_PROXY,
+@@ -263,6 +264,11 @@
+   g_object_class_install_property (gobject_class,
+       PROP_COOKIES, g_param_spec_boxed ("cookies", "Cookies",
+           "HTTP request cookies", G_TYPE_STRV, G_PARAM_READWRITE));
++  g_object_class_install_property (gobject_class,
++      PROP_IS_LIVE,
++      g_param_spec_boolean ("is-live", "is-live",
++          "Act like a live source",
++          FALSE, G_PARAM_READWRITE));
+ 
+   /* icecast stuff */
+   g_object_class_install_property (gobject_class,
+@@ -427,6 +433,9 @@
+       g_strfreev (src->cookies);
+       src->cookies = g_strdupv (g_value_get_boxed (value));
+       break;
++    case PROP_IS_LIVE:
++      gst_base_src_set_live (GST_BASE_SRC(src), g_value_get_boolean (value));
++      break;
+   }
+ done:
+   return;
+@@ -461,6 +470,9 @@
+     case PROP_COOKIES:
+       g_value_set_boxed (value, g_strdupv (src->cookies));
+       break;
++    case PROP_IS_LIVE:
++      g_value_set_boolean (value, gst_base_src_is_live (GST_BASE_SRC(src)));
++      break;
+     case PROP_IRADIO_MODE:
+       g_value_set_boolean (value, src->iradio_mode);
+       break;
+

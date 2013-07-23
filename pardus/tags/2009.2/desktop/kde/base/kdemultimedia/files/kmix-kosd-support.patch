@@ -1,0 +1,140 @@
+Index: kdemultimedia-4.4.2/kmix/kmix.cpp
+===================================================================
+--- kdemultimedia-4.4.2.orig/kmix/kmix.cpp
++++ kdemultimedia-4.4.2/kmix/kmix.cpp
+@@ -60,9 +60,6 @@
+ #include "viewdockareapopup.h"
+ #include "dialogselectmaster.h"
+ 
+-#include "osdwidget.h"
+-
+-
+ /* KMixWindow
+  * Constructs a mixer window (KMix main window)
+  */
+@@ -96,6 +93,9 @@ KMixWindow::KMixWindow(bool invisible)
+    if ( m_startVisible && ! invisible)
+       show(); // Started visible: We don't do "m_isVisible = true;", as the showEvent() already does it
+ 
++   // Connect to D-Bus for KOSD notifications
++   m_kOSDInterface = new QDBusInterface("org.kde.kded", "/modules/kosd", "org.kde.KOSD");
++
+    connect( kapp, SIGNAL( aboutToQuit()), SLOT( saveConfig()) );
+ }
+ 
+@@ -147,8 +147,6 @@ void KMixWindow::initActions()
+    globalAction->setGlobalShortcut(KShortcut(Qt::Key_VolumeMute));
+    connect(globalAction, SIGNAL(triggered(bool) ), SLOT(slotMute()));
+ 
+-   osdWidget = new OSDWidget();
+-
+    createGUI( "kmixui.rc" );
+ }
+ 
+@@ -452,10 +450,6 @@ void KMixWindow::plugged( const char* dr
+         recreateGUI(true);
+     }
+ 
+-// Test code for OSD. But OSD is postponed to KDE4.1
+-//    OSDWidget* osd = new OSDWidget(0);
+-//    osd->volChanged(70, true);
+-
+ }
+ 
+ void KMixWindow::unplugged( const QString& udi)
+@@ -644,17 +638,21 @@ void KMixWindow::showVolumeDisplay()
+   MixDevice *md = Mixer::getGlobalMasterMD();
+   if ( md == 0 ) return; // shouldn't happen, but lets play safe
+   int currentVolume = mixer->volume(md->id());
+-  
+-  osdWidget->setCurrentVolume(currentVolume, md->isMuted());
+-  osdWidget->show();
+-  osdWidget->activateOSD(); //Enable the hide timer
+-
+-  //Center the OSD
+-  QRect rect = KApplication::kApplication()->desktop()->screenGeometry(QCursor::pos());
+-  QSize size = osdWidget->sizeHint();
+-  int posX = rect.x() + (rect.width() - size.width()) / 2;
+-  int posY = rect.y() + 4 * rect.height() / 5;
+-  osdWidget->setGeometry(posX, posY, size.width(), size.height());
++  QString icon = "audio-volume-high";
++  if (!md->isMuted()) {
++      if (currentVolume < 25)
++          icon = "audio-volume-low";
++      else if (currentVolume < 75)
++          icon = "audio-volume-medium";
++  } else
++      icon = "audio-volume-muted";
++
++  // Show OSD
++  //QDBusConnection dbus( QDBusConnection::sessionBus() );
++  //QDBusInterface iface( "org.kde.kded", "/modules/kosd", "org.kde.KOSD", dbus );
++  //iface.call( "showOSD", icon, "", currentVolume );
++  m_kOSDInterface->call("showOSD", icon, "", currentVolume);
++
+ }
+ 
+ void KMixWindow::slotMute()
+@@ -663,7 +661,7 @@ void KMixWindow::slotMute()
+   if ( mixer == 0 ) return; // e.g. when no soundcard is available
+   MixDevice *md = Mixer::getGlobalMasterMD();
+   if ( md == 0 ) return; // shouldn't happen, but lets play safe
+-  mixer->toggleMute(md->id()); 
++  mixer->toggleMute(md->id());
+   showVolumeDisplay();
+ }
+ 
+Index: kdemultimedia-4.4.2/kmix/kmix.h
+===================================================================
+--- kdemultimedia-4.4.2.orig/kmix/kmix.h
++++ kdemultimedia-4.4.2/kmix/kmix.h
+@@ -31,6 +31,7 @@ class QLabel;
+ #include <QVBoxLayout>
+ #include <QProgressBar>
+ #include <QTimer>
++#include <QDBusInterface>
+ class KTabWidget;
+ 
+ // KDE
+@@ -46,8 +47,6 @@ class Mixer;
+ class ViewDockAreaPopup;
+ #include "mixer.h"
+ 
+-class OSDWidget;
+-
+ class
+ KMixWindow : public KXmlGuiWindow
+ {
+@@ -111,6 +110,9 @@ KMixWindow : public KXmlGuiWindow
+    bool m_multiDriverMode;         // Not officially supported.
+    Qt::Orientation m_toplevelOrientation;
+ 
++   /* For KOSD interaction */
++   QDBusInterface *m_kOSDInterface;
++
+    KTabWidget *m_wsMixers;
+    KMixPrefDlg *m_prefDlg;
+    KMixDockWidget *m_dockWidget;
+@@ -124,8 +126,6 @@ KMixWindow : public KXmlGuiWindow
+    void showVolumeDisplay();
+    void increaseOrDecreaseVolume(bool increase);
+ 
+-   OSDWidget* osdWidget;
+-   
+   private slots:
+    void saveConfig();
+    void slotHWInfo();
+Index: kdemultimedia-4.4.2/kmix/CMakeLists.txt
+===================================================================
+--- kdemultimedia-4.4.2.orig/kmix/CMakeLists.txt
++++ kdemultimedia-4.4.2/kmix/CMakeLists.txt
+@@ -35,8 +35,7 @@ set(kmix_KDEINIT_SRCS ${kmix_adaptor_SRC
+    KMixApp.cpp 
+    dialogselectmaster.cpp 
+    kmixdevicemanager.cpp 
+-   guiprofile.cpp
+-   osdwidget.cpp)
++   guiprofile.cpp)
+ 
+ kde4_add_kdeinit_executable( kmix ${kmix_KDEINIT_SRCS})
+ 

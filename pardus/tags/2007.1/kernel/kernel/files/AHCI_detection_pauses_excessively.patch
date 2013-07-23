@@ -1,0 +1,51 @@
+diff --git a/drivers/ata/libata-core.c b/drivers/ata/libata-core.c
+index 3fd7c79..89aa449 100644
+--- a/drivers/scsi/libata-core.c
++++ b/drivers/scsi/libata-core.c
+@@ -2669,20 +2669,26 @@ int sata_phy_debounce(struct ata_port *a
+ 
+ 		/* DET stable? */
+ 		if (cur == last) {
++			printk("SATA PHY: stable DET=%x\n", cur);
+ 			if (cur == 1 && time_before(jiffies, timeout))
+ 				continue;
+-			if (time_after(jiffies, last_jiffies + duration))
++			if (time_after(jiffies, last_jiffies + duration)) {
++				printk("SATA PHY: debounced\n");
+ 				return 0;
++			}
+ 			continue;
+ 		}
+ 
++		printk("SATA PHY: unstable DET=%x->%x\n", last, cur);
+ 		/* unstable, start over */
+ 		last = cur;
+ 		last_jiffies = jiffies;
+ 
+ 		/* check timeout */
+-		if (time_after(jiffies, timeout))
++		if (time_after(jiffies, timeout)) {
++			printk("SATA PHY: failed to debounce\n");
+ 			return -EBUSY;
++		}
+ 	}
+ }
+ 
+diff --git a/include/linux/libata.h b/include/linux/libata.h
+index 9080789..8220ca3 100644
+--- a/include/linux/libata.h
++++ b/include/linux/libata.h
+@@ -689,10 +689,11 @@ extern const struct ata_port_operations
+ static inline const unsigned long *
+ sata_ehc_deb_timing(struct ata_eh_context *ehc)
+ {
+-	if (ehc->i.flags & ATA_EHI_HOTPLUGGED)
++/*	if (ehc->i.flags & ATA_EHI_HOTPLUGGED)
+ 		return sata_deb_timing_hotplug;
+ 	else
+-		return sata_deb_timing_normal;
++		return sata_deb_timing_normal;*/
++	return sata_deb_timing_long;
+ }
+ 
+ static inline int ata_port_is_dummy(struct ata_port *ap)

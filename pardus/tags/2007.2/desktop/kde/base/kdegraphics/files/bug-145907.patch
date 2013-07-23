@@ -1,0 +1,31 @@
+Index: kpdf/core/generator_pdf/generator_pdf.cpp
+===================================================================
+--- kpdf/core/generator_pdf/generator_pdf.cpp	(revision 668257)
++++ kpdf/core/generator_pdf/generator_pdf.cpp	(revision 668258)
+@@ -316,7 +316,7 @@
+     // 1. Set OutputDev parameters and Generate contents
+     // note: thread safety is set on 'false' for the GUI (this) thread
+     kpdfOutputDev->setParams( request->width, request->height, genObjectRects, genObjectRects, false );
+-    pdfdoc->displayPage( kpdfOutputDev, page->number() + 1, fakeDpiX, fakeDpiY, 0, false, true, genObjectRects );
++    pdfdoc->displayPage( kpdfOutputDev, page->number() + 1, fakeDpiX, fakeDpiY, 0, false, true, false );
+     if ( genObjectRects )
+         pdfdoc->processLinks( kpdfOutputDev, page->number() + 1 );
+ 
+@@ -498,7 +498,7 @@
+         docLock.lock();
+         for ( ; pIt != pEnd; ++pIt )
+         {
+-            pdfdoc->displayPage(psOut, *pIt, 72, 72, 0, false, globalParams->getPSCrop(), gFalse);
++            pdfdoc->displayPage(psOut, *pIt, 72, 72, 0, false, globalParams->getPSCrop(), gTrue);
+         }
+         docLock.unlock();
+ 
+@@ -1197,7 +1197,7 @@
+     d->generator->kpdfOutputDev->setParams( width, height, 
+                                             genObjectRects, genObjectRects, TRUE /*thread safety*/ );
+     d->generator->pdfdoc->displayPage( d->generator->kpdfOutputDev, page->number() + 1,
+-                                       fakeDpiX, fakeDpiY, 0, false, true, genObjectRects );
++                                       fakeDpiX, fakeDpiY, 0, false, true, false );
+     if ( genObjectRects )
+         d->generator->pdfdoc->processLinks( d->generator->kpdfOutputDev, page->number() + 1 );
+ 

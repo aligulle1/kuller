@@ -1,0 +1,172 @@
+diff -rup virtinst-0.400.3.orig/virtinst/CapabilitiesParser.py virtinst-0.400.3.new/virtinst/CapabilitiesParser.py
+--- virtinst-0.400.3.orig/virtinst/CapabilitiesParser.py	2009-03-10 03:32:15.000000000 +0000
++++ virtinst-0.400.3.new/virtinst/CapabilitiesParser.py	2009-04-03 19:15:33.000000000 +0100
+@@ -93,6 +93,7 @@ class Host(object):
+ 
+         self.features = CapabilityFeatures()
+         self.topology = None
++        self.secmodel = None
+ 
+         if not node is None:
+             self.parseXML(node)
+@@ -103,6 +104,9 @@ class Host(object):
+             if child.name == "topology":
+                 self.topology = Topology(child)
+ 
++            if child.name == "secmodel":
++                self.secmodel = SecurityModel(child)
++
+             if child.name != "cpu":
+                 child = child.next
+                 continue
+@@ -252,6 +256,21 @@ class TopologyCPU(object):
+         self.id = int(node.prop("id"))
+ 
+ 
++class SecurityModel(object):
++    def __init__(self, node = None):
++        self.model = None
++        self.doi = None
++
++        if not node is None:
++            self.parseXML(node)
++
++    def parseXML(self, node):
++        for child in node.children or []:
++           if child.name == "model":
++                self.model = child.content
++           elif child.name == "doi":
++                self.doi = child.content
++
+ class Capabilities(object):
+     def __init__(self, node = None):
+         self.host = None
+diff -rup virtinst-0.400.3.orig/virtinst/Installer.py virtinst-0.400.3.new/virtinst/Installer.py
+--- virtinst-0.400.3.orig/virtinst/Installer.py	2009-03-10 03:32:15.000000000 +0000
++++ virtinst-0.400.3.new/virtinst/Installer.py	2009-04-03 18:15:10.000000000 +0100
+@@ -136,12 +136,28 @@ class Installer(object):
+     def get_scratchdir(self):
+         if platform.system() == 'SunOS':
+             return '/var/tmp'
+-        if self.type == "xen" and os.path.exists(XEN_SCRATCH):
++        if os.geteuid() == 0 and self.type == "xen" and os.path.exists(XEN_SCRATCH):
+             return XEN_SCRATCH
+         if os.geteuid() == 0 and os.path.exists(LIBVIRT_SCRATCH):
+             return LIBVIRT_SCRATCH
+-        else:
+-            return os.path.expanduser("~/.virtinst/boot")
++
++        appdir = os.path.expanduser("~/.virtinst")
++        bootdir = appdir + "/boot"
++        # Try and make directory immediately and set selinux
++        # context if possible
++        try:
++            import selinux
++            if not os.access(appdir, os.W_OK):
++                os.mkdir(appdir)
++            if not os.access(bootdir, os.W_OK):
++                os.mkdir(bootdir)
++            selinux.restorecon(bootdir, recursive=True)
++            logging.info("Restored SELinux context on %s" % bootdir)
++        except Exception, e:
++            logging.error("Unable to restore SELinux context on %s: %s" % (bootdir, str(e)))
++            pass
++
++        return bootdir
+     scratchdir = property(get_scratchdir)
+ 
+     def get_cdrom(self):
+Only in virtinst-0.400.3.new/virtinst: virtinst-0.400.3-selinux-context.patch
+diff -rup virtinst-0.400.3.orig/virtinst/VirtualDisk.py virtinst-0.400.3.new/virtinst/VirtualDisk.py
+--- virtinst-0.400.3.orig/virtinst/VirtualDisk.py	2009-03-10 03:32:15.000000000 +0000
++++ virtinst-0.400.3.new/virtinst/VirtualDisk.py	2009-04-03 19:23:49.000000000 +0100
+@@ -28,6 +28,7 @@ import _util
+ import Storage
+ from VirtualDevice import VirtualDevice
+ from virtinst import _virtinst as _
++from CapabilitiesParser import parse as parseCapabilities
+ 
+ def _vdisk_create(path, size, kind, sparse = True):
+     force_fixed = "raw"
+@@ -557,7 +558,6 @@ class VirtualDisk(VirtualDevice):
+                     # vdisk _is_ a directory.
+                     raise ValueError(_("The path '%s' must be a file or a "
+                                        "device, not a directory") % self.path)
+-                # XXX: Any selinux validation checks should go here
+ 
+             self.__set_dev_type()
+             return True
+@@ -605,6 +605,8 @@ class VirtualDisk(VirtualDevice):
+         @param progresscb: progress meter
+         @type progresscb: instanceof urlgrabber.BaseMeter
+         """
++        self.setup_security_context()
++
+         if self.vol_object:
+             return
+         elif self.vol_install:
+@@ -651,7 +653,63 @@ class VirtualDisk(VirtualDevice):
+                     os.close(fd)
+                 if progresscb:
+                     progresscb.end(size_bytes)
+-        # FIXME: set selinux context?
++
++    def setup_security_context(self):
++        logging.info("Setting up security contexts")
++        if self.device != VirtualDisk.DEVICE_CDROM:
++            return
++
++        caps = self._caps
++        if not caps or caps.host.secmodel is None:
++            logging.info("No security model active")
++            return
++        if caps.host.secmodel.model != "selinux":
++            logging.info("Security model is not selinux")
++            return
++
++        wantLabel = "system_u:object_r:virt_content_t:s0"
++        changeLabel = False
++        if self.vol_object:
++            xml = self.vol_object.XMLDesc(0)
++            label = _util.get_xml_path(xml, "/volume/target/permissions/label")
++
++            if label == wantLabel:
++                logging.info("Labelling is correct")
++                return
++
++            if self._is_remote():
++                raise ValueError, _("Install volume %s has incorrect SELinux label %s, expecting %s" %
++                                    (self.path, label, wantLabel))
++            else:
++                changeLabel = True
++        elif self.path:
++            try:
++                import selinux
++                con = selinux.getfilecon(self.path)
++                if con == wantLabel:
++                    logging.info("Labelling is correct")
++                    return
++
++                if self._is_remote():
++                    raise ValueError, _("Install volume %s has incorrect SELinux label %s, expecting %s" %
++                                        (self.path, label, wantLabel))
++                else:
++                    if self.path[0:4] == "/dev":
++                        logging.info("Not changing context on physical device")
++                    else:
++                        changeLabel = True
++            except Exception, e:
++                logging.error("Failed to validate SELinux labelling: %s. Assuming its OK" % str(e))
++
++        if changeLabel:
++            try:
++                import selinux
++                selinux.setfilecon(self.path, wantLabel)
++                logging.info("Changed SELinux label to %s" % wantLabel)
++            except Exception, e:
++                raise ValueError, _(("Unable to fix install volume SELinux labelling: %s\n" % str(e)) +
++                                    ("Please run 'chcon %s %s' manually and retry installation" % (wantLabel, self.path)))
++
+ 
+     def get_xml_config(self, disknode=None):
+         """

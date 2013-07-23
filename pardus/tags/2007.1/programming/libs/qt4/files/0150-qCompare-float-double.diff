@@ -1,0 +1,69 @@
+qt-bugs@ issue : 136537
+Trolltech task ID : 137260
+bugs.kde.org number : none
+applied: yes
+author: Benoit Jacob <jacob@math.jussieu.fr>
+
+
+
+Dear qt-bugs,
+
+I attach a patch fixing/improving qCompare<float> and qCompare<double> in 
+QTestLib.
+
+For instance, qCompare<float> currently does the following test:
+
+return (qAbs(t1 - t2) < 0.00001f)
+
+this is of course a bad test, for instance take this example:
+  t1 = 1e-10
+  t2 = 1e-13
+Here, t1 is 1000 times bigger than t2 so it shouldn't be considered equal to 
+t2. But QTestLib's current test will return true because t1-t2 is of the 
+order of 1e-10, which is smaller than 0.00001f.
+
+So my patch corrects this test as follows (which is very standard):
+
+return (qAbs(t1 - t2) <= 0.00001f * qMin(qAbs(t1), qAbs(t2)))
+
+so that the allowed difference between t1 and t2 is proportional to the 
+smallest of the absolute values of t1 and t2.
+
+Note that I replace < with <=. This is important for the test that I propose, 
+because in the case when
+  t1 == t2 == 0
+we want to return true, not false. Of course that didn't make a difference 
+with the old test.
+
+Same thing for qCompare<double>.
+
+I have left unmodified the values 0.00001f and 0.000000000001, so that the new 
+test is equivalent to the old one for numbers of the order of magnitude of 1.
+
+Cheers,
+Benoit
+
+
+
+Index: tools/qtestlib/src/qtestcase.cpp
+===================================================================
+--- tools/qtestlib/src/qtestcase.cpp	(révision 596157)
++++ tools/qtestlib/src/qtestcase.cpp	(copie de travail)
+@@ -1403,7 +1403,7 @@
+ bool QTest::qCompare<float>(float const &t1, float const &t2, const char *actual, const char *expected,
+                     const char *file, int line)
+ {
+-    return (qAbs(t1 - t2) < 0.00001f)
++    return (qAbs(t1 - t2) <= 0.00001f * qMin(qAbs(t1), qAbs(t2)))
+             ? compare_helper(true, "COMPARE()", file, line)
+             : compare_helper(false, "Compared floats are not the same (fuzzy compare)",
+                              toString(t1), toString(t2), actual, expected, file, line);
+@@ -1416,7 +1416,7 @@
+ bool QTest::qCompare<double>(double const &t1, double const &t2, const char *actual, const char *expected,
+                     const char *file, int line)
+ {
+-    return (qAbs(t1 - t2) < 0.000000000001)
++    return (qAbs(t1 - t2) <= 0.000000000001 * qMin(qAbs(t1), qAbs(t2)))
+             ? compare_helper(true, "COMPARE()", file, line)
+             : compare_helper(false, "Compared doubles are not the same (fuzzy compare)",
+                              toString(t1), toString(t2), actual, expected, file, line);

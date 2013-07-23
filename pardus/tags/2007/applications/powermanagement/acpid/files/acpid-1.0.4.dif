@@ -1,0 +1,40 @@
+--- acpid.c.orig	2004-10-18 00:33:51.000000000 +0200
++++ acpid.c	2005-08-02 19:22:04.000000000 +0200
+@@ -61,7 +61,7 @@
+ main(int argc, char **argv)
+ {
+ 	int event_fd;
+-	int sock_fd;
++	int sock_fd = 0;
+ 
+ 	/* learn who we really are */
+ 	progname = (const char *)strrchr(argv[0], '/');
+@@ -386,7 +386,8 @@
+ 	umask(0);
+ 
+ 	/* get outta the way */
+-	chdir("/");
++	if(chdir("/") < 0)
++		fprintf(stderr, "%s: chdir: %s\n", progname, strerror(errno));
+ 
+ 	return 0;
+ }
+--- Makefile.orig	2004-10-18 00:54:28.000000000 +0200
++++ Makefile	2005-08-02 19:22:04.000000000 +0200
+@@ -21,7 +21,7 @@
+ MAN8 = acpid.8 acpi_listen.8
+ MAN8GZ = $(MAN8:.8=.8.gz)
+ 
+-CFLAGS = -Wall -Werror -g $(DEFS)
++CFLAGS = -Wall -Werror -g $(DEFS) $(EXTRA_CFLAGS)
+ DEFS = -DVERSION="\"$(VERSION)\""
+ 
+ all: $(PROGS)
+@@ -36,6 +36,7 @@
+ install: $(PROGS) man
+ 	mkdir -p $(SBINDIR)
+ 	install -m 750 acpid $(SBINDIR)
++	mkdir -p $(BINDIR)
+ 	install -m 755 acpi_listen $(BINDIR)
+ 	mkdir -p $(MAN8DIR)
+ 	install -m 644 $(MAN8GZ) $(MAN8DIR)

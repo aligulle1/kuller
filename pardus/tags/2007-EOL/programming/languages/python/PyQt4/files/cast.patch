@@ -1,0 +1,21 @@
+diff -ur PyQt-x11-gpl-4.4.2.orig/designer/pluginloader.cpp PyQt-x11-gpl-4.4.2/designer/pluginloader.cpp
+--- PyQt-x11-gpl-4.4.2.orig/designer/pluginloader.cpp	2008-05-21 00:32:58.000000000 +0300
++++ PyQt-x11-gpl-4.4.2/designer/pluginloader.cpp	2008-05-21 23:17:03.000000000 +0300
+@@ -281,7 +281,7 @@
+ PyObject *PyCustomWidgets::getModuleAttr(const char *module, const char *attr)
+ {
+ #if PY_VERSION_HEX >= 0x02050000
+-    PyObject *mod = PyImport_ImportModule(module);
++    PyObject *mod = PyImport_ImportModule(const_cast<char *>(module));
+ #else
+     PyObject *mod = PyImport_ImportModule(const_cast<char *>(module));
+ #endif
+@@ -293,7 +293,7 @@
+     }
+ 
+ #if PY_VERSION_HEX >= 0x02050000
+-    PyObject *obj = PyObject_GetAttrString(mod, attr);
++    PyObject *obj = PyObject_GetAttrString(mod, const_cast<char *>(attr));
+ #else
+     PyObject *obj = PyObject_GetAttrString(mod, const_cast<char *>(attr));
+ #endif

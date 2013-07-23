@@ -1,0 +1,33 @@
+Index: konversation-1.1/konversation/src/inputfilter.cpp
+===================================================================
+--- konversation-1.1.orig/konversation/src/inputfilter.cpp
++++ konversation-1.1/konversation/src/inputfilter.cpp
+@@ -27,6 +27,9 @@
+ #include <qstringlist.h>
+ #include <qdatetime.h>
+ #include <qregexp.h>
++#include <qfile.h>
++#include <qstring.h>
++#include <qtextstream.h>
+ 
+ #include <klocale.h>
+ #include <kdeversion.h>
+@@ -242,9 +245,16 @@ void InputFilter::parseClientCommand(con
+                     }
+                     else
+                     {
++                        // Patch for Pardus
++                        QString release;
++                        QFile file("/etc/pardus-release");
++                        file.open(IO_ReadOnly);
++                        QTextStream stream( &file );
++                        release = stream.readLine();
++                        file.close();
+                         // Do not internationalize the below version string
+-                        reply = QString("Konversation %1 (C) 2002-2008 by the Konversation team")
+-                            .arg(QString(KONVI_VERSION));
++                        reply = QString("Konversation %1 (C) 2002-2008 by the Konversation team | %2")
++                             .arg(QString(KONVI_VERSION)).arg(release);
+                     }
+                     server->ctcpReply(sourceNick,"VERSION "+reply);
+                 }

@@ -1,0 +1,12 @@
+--- configure.py	2007-06-26 13:08:39.000000000 +0300
++++ configure.py	2007-06-26 13:06:01.000000000 +0300
+@@ -763,8 +763,7 @@
+         f.close ()
+         target  = os.path.join (opt_kdelibdir, "kde3", "libkonsolepart.so")
+         symlink = os.path.join (opt_kdelibdir, "libkonsolepart.so")
+-        buff = buff.replace ("install:\n", "install:\n\tln -sf %s %s\n" % (target, symlink))
+-        buff = buff.replace ("\nclean", "\tldconfig\n\nclean")
++        buff = buff.replace ("install:\n", "install:\n\tmkdir -p $(DESTDIR)/usr/kde/3.5/lib\n\tln -sf %s $(DESTDIR)/%s\n" % (target, symlink))
+         f = open ("Makefile.new", "w")
+         f.write (buff)
+         f.close ()

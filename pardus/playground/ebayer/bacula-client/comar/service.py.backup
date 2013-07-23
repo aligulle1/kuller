@@ -1,0 +1,20 @@
+serviceType = "server"
+serviceDesc = _({"en": "Bacula Backup Client",
+                 "tr": "Bacula Yedek İstemci Servisi"})
+
+from comar.service import *
+
+@synchronized
+def start():
+    startService(command="/usr/sbin/bacula-fd",
+                 args="",
+                 donotify=True)
+
+@synchronized
+def stop():
+    stopService(pidfile="/var/run/bacula-fd.9103.pid",
+                donotify=True)
+
+
+def status():
+    return isServiceRunning("/var/run/bacula-fd.9103.pid")

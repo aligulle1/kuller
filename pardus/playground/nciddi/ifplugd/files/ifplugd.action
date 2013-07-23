@@ -1,0 +1,63 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+import sys
+import dbus
+from pardus import netutils
+
+def dbus_call(script, model, method, *args):
+    try:
+        bus = dbus.SystemBus()
+        obj = bus.get_object("tr.org.pardus.comar", "/package/%s" % script)
+        iface = dbus.Interface(obj, dbus_interface="tr.org.pardus.comar.%s" % model)
+    except dbus.DBusException, exception:
+        self.errorDBus(exception)
+        return
+    try:
+        func = getattr(iface, method)
+        return func(*args)
+    except dbus.DBusException, exception:
+        return
+
+def set_state(conn, state):
+    conn_name, type = conn
+    if type == 'wireless':
+        dbus_call('wireless_tools','Net.Link','setState', conn_name, state)
+    elif type == 'net':
+        dbus_call('net_tools','Net.Link','setState', conn_name, state)
+
+def find_conn(if_name):
+    ifc = netutils.IF(if_name)
+    devuid = ifc.deviceUID()
+    if ifc.isWireless():
+        wt_conns = [str(b) for b in dbus_call('wireless_tools','Net.Link','connections')]
+        for conn in wt_conns:
+            conn_info = dbus_call('wireless_tools','Net.Link','connectionInfo',conn)
+            if conn_info['device_id'] == devuid:
+                return [conn,'wireless']
+    else:
+        nt_conns = [str(b) for b in dbus_call('net_tools','Net.Link','connections')]
+        for conn in nt_conns:
+            conn_info = dbus_call('net_tools','Net.Link','connectionInfo',conn)
+            if conn_info['device_id'] == devuid:
+                return [conn,'net']
+
+def main():
+    try:
+        if_name = sys.argv[1]
+        cmd = sys.argv[2]
+    except IndexError:
+        return 1
+
+    conn = find_conn(if_name)
+
+    if cmd == 'up':
+        set_state(conn,'up')
+    elif cmd == 'down':
+        set_state(conn,'down')
+    else:
+        return 1
+
+
+if __name__ == '__main__':
+    sys.exit(main())

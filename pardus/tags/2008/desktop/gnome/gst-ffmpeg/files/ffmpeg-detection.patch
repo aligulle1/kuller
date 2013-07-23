@@ -1,0 +1,63 @@
+diff -Nur gst-ffmpeg-0.10.4-old/config.h.in gst-ffmpeg-0.10.4/config.h.in
+--- gst-ffmpeg-0.10.4-old/config.h.in	2008-06-02 12:24:05.000000000 +0300
++++ gst-ffmpeg-0.10.4/config.h.in	2008-06-02 12:24:20.000000000 +0300
+@@ -12,8 +12,8 @@
+ /* package origin */
+ #undef GST_PACKAGE_ORIGIN
+ 
+-/* Define to 1 if you have the <avi.h> header file. */
+-#undef HAVE_AVI_H
++/* Define to 1 if you have the <avio.h> header file. */
++#undef HAVE_LIBAVFORMAT_AVIO_H
+ 
+ /* Define if the host CPU is an Alpha */
+ #undef HAVE_CPU_ALPHA
+diff -Nur gst-ffmpeg-0.10.4-old/configure gst-ffmpeg-0.10.4/configure
+--- gst-ffmpeg-0.10.4-old/configure	2008-06-02 12:24:05.000000000 +0300
++++ gst-ffmpeg-0.10.4/configure	2008-06-02 12:25:40.000000000 +0300
+@@ -25408,7 +25408,7 @@
+   saved_CPPFLAGS="$CPPFLAGS"
+   CPPFLAGS="$CPPFLAGS $FFMPEG_CFLAGS"
+ 
+-for ac_header in avi.h
++for ac_header in libavformat/avio.h
+ do
+ as_ac_Header=`echo "ac_cv_header_$ac_header" | $as_tr_sh`
+ if { as_var=$as_ac_Header; eval "test \"\${$as_var+set}\" = set"; }; then
+@@ -25588,7 +25588,7 @@
+ 
+   FFMPEG_SUBDIRS=gst-libs
+   cat >>confdefs.h <<\_ACEOF
+-#define HAVE_AVI_H 1
++#define HAVE_LIBAVFORMAT_AVIO_H 1
+ _ACEOF
+ 
+ 
+@@ -25624,13 +25624,6 @@
+ 
+ 
+ 
+-if test x$HAVE_FFMPEG_UNINSTALLED = x1; then
+-
+-cat >>confdefs.h <<\_ACEOF
+-#define HAVE_FFMPEG_UNINSTALLED
+-_ACEOF
+-
+-fi
+  if test x$HAVE_FFMPEG_UNINSTALLED = x1; then
+   HAVE_FFMPEG_UNINSTALLED_TRUE=
+   HAVE_FFMPEG_UNINSTALLED_FALSE='#'
+diff -Nur gst-ffmpeg-0.10.4-old/ext/ffmpeg/gstffmpegdemux.c gst-ffmpeg-0.10.4/ext/ffmpeg/gstffmpegdemux.c
+--- gst-ffmpeg-0.10.4-old/ext/ffmpeg/gstffmpegdemux.c	2008-06-02 12:24:05.000000000 +0300
++++ gst-ffmpeg-0.10.4/ext/ffmpeg/gstffmpegdemux.c	2008-06-02 12:24:20.000000000 +0300
+@@ -26,8 +26,8 @@
+ #include <string.h>
+ #ifdef HAVE_FFMPEG_UNINSTALLED
+ #include <avformat.h>
+-#ifdef HAVE_AVI_H
+-#include <avi.h>
++#ifdef HAVE_LIBAVFORMAT_AVIO_H
++#include <libavformat/avio.h>
+ #endif
+ #else
+ #include <libavformat/avformat.h>

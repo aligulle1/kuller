@@ -1,0 +1,34 @@
+diff -Nuar mongodb-src-r1.8.1.orig/SConstruct mongodb-src-r1.8.1/SConstruct
+--- mongodb-src-r1.8.1.orig/SConstruct	2011-04-06 07:40:13.000000000 +0300
++++ mongodb-src-r1.8.1/SConstruct	2011-05-13 09:03:50.794000001 +0300
+@@ -668,12 +668,13 @@
+     if has_option( "distcc" ):
+         env["CXX"] = "distcc " + env["CXX"]
+         
+-    env.Append( CPPFLAGS="-fPIC -fno-strict-aliasing -ggdb -pthread -Wall -Wsign-compare -Wno-unknown-pragmas -Winvalid-pch" )
++    env.Append( CPPFLAGS="-fPIC -fno-strict-aliasing -pthread -Wall -Wsign-compare -Wno-unknown-pragmas -Winvalid-pch" )
+     # env.Append( " -Wconversion" ) TODO: this doesn't really work yet
+     if linux:
+-        env.Append( CPPFLAGS=" -Werror " )
+         env.Append( CPPFLAGS=" -fno-builtin-memcmp " ) # glibc's memcmp is faster than gcc's
++    env.Append( CXXFLAGS=os.environ['CXXFLAGS'])
+     env.Append( CXXFLAGS=" -Wnon-virtual-dtor " )
++    env.Append( LINKFLAGS=os.environ['LDFLAGS'] )
+     env.Append( LINKFLAGS=" -fPIC -pthread -rdynamic" )
+     env.Append( LIBS=[] )
+ 
+@@ -683,12 +684,12 @@
+ 
+     if linux and has_option( "sharedclient" ):
+         env.Append( LINKFLAGS=" -Wl,--as-needed -Wl,-zdefs " )
++        env.Append( SHLINKFLAGS=" -Wl,-soname=libmongoclient.so " )
+ 
+     if debugBuild:
+         env.Append( CPPFLAGS=" -O0 -fstack-protector " );
+         env['ENV']['GLIBCXX_FORCE_NEW'] = 1; # play nice with valgrind
+-    else:
+-        env.Append( CPPFLAGS=" -O3" )
++
+         #env.Append( CPPFLAGS=" -fprofile-generate" )
+         #env.Append( LINKFLAGS=" -fprofile-generate" )
+         # then:

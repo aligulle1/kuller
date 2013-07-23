@@ -1,0 +1,20 @@
+diff --exclude=.svn --exclude=.svnignore --exclude=CVS -Naur quassel-0.4.1-orig/src/common/identity.cpp quassel-0.4.1/src/common/identity.cpp
+--- quassel-0.4.1-orig/src/common/identity.cpp	2009-03-24 09:19:56.000000000 +0200
++++ quassel-0.4.1/src/common/identity.cpp	2009-03-24 10:33:50.000000000 +0200
+@@ -22,6 +22,7 @@
+ 
+ #include <QMetaProperty>
+ #include <QVariantMap>
++#include <QString>
+ 
+ #ifdef Q_OS_MAC
+ #  include <CoreServices/CoreServices.h>
+@@ -126,7 +127,7 @@
+   QString realName;
+   struct passwd *pwd = getpwuid(getuid());
+   if(pwd)
+-    realName = pwd->pw_gecos;
++    realName = QString::fromUtf8(pwd->pw_gecos);
+   if(!realName.isEmpty())
+     return realName;
+   else

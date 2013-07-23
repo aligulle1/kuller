@@ -1,0 +1,93 @@
+--- cdrdao-1.2.2.orig/dao/main.cc	2006-09-19 09:07:11.000000000 +0000
++++ cdrdao-1.2.2/dao/main.cc	2007-09-04 20:25:20.000000000 +0000
+@@ -2027,6 +2027,8 @@ static int copyCd(CdrDriver *src, CdrDri
+   }
+ 
+   if (src == dst) {
++    // unlock src to make swaping possible
++    src->preventMediumRemoval(0);
+     message(0, "Please insert a recordable medium and hit enter.");
+     getc(stdin);
+   }
+diff -Naurp cdrdao-1.2.2.orig/scsilib/libscg/scsi-linux-sg.c cdrdao-1.2.2/scsilib/libscg/scsi-linux-sg.c
+--- cdrdao-1.2.2.orig/scsilib/libscg/scsi-linux-sg.c	2006-09-20 10:51:11.000000000 +0000
++++ cdrdao-1.2.2/scsilib/libscg/scsi-linux-sg.c	2007-09-04 20:25:20.000000000 +0000
+@@ -225,6 +225,27 @@ LOCAL	long	sg_raisedma	__PR((SCSI *scgp,
+ #endif
+ LOCAL	void	sg_settimeout	__PR((int f, int timeout));
+ 
++int    sg_open_excl    __PR((char *device, int mode));
++
++int
++sg_open_excl(device, mode)
++       char    *device;
++       int     mode;
++{
++       int f;
++       int i;
++       f = open(device, mode|O_EXCL);
++       for (i = 0; (i < 10) && (f == -1 && (errno == EACCES || errno == EBUSY)); i++) {
++           fprintf(stderr, "Error trying to open %s exclusively (%s)... retrying in 1 second.\n", device, strerror(errno));
++	   usleep(1000000 + 100000.0 * rand()/(RAND_MAX+1.0));
++	   f = open(device, mode|O_EXCL);
++       }
++       if (f == -1 && errno != EACCES && errno != EBUSY) {
++           f = open(device, mode);
++       }
++       return f;
++}
++
+ /*
+  * Return version information for the low level SCSI transport code.
+  * This has been introduced to make it easier to trace down problems
+@@ -407,7 +428,7 @@ scanopen:
+ 		
+ 		for (i = 0; globbuf.gl_pathv && globbuf.gl_pathv[i] != NULL ; i++) {
+ 			devname = globbuf.gl_pathv[i];
+-			f = open(devname, O_RDWR | O_NONBLOCK);
++			f = sg_open_excl(devname, O_RDWR | O_NONBLOCK);
+ 			if (f < 0) {
+ 				/*
+ 				 * Set up error string but let us clear it later
+@@ -458,7 +479,7 @@ scanopen:
+ 		for (i = 0; globbuf.gl_pathv && globbuf.gl_pathv[i] != NULL ; i++) {
+ 			devname = globbuf.gl_pathv[i];
+ 
+-			f = open(devname, O_RDWR | O_NONBLOCK);
++			f = sg_open_excl(devname, O_RDWR | O_NONBLOCK);
+ 			if (f < 0) {
+ 				/*
+ 				 * Set up error string but let us clear it later
+@@ -511,7 +532,7 @@ openbydev:
+ 			"Warning: Open by 'devname' is unintentional and not supported.\n");
+ 		}
+ 					/* O_NONBLOCK is dangerous */
+-		f = open(device, O_RDWR | O_NONBLOCK);
++		f = sg_open_excl(device, O_RDWR | O_NONBLOCK);
+ /*		if (f < 0 && errno == ENOENT)*/
+ /*			goto openpg;*/
+ 
+diff -Naurp cdrdao-1.2.2.orig/scsilib/libscg/scsitransp.c cdrdao-1.2.2/scsilib/libscg/scsitransp.c
+--- cdrdao-1.2.2.orig/scsilib/libscg/scsitransp.c	2004-06-17 20:20:27.000000000 +0000
++++ cdrdao-1.2.2/scsilib/libscg/scsitransp.c	2007-09-04 20:25:20.000000000 +0000
+@@ -52,8 +52,9 @@ static	char sccsid[] =
+  *	Choose your name instead of "schily" and make clear that the version
+  *	string is related to a modified source.
+  */
+-LOCAL	char	_scg_version[]		= "0.8";	/* The global libscg version	*/
+-LOCAL	char	_scg_auth_schily[]	= "schily";	/* The author for this module	*/
++LOCAL	char	_scg_version[]		= "0.8ubuntu1";	/* The global libscg version	*/
++LOCAL	char	_scg_auth_ubuntu[]	= "ubuntu";	/* The author for this module	*/
++
+ 
+ #define	DEFTIMEOUT	20	/* Default timeout for SCSI command transport */
+ 
+@@ -137,7 +138,7 @@ scg_version(scgp, what)
+ 		 * return "schily" for the SCG_AUTHOR request.
+ 		 */
+ 		case SCG_AUTHOR:
+-			return (_scg_auth_schily);
++			return (_scg_auth_ubuntu);
+ 		case SCG_SCCS_ID:
+ 			return (sccsid);
+ 		default:

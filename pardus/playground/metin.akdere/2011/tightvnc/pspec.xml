@@ -1,0 +1,121 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>tightvnc</Name>
+        <Homepage>http://www.tightvnc.com</Homepage>
+        <Packager>
+            <Name>Metin Akdere</Name>
+            <Email>metin@pardus.org.tr</Email>
+        </Packager>
+        <License>GPLv2</License>
+        <IsA>app:console</IsA>
+        <Summary>Free remote control software package</Summary>
+        <Description>With TightVNC, you can see the desktop of a remote machine and control it with your local mouse and keyboard, just like you would do it sitting in the front of that computer.</Description>
+        <Archive sha1sum="ab4ed3d8e9d5188edf0ff27fce3027495f1a8851" type="tarbz2">http://www.tightvnc.com/download/1.3.10/tightvnc-1.3.10_unixsrc.tar.bz2</Archive>
+        <Archive sha1sum="5dd074d6302732a08ba847c45413d566abf6b7e7" type="targz">http://www.tightvnc.com/download/1.3.10/tightvnc-1.3.10_javasrc.tar.gz</Archive>
+        <BuildDependencies>
+            <Dependency>jpeg-devel</Dependency>
+            <Dependency>libXaw-devel</Dependency>
+            <Dependency>libXext-devel</Dependency>
+            <Dependency>libXfont-devel</Dependency>
+            <Dependency>libXmu-devel</Dependency>
+            <Dependency>libXt-devel</Dependency>
+            <Dependency>sun-jdk</Dependency>
+            <Dependency>xorg-server-devel</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <Patch level="0">server-CVE-2007-1003.patch</Patch>
+            <Patch level="0">server-CVE-2007-1351-1352.patch</Patch>
+            <Patch level="0">tightvnc-1.3.10-java-build.patch</Patch>
+            <Patch level="0">tightvnc-1.3.10-pathfixes.patch</Patch>
+            <Patch level="0">tightvnc-1.3.8-imake-tmpdir.patch</Patch>
+            <Patch level="0">pardus-xsession.diff</Patch>
+
+            <!-- Patches from SuSe. Investigate more before activating.
+            <Patch level="0">tightvnc-byteorder.patch</Patch>
+            <Patch level="0">tightvnc-altgr.patch</Patch>
+            <Patch level="0">tightvnc-newfbsize.patch</Patch>
+            <Patch level="0">tightvnc-rfbversion.patch</Patch>
+            <Patch level="0">tightvnc-vncviewer-scrollbar.patch</Patch>
+            <Patch level="0">tightvnc-X_SetInputFocus.patch</Patch>
+            <Patch level="0">vncconnect.patch</Patch>
+            <Patch level="0">vncpasswd.patch</Patch>
+            <Patch level="0">vncviewer.patch</Patch>
+            -->
+
+        </Patches>
+    </Source>
+    <Package>
+        <Name>tightvnc-server</Name>
+        <Summary>Server for the VNC remote display system</Summary>
+        <RuntimeDependencies>
+            <Dependency>jpeg</Dependency>
+            <Dependency>xorg-app</Dependency>
+        </RuntimeDependencies>
+         <Conflicts>
+            <Package>xorg-server-xvnc</Package>
+        </Conflicts>
+       <Files>
+            <Path fileType="config">/etc</Path>
+            <Path fileType="executable">/usr/bin/Xvnc</Path>
+            <Path fileType="executable">/usr/bin/vncserver</Path>
+            <Path fileType="executable">/usr/bin/vncpasswd</Path>
+            <Path fileType="executable">/usr/bin/vncconnect</Path>
+            <Path fileType="library">/usr/lib</Path>
+            <Path fileType="man">/usr/share/man</Path>
+            <Path fileType="doc">/usr/share/doc</Path>
+        </Files>
+     </Package>
+
+    <Package>
+        <Name>tightvnc-viewer</Name>
+        <Summary>Viewer for the VNC remote display system</Summary>
+        <RuntimeDependencies>
+            <Dependency>jpeg</Dependency>
+            <Dependency>libXaw</Dependency>
+            <Dependency>libXext</Dependency>
+            <Dependency>libXfont</Dependency>
+            <Dependency>libXmu</Dependency>
+            <Dependency>libXt</Dependency>
+            <Dependency release="current">tightvnc-server</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="executable">/usr/bin/vncviewer</Path>
+            <Path fileType="man">/usr/share/man/man1/vncviewer.1</Path>
+            <Path fileType="data">/usr/share/applications</Path>
+            <Path fileType="data">/usr/share/icons</Path>
+        </Files>
+         <AdditionalFiles>
+             <AdditionalFile owner="root" permission="0644" target="/usr/share/applications/vncviewer.desktop">vncviewer.desktop</AdditionalFile>
+             <AdditionalFile owner="root" permission="0644" target="/usr/share/icons/hicolor/16x16/apps/vnc.png">vnc16.png</AdditionalFile>
+             <AdditionalFile owner="root" permission="0644" target="/usr/share/icons/hicolor/32x32/apps/vnc.png">vnc32.png</AdditionalFile>
+             <AdditionalFile owner="root" permission="0644" target="/usr/share/icons/hicolor/48x48/apps/vnc.png">vnc48.png</AdditionalFile>
+        </AdditionalFiles>
+   </Package>
+
+    <Package>
+        <Name>tightvnc-java</Name>
+        <Summary>Java viewer for the VNC remote display system</Summary>
+        <RuntimeDependencies>
+            <Dependency>jpeg</Dependency>
+            <Dependency>sun-jre</Dependency>
+            <Dependency release="current">tightvnc-server</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="library">/usr/share/vnc/*.jar</Path>
+            <Path fileType="data">/usr/share/vnc/classes</Path>
+        </Files>
+    </Package>
+
+    <History>
+        <Update release="1">
+            <Date>2011-03-21</Date>
+            <Version>1.3.10</Version>
+            <Comment>First release.</Comment>
+            <Name>Metin Akdere</Name>
+            <Email>metin@pardus.org.tr</Email>
+        </Update>
+    </History>
+</PISI>
+

@@ -1,0 +1,80 @@
+Index: kdebase/kdesktop/lock/lockdlg.cc
+===================================================================
+--- kdebase.orig/kdesktop/lock/lockdlg.cc
++++ kdebase/kdesktop/lock/lockdlg.cc
+@@ -332,6 +332,7 @@ void PasswordDlg::reapVerify()
+             ok->setEnabled(false);
+             cancel->setEnabled(false);
+             mNewSessButton->setEnabled( false );
++            badPasswordLogin();
+             return;
+         case AuthAbort:
+             return;
+@@ -339,6 +340,38 @@ void PasswordDlg::reapVerify()
+     cantCheck();
+ }
+ 
++
++#include <kapplication.h>
++void PasswordDlg::movedialog( int _move )
++{
++     waitMoveDialog = true;
++     this->move(pos().x()+_move, pos().y());
++     TQTimer::singleShot( 50, this, TQT_SLOT(moveTimerDone()) );
++     while (waitMoveDialog)
++          kapp->processEvents();
++}
++
++void PasswordDlg::moveTimerDone()
++{
++     waitMoveDialog = false;
++}
++
++void PasswordDlg::badPasswordLogin()
++{
++     if ( mUnlockingFailed )
++     {
++          for ( int i = 0 ; i<2 ; i++)
++          {
++               movedialog( 10 );
++               movedialog( -20 );
++               movedialog( 20 );
++               movedialog( -20 );
++               movedialog( 20 );
++               movedialog( -10 );
++          }
++     }
++}
++
+ void PasswordDlg::handleVerify()
+ {
+     int ret;
+Index: kdebase/kdesktop/lock/lockdlg.h
+===================================================================
+--- kdebase.orig/kdesktop/lock/lockdlg.h
++++ kdebase/kdesktop/lock/lockdlg.h
+@@ -57,6 +57,7 @@ private slots:
+     void slotOK();
+     void layoutClicked();
+     void slotActivity();
++    void moveTimerDone();
+ 
+ private:
+     void setLayoutText( const TQString &txt );
+@@ -73,6 +74,8 @@ private:
+     void handleVerify();
+     void reapVerify();
+     void cantCheck();
++    void movedialog( int _move );
++    void badPasswordLogin();
+     GreeterPluginHandle *mPlugin;
+     KGreeterPlugin *greet;
+     TQFrame      *frame;
+@@ -88,6 +91,7 @@ private:
+     TQStringList::iterator currLayout;
+     int         sPid, sFd;
+     TQListView   *lv;
++    bool        waitMoveDialog;
+ };
+ 
+ #endif

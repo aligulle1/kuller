@@ -1,0 +1,186 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>samba</Name>
+        <Homepage>http://www.samba.org/</Homepage>
+        <Packager>
+            <Name>Ekin Meroğlu</Name>
+            <Email>ekin@pardus.org.tr</Email>
+        </Packager>
+        <License>GPL-2</License>
+        <IsA>daemon</IsA>
+        <Summary>SAMBA is a suite of SMB and CIFS client/server programs for UNIX</Summary>
+        <Summary xml:lang="tr">SAMBA, Linux için Windows ağ paylaşım yazılımıdır</Summary>
+        <Description>Samba is a free software implementation of Microsoft's networking protocol released under the GNU General Public License. As of version 3, Samba not only provides file and print services for various Microsoft Windows clients but can also integrate with a Windows Server domain, either as a Primary Domain Controller (PDC) or as a Domain Member. It can also be part of an Active Directory domain.</Description>
+        <Description xml:lang="tr">Samba, Linux ve Unix işletim sistemleri ile Windows NT ve Windows 9x işletim sistemleri arasındaki iletişimi sağlayan bir ağ sunucusu uygulamasıdır. Samba yalnızca Linux ve windows makinaların birbirlerini görmelerini sağlamaz aynı zamanda Linux çalıştıran bilgisayarların windows ağında yazıcı sunucusu gibi işlevleri edinmesi içinde kullanılır. Ayrıca Active Directory ile de uyumludur.</Description>
+        <Archive sha1sum="a5361d54ac5fafe34ae17e0fa14c864bcdf16089" type="targz">http://us4.samba.org/samba/ftp/stable/samba-3.0.23c.tar.gz</Archive>
+        <Patches>
+            <Patch>004_all_samba-2.2.8-statfs.patch</Patch>
+            <Patch>002_all_samba-3.0.x-smbumount-uid32.patch</Patch>
+        </Patches>
+        <BuildDependencies>
+            <Dependency>popt</Dependency>
+            <Dependency>acl</Dependency>
+            <Dependency>cups</Dependency>
+            <Dependency>pam</Dependency>
+            <Dependency>python</Dependency>
+            <Dependency>readline</Dependency>
+            <Dependency>libxml2</Dependency>
+            <Dependency>zlib</Dependency>
+            <Dependency releaseFrom="9">openldap-client</Dependency>
+            <Dependency>mit-kerberos</Dependency>
+        </BuildDependencies>
+    </Source>
+
+    <Package>
+        <Name>samba-python</Name>
+        <RuntimeDependencies>
+            <Dependency>acl</Dependency>
+            <Dependency>cups</Dependency>
+            <Dependency>libxml2</Dependency>
+            <Dependency>samba</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="library">/usr/lib/python2.4/site-packages/samba</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>samba</Name>
+        <RuntimeDependencies>
+            <Dependency>acl</Dependency>
+            <Dependency>cups</Dependency>
+            <Dependency>libxml2</Dependency>
+            <Dependency releaseFrom="9">openldap-client</Dependency>
+            <Dependency>mit-kerberos</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="config">/etc</Path>
+            <Path fileType="library">/lib/security</Path>
+            <Path fileType="executable">/sbin</Path>
+            <Path fileType="executable">/usr/bin</Path>
+            <Path fileType="header">/usr/include</Path>
+            <Path fileType="library">/usr/lib</Path>
+            <Path fileType="executable">/usr/sbin</Path>
+            <Path fileType="man">/usr/share/man</Path>
+            <Path fileType="data">/var/cache/samba</Path>
+            <Path fileType="data">/var/lib</Path>
+            <Path fileType="data">/var/log</Path>
+            <Path fileType="data">/var/run</Path>
+        </Files>
+        <AdditionalFiles>
+            <AdditionalFile owner="root" permission="0644" target="/etc/samba/smbusers">smbusers</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/etc/samba/smb.conf">smb.conf</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/etc/samba/lmhosts">lmhosts</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/etc/samba/system-auth-winbind">system-auth-winbind</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/etc/pam.d/samba">samba.pam</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/etc/conf.d/samba">samba.confd</AdditionalFile>
+        </AdditionalFiles>
+        <Provides>
+            <COMAR script="package.py">System.Package</COMAR>
+            <COMAR script="service.py">System.Service</COMAR>
+        </Provides>
+    </Package>
+
+    <History>
+        <Update release="14">
+            <Date>2006-11-28</Date>
+            <Version>3.0.23_p3</Version>
+            <Comment>Use pythonmodules</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="13">
+            <Date>2006-10-15</Date>
+            <Version>3.0.23_p3</Version>
+            <Comment>Install mount.cifs helpers in /usr/bin</Comment>
+            <Name>Ekin Meroğlu</Name>
+            <Email>ekin@pardus.org.tr</Email>
+        </Update>
+        <Update release="12">
+            <Date>2006-10-09</Date>
+            <Version>3.0.23_p3</Version>
+            <Comment>Service script updated.</Comment>
+            <Name>Bahadır Kandemir</Name>
+            <Email>bahadir@pardus.org.tr</Email>
+        </Update>
+        <Update release="11">
+            <Date>2006-09-09</Date>
+            <Version>3.0.23_p3</Version>
+            <Comment>Version bump</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="10">
+            <Date>2006-07-11</Date>
+            <Version>3.0.23</Version>
+            <Comment>LDAP support</Comment>
+            <Name>Ali Erdinç Köroğlu</Name>
+            <Email>erdinc@pardus.org.tr</Email>
+        </Update>
+        <Update release="9" type="security">
+            <Date>2006-07-11</Date>
+            <Version>3.0.23</Version>
+            <Comment>Version bump to fix CAN-2006-3403</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="8">
+            <Date>2006-05-07</Date>
+            <Version>3.0.22</Version>
+            <Comment>Added müdür script</Comment>
+            <Name>Onur Küçük</Name>
+            <Email>onur@pardus.org.tr</Email>
+        </Update>
+        <Update release="7" type="security">
+            <Date>2006-03-30</Date>
+            <Version>3.0.22</Version>
+            <Comment>Version bump to fix CAN-2006-1059</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="6">
+            <Date>2006-03-02</Date>
+            <Version>3.0.21c</Version>
+            <Comment>Stable update</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="5">
+            <Date>2006-02-04</Date>
+            <Version>3.0.21b</Version>
+            <Comment>fix #1712</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="4">
+            <Date>2006-02-02</Date>
+            <Version>3.0.21b</Version>
+            <Comment>New stable release, and enable Kerberos support</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="3" type="bug">
+            <Date>2006-01-25</Date>
+            <Version>3.0.20b</Version>
+            <Comment>Fix printing with remote SMB systems, bugfix from Muazzez Mirasedoğlu</Comment>
+            <Name>Onur Küçük</Name>
+            <Email>onur@pardus.org.tr</Email>
+        </Update>
+        <Update release="2">
+            <Date>2005-12-15</Date>
+            <Version>3.0.20b</Version>
+            <Comment>Default smb.conf powered by Doruk Fişek (#1166)</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="1">
+            <Date>2005-11-28</Date>
+            <Version>3.0.20b</Version>
+            <Comment>First release.</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+    </History>
+</PISI>

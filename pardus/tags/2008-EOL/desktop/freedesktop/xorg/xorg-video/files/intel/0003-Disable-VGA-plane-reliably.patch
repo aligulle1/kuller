@@ -1,0 +1,67 @@
+From 73fde98a7354cc087e6f230f96533e15706fa48b Mon Sep 17 00:00:00 2001
+From: Ma Ling <ling.ma@intel.com>
+Date: Wed, 14 Jan 2009 14:46:52 +0800
+Subject: [PATCH 03/20] Disable VGA plane reliably
+
+This fixes #17235, VGA random hang on recent G45/43 board.
+From spec, SR01 bit 5 should be set before VGA plane disable through
+control register, otherwise we might get random crash and lockups.
+---
+ src/i830_display.c |   34 ++++++++++++++++++++++++++++++++--
+ 1 files changed, 32 insertions(+), 2 deletions(-)
+
+diff --git xf86-video-intel-2.4.3/src/i830_display.c xf86-video-intel-2.4.3/src/i830_display.c
+index 1ae0c3d..49eb1b5 100644
+--- xf86-video-intel-2.4.3/src/i830_display.c
++++ xf86-video-intel-2.4.3/src/i830_display.c
+@@ -776,6 +776,37 @@ static void i830_modeset_ctl(xf86CrtcPtr crtc, int dpms_state)
+ }
+ #endif /* DRM_IOCTL_MODESET_CTL && XF86DRI */
+ 
++static void
++i830_disable_vga_plane (xf86CrtcPtr crtc)
++{
++    ScrnInfoPtr pScrn = crtc->scrn;
++    I830Ptr pI830 = I830PTR(pScrn);
++    uint32_t vgacntrl = INREG(VGACNTRL);
++    uint8_t sr01;
++
++    if (vgacntrl & VGA_DISP_DISABLE)
++	return;
++
++    /*
++       Set bit 5 of SR01;
++       Wait 30us;
++       */
++    OUTREG8(SRX, 1);
++    sr01 = INREG8(SRX + 1);
++    OUTREG8(SRX + 1, sr01 | (1 << 5));
++    usleep(30);
++
++    vgacntrl |= VGA_DISP_DISABLE;
++
++    /* disable center mode */
++    if (IS_I9XX(pI830))
++	vgacntrl &= ~(3 << 24);
++
++    OUTREG(VGACNTRL, vgacntrl);
++    i830WaitForVblank(pScrn);
++
++}
++
+ /**
+  * Sets the power management mode of the pipe and plane.
+  *
+@@ -900,8 +931,7 @@ i830_crtc_dpms(xf86CrtcPtr crtc, int mode)
+ 	}
+ 
+ 	/* Disable the VGA plane that we never use. */
+-	OUTREG(VGACNTRL, VGA_DISP_DISABLE);
+-	i830WaitForVblank(pScrn);
++	i830_disable_vga_plane (crtc);
+ 
+ 	break;
+     }
+-- 
+1.6.2
+

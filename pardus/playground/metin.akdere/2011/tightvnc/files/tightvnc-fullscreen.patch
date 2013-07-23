@@ -1,0 +1,193 @@
+--- vnc_unixsrc.orig/vncviewer/fullscreen.c
++++ vnc_unixsrc/vncviewer/fullscreen.c
+@@ -35,7 +35,35 @@
+ static Dimension viewportWidth, viewportHeight;
+ static Dimension scrollbarWidth, scrollbarHeight;
+ 
++#define _NET_WM_STATE_REMOVE        0    /* remove/unset property */
++#define _NET_WM_STATE_ADD           1    /* add/set property */
+ 
++static void
++netwm_set_state(Display *dpy, Window win, int operation, Atom state)
++{
++    XEvent e;
++    Atom _NET_WM_STATE = XInternAtom(dpy, "_NET_WM_STATE", False);
++
++    memset(&e,0,sizeof(e));
++    e.xclient.type = ClientMessage;
++    e.xclient.message_type = _NET_WM_STATE;
++    e.xclient.display = dpy;
++    e.xclient.window = win;
++    e.xclient.format = 32;
++    e.xclient.data.l[0] = operation;
++    e.xclient.data.l[1] = state;
++
++    XSendEvent(dpy, DefaultRootWindow(dpy), False,
++               SubstructureRedirectMask, &e);
++}
++
++static void
++netwm_fullscreen(Display *dpy, Window win, int state)
++{
++    Atom _NET_WM_STATE_FULLSCREEN = XInternAtom(dpy, "_NET_WM_STATE_FULLSCREEN", False);
++    int op = state ? _NET_WM_STATE_ADD : _NET_WM_STATE_REMOVE;
++    netwm_set_state(dpy,win,op,_NET_WM_STATE_FULLSCREEN);
++}
+ 
+ /*
+  * FullScreenOn goes into full-screen mode.  It makes the toplevel window
+@@ -99,14 +127,16 @@
+     scrollbarHeight = oldViewportHeight - clipHeight;
+ 
+     if (si.framebufferWidth > dpyWidth) {
+-      viewportWidth = toplevelWidth = dpyWidth + scrollbarWidth;
++	toplevelWidth = dpyWidth + scrollbarWidth;
++	viewportWidth = toplevelWidth;
+     } else {
+       viewportWidth = si.framebufferWidth + scrollbarWidth;
+       toplevelWidth = dpyWidth;
+     }
+ 
+     if (si.framebufferHeight > dpyHeight) {
+-      viewportHeight = toplevelHeight = dpyHeight + scrollbarHeight;
++	toplevelHeight = dpyHeight + scrollbarHeight;
++	viewportHeight = toplevelHeight;
+     } else {
+       viewportHeight = si.framebufferHeight + scrollbarHeight;
+       toplevelHeight = dpyHeight;
+@@ -122,37 +152,14 @@
+   viewportX = (toplevelWidth - viewportWidth) / 2;
+   viewportY = (toplevelHeight - viewportHeight) / 2;
+ 
+-
+   /* We want to stop the window manager from managing our toplevel window.
+      This is not really a nice thing to do, so may not work properly with every
+      window manager.  We do this simply by setting overrideRedirect and
+      reparenting our window to the root.  The window manager will get a
+      ReparentNotify and hopefully clean up its frame window. */
+ 
+-  XtVaSetValues(toplevel, XtNoverrideRedirect, True, NULL);
+-
+-  XReparentWindow(dpy, XtWindow(toplevel), DefaultRootWindow(dpy), 0, 0);
+-
+-  /* Some WMs does not obey x,y values of XReparentWindow; the window
+-     is not placed in the upper, left corner. The code below fixes
+-     this: It manually moves the window, after the Xserver is done
+-     with XReparentWindow. The last XSync seems to prevent losing
+-     focus, but I don't know why. */
+-  XSync(dpy, False);
+-  XMoveWindow(dpy, XtWindow(toplevel), 0, 0);
+-  XSync(dpy, False);
+-
+-  /* Now we want to fix the size of "viewport".  We shouldn't just change it
+-     directly.  Instead we set "toplevel" to the required size (which should
+-     propagate through "form" to "viewport").  Then we remove "viewport" from
+-     being managed by "form", change its resources to position it and make sure
+-     that "form" won't attempt to resize it, then ask "form" to manage it
+-     again. */
+-
+-  XtResizeWidget(toplevel, viewportWidth, viewportHeight, 0);
+-
++  XtResizeWidget(viewport, viewportWidth, viewportHeight, 0);
+   XtUnmanageChild(viewport);
+-
+   XtVaSetValues(viewport,
+ 		XtNhorizDistance, viewportX,
+ 		XtNvertDistance, viewportY,
+@@ -162,28 +169,10 @@
+ 		XtNbottom, XtChainTop,
+ 		NULL);
+ 
+-  XtManageChild(viewport);
+-
+-  /* Now we can set "toplevel" to its proper size. */
+-
+-  XtResizeWidget(toplevel, toplevelWidth, toplevelHeight, 0);
+-
+-  /* Set the popup to overrideRedirect too */
+ 
++  XtManageChild(viewport);
+   XtVaSetValues(popup, XtNoverrideRedirect, True, NULL);
+-
+-  /* Try to get the input focus. */
+-
+-  XSetInputFocus(dpy, DefaultRootWindow(dpy), RevertToPointerRoot,
+-		 CurrentTime);
+-
+-  /* Optionally, grab the keyboard. */
+-
+-  if (appData.grabKeyboard &&
+-      XtGrabKeyboard(desktop, True, GrabModeAsync,
+-		     GrabModeAsync, CurrentTime) != GrabSuccess) {
+-    fprintf(stderr, "XtGrabKeyboard() failed.\n");
+-  }
++  netwm_fullscreen(dpy, XtWindow(toplevel), True);
+ }
+ 
+ 
+@@ -210,14 +199,11 @@
+ 
+   appData.fullScreen = False;
+ 
+-  if (appData.grabKeyboard)
+-    XtUngrabKeyboard(desktop, CurrentTime);
+-
+-  XtUnmapWidget(toplevel);
+-
++  netwm_fullscreen(dpy, XtWindow(toplevel), False);
+   XtResizeWidget(toplevel,
+ 		 viewportWidth - scrollbarWidth,
+ 		 viewportHeight - scrollbarHeight, 0);
++
+   XtResizeWidget(viewport,
+ 		 viewportWidth - scrollbarWidth,
+ 		 viewportHeight - scrollbarHeight, 0);
+@@ -236,18 +222,6 @@
+ 		NULL);
+ 
+   XtManageChild(viewport);
+-
+-  XtVaSetValues(toplevel, XtNoverrideRedirect, False, NULL);
+-
+-  if ((toplevelWidth + appData.wmDecorationWidth) >= dpyWidth)
+-    toplevelWidth = dpyWidth - appData.wmDecorationWidth;
+-
+-  if ((toplevelHeight + appData.wmDecorationHeight) >= dpyHeight)
+-    toplevelHeight = dpyHeight - appData.wmDecorationHeight;
+-
+-  XtResizeWidget(toplevel, toplevelWidth, toplevelHeight, 0);
+-
+-  XtMapWidget(toplevel);
+   XSync(dpy, False);
+ 
+   /* Set the popup back to non-overrideRedirect */
+--- vncviewer/misc.c
++++ vncviewer/misc.c
+@@ -65,19 +65,6 @@
+   dpyWidth = WidthOfScreen(DefaultScreenOfDisplay(dpy));
+   dpyHeight = HeightOfScreen(DefaultScreenOfDisplay(dpy));
+ 
+-  if (appData.fullScreen) {
+-
+-    /* full screen - set position to 0,0, but defer size calculation until
+-       widgets are realized */
+-
+-    XtVaSetValues(toplevel, XtNoverrideRedirect, True,
+-		  XtNgeometry, "+0+0", NULL);
+-
+-  } else {
+-
+-    /* not full screen - work out geometry for middle of screen unless
+-       specified by user */
+-
+     XtVaGetValues(toplevel, XtNgeometry, &geometry, NULL);
+ 
+     if (geometry == NULL) {
+@@ -105,7 +92,6 @@
+ 	      toplevelWidth, toplevelHeight, toplevelX, toplevelY);
+       XtVaSetValues(toplevel, XtNgeometry, geometry, NULL);
+     }
+-  }
+ 
+   /* Test if the keyboard is grabbed.  If so, it's probably because the
+      XDM login window is up, so try iconifying it to release the grab */

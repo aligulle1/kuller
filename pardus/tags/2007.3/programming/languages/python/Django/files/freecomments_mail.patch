@@ -1,0 +1,26 @@
+diff -ur Django-0.95.1.orig/django/contrib/comments/models.py Django-0.95.1/django/contrib/comments/models.py
+--- Django-0.95.1.orig/django/contrib/comments/models.py	2006-07-21 23:48:17.000000000 +0300
++++ Django-0.95.1/django/contrib/comments/models.py	2007-02-18 17:37:34.209935905 +0200
+@@ -4,6 +4,7 @@
+ from django.contrib.auth.models import User
+ from django.utils.translation import gettext_lazy as _
+ from django.conf import settings
++from django.core.mail import mail_managers 
+ import datetime
+ 
+ MIN_PHOTO_DIMENSION = 5
+@@ -187,6 +188,14 @@
+         date_hierarchy = 'submit_date'
+         search_fields = ('comment', 'person_name')
+ 
++    def save(self):
++        if self.id is None:
++            mail_subject = 'New comment posted on %s "%s"' % (self.site.name, self.get_content_object().title)
++            mail_body = 'On %s, %s posted the following comment on "%s":\n\n%s' % (self.submit_date.strftime("%A, %B %d, %Y at %I:%M %p"), self.person_name, self.get_content_object().title, self.comment)
++            mail_managers(mail_subject, mail_body, fail_silently=True)
++
++        super(FreeComment, self).save()
++
+     def __repr__(self):
+         return "%s: %s..." % (self.person_name, self.comment[:100])
+ 

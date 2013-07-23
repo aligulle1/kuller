@@ -1,0 +1,18 @@
+--- qca-pkcs11.cpp.orig	2010-01-28 14:33:41.000000000 +0200
++++ qca-pkcs11.cpp	2010-01-28 14:34:00.000000000 +0200
+@@ -3036,14 +3036,7 @@
+ 	}
+ 
+ 
+-//@BEGIN-WORKAROUND
+-// Qt vsprintf cannot can NULL for %s as vsprintf does.
+-//	QCA_logTextMessage (QString ().vsprintf (format, args), severity);
+-	char buffer[2048];
+-	QT_VSNPRINTF (buffer, sizeof (buffer)-1, format, args);
+-	buffer[sizeof (buffer)-1] = '\x0';
+-	QCA_logTextMessage (buffer, severity);
+-//@END-WORKAROUND
++	QCA_logTextMessage (QString ().vsprintf (format, args), severity);
+ }
+ 
+ void

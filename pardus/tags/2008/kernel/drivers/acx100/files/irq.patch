@@ -1,0 +1,16 @@
+--- pci.c.org	2008-05-03 18:31:54.000000000 +0300
++++ pci.c	2008-05-03 19:02:43.000000000 +0300
+@@ -2072,7 +2072,12 @@
+ /* TODO: pci_set_power_state(pdev, PCI_D0); ? */
+ 
+ 	/* request shared IRQ handler */
+-	if (request_irq(ndev->irq, acxpci_i_interrupt, IRQF_SHARED, ndev->name, ndev)) {
++
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,21))  
++    if (request_irq(ndev->irq, acxpci_i_interrupt, IRQF_SHARED, ndev->name, ndev)) {
++#else
++    if (request_irq(ndev->irq, acxpci_i_interrupt, SA_SHIRQ, ndev->name, ndev)) {
++#endif
+ 		printk("%s: request_irq FAILED\n", ndev->name);
+ 		result = -EAGAIN;
+ 		goto done;

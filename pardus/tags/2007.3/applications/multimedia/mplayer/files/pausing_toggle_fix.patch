@@ -1,0 +1,16 @@
+diff -Nur mplayer-20071112-old/command.c mplayer-20071112/command.c
+--- mplayer-20071112-old/command.c	2007-11-12 19:20:03.470930421 +0200
++++ mplayer-20071112/command.c	2007-11-12 19:22:31.095488077 +0200
+@@ -2801,7 +2801,11 @@
+ 	break;
+     case 3:	// "pausing_toggle"
+ 	mpctx->was_paused = !mpctx->was_paused;
+-	// fall through
++	if (mpctx->was_paused)
++	    mpctx->osd_function = OSD_PAUSE;
++	else if (mpctx->osd_function == OSD_PAUSE)
++	    mpctx->osd_function = OSD_PLAY;
++	break;
+     case 2:	// "pausing_keep"
+ 	if (mpctx->was_paused)
+ 	    mpctx->osd_function = OSD_PAUSE;

@@ -1,0 +1,218 @@
+diff -u trunk/plug-ins/common/psd-load.c trunk/plug-ins/common/psd-load.c
+--- trunk/plug-ins/common/psd-load.c	2007-07-10 13:13:53.000000000 +0300
++++ trunk/plug-ins/common/psd-load.c	(revision 22884)
+@@ -415,7 +415,8 @@
+                                             long     len,
+                                             gchar   *why,
+                                             gint     step);
+-static void   read_whole_file              (FILE    *fd);
++static void   read_whole_file              (FILE    *fd,
++                                            const gchar  *name);
+ static void   reshuffle_cmap               (guchar  *map256);
+ static gchar *getpascalstring              (FILE    *fd,
+                                             gchar   *why);
+@@ -1045,6 +1046,17 @@
+   layer->width  = right - left;
+   layer->height = bottom - top;
+ 
++  if ((layer->height > GIMP_MAX_IMAGE_SIZE) ||
++      (layer->width > GIMP_MAX_IMAGE_SIZE))
++    {
++      g_error ("Input file has a larger layer size than GIMP can handle.");
++    }
++
++  if (layer->width > (G_MAXUINT / layer->height))
++    {
++      g_error ("Input file has a larger layer size than GIMP can handle.");
++    }
++
+   IFDBG printf("\t\t\t\tLayer extents: (%d,%d) -> (%d,%d)\n",
+                left,top,right,bottom);
+ 
+@@ -1054,6 +1066,13 @@
+   IFDBG printf("\t\t\t\tNumber of channels: %d\n",
+                (int)layer->num_channels);
+ 
++  if ((layer->num_channels < 0) || (layer->num_channels > 56))
++    {
++      g_message ("Error: invalid number of channels in layer %d: %d",
++                 layernum, layer->num_channels);
++      gimp_quit();
++    }
++
+   if (layer->num_channels)
+     {
+       layer->channel = g_new(PSDchannel, layer->num_channels);
+@@ -1084,7 +1103,7 @@
+   if (strncmp(sig, "8BIM", 4)!=0)
+     {
+       IFDBG printf("\t\t\t(layer blend signature '%c%c%c%c' is incorrect: quitting)\n", sig[0], sig[1], sig[2], sig[3]);
+-      g_message ("Error: layer blend signature is incorrect. :-(");
++      g_message ("Error: layer blend signature is incorrect");
+       gimp_quit();
+     }
+ 
+@@ -1158,6 +1177,17 @@
+       layer->lm_width = right - left;
+       layer->lm_height = bottom - top;
+ 
++    if ((layer->lm_height > GIMP_MAX_IMAGE_SIZE) ||
++        (layer->lm_width > GIMP_MAX_IMAGE_SIZE))
++      {
++        g_error ("Input file has a larger layer mask size than GIMP can handle.");
++      }
++
++    if (layer->lm_width > (G_MAXUINT / layer->lm_height))
++      {
++        g_error ("Input file has a larger layer mask size than GIMP can handle.");
++      }
++
+       color = getguchar(fd, "lmask color");
+       flags = getguchar(fd, "lmask flags");
+ 
+@@ -1474,20 +1504,26 @@
+                               gint  layeri,
+                               gint  channeli)
+ {
+-  int         width, height;
++  gint        width, height;
+   guchar     *tmpline;
+   gint        compression;
+-  guint32     offset = 0;
++  guint32     offset  = 0;
+   PSDchannel *channel = &psd_image.layer[layeri].channel[channeli];
+ 
+-  fsetpos(fd, &channel->fpos);
++  fsetpos (fd, &channel->fpos);
+ 
+-  compression = getgint16(fd, "layer channel compression type");
+-  offset+=2;
++  compression = getgint16 (fd, "layer channel compression type");
++  offset += 2;
+ 
+   width  = channel->width;
+   height = channel->height;
+ 
++  if (width > G_MAXINT16 || height > G_MAXINT16)
++    {
++      g_message ("Error: Invalid channel dimensions");
++      gimp_quit ();
++    }
++
+   IFDBG
+     {
+       printf ("\t\t\tLayer (%d) Channel (%d:%d) Compression: %d (%s)\n",
+@@ -1559,7 +1595,7 @@
+ 
+     default: /* *unknown* */
+       IFDBG {printf("\nEEP!\n");fflush(stdout);}
+-      g_message ("*** Unknown compression type in channel.");
++      g_message ("Error: Unknown compression type in channel");
+       gimp_quit();
+     }
+ 
+@@ -2086,7 +2122,7 @@
+   gimp_progress_init_printf (_("Opening '%s'"),
+                              gimp_filename_to_utf8 (name));
+ 
+-  read_whole_file (fd);
++  read_whole_file (fd, name);
+ 
+   if (psd_image.num_layers > 0) /* PS3-style */
+     {
+@@ -2279,7 +2315,7 @@
+               break;
+ 
+             default:
+-              g_message ("Error: Sorry, can't deal with a layered image of this type.\n");
++              g_message ("Error: Can't deal with a layered image of this type");
+               gimp_quit();
+             }
+ 
+@@ -2782,7 +2818,7 @@
+ 
+   if (uclen > 0)
+     {
+-      printf ("PSD: unexpected EOF while reading image data\n");
++      g_message ("Unexpected end of file while reading image data");
+       gimp_quit ();
+     }
+ 
+@@ -3085,7 +3121,7 @@
+ 
+   if (tmp == EOF)
+     {
+-      printf ("PSD: unexpected EOF while reading '%s' chunk\n", why);
++      g_message ("Unexpected end of file while reading '%s' chunk", why);
+       gimp_quit ();
+     }
+ 
+@@ -3129,7 +3165,7 @@
+ {
+   if (fread (buf, len, 1, fd) == 0)
+     {
+-      printf ("PSD: unexpected EOF while reading '%s' chunk\n", why);
++      g_message ("Unexpected end of file while reading '%s' chunk", why);
+       gimp_quit();
+     }
+ }
+@@ -3164,7 +3200,7 @@
+ }
+ 
+ static void
+-read_whole_file (FILE *fd)
++read_whole_file (FILE *fd, const gchar *filename)
+ {
+     guint16 w;
+     glong   pos;
+@@ -3174,13 +3210,39 @@
+     xfread (fd, &PSDheader.signature, 4, "signature");
+     PSDheader.version  = getgint16 (fd, "version");
+     xfread (fd, &dummy, 6, "reserved");
++
+     PSDheader.channels = getgint16 (fd, "channels");
++
++    /* Photoshop CS (version 8) supports a maximum of 56 channels */
++
++    if (PSDheader.channels > 56)
++      {
++        g_error ("'%s' has more channels than GIMP can handle.",
++                 gimp_filename_to_utf8 (filename));
++      }
++
+     PSDheader.rows     = getgint32 (fd, "rows");
+     PSDheader.columns  = getgint32 (fd, "columns");
++
++    /* Photoshop CS (version 8) supports 300000 x 300000, but this
++       is currently larger than GIMP_MAX_IMAGE_SIZE */
++
++    if ((PSDheader.rows > GIMP_MAX_IMAGE_SIZE) ||
++        (PSDheader.columns > GIMP_MAX_IMAGE_SIZE))
++      {
++        g_error ("'%s' has a larger image size than GIMP can handle.",
++                 gimp_filename_to_utf8 (filename));
++      }
++
++    if (PSDheader.columns > (G_MAXUINT / PSDheader.rows))
++      {
++        g_error ("'%s' has a larger image size than GIMP can handle.",
++                 gimp_filename_to_utf8 (filename));
++      }
++
+     PSDheader.bpp      = getgint16 (fd, "depth");
+     PSDheader.mode     = getgint16 (fd, "mode");
+ 
+-
+     psd_image.num_layers       = 0;
+     psd_image.type             = PSDheader.mode;
+     psd_image.colmaplen        = 0;
+@@ -3234,7 +3296,8 @@
+       }
+     if (PSDheader.version != 1)
+       {
+-        g_message (_("The PSD file has bad version number '%d', not 1"), PSDheader.version);
++        g_message (_("The PSD file has bad version number '%d', not 1"),
++                   PSDheader.version);
+         gimp_quit ();
+       }
+     w = PSDheader.mode;

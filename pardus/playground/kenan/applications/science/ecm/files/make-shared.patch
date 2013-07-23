@@ -1,0 +1,62 @@
+--- Makefile.in.orig	2007-12-04 22:45:55.000000000 +0200
++++ Makefile.in	2007-12-04 22:49:42.000000000 +0200
+@@ -39,7 +39,7 @@
+ @MEMORY_DEBUG_TRUE@am__append_1 = memory.c
+ @MEMORY_DEBUG_TRUE@am__append_2 = memory.c
+ @WITH_GWNUM_TRUE@am__append_3 = Fgw.c
+-@WITH_GWNUM_FALSE@ecm_DEPENDENCIES = libecm.a
++@WITH_GWNUM_FALSE@ecm_DEPENDENCIES = libecm.so
+ @MAKE_MANPAGE_TRUE@am__append_4 = ecm.1
+ subdir = .
+ SUBDIRS =
+@@ -114,7 +114,7 @@
+ am_ecmfactor_OBJECTS = ecmfactor.$(OBJEXT)
+ ecmfactor_OBJECTS = $(am_ecmfactor_OBJECTS)
+ ecmfactor_LDADD = $(LDADD)
+-ecmfactor_DEPENDENCIES = libecm.a
++ecmfactor_DEPENDENCIES = libecm.so
+ am__tune_SOURCES_DIST = mpmod.c tune.c mul_lo.c listz.c auxlib.c \
+ 	ks-multiply.c toomcook.c schoen_strass.c polyeval.c median.c \
+ 	ecm_ntt.c ntt_gfp.c mpzspv.c mpzspm.c sp.c spv.c spm.c \
+@@ -209,7 +209,7 @@
+ INSTALL_PROGRAM = @INSTALL_PROGRAM@
+ INSTALL_SCRIPT = @INSTALL_SCRIPT@
+ INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
+-LDADD = libecm.a
++LDADD = libecm.so
+ LDFLAGS = @LDFLAGS@
+ LIBOBJS = @LIBOBJS@
+ LIBS = @LIBS@
+@@ -282,7 +282,7 @@
+ target_alias = @target_alias@
+ top_builddir = @top_builddir@
+ top_srcdir = @top_srcdir@
+-lib_LIBRARIES = libecm.a
++lib_LIBRARIES = libecm.so
+ libecm_a_SOURCES = ecm.c ecm2.c pm1.c pp1.c getprime.c listz.c lucas.c \
+ 	stage2.c toomcook.c mpmod.c mul_lo.c polyeval.c median.c \
+ 	schoen_strass.c ks-multiply.c rho.c bestd.c auxlib.c random.c \
+@@ -409,10 +409,10 @@
+ 
+ clean-libLIBRARIES:
+ 	-test -z "$(lib_LIBRARIES)" || rm -f $(lib_LIBRARIES)
+-libecm.a: $(libecm_a_OBJECTS) $(libecm_a_DEPENDENCIES) 
+-	-rm -f libecm.a
+-	$(libecm_a_AR) libecm.a $(libecm_a_OBJECTS) $(libecm_a_LIBADD)
+-	$(RANLIB) libecm.a
++libecm.so: $(libecm_a_OBJECTS) $(libecm_a_DEPENDENCIES) 
++	-rm -f libecm.so
++	$(libecm_a_AR) libecm.so $(libecm_a_OBJECTS) $(libecm_a_LIBADD)
++	$(RANLIB) libecm.so
+ install-binPROGRAMS: $(bin_PROGRAMS)
+ 	@$(NORMAL_INSTALL)
+ 	test -z "$(bindir)" || $(MKDIR_P) "$(DESTDIR)$(bindir)"
+@@ -1378,7 +1378,7 @@
+ @WITH_GWNUM_TRUE@  gwdata.ld :
+ @WITH_GWNUM_TRUE@	echo "SECTIONS { .data : { . = ALIGN(0x20); *(_GWDATA) } }" >gwdata.ld
+ @WITH_GWNUM_TRUE@  Fgwtest : Fgw.c gwdata.ld
+-@WITH_GWNUM_TRUE@	$(CC) $(CFLAGS) $(CPPFLAGS) -g -DTESTDRIVE -Wl,gwdata.ld -o Fgwtest Fgw.c libecm.a $(LIBS)
++@WITH_GWNUM_TRUE@	$(CC) $(CFLAGS) $(CPPFLAGS) -g -DTESTDRIVE -Wl,gwdata.ld -o Fgwtest Fgw.c libecm.so $(LIBS)
+ 
+ ecm-params:	tune
+ 		@echo Optimising parameters for your system, please be patient.

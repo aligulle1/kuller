@@ -1,0 +1,48 @@
+commit 59f4ff2ecff4cef36378928cec891785b402e80c
+Author: Alan Stern <stern@rowland.harvard.edu>
+Date:   Tue Jul 29 11:58:06 2008 -0400
+
+    usb-storage: automatically recognize bad residues
+    
+    This patch (as1119) will help to reduce the clutter of usb-storage's
+    unusual_devs file by automatically detecting some devices that need
+    the IGNORE_RESIDUE flag.  The idea is that devices should never return
+    a non-zero residue for an INQUIRY or a READ CAPACITY command unless
+    they failed to transfer all the requested data.  So if one of these
+    commands transfers a standard amount of data but there is a positive
+    residue, we know that the residue is bogus and we can set the flag.
+    
+    This fixes the problems reported in Bugzilla #11125.
+    
+    Signed-off-by: Alan Stern <stern@rowland.harvard.edu>
+    Signed-off-by: Greg Kroah-Hartman <gregkh@suse.de>
+
+Index: linux-2.6.25/drivers/usb/storage/transport.c
+===================================================================
+--- linux-2.6.25.orig/drivers/usb/storage/transport.c
++++ linux-2.6.25/drivers/usb/storage/transport.c
+@@ -1033,8 +1033,22 @@ int usb_stor_Bulk_transport(struct scsi_
+ 
+ 	/* try to compute the actual residue, based on how much data
+ 	 * was really transferred and what the device tells us */
+-	if (residue) {
+-		if (!(us->flags & US_FL_IGNORE_RESIDUE)) {
++
++	if (residue && !(us->flags & US_FL_IGNORE_RESIDUE)) {
++ 
++		/* Heuristically detect devices that generate bogus residues
++		 * by seeing what happens with INQUIRY and READ CAPACITY
++		 * commands.
++		 */
++		if (bcs->Status == US_BULK_STAT_OK &&
++				scsi_get_resid(srb) == 0 &&
++					((srb->cmnd[0] == INQUIRY &&
++						transfer_length == 36) ||
++					(srb->cmnd[0] == READ_CAPACITY &&
++						transfer_length == 8))) {
++			us->flags |= US_FL_IGNORE_RESIDUE;
++
++		} else {
+ 			residue = min(residue, transfer_length);
+ 			scsi_set_resid(srb, max(scsi_get_resid(srb),
+ 			                                       (int) residue));

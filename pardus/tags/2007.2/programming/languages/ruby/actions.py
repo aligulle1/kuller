@@ -1,0 +1,34 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+#
+# Copyright 2005-2007 TUBITAK/UEKAE
+# Licensed under the GNU General Public License, version 2.
+# See the file http://www.gnu.org/copyleft/gpl.txt.
+
+from pisi.actionsapi import autotools
+from pisi.actionsapi import pisitools
+from pisi.actionsapi import shelltools
+from pisi.actionsapi import get
+
+def setup():
+    # gcc 3.x is buggy and needs this
+    shelltools.export("CFLAGS", get.CFLAGS().replace("-fomit-frame-pointer", ""))
+    shelltools.export("CXXFLAGS", get.CXXFLAGS().replace("-fomit-frame-pointer", ""))
+
+    autotools.configure("--enable-shared \
+                         --enable-pthread \
+                         --enable-doc \
+                         --enable-ipv6 \
+                         --with-sitedir=/usr/lib/ruby/site_ruby")
+
+def build():
+    autotools.make()
+
+def install():
+    autotools.rawInstall("DESTDIR=%s" % get.installDIR())
+    autotools.rawInstall("DESTDIR=%s install-doc" % get.installDIR())
+
+    # No static libs
+    pisitools.remove("/usr/lib/libruby-static.a")
+
+    pisitools.dodoc("COPYING*", "ChangeLog", "MANIFEST", "README*", "ToDo")

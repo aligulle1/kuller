@@ -1,0 +1,372 @@
+Index: evas/src/lib/include/evas_private.h
+===================================================================
+--- evas/src/lib/include/evas_private.h	(revision 46192)
++++ evas/src/lib/include/evas_private.h	(revision 46215)
+@@ -490,7 +490,7 @@
+ struct _Evas_Func_Node
+ {
+    EINA_INLIST;
+-   void (*func) (void *data, Evas *e, Evas_Object *obj, void *event_info);
++   void (*func) ();
+    void *data;
+    Evas_Callback_Type type;
+    unsigned char delete_me : 1;
+Index: evas/src/lib/Evas.h
+===================================================================
+--- evas/src/lib/Evas.h	(revision 46192)
++++ evas/src/lib/Evas.h	(revision 46215)
+@@ -43,6 +43,10 @@
+ 
+ typedef enum _Evas_Callback_Type
+ {
++   /*
++    * The following events are only for use with objects
++    * evas_object_event_callback_add():
++    */
+    EVAS_CALLBACK_MOUSE_IN, /**< Mouse In Event */
+    EVAS_CALLBACK_MOUSE_OUT, /**< Mouse Out Event */
+    EVAS_CALLBACK_MOUSE_DOWN, /**< Mouse Button Down Event */
+@@ -67,10 +71,20 @@
+    EVAS_CALLBACK_CHANGED_SIZE_HINTS, /**< Size hints changed event */
+    EVAS_CALLBACK_IMAGE_PRELOADED, /**< Image as been preloaded */
+ 
++
++   /*
++    * The following events are only for use with canvas
++    * evas_event_callback_add():
++    */
++
+    EVAS_CALLBACK_CANVAS_FOCUS_IN, /**< Canvas got focus as a whole */
+    EVAS_CALLBACK_CANVAS_FOCUS_OUT, /**< Canvas lost focus as a whole */
+    EVAS_CALLBACK_RENDER_FLUSH_PRE, /**< Called just before rendering is updated on the canvas target */
+    EVAS_CALLBACK_RENDER_FLUSH_POST, /**< Called just after rendering is updated on the canvas target */
++
++
++
++   /* the following id no event number, but a sentinel: */
+    EVAS_CALLBACK_LAST /**< keep as last element/sentinel -- not really an event */
+ } Evas_Callback_Type; /**< The type of event to trigger the callback */
+ 
+@@ -112,6 +126,14 @@
+ 
+ typedef struct _Evas_Transform Evas_Transform; /**< An Evas projective or affine transform */
+ typedef struct _Evas_Coord_Rectangle  Evas_Coord_Rectangle; /**< A generic rectangle handle */
++typedef struct _Evas_Point                   Evas_Point; /**< integer point */
++
++typedef struct _Evas_Coord_Point             Evas_Coord_Point;  /**< Evas_Coord point */
++typedef struct _Evas_Coord_Precision_Point   Evas_Coord_Precision_Point; /**< Evas_Coord point with sub-pixel precision */
++
++typedef struct _Evas_Position                Evas_Position; /**< associates given point in Canvas and Output */
++typedef struct _Evas_Precision_Position      Evas_Precision_Position; /**< associates given point in Canvas and Output, with sub-pixel precision */
++
+ typedef struct _Evas_Smart_Class      Evas_Smart_Class; /**< A smart object base class */
+ typedef struct _Evas_Smart_Cb_Description Evas_Smart_Cb_Description; /**< A smart object callback description, used to provide introspection */
+ typedef struct _Evas_Map              Evas_Map; /**< An array of map points */
+@@ -144,6 +166,34 @@
+    Evas_Coord h; /**< height of rectangle */
+ };
+ 
++struct _Evas_Point
++{
++   int x, y;
++};
++
++struct _Evas_Coord_Point
++{
++   Evas_Coord x, y;
++};
++
++struct _Evas_Coord_Precision_Point
++{
++   Evas_Coord x, y;
++   double xsub, ysub;
++};
++
++struct _Evas_Position
++{
++    Evas_Point output;
++    Evas_Coord_Point canvas;
++};
++
++struct _Evas_Precision_Position
++{
++    Evas_Point output;
++    Evas_Coord_Precision_Point canvas;
++};
++
+ typedef enum _Evas_Aspect_Control
+ {
+    EVAS_ASPECT_CONTROL_NONE = 0,
+@@ -490,12 +540,10 @@
+ struct _Evas_Event_Mouse_Down /** Mouse button press event */
+ {
+    int button; /**< Mouse button number that went down (1 - 32) */
+-   struct {
+-      int x, y;
+-   } output;
+-   struct {
+-      Evas_Coord x, y;
+-   } canvas;
++
++   Evas_Point output;
++   Evas_Coord_Point canvas;
++
+    void          *data;
+    Evas_Modifier *modifiers;
+    Evas_Lock     *locks;
+@@ -509,12 +557,10 @@
+ struct _Evas_Event_Mouse_Up /** Mouse button release event */
+ {
+    int button; /**< Mouse button number that was raised (1 - 32) */
+-   struct {
+-      int x, y;
+-   } output;
+-   struct {
+-      Evas_Coord x, y;
+-   } canvas;
++
++   Evas_Point output;
++   Evas_Coord_Point canvas;
++
+    void          *data;
+    Evas_Modifier *modifiers;
+    Evas_Lock     *locks;
+@@ -528,12 +574,10 @@
+ struct _Evas_Event_Mouse_In /** Mouse enter event */
+ {
+    int buttons; /**< Button pressed mask, Bits set to 1 are buttons currently pressed (bit 0 = mouse button 1, bit 1 = mouse button 2 etc.) */
+-   struct {
+-      int x, y;
+-   } output;
+-   struct {
+-      Evas_Coord x, y;
+-   } canvas;
++
++   Evas_Point output;
++   Evas_Coord_Point canvas;
++
+    void          *data;
+    Evas_Modifier *modifiers;
+    Evas_Lock     *locks;
+@@ -545,12 +589,11 @@
+ struct _Evas_Event_Mouse_Out /** Mouse leave event */
+ {
+    int buttons; /**< Button pressed mask, Bits set to 1 are buttons currently pressed (bit 0 = mouse button 1, bit 1 = mouse button 2 etc.) */
+-   struct {
+-      int x, y;
+-   } output;
+-   struct {
+-      Evas_Coord x, y;
+-   } canvas;
++
++
++   Evas_Point output;
++   Evas_Coord_Point canvas;
++
+    void          *data;
+    Evas_Modifier *modifiers;
+    Evas_Lock     *locks;
+@@ -562,14 +605,9 @@
+ struct _Evas_Event_Mouse_Move /** Mouse button down event */
+ {
+    int buttons; /**< Button pressed mask, Bits set to 1 are buttons currently pressed (bit 0 = mouse button 1, bit 1 = mouse button 2 etc.) */
+-   struct {
+-      struct {
+-	 int x, y;
+-      } output;
+-      struct {
+-	 Evas_Coord x, y;
+-      } canvas;
+-   } cur, prev;
++
++   Evas_Position cur, prev;
++
+    void          *data;
+    Evas_Modifier *modifiers;
+    Evas_Lock     *locks;
+@@ -583,14 +621,9 @@
+    int direction; /* 0 = default up/down wheel FIXME: more wheel types */
+    int z; /* ...,-2,-1 = down, 1,2,... = up */
+ 
+-   struct {
+-      int x, y;
+-   } output;
++   Evas_Point output;
++   Evas_Coord_Point canvas;
+ 
+-   struct {
+-      Evas_Coord x, y;
+-   } canvas;
+-
+    void          *data;
+    Evas_Modifier *modifiers;
+    Evas_Lock     *locks;
+@@ -604,13 +637,10 @@
+    int device; /**< Multi device number that went down (1 or more for extra touches) */
+    double radius, radius_x, radius_y;
+    double pressure, angle;
+-   struct {
+-      int x, y;
+-   } output;
+-   struct {
+-      Evas_Coord x, y;
+-      double xsub, ysub;
+-   } canvas;
++
++   Evas_Point output;
++   Evas_Coord_Precision_Point canvas;
++
+    void          *data;
+    Evas_Modifier *modifiers;
+    Evas_Lock     *locks;
+@@ -626,13 +656,10 @@
+    int device; /**< Multi device number that went up (1 or more for extra touches) */
+    double radius, radius_x, radius_y;
+    double pressure, angle;
+-   struct {
+-      int x, y;
+-   } output;
+-   struct {
+-      Evas_Coord x, y;
+-      double xsub, ysub;
+-   } canvas;
++
++   Evas_Point output;
++   Evas_Coord_Precision_Point canvas;
++
+    void          *data;
+    Evas_Modifier *modifiers;
+    Evas_Lock     *locks;
+@@ -648,15 +675,9 @@
+    int device; /**< Multi device number that moved (1 or more for extra touches) */
+    double radius, radius_x, radius_y;
+    double pressure, angle;
+-   struct {
+-      struct {
+-	 int x, y;
+-      } output;
+-      struct {
+-	 Evas_Coord x, y;
+-         double xsub, ysub;
+-      } canvas;
+-   } cur;
++
++   Evas_Precision_Position cur;
++
+    void          *data;
+    Evas_Modifier *modifiers;
+    Evas_Lock     *locks;
+@@ -712,7 +733,8 @@
+ } Evas_Object_Pointer_Mode;
+ 
+ typedef void (*Evas_Smart_Cb) (void *data, Evas_Object *obj, void *event_info);
+-typedef void (*Evas_Event_Cb) (void *data, Evas *e, Evas_Object *obj, void *event_info);
++typedef void (*Evas_Event_Cb) (void *data, Evas *e, void *event_info);
++typedef void (*Evas_Object_Event_Cb) (void *data, Evas *e, Evas_Object *obj, void *event_info);
+ 
+ #ifdef __cplusplus
+ extern "C" {
+@@ -1246,9 +1268,9 @@
+    EAPI void              evas_object_precise_is_inside_set (Evas_Object *obj, Eina_Bool precise) EINA_ARG_NONNULL(1);
+    EAPI Eina_Bool         evas_object_precise_is_inside_get (const Evas_Object *obj) EINA_WARN_UNUSED_RESULT EINA_ARG_NONNULL(1) EINA_PURE;
+ 
+-   EAPI void              evas_object_event_callback_add    (Evas_Object *obj, Evas_Callback_Type type, Evas_Event_Cb func, const void *data) EINA_ARG_NONNULL(1, 3);
+-  EAPI void             *evas_object_event_callback_del    (Evas_Object *obj, Evas_Callback_Type type, Evas_Event_Cb func) EINA_ARG_NONNULL(1, 3);
+-   EAPI void             *evas_object_event_callback_del_full(Evas_Object *obj, Evas_Callback_Type type, Evas_Event_Cb func, const void *data) EINA_ARG_NONNULL(1, 3);
++   EAPI void              evas_object_event_callback_add    (Evas_Object *obj, Evas_Callback_Type type, Evas_Object_Event_Cb func, const void *data) EINA_ARG_NONNULL(1, 3);
++  EAPI void             *evas_object_event_callback_del    (Evas_Object *obj, Evas_Callback_Type type, Evas_Object_Event_Cb func) EINA_ARG_NONNULL(1, 3);
++   EAPI void             *evas_object_event_callback_del_full(Evas_Object *obj, Evas_Callback_Type type, Evas_Object_Event_Cb func, const void *data) EINA_ARG_NONNULL(1, 3);
+ 
+    EAPI void              evas_event_callback_add           (Evas *e, Evas_Callback_Type type, Evas_Event_Cb func, const void *data) EINA_ARG_NONNULL(1, 3);
+    EAPI void             *evas_event_callback_del           (Evas *e, Evas_Callback_Type type, Evas_Event_Cb func) EINA_ARG_NONNULL(1, 3);
+Index: evas/src/lib/canvas/evas_callbacks.c
+===================================================================
+--- evas/src/lib/canvas/evas_callbacks.c	(revision 46192)
++++ evas/src/lib/canvas/evas_callbacks.c	(revision 46215)
+@@ -61,7 +61,7 @@
+ evas_event_callback_call(Evas *e, Evas_Callback_Type type, void *event_info)
+ {
+    Eina_Inlist **l_mod = NULL, *l;
+-   
++
+    _evas_walk(e);
+    if (e->callbacks)
+      {
+@@ -74,8 +74,9 @@
+ 	     fn = (Evas_Func_Node *)l;
+ 	     if ((fn->type == type) && (!fn->delete_me))
+ 	       {
+-	          if (fn->func)
+-	            fn->func(fn->data, e, NULL, event_info);
++		  Evas_Event_Cb func = fn->func;
++	          if (func)
++	            func(fn->data, e, event_info);
+ 	       }
+ 	     if (e->delete_me) break;
+           }
+@@ -140,8 +141,9 @@
+ 	     fn = (Evas_Func_Node *)l;
+ 	     if ((fn->type == type) && (!fn->delete_me))
+ 	       {
+-	          if (fn->func)
+-	            fn->func(fn->data, obj->layer->evas, obj, event_info);
++		  Evas_Object_Event_Cb func = fn->func;
++	          if (func)
++	            func(fn->data, obj->layer->evas, obj, event_info);
+ 	       }
+ 	     if (obj->delete_me) break;
+           }
+@@ -355,7 +357,7 @@
+  * @endcode
+  */
+ EAPI void
+-evas_object_event_callback_add(Evas_Object *obj, Evas_Callback_Type type, void (*func) (void *data, Evas *e, Evas_Object *obj, void *event_info), const void *data)
++evas_object_event_callback_add(Evas_Object *obj, Evas_Callback_Type type, Evas_Object_Event_Cb func, const void *data)
+ {
+    /* MEM OK */
+    Evas_Func_Node *fn;
+@@ -408,7 +410,7 @@
+  * @endcode
+  */
+ EAPI void *
+-evas_object_event_callback_del(Evas_Object *obj, Evas_Callback_Type type, void (*func) (void *data, Evas *e, Evas_Object *obj, void *event_info))
++evas_object_event_callback_del(Evas_Object *obj, Evas_Callback_Type type, Evas_Object_Event_Cb func)
+ {
+    /* MEM OK */
+    Evas_Func_Node *fn;
+@@ -465,7 +467,7 @@
+  * @endcode
+  */
+ EAPI void *
+-evas_object_event_callback_del_full(Evas_Object *obj, Evas_Callback_Type type, void (*func) (void *data, Evas *e, Evas_Object *obj, void *event_info), const void *data)
++evas_object_event_callback_del_full(Evas_Object *obj, Evas_Callback_Type type, Evas_Object_Event_Cb func, const void *data)
+ {
+    /* MEM OK */
+    Evas_Func_Node *fn;
+@@ -496,7 +498,7 @@
+ }
+ 
+ EAPI void
+-evas_event_callback_add(Evas *e, Evas_Callback_Type type, void (*func) (void *data, Evas *e, Evas_Object *obj, void *event_info), const void *data)
++evas_event_callback_add(Evas *e, Evas_Callback_Type type, Evas_Event_Cb func, const void *data)
+ {
+    /* MEM OK */
+    Evas_Func_Node *fn;
+@@ -525,7 +527,7 @@
+ }
+ 
+ EAPI void *
+-evas_event_callback_del(Evas *e, Evas_Callback_Type type, void (*func) (void *data, Evas *e, Evas_Object *obj, void *event_info))
++evas_event_callback_del(Evas *e, Evas_Callback_Type type, Evas_Event_Cb func)
+ {
+    /* MEM OK */
+    Evas_Func_Node *fn;
+@@ -554,7 +556,7 @@
+ }
+ 
+ EAPI void *
+-evas_event_callback_del_full(Evas *e, Evas_Callback_Type type, void (*func) (void *data, Evas *e, Evas_Object *obj, void *event_info), const void *data)
++evas_event_callback_del_full(Evas *e, Evas_Callback_Type type, Evas_Event_Cb func, const void *data)
+ {
+    /* MEM OK */
+    Evas_Func_Node *fn;

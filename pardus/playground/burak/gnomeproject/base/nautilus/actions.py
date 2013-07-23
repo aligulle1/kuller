@@ -1,0 +1,33 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+#
+# Licensed under the GNU General Public License, version 2.
+# See the file http://www.gnu.org/copyleft/gpl.txt.
+
+from pisi.actionsapi import autotools
+from pisi.actionsapi import pisitools
+from pisi.actionsapi import get
+from pisi.actionsapi import shelltools
+
+shelltools.export("HOME", get.workDIR())
+
+NoStrip = ["/"]
+
+def setup():
+    shelltools.export("CFLAGS","-O0 -g -DVERBOSE")
+    shelltools.export("LDFLAGS","")
+    autotools.autoreconf("-fiv")
+    autotools.configure("--disable-static\
+                         --disable-packagekit\
+                         --disable-update-mimedb\
+                         --enable-introspection \
+                         --disable-more-warnings")
+
+def build():
+    autotools.make()
+
+def install():
+    autotools.rawInstall("DESTDIR=%s" % get.installDIR())
+
+    #pisitools.dodoc("AUTHORS", "ChangeLog", "COPYING", "NEWS", "README")
+    pisitools.dodoc("AUTHORS", "COPYING", "NEWS", "README")

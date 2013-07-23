@@ -1,0 +1,34 @@
+From: Mike Hommey
+Subject: about:about throws 404
+References:
+https://bugzilla.mozilla.org/show_bug.cgi?id=349451
+https://bugzilla.novell.com/show_bug.cgi?id=402699
+
+--- docshell/base/nsAboutRedirector.cpp
++++ docshell/base/nsAboutRedirector.cpp
+@@ -85,7 +85,9 @@ static RedirEntry kRedirMap[] = {
+       nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT },
+     { "licence", "chrome://global/content/license.html",
+       nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT },
++#ifndef MOZ_XUL_APP
+     { "about", "chrome://global/content/aboutAbout.html", 0 },
++#endif
+     { "neterror", "chrome://global/content/netError.xhtml",
+       nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
+       nsIAboutModule::ALLOW_SCRIPT }
+--- docshell/build/nsDocShellModule.cpp
++++ docshell/build/nsDocShellModule.cpp
+@@ -205,11 +205,13 @@ static const nsModuleComponentInfo gDocShellModuleInfo[] = {
+       NS_ABOUT_MODULE_CONTRACTID_PREFIX "licence",
+       nsAboutRedirector::Create
+     },
++#ifndef MOZ_XUL_APP
+     { "about:about",
+       NS_ABOUT_REDIRECTOR_MODULE_CID,
+       NS_ABOUT_MODULE_CONTRACTID_PREFIX "about",
+       nsAboutRedirector::Create
+     },
++#endif
+     { "about:neterror",
+       NS_ABOUT_REDIRECTOR_MODULE_CID,
+       NS_ABOUT_MODULE_CONTRACTID_PREFIX "neterror",

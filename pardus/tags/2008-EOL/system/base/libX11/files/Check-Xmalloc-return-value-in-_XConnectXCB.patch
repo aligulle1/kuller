@@ -1,0 +1,31 @@
+From 5d404e80394b92f2e9cf7a8d967076d81085259a Mon Sep 17 00:00:00 2001
+From: Julien Cristau <jcristau@debian.org>
+Date: Tue, 17 Feb 2009 15:23:40 +0100
+Subject: [PATCH] Check Xmalloc return value in _XConnectXCB
+
+X.Org bug#19137 <http://bugs.freedesktop.org/show_bug.cgi?id=19137>
+
+Signed-off-by: Julien Cristau <jcristau@debian.org>
+---
+ src/xcb_disp.c |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
+
+diff --git a/src/xcb_disp.c b/src/xcb_disp.c
+index 079c87f..5779d67 100644
+--- a/src/xcb_disp.c
++++ b/src/xcb_disp.c
+@@ -76,6 +76,11 @@ int _XConnectXCB(Display *dpy, _Xconst char *display, char **fullnamep, int *scr
+ 
+ 		len = strlen(host) + (1 + 20 + 1 + 20 + 1);
+ 		*fullnamep = Xmalloc(len);
++		if (!*fullnamep) {
++			free(host);
++			return 0;
++		}
++
+ 		snprintf(*fullnamep, len, "%s:%d.%d", host, n, *screenp);
+ 		free(host);
+ 	}
+-- 
+1.6.2
+

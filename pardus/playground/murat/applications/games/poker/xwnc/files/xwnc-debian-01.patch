@@ -1,0 +1,537 @@
+diff -u -r1.3 Makefile.am
+--- xwnc/Makefile.am	27 Mar 2006 14:44:56 -0000	1.3
++++ xwnc/Makefile.am	24 Apr 2006 18:17:12 -0000
+@@ -1,37 +1,51 @@
+ ## -*- Makefile -*- mode
+ ## Process this file with automake to create Makefile.in
++MAINTAINERCLEANFILES = \
++	INSTALL \
++	Makefile.in \
++	aclocal.m4 \
++	config.guess \
++	config.h.in \
++	config.sub \
++	configure \
++	depcomp \
++	install-sh \
++	missing \
++	mkinstalldirs \
++	Makefile.in \
++	compile \
++	ltmain.sh \
++	xserver/fb/Makefile.in \
++	xserver/hw/wnc/Makefile.in \
++	xserver/hw/Makefile.in \
++	xserver/mi/Makefile.in \
++	xserver/os/Makefile.in \
++	xserver/dix/Makefile.in \
++	xserver/Xext/Makefile.in \
++	xserver/Makefile.in \
++	xserver/render/Makefile.in \
++	xserver/include/Makefile.in \
++	xserver/GL/glx/Makefile.in \
++	xserver/GL/mesa/Makefile.in \
++	xserver/GL/Makefile.in \
++	xserver/dbe/Makefile.in \
++	xserver/record/Makefile.in \
++	xserver/xfixes/Makefile.in \
++	xlibs/Xau/Makefile.in \
++	xlibs/Xdmcp/Makefile.in \
++	xlibs/Xfont/fc/Makefile.in \
++	xlibs/Xfont/util/Makefile.in \
++	xlibs/Xfont/stubs/Makefile.in \
++	xlibs/Xfont/FreeType/Makefile.in \
++	xlibs/Xfont/fontfile/Makefile.in \
++	xlibs/Xfont/bitmap/Makefile.in \
++	xlibs/Xfont/Makefile.in \
++	xlibs/Xfont/builtins/Makefile.in \
++	xlibs/Makefile.in \
++	wncauth/Makefile.in
++
++DISTCLEANFILES = \
++	config.log \
++	config.status
+ 
+-
+-SUBDIRS = doc
+-
+-if HAVE_FVWM
+-SUBDIRS += fvwm-insitu
+-endif
+-
+-SUBDIRS += wncauth xlibs xserver bin
+-
+-if HAVE_FVWMAMETISTA
+-SUBDIRS += FvwmAmetista
+-endif
+-
+-SUBDIRS += rpm
+-
+-## ---------------------------------------------------------------------------
+-## Produce an rpm package using dist or from the given tarball
+-## (requires rpmbuild in your system)
+-#  Usage:
+-#    make rpm-dist
+-#    make release=1 rpm-dist
+-#    make rpm-this
+-#    make version=2.3.22 release=2 rpm-this
+-#    make rpm-dist cparams='--enable-multibyte --quiet' mparams='CFLAGS="-O2 -g"'
+-
+-# automatical regeneration is missing for other dirs, so do it explicitly
+-rpm-regenerate:
+-	(cd rpm && $(MAKE) $(AM_MAKEFLAGS) Makefile *.spec) || exit 1
+-
+-rpm-dist: dist rpm-this
+-
+-rpm-this: rpm-regenerate
+-	(cd rpm && $(MAKE) $(AM_MAKEFLAGS) this) || exit 1
+-
++SUBDIRS = wncauth xlibs xserver
+Index: configure.ac
+===================================================================
+RCS file: /cvs/underware/xwnc/configure.ac,v
+retrieving revision 1.4
+diff -u -r1.4 configure.ac
+--- xwnc/configure.ac	27 Mar 2006 14:44:56 -0000	1.4
++++ xwnc/configure.ac	24 Apr 2006 18:17:12 -0000
+@@ -155,6 +155,12 @@
+ 	AC_DEFINE(SCREENSAVER,1,[Support MIT-SCREEN-SAVER extension])
+ fi
+ 
++ARCH=$(arch)
++echo "$ARCH"
++if test "$ARCH" = "x86_64"; then
++	AC_DEFINE(_XSERVER64,1,[64 bits])
++fi
++
+ AM_CONDITIONAL(RES, [test x$RES = xyes])
+ if test "$RES" = yes; then
+ 	AC_DEFINE(RES,1,[Support X resource extension])
+@@ -384,7 +390,12 @@
+ dnl FvwmAmetista stuff
+ dnl
+ 
+-with_FvwmAmetista=yes
++AC_ARG_WITH(	fvwm-ametista,
++		AS_HELP_STRING(	[--without-fvwm-ametista],
++				[Dont build Fvwm Ametista]),
++		with_FvwmAmetista=$withval,
++		with_FvwmAmetista=yes)
++
+ FvwmAmetista_failure=
+ NUCLEO_CPPFLAGS=
+ NUCLEO_LDFLAGS=
+@@ -460,9 +471,7 @@
+     with_FvwmAmetista=no
+     FvwmAmetista_failure="fvwm-insitu source code not found"
+   fi
+-fi
+ 
+-if test x"$with_FvwmAmetista" = x"yes"; then
+   # ametista
+   NUCLEO_CPPFLAGS="`nucleo-config --cppflags`"
+   NUCLEO_LDFLAGS="`nucleo-config --ldflags`"
+@@ -477,6 +486,8 @@
+   FVWM_LDFLAGS='${top_builddir}/'"fvwm-insitu/libs/libfvwm.a"
+   FVWM_MODULEDIR='${libexecdir}/'"fvwm-insitu/$FVWM_VERSION"
+   FVWM_MODULEDIR_EXPANDED="${LIBEXECDIR}/fvwm-insitu/$FVWM_VERSION" 
++elif test "$FvwmAmetista_failure" = ""; then
++  FvwmAmetista_failure="disabled by user"
+ fi
+ 
+ 
+@@ -519,6 +530,11 @@
+ 
+ # ------------------------------------
+ 
++case $host_os in
++     cygwin*)
++      CFLAGS="$CFLAGS -DFD_SETSIZE=256"
++esac
++
+ AC_OUTPUT([
+ Makefile
+ wncauth/Makefile
+@@ -548,28 +564,6 @@
+ xserver/GL/mesa/Makefile
+ xserver/hw/Makefile
+ xserver/hw/wnc/Makefile
+-FvwmAmetista/Makefile
+-FvwmAmetista/wncdesktop/Makefile
+-FvwmAmetista/fvwmmodule/Makefile
+-FvwmAmetista/wstyle/Makefile
+-FvwmAmetista/texture/Makefile
+-FvwmAmetista/main/Makefile
+-FvwmAmetista/config/Makefile
+-FvwmAmetista/config/fvwm2rc
+-FvwmAmetista/config/ametistarc
+-FvwmAmetista/config/colours/Makefile
+-FvwmAmetista/config/window/Makefile
+-FvwmAmetista/images/Makefile
+-FvwmAmetista/images/16x16/Makefile
+-FvwmAmetista/images/cursors/Makefile
+-FvwmAmetista/images/buttons/Makefile
+-FvwmAmetista/images/buttons/redmond/Makefile
+-bin/Makefile
+-bin/metisse-start-fvwm
+-doc/Makefile
+-doc/images/Makefile
+-rpm/Makefile
+-rpm/metisse.spec
+ ])
+ 
+ dnl xserver/miext/Makefile
+Index: wncauth/wncproto.h
+===================================================================
+RCS file: /cvs/underware/xwnc/wncauth/wncproto.h,v
+retrieving revision 1.4
+diff -u -r1.4 wncproto.h
+--- xwnc/wncauth/wncproto.h	27 Mar 2006 14:44:57 -0000	1.4
++++ xwnc/wncauth/wncproto.h	24 Apr 2006 18:17:13 -0000
+@@ -741,9 +741,11 @@
+  * ConfigureWindow - 
+  */
+ 
++typedef char rfbConfigureWindowProperty[64];
++
+ typedef struct {
+ 	CARD8 type;			/* always rfbConfigureWindow */
+-	CARD8 pad1;
++	CARD8 isroot;               /* root window : 1, not root window : 0 */
+ 	CARD16 pad2;
+ 	CARD32 window;              /* window id */
+ 	CARD16 xsgn;                /* 0: negative, 1: positive */
+@@ -752,9 +754,10 @@
+ 	CARD16 y;                   /* position */
+ 	CARD32 width;               /* size of the window */
+ 	CARD32 height;
++	rfbConfigureWindowProperty window_name;
+ } rfbConfigureWindowMsg;
+ 
+-#define sz_rfbConfigureWindowMsg 24
++#define sz_rfbConfigureWindowMsg (24 + sizeof (rfbConfigureWindowProperty))
+ 
+ /*-----------------------------------------------------------------------------
+  * UnmapWindow - 
+Index: xserver/fb/fbpict.c
+===================================================================
+RCS file: /cvs/underware/xwnc/xserver/fb/fbpict.c,v
+retrieving revision 1.1.1.1
+diff -u -r1.1.1.1 fbpict.c
+--- xwnc/xserver/fb/fbpict.c	26 Aug 2004 14:55:53 -0000	1.1.1.1
++++ xwnc/xserver/fb/fbpict.c	24 Apr 2006 18:17:14 -0000
+@@ -192,7 +192,7 @@
+ 	}
+ 
+ #if IMAGE_BYTE_ORDER == LSBFirst
+-	#define setupPackedReader(count,temp,where,workingWhere,workingVal) count=(int)where; \
++	#define setupPackedReader(count,temp,where,workingWhere,workingVal) count=(long int)where; \
+ 					temp=count&3; \
+ 					where-=temp; \
+ 					workingWhere=(CARD32 *)where; \
+@@ -1092,7 +1092,7 @@
+ 		srcLine += srcStride;
+ 		w = width;
+ 		
+-		if(((int)src&1)==1)
++		if(((long int)src&1)==1)
+ 		{
+ 			s_16 = *src++;
+ 			d_16 = *dst;
+@@ -1100,7 +1100,7 @@
+ 			w--;
+ 		}
+ 		isrc=(CARD32 *)src;
+-		if(((int)dst&1)==0)
++		if(((long int)dst&1)==0)
+ 		{
+ 			idst=(CARD32 *)dst;
+ 			while (w>1)
+@@ -1210,7 +1210,7 @@
+ 				setupPackedReader(ws,wt,isrc,wsrc,workingSource);
+ 
+ 				/* get to word aligned */
+-				switch(!(int)dst&3)
++				switch(!(long int)dst&3)
+ 				{
+ 					case 1:
+ 						readPackedSource(rs);
+@@ -1286,7 +1286,7 @@
+ 				srcLine += srcStride;
+ 				w = width*3;
+ 				/* get to word aligned */
+-				switch(!(int)src&3)
++				switch(!(long int)src&3)
+ 				{
+ 					case 1:
+ 						rd=alphamaskCombine24(*src++, *dst)>>8;
+Index: xserver/hw/wnc/dispcur.c
+===================================================================
+RCS file: /cvs/underware/xwnc/xserver/hw/wnc/dispcur.c,v
+retrieving revision 1.3
+diff -u -r1.3 dispcur.c
+--- xwnc/xserver/hw/wnc/dispcur.c	27 Mar 2006 14:44:57 -0000	1.3
++++ xwnc/xserver/hw/wnc/dispcur.c	24 Apr 2006 18:17:14 -0000
+@@ -317,7 +317,7 @@
+      if (!ScreenPriv)
+           return FALSE;
+ 
+-     CURSOR_PRIV(pScreen) = ScreenPriv;
++     pScreen->devPrivates[rfbCursorScreenIndex].ptr = ScreenPriv;
+ 
+      /* override some screen procedures */
+      ScreenPriv->QueryBestSize = pScreen->QueryBestSize;
+Index: xserver/hw/wnc/rfb.h
+===================================================================
+RCS file: /cvs/underware/xwnc/xserver/hw/wnc/rfb.h,v
+retrieving revision 1.4
+diff -u -r1.4 rfb.h
+--- xwnc/xserver/hw/wnc/rfb.h	27 Mar 2006 14:44:57 -0000	1.4
++++ xwnc/xserver/hw/wnc/rfb.h	24 Apr 2006 18:17:14 -0000
+@@ -319,7 +319,7 @@
+ void
+ rfbSendConfigureWindow(
+ 	unsigned long window, int x, int y, unsigned int width,
+-	unsigned int height);
++	unsigned int height, int isroot, const char* window_name);
+ void rfbSendDestroyWindow(unsigned long window);
+ void rfbSendUnmapWindow(unsigned long window);
+ void rfbSendRestackWindow(
+Index: xserver/hw/wnc/rfbRootless.c
+===================================================================
+RCS file: /cvs/underware/xwnc/xserver/hw/wnc/rfbRootless.c,v
+retrieving revision 1.4
+diff -u -r1.4 rfbRootless.c
+--- xwnc/xserver/hw/wnc/rfbRootless.c	27 Mar 2006 14:44:57 -0000	1.4
++++ xwnc/xserver/hw/wnc/rfbRootless.c	24 Apr 2006 18:17:15 -0000
+@@ -322,6 +322,26 @@
+ 	return flags;
+ }
+ 
++/**************************************************************************/
++
++static const char*	find_wm_name(RootlessWindowPtr frame, char* buffer)
++{
++	PropertyPtr	p = frame->win->optional->userProps;
++	while (p)
++		if (p->propertyName == XA_WM_NAME)
++			break;
++		else
++			p = p->next;
++	if (p)
++	  {
++	    int	size = MIN(sizeof (rfbConfigureWindowProperty) - 1, p->size);
++	    memcpy(buffer, p->data, size), buffer[p->size] = 0;
++	  }
++	else
++	  memcpy(buffer, "", sizeof (""));
++	return buffer;
++}
++
+ /* ************************************************************************** 
+  *
+  *
+@@ -885,11 +905,15 @@
+ 				REGION_UNION(
+ 					pScreen,&c->modifiedRegion,
+ 					&c->modifiedRegion, &reg);
+-				rfbSendConfigureWindow(
+-					w->frame->win->drawable.id,
++				{
++					char	buffer[sizeof (rfbConfigureWindowProperty)];
++					rfbSendConfigureWindow(w->frame->win->drawable.id,
+ 					w->frame->x, w->frame->y,
+ 					w->frame->width,
+-					w->frame->height);
++							       w->frame->height,
++							       IsRoot(w->frame->win),
++							       find_wm_name(w->frame, buffer));
++				}
+ 				if (REGION_NOTEMPTY(pScreen,&w->bShape))
+ 				{
+ 					c->shapeChanged = 1;
+@@ -947,10 +971,14 @@
+ 		pFrame->win->drawable.width, pFrame->win->drawable.height,
+ 		(rw->pixelData)? rw->pixelData:0);
+ #endif
+-
+-	rfbSendConfigureWindow(
+-		pFrame->win->drawable.id, newX, newY, pFrame->width,
+-		pFrame->height);
++	{
++		char	buffer[sizeof (rfbConfigureWindowProperty)];
++		rfbSendConfigureWindow(pFrame->win->drawable.id,
++				       newX, newY,
++				       pFrame->width, pFrame->height,
++				       IsRoot(pFrame->win),
++				       find_wm_name(pFrame, buffer));
++	}
+ 
+ 	REGION_INIT(pScreen,&rw->bShape,NullBox,0);
+ 	if (pShape)
+@@ -999,10 +1027,14 @@
+ 		newX, newY, rw->frame->width, rw->frame->height);
+ #endif
+ 
+-	rfbSendConfigureWindow(
+-		rw->frame->win->drawable.id, newX, newY, rw->frame->width,
+-		rw->frame->height);
+-
++	{
++		char	buffer[sizeof (rfbConfigureWindowProperty)];
++		rfbSendConfigureWindow(rw->frame->win->drawable.id,
++				       newX, newY,
++				       rw->frame->width, rw->frame->height,
++				       IsRoot(rw->frame->win),
++				       find_wm_name(rw->frame, buffer));
++	}
+ }
+ 
+ #define DEBUG_rfbRestackFrame 0
+@@ -1075,8 +1107,14 @@
+ 		rw->frame->win->drawable.width, rw->frame->win->drawable.height,
+ 		(long unsigned)rw->pixelData);
+ #endif
+-	rfbSendConfigureWindow(
+-		rw->frame->win->drawable.id, newX, newY, newW, newH);
++	{
++		char	buffer[sizeof (rfbConfigureWindowProperty)];
++		rfbSendConfigureWindow(rw->frame->win->drawable.id,
++				       newX, newY,
++				       newW, newH,
++				       IsRoot(rw->frame->win),
++				       find_wm_name(rw->frame, buffer));
++	}
+ 
+ 	for (cl = rfbClientHead; cl; cl = cl->next)
+ 	{
+Index: xserver/hw/wnc/rfbserver.c
+===================================================================
+RCS file: /cvs/underware/xwnc/xserver/hw/wnc/rfbserver.c,v
+retrieving revision 1.4
+diff -u -r1.4 rfbserver.c
+--- xwnc/xserver/hw/wnc/rfbserver.c	27 Mar 2006 14:44:57 -0000	1.4
++++ xwnc/xserver/hw/wnc/rfbserver.c	24 Apr 2006 18:17:15 -0000
+@@ -960,7 +960,7 @@
+ void
+ rfbSendConfigureWindow(
+ 	unsigned long window, int x, int y, unsigned int width,
+-	unsigned int height)
++	unsigned int height, int isroot, const char* window_name)
+ {
+     rfbClientPtr cl, nextCl;
+     rfbConfigureWindowMsg cw;
+@@ -991,9 +991,10 @@
+ 	}
+ 	cw.width = Swap32IfLE(width);
+ 	cw.height = Swap32IfLE(height);
++	cw.isroot = isroot;
+ 	/* for valgrind */
+-	cw.pad1 = 0;
+ 	cw.pad2 = 0;
++	strncpy(cw.window_name, window_name, sizeof (rfbConfigureWindowProperty));
+ 	if (WriteExact(cl->sock, (char *)&cw, sz_rfbConfigureWindowMsg) < 0)
+ 	{
+ 		rfbLogPerror("rfbConfigureWindow: write");
+Index: xserver/hw/wnc/rootlessCommon.h
+===================================================================
+RCS file: /cvs/underware/xwnc/xserver/hw/wnc/rootlessCommon.h,v
+retrieving revision 1.1.1.1
+diff -u -r1.1.1.1 rootlessCommon.h
+--- xwnc/xserver/hw/wnc/rootlessCommon.h	26 Aug 2004 14:56:04 -0000	1.1.1.1
++++ xwnc/xserver/hw/wnc/rootlessCommon.h	24 Apr 2006 18:17:15 -0000
+@@ -223,7 +223,7 @@
+                             ((int)(_x) * _pPix->drawable.bitsPerPixel/8 + \
+                              (int)(_y) * _pPix->devKind);		\
+     if (_pPix->drawable.bitsPerPixel != FB_UNIT) {			\
+-        unsigned _diff = ((unsigned) _pPix->devPrivate.ptr) & 		\
++        unsigned long int _diff = ((unsigned long int) _pPix->devPrivate.ptr) & 		\
+                          (FB_UNIT / CHAR_BIT - 1);			\
+ 	_pPix->devPrivate.ptr = (char *) (_pPix->devPrivate.ptr) - 	\
+                                 _diff;					\
+Index: xserver/hw/wnc/rootlessScreen.c
+===================================================================
+RCS file: /cvs/underware/xwnc/xserver/hw/wnc/rootlessScreen.c,v
+retrieving revision 1.3
+diff -u -r1.3 rootlessScreen.c
+--- xwnc/xserver/hw/wnc/rootlessScreen.c	27 Mar 2006 14:44:57 -0000	1.3
++++ xwnc/xserver/hw/wnc/rootlessScreen.c	24 Apr 2006 18:17:16 -0000
+@@ -567,7 +567,7 @@
+ 
+     s = xalloc(sizeof(RootlessScreenRec));
+     if (! s) return FALSE;
+-    SCREENREC(pScreen) = s;
++    pScreen->devPrivates[rootlessScreenPrivateIndex].ptr = s;
+ 
+     s->pixmap_data = NULL;
+     s->pixmap_data_size = 0;
+Index: xserver/hw/wnc/rootlessWindow.c
+===================================================================
+RCS file: /cvs/underware/xwnc/xserver/hw/wnc/rootlessWindow.c,v
+retrieving revision 1.3
+diff -u -r1.3 rootlessWindow.c
+--- xwnc/xserver/hw/wnc/rootlessWindow.c	27 Mar 2006 14:44:57 -0000	1.3
++++ xwnc/xserver/hw/wnc/rootlessWindow.c	24 Apr 2006 18:17:16 -0000
+@@ -64,7 +64,7 @@
+     Bool result;
+     RegionRec saveRoot;
+ 
+-    WINREC(pWin) = NULL;
++    pWin->devPrivates[rootlessWindowPrivateIndex].ptr = NULL;
+ 
+     SCREEN_UNWRAP(pWin->drawable.pScreen, CreateWindow);
+ 
+@@ -105,7 +105,7 @@
+ #endif
+ 
+     xfree(winRec);
+-    WINREC(pWin) = NULL;
++    pWin->devPrivates[rootlessWindowPrivateIndex].ptr = NULL;
+ }
+ 
+ 
+@@ -349,7 +349,7 @@
+     winRec->pixmap = NULL;
+     winRec->wid = NULL;
+ 
+-    WINREC(pWin) = winRec;
++    pWin->devPrivates[rootlessWindowPrivateIndex].ptr = winRec;
+ 
+ #ifdef SHAPE
+     // Set the frame's shape if the window is shaped
+@@ -366,7 +366,7 @@
+     {
+         RL_DEBUG_MSG("implementation failed to create frame!\n");
+         xfree(winRec);
+-        WINREC(pWin) = NULL;
++        pWin->devPrivates[rootlessWindowPrivateIndex].ptr = NULL;
+         return NULL;
+     }
+ 
+@@ -1261,8 +1261,8 @@
+ 
+ 	/* Switch the frame record from one to the other. */
+ 
+-	WINREC(pWin) = NULL;
+-	WINREC(pTopWin) = winRec;
++	pWin->devPrivates[rootlessWindowPrivateIndex].ptr = NULL;
++	pTopWin->devPrivates[rootlessWindowPrivateIndex].ptr = winRec;
+ 
+ 	RootlessInitializeFrame(pTopWin, winRec);
+ 	RootlessReshapeFrame(pTopWin);
+Index: xserver/include/servermd.h
+===================================================================
+RCS file: /cvs/underware/xwnc/xserver/include/servermd.h,v
+retrieving revision 1.3
+diff -u -r1.3 servermd.h
+--- xwnc/xserver/include/servermd.h	27 Mar 2006 14:44:57 -0000	1.3
++++ xwnc/xserver/include/servermd.h	24 Apr 2006 18:17:16 -0000
+@@ -403,7 +403,7 @@
+ 
+ #endif /* ia64 */
+ 
+-#if defined(__AMD64__) || defined(AMD64)
++#if defined(__x86_64__)
+ # define IMAGE_BYTE_ORDER	LSBFirst
+ 
+ # if defined(XF86MONOVGA) || defined(XF86VGA16) || defined(XF86MONO)

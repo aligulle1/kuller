@@ -1,0 +1,525 @@
+Marek Mahut <mmahut@fedoraproject.org>: Patch to fix build under gcc 4.4
+
+diff -Naur gnuradio-3.2-upstream/gnuradio-core/src/lib/filter/gr_fft_filter_ccc.cc gnuradio-3.2/gnuradio-core/src/lib/filter/gr_fft_filter_ccc.cc
+--- gnuradio-3.2-upstream/gnuradio-core/src/lib/filter/gr_fft_filter_ccc.cc	2009-07-25 09:14:00.862437254 +0200
++++ gnuradio-3.2/gnuradio-core/src/lib/filter/gr_fft_filter_ccc.cc	2009-07-25 09:17:18.282187738 +0200
+@@ -39,6 +39,7 @@
+ 
+ #include <iostream>
+ #include <string.h>
++#include <cstdio>
+ 
+ gr_fft_filter_ccc_sptr gr_make_fft_filter_ccc (int decimation, const std::vector<gr_complex> &taps)
+ {
+diff -Naur gnuradio-3.2-upstream/gnuradio-core/src/lib/filter/gr_fft_filter_fff.cc gnuradio-3.2/gnuradio-core/src/lib/filter/gr_fft_filter_fff.cc
+--- gnuradio-3.2-upstream/gnuradio-core/src/lib/filter/gr_fft_filter_fff.cc	2009-07-25 09:14:00.864437599 +0200
++++ gnuradio-3.2/gnuradio-core/src/lib/filter/gr_fft_filter_fff.cc	2009-07-25 09:17:25.071217820 +0200
+@@ -34,6 +34,7 @@
+ 
+ #include <iostream>
+ #include <string.h>
++#include <cstdio>
+ 
+ gr_fft_filter_fff_sptr gr_make_fft_filter_fff (int decimation, const std::vector<float> &taps)
+ {
+diff -Naur gnuradio-3.2-upstream/gnuradio-core/src/lib/general/gr_align_on_samplenumbers_ss.cc gnuradio-3.2/gnuradio-core/src/lib/general/gr_align_on_samplenumbers_ss.cc
+--- gnuradio-3.2-upstream/gnuradio-core/src/lib/general/gr_align_on_samplenumbers_ss.cc	2009-07-25 09:14:01.033433009 +0200
++++ gnuradio-3.2/gnuradio-core/src/lib/general/gr_align_on_samplenumbers_ss.cc	2009-07-25 09:17:36.663188600 +0200
+@@ -28,6 +28,7 @@
+ #include <gr_io_signature.h>
+ #include <assert.h>
+ #include <stdexcept>
++#include <cstdio>
+ #include <string.h>
+ 
+ //define ALIGN_ADVANCED_IMPLEMENTATION to have an alternative implementation of the align algoritm which exactly follows the align_interval spec.
+diff -Naur gnuradio-3.2-upstream/gnuradio-core/src/lib/general/gr_clock_recovery_mm_cc.cc gnuradio-3.2/gnuradio-core/src/lib/general/gr_clock_recovery_mm_cc.cc
+--- gnuradio-3.2-upstream/gnuradio-core/src/lib/general/gr_clock_recovery_mm_cc.cc	2009-07-25 09:14:01.051436257 +0200
++++ gnuradio-3.2/gnuradio-core/src/lib/general/gr_clock_recovery_mm_cc.cc	2009-07-25 09:17:42.243478128 +0200
+@@ -29,6 +29,7 @@
+ #include <gr_clock_recovery_mm_cc.h>
+ #include <gri_mmse_fir_interpolator_cc.h>
+ #include <stdexcept>
++#include <cstdio>
+ 
+ // Public constructor
+ 
+diff -Naur gnuradio-3.2-upstream/gnuradio-core/src/lib/general/gr_constellation_decoder_cb.cc gnuradio-3.2/gnuradio-core/src/lib/general/gr_constellation_decoder_cb.cc
+--- gnuradio-3.2-upstream/gnuradio-core/src/lib/general/gr_constellation_decoder_cb.cc	2009-07-25 09:14:01.025437774 +0200
++++ gnuradio-3.2/gnuradio-core/src/lib/general/gr_constellation_decoder_cb.cc	2009-07-25 09:17:47.250185275 +0200
+@@ -27,6 +27,7 @@
+ #include <gr_constellation_decoder_cb.h>
+ #include <gr_io_signature.h>
+ #include <stdexcept>
++#include <cstdio>
+ 
+ #include <iostream>
+ using std::cout;
+diff -Naur gnuradio-3.2-upstream/gnuradio-core/src/lib/general/gr_correlate_access_code_bb.cc gnuradio-3.2/gnuradio-core/src/lib/general/gr_correlate_access_code_bb.cc
+--- gnuradio-3.2-upstream/gnuradio-core/src/lib/general/gr_correlate_access_code_bb.cc	2009-07-25 09:14:01.060434982 +0200
++++ gnuradio-3.2/gnuradio-core/src/lib/general/gr_correlate_access_code_bb.cc	2009-07-25 09:17:54.333184463 +0200
+@@ -28,6 +28,7 @@
+ #include <gr_io_signature.h>
+ #include <stdexcept>
+ #include <gr_count_bits.h>
++#include <cstdio>
+ 
+ #define VERBOSE 0
+ 
+diff -Naur gnuradio-3.2-upstream/gnuradio-core/src/lib/general/gr_dd_mpsk_sync_cc.cc gnuradio-3.2/gnuradio-core/src/lib/general/gr_dd_mpsk_sync_cc.cc
+--- gnuradio-3.2-upstream/gnuradio-core/src/lib/general/gr_dd_mpsk_sync_cc.cc	2009-07-25 09:14:01.047433541 +0200
++++ gnuradio-3.2/gnuradio-core/src/lib/general/gr_dd_mpsk_sync_cc.cc	2009-07-25 09:18:01.345183736 +0200
+@@ -30,7 +30,7 @@
+ #include <gri_mmse_fir_interpolator_cc.h>
+ #include <math.h>
+ #include <stdexcept>
+-
++#include <cstdio>
+ #include <gr_complex.h>
+ 
+ #define M_TWOPI (2*M_PI)
+diff -Naur gnuradio-3.2-upstream/gnuradio-core/src/lib/general/gr_decode_ccsds_27_fb.cc gnuradio-3.2/gnuradio-core/src/lib/general/gr_decode_ccsds_27_fb.cc
+--- gnuradio-3.2-upstream/gnuradio-core/src/lib/general/gr_decode_ccsds_27_fb.cc	2009-07-25 09:14:01.076437534 +0200
++++ gnuradio-3.2/gnuradio-core/src/lib/general/gr_decode_ccsds_27_fb.cc	2009-07-25 09:18:07.285215839 +0200
+@@ -24,6 +24,7 @@
+ 
+ #include <gr_decode_ccsds_27_fb.h>
+ #include <gr_io_signature.h>
++#include <cstdio>
+ 
+ gr_decode_ccsds_27_fb_sptr 
+ gr_make_decode_ccsds_27_fb()
+diff -Naur gnuradio-3.2-upstream/gnuradio-core/src/lib/general/gr_dpll_bb.cc gnuradio-3.2/gnuradio-core/src/lib/general/gr_dpll_bb.cc
+--- gnuradio-3.2-upstream/gnuradio-core/src/lib/general/gr_dpll_bb.cc	2009-07-25 09:14:01.055437436 +0200
++++ gnuradio-3.2/gnuradio-core/src/lib/general/gr_dpll_bb.cc	2009-07-25 09:18:20.651188536 +0200
+@@ -26,6 +26,7 @@
+ 
+ #include <gr_dpll_bb.h>
+ #include <gr_io_signature.h>
++#include <cstdio>
+ 
+ gr_dpll_bb_sptr
+ gr_make_dpll_bb (float period, float gain)
+diff -Naur gnuradio-3.2-upstream/gnuradio-core/src/lib/general/gr_fft_vfc.cc gnuradio-3.2/gnuradio-core/src/lib/general/gr_fft_vfc.cc
+--- gnuradio-3.2-upstream/gnuradio-core/src/lib/general/gr_fft_vfc.cc	2009-07-25 09:14:01.032433570 +0200
++++ gnuradio-3.2/gnuradio-core/src/lib/general/gr_fft_vfc.cc	2009-07-25 09:18:27.588184185 +0200
+@@ -30,6 +30,7 @@
+ #include <math.h>
+ #include <stdexcept>
+ #include <string.h>
++#include <cstdio>
+ 
+ 
+ // FIXME after this is working, change to use native real to complex fft.
+diff -Naur gnuradio-3.2-upstream/gnuradio-core/src/lib/general/gr_mpsk_receiver_cc.cc gnuradio-3.2/gnuradio-core/src/lib/general/gr_mpsk_receiver_cc.cc
+--- gnuradio-3.2-upstream/gnuradio-core/src/lib/general/gr_mpsk_receiver_cc.cc	2009-07-25 09:14:01.080445069 +0200
++++ gnuradio-3.2/gnuradio-core/src/lib/general/gr_mpsk_receiver_cc.cc	2009-07-25 09:18:45.986188440 +0200
+@@ -31,6 +31,7 @@
+ #include <gr_math.h>
+ #include <gr_expj.h>
+ #include <gri_mmse_fir_interpolator_cc.h>
++#include <cstdio>
+ 
+ 
+ #define M_TWOPI (2*M_PI)
+diff -Naur gnuradio-3.2-upstream/gnuradio-core/src/lib/general/gr_ofdm_frame_acquisition.cc gnuradio-3.2/gnuradio-core/src/lib/general/gr_ofdm_frame_acquisition.cc
+--- gnuradio-3.2-upstream/gnuradio-core/src/lib/general/gr_ofdm_frame_acquisition.cc	2009-07-25 09:14:01.067433082 +0200
++++ gnuradio-3.2/gnuradio-core/src/lib/general/gr_ofdm_frame_acquisition.cc	2009-07-25 09:36:03.133188443 +0200
+@@ -28,6 +28,7 @@
+ #include <gr_io_signature.h>
+ #include <gr_expj.h>
+ #include <gr_math.h>
++#include <cstdio>
+ 
+ #define VERBOSE 0
+ #define M_TWOPI (2*M_PI)
+diff -Naur gnuradio-3.2-upstream/gnuradio-core/src/lib/general/gr_ofdm_sampler.cc gnuradio-3.2/gnuradio-core/src/lib/general/gr_ofdm_sampler.cc
+--- gnuradio-3.2-upstream/gnuradio-core/src/lib/general/gr_ofdm_sampler.cc	2009-07-25 09:14:01.055437436 +0200
++++ gnuradio-3.2/gnuradio-core/src/lib/general/gr_ofdm_sampler.cc	2009-07-25 09:43:44.309459146 +0200
+@@ -27,6 +27,7 @@
+ #include <gr_ofdm_sampler.h>
+ #include <gr_io_signature.h>
+ #include <gr_expj.h>
++#include <cstdio>
+ 
+ gr_ofdm_sampler_sptr
+ gr_make_ofdm_sampler (unsigned int fft_length, 
+diff -Naur gnuradio-3.2-upstream/gnuradio-core/src/lib/general/gr_simple_correlator.cc gnuradio-3.2/gnuradio-core/src/lib/general/gr_simple_correlator.cc
+--- gnuradio-3.2-upstream/gnuradio-core/src/lib/general/gr_simple_correlator.cc	2009-07-25 09:14:01.078437530 +0200
++++ gnuradio-3.2/gnuradio-core/src/lib/general/gr_simple_correlator.cc	2009-07-25 09:18:50.951455747 +0200
+@@ -31,6 +31,7 @@
+ #include <stdexcept>
+ #include <gr_count_bits.h>
+ #include <string.h>
++#include <cstdio>
+ 
+ 
+ static const int THRESHOLD = 3;
+diff -Naur gnuradio-3.2-upstream/gnuradio-core/src/lib/general/gr_stream_mux.cc gnuradio-3.2/gnuradio-core/src/lib/general/gr_stream_mux.cc
+--- gnuradio-3.2-upstream/gnuradio-core/src/lib/general/gr_stream_mux.cc	2009-07-25 09:14:01.083447508 +0200
++++ gnuradio-3.2/gnuradio-core/src/lib/general/gr_stream_mux.cc	2009-07-25 09:18:55.617260043 +0200
+@@ -27,6 +27,7 @@
+ #include <gr_stream_mux.h>
+ #include <gr_io_signature.h>
+ #include <string.h>
++#include <cstdio>
+ 
+ #define VERBOSE 0
+ 
+diff -Naur gnuradio-3.2-upstream/gnuradio-core/src/lib/io/gr_wavfile_sink.cc gnuradio-3.2/gnuradio-core/src/lib/io/gr_wavfile_sink.cc
+--- gnuradio-3.2-upstream/gnuradio-core/src/lib/io/gr_wavfile_sink.cc	2009-07-25 09:14:00.995437624 +0200
++++ gnuradio-3.2/gnuradio-core/src/lib/io/gr_wavfile_sink.cc	2009-07-25 09:19:02.378184445 +0200
+@@ -30,6 +30,7 @@
+ #include <stdexcept>
+ #include <climits>
+ #include <cstring>
++#include <cstdio>
+ #include <cmath>
+ #include <fcntl.h>
+ 
+diff -Naur gnuradio-3.2-upstream/gr-audio-alsa/src/gri_alsa.cc gnuradio-3.2/gr-audio-alsa/src/gri_alsa.cc
+--- gnuradio-3.2-upstream/gr-audio-alsa/src/gri_alsa.cc	2009-07-25 09:14:00.474445345 +0200
++++ gnuradio-3.2/gr-audio-alsa/src/gri_alsa.cc	2009-07-25 09:19:13.904207014 +0200
+@@ -26,6 +26,7 @@
+ 
+ #include <gri_alsa.h>
+ #include <algorithm>
++#include <cstdio>
+ 
+ static snd_pcm_access_t access_types[] = {
+   SND_PCM_ACCESS_MMAP_INTERLEAVED,
+diff -Naur gnuradio-3.2-upstream/gr-audio-osx/src/audio_osx_sink.cc gnuradio-3.2/gr-audio-osx/src/audio_osx_sink.cc
+--- gnuradio-3.2-upstream/gr-audio-osx/src/audio_osx_sink.cc	2009-07-25 09:14:00.341445675 +0200
++++ gnuradio-3.2/gr-audio-osx/src/audio_osx_sink.cc	2009-07-25 09:19:21.598183148 +0200
+@@ -30,6 +30,7 @@
+ #include <gr_io_signature.h>
+ #include <stdexcept>
+ #include <audio_osx.h>
++#include <cstdio>
+ 
+ #define _OSX_AU_DEBUG_ 0
+ 
+diff -Naur gnuradio-3.2-upstream/gr-audio-osx/src/audio_osx_source.cc gnuradio-3.2/gr-audio-osx/src/audio_osx_source.cc
+--- gnuradio-3.2-upstream/gr-audio-osx/src/audio_osx_source.cc	2009-07-25 09:14:00.343450491 +0200
++++ gnuradio-3.2/gr-audio-osx/src/audio_osx_source.cc	2009-07-25 09:19:27.590184106 +0200
+@@ -30,6 +30,7 @@
+ #include <gr_io_signature.h>
+ #include <stdexcept>
+ #include <audio_osx.h>
++#include <cstdio>
+ 
+ #define _OSX_AU_DEBUG_ 0
+ #define _OSX_DO_LISTENERS_ 0
+diff -Naur gnuradio-3.2-upstream/gr-audio-portaudio/src/gri_portaudio.cc gnuradio-3.2/gr-audio-portaudio/src/gri_portaudio.cc
+--- gnuradio-3.2-upstream/gr-audio-portaudio/src/gri_portaudio.cc	2009-07-25 09:14:00.477445200 +0200
++++ gnuradio-3.2/gr-audio-portaudio/src/gri_portaudio.cc	2009-07-25 09:19:33.475184246 +0200
+@@ -27,6 +27,7 @@
+ #include <gri_portaudio.h>
+ #include <portaudio.h>
+ #include <string.h>
++#include <cstdio>
+ 
+ 
+ PaDeviceIndex
+diff -Naur gnuradio-3.2-upstream/gr-pager/src/pager_flex_sync.cc gnuradio-3.2/gr-pager/src/pager_flex_sync.cc
+--- gnuradio-3.2-upstream/gr-pager/src/pager_flex_sync.cc	2009-07-25 09:14:01.100445030 +0200
++++ gnuradio-3.2/gr-pager/src/pager_flex_sync.cc	2009-07-25 09:19:38.231198885 +0200
+@@ -29,6 +29,7 @@
+ #include <pageri_util.h>
+ #include <gr_io_signature.h>
+ #include <gr_count_bits.h>
++#include <cstdio>
+ 
+ pager_flex_sync_sptr pager_make_flex_sync()
+ {
+diff -Naur gnuradio-3.2-upstream/gr-qtgui/src/lib/spectrumUpdateEvents.h gnuradio-3.2/gr-qtgui/src/lib/spectrumUpdateEvents.h
+--- gnuradio-3.2-upstream/gr-qtgui/src/lib/spectrumUpdateEvents.h	2009-07-25 09:14:00.716437539 +0200
++++ gnuradio-3.2/gr-qtgui/src/lib/spectrumUpdateEvents.h	2009-07-26 11:08:31.834443932 +0200
+@@ -5,6 +5,7 @@
+ #include <QString>
+ #include <complex>
+ #include <highResTimeFunctions.h>
++#include <stdint.h>
+ 
+ class SpectrumUpdateEvent:public QEvent{
+ 
+diff -Naur gnuradio-3.2-upstream/gr-qtgui/src/lib/Waterfall3DDisplayPlot.h gnuradio-3.2/gr-qtgui/src/lib/Waterfall3DDisplayPlot.h
+--- gnuradio-3.2-upstream/gr-qtgui/src/lib/Waterfall3DDisplayPlot.h	2009-07-25 09:14:00.717434185 +0200
++++ gnuradio-3.2/gr-qtgui/src/lib/Waterfall3DDisplayPlot.h	2009-07-26 15:39:18.539220269 +0200
+@@ -9,6 +9,8 @@
+ #include <qwt3d_color.h>
+ #include <qwt_color_map.h>
+ 
++#include <cstdio>
++
+ class Waterfall3DColorMap:public Qwt3D::Color, public QwtLinearColorMap{
+ public:
+   Waterfall3DColorMap();
+diff -Naur gnuradio-3.2-upstream/gr-usrp/apps/usrp_siggen.cc gnuradio-3.2/gr-usrp/apps/usrp_siggen.cc
+--- gnuradio-3.2-upstream/gr-usrp/apps/usrp_siggen.cc	2009-07-25 09:14:00.503447733 +0200
++++ gnuradio-3.2/gr-usrp/apps/usrp_siggen.cc	2009-07-25 17:21:57.442443913 +0200
+@@ -26,6 +26,7 @@
+ #include <stdexcept>
+ #include <iostream>
+ #include <boost/program_options.hpp>
++#include <cstdio>
+ 
+ namespace po = boost::program_options;
+ 
+diff -Naur gnuradio-3.2-upstream/gr-usrp/src/usrp_sink_base.cc gnuradio-3.2/gr-usrp/src/usrp_sink_base.cc
+--- gnuradio-3.2-upstream/gr-usrp/src/usrp_sink_base.cc	2009-07-25 09:14:00.501447597 +0200
++++ gnuradio-3.2/gr-usrp/src/usrp_sink_base.cc	2009-07-25 17:19:08.780188246 +0200
+@@ -28,6 +28,7 @@
+ #include <gr_io_signature.h>
+ #include <usrp_standard.h>
+ #include <assert.h>
++#include <cstdio>
+ 
+ static const int OUTPUT_MULTIPLE_SAMPLES = 128;		// DON'T CHANGE THIS VALUE!
+ 
+diff -Naur gnuradio-3.2-upstream/gr-usrp/src/usrp_source_base.cc gnuradio-3.2/gr-usrp/src/usrp_source_base.cc
+--- gnuradio-3.2-upstream/gr-usrp/src/usrp_source_base.cc	2009-07-25 09:14:00.502445220 +0200
++++ gnuradio-3.2/gr-usrp/src/usrp_source_base.cc	2009-07-25 17:19:51.214219555 +0200
+@@ -28,6 +28,7 @@
+ #include <gr_io_signature.h>
+ #include <usrp_standard.h>
+ #include <assert.h>
++#include <cstdio>
+ 
+ static const int OUTPUT_MULTIPLE_BYTES = 4 * 1024;
+ 
+diff -Naur gnuradio-3.2-upstream/mblock/src/lib/mb_worker.cc gnuradio-3.2/mblock/src/lib/mb_worker.cc
+--- gnuradio-3.2-upstream/mblock/src/lib/mb_worker.cc	2009-07-25 09:14:00.496445162 +0200
++++ gnuradio-3.2/mblock/src/lib/mb_worker.cc	2009-07-25 11:17:09.894192322 +0200
+@@ -29,6 +29,7 @@
+ #include <mb_gettid.h>
+ #include <mblock/msg_accepter.h>
+ #include <iostream>
++#include <cstdio>
+ #ifdef HAVE_SCHED_H
+ #include <sched.h>
+ #endif
+diff -Naur gnuradio-3.2-upstream/mblock/src/lib/qa_bitset.cc gnuradio-3.2/mblock/src/lib/qa_bitset.cc
+--- gnuradio-3.2-upstream/mblock/src/lib/qa_bitset.cc	2009-07-25 09:14:00.494447611 +0200
++++ gnuradio-3.2/mblock/src/lib/qa_bitset.cc	2009-07-25 11:17:15.999184361 +0200
+@@ -27,6 +27,7 @@
+ #include <mblock/message.h>
+ #include <mblock/class_registry.h>
+ #include <iostream>
++#include <cstdio>
+ #include <sstream>
+ #include <bitset>
+ 
+diff -Naur gnuradio-3.2-upstream/mblock/src/lib/qa_disconnect.cc gnuradio-3.2/mblock/src/lib/qa_disconnect.cc
+--- gnuradio-3.2-upstream/mblock/src/lib/qa_disconnect.cc	2009-07-25 09:14:00.494447611 +0200
++++ gnuradio-3.2/mblock/src/lib/qa_disconnect.cc	2009-07-25 13:41:30.945188181 +0200
+@@ -29,6 +29,7 @@
+ #include <iostream>
+ #include <sstream>
+ #include <bitset>
++#include <cstdio>
+ 
+ static pmt_t s_in = pmt_intern("in");
+ static pmt_t s_out = pmt_intern("out");
+diff -Naur gnuradio-3.2-upstream/usrp/host/lib/legacy/db_boards.cc gnuradio-3.2/usrp/host/lib/legacy/db_boards.cc
+--- gnuradio-3.2-upstream/usrp/host/lib/legacy/db_boards.cc	2009-07-25 09:14:00.618447788 +0200
++++ gnuradio-3.2/usrp/host/lib/legacy/db_boards.cc	2009-07-25 16:59:10.714438636 +0200
+@@ -31,6 +31,7 @@
+ #include <db_wbx.h>
+ #include <db_dtt754.h>
+ #include <db_dtt768.h>
++#include <cstdio>
+ 
+ std::vector<db_base_sptr>
+ instantiate_dbs(int dbid, usrp_basic_sptr usrp, int which_side)
+diff -Naur gnuradio-3.2-upstream/usrp/host/lib/legacy/db_dbs_rx.cc gnuradio-3.2/usrp/host/lib/legacy/db_dbs_rx.cc
+--- gnuradio-3.2-upstream/usrp/host/lib/legacy/db_dbs_rx.cc	2009-07-25 09:14:00.618447788 +0200
++++ gnuradio-3.2/usrp/host/lib/legacy/db_dbs_rx.cc	2009-07-25 17:00:38.567217525 +0200
+@@ -21,6 +21,7 @@
+ #include <db_dbs_rx.h>
+ #include <db_base_impl.h>
+ #include <cmath>
++#include <cstdio>
+ 
+ 
+ /*****************************************************************************/
+diff -Naur gnuradio-3.2-upstream/usrp/host/lib/legacy/db_xcvr2450.cc gnuradio-3.2/usrp/host/lib/legacy/db_xcvr2450.cc
+--- gnuradio-3.2-upstream/usrp/host/lib/legacy/db_xcvr2450.cc	2009-07-25 09:14:00.617445275 +0200
++++ gnuradio-3.2/usrp/host/lib/legacy/db_xcvr2450.cc	2009-07-25 17:01:20.805468727 +0200
+@@ -21,6 +21,7 @@
+ #include <db_xcvr2450.h>
+ #include <db_base_impl.h>
+ #include <cmath>
++#include <cstdio>
+ #include <boost/thread.hpp>
+ #include <boost/weak_ptr.hpp>
+ 
+diff -Naur gnuradio-3.2-upstream/usrp/host/lib/legacy/fusb_darwin.cc gnuradio-3.2/usrp/host/lib/legacy/fusb_darwin.cc
+--- gnuradio-3.2-upstream/usrp/host/lib/legacy/fusb_darwin.cc	2009-07-25 09:14:00.612447799 +0200
++++ gnuradio-3.2/usrp/host/lib/legacy/fusb_darwin.cc	2009-07-25 09:19:46.638210966 +0200
+@@ -33,6 +33,7 @@
+ #include "fusb.h"
+ #include "fusb_darwin.h"
+ #include "darwin_libusb.h"
++#include <cstdio>
+ 
+ static const int USB_TIMEOUT = 100;	// in milliseconds
+ static const UInt8 NUM_QUEUE_ITEMS = 20;
+diff -Naur gnuradio-3.2-upstream/usrp/host/lib/legacy/fusb_linux.cc gnuradio-3.2/usrp/host/lib/legacy/fusb_linux.cc
+--- gnuradio-3.2-upstream/usrp/host/lib/legacy/fusb_linux.cc	2009-07-25 09:14:00.616447792 +0200
++++ gnuradio-3.2/usrp/host/lib/legacy/fusb_linux.cc	2009-07-25 09:19:54.041184719 +0200
+@@ -33,10 +33,10 @@
+ #include <linux/usbdevice_fs.h>	// interface to kernel portion of user mode usb driver
+ #include <sys/ioctl.h>
+ #include <assert.h>
+-#include <string.h>
+ #include <algorithm>
+ #include <errno.h>
+ #include <string.h>
++#include <cstdio>
+ 
+ #define MINIMIZE_TX_BUFFERING 1		// must be defined to 0 or 1
+ 
+diff -Naur gnuradio-3.2-upstream/usrp/host/lib/legacy/fusb_win32.cc gnuradio-3.2/usrp/host/lib/legacy/fusb_win32.cc
+--- gnuradio-3.2-upstream/usrp/host/lib/legacy/fusb_win32.cc	2009-07-25 09:14:00.617445275 +0200
++++ gnuradio-3.2/usrp/host/lib/legacy/fusb_win32.cc	2009-07-25 09:19:58.736184198 +0200
+@@ -29,6 +29,7 @@
+ #include <assert.h>
+ #include <stdexcept>
+ #include <string.h>
++#include <cstdio>
+ 
+ static const int MAX_BLOCK_SIZE = fusb_sysconfig::max_block_size();
+ static const int DEFAULT_BLOCK_SIZE = MAX_BLOCK_SIZE;
+diff -Naur gnuradio-3.2-upstream/usrp/host/lib/legacy/usrp_basic.cc gnuradio-3.2/usrp/host/lib/legacy/usrp_basic.cc
+--- gnuradio-3.2-upstream/usrp/host/lib/legacy/usrp_basic.cc	2009-07-25 09:14:00.611447732 +0200
++++ gnuradio-3.2/usrp/host/lib/legacy/usrp_basic.cc	2009-07-25 09:20:04.941434694 +0200
+@@ -37,6 +37,7 @@
+ #include <math.h>
+ #include <ad9862.h>
+ #include <string.h>
++#include <cstdio>
+ 
+ using namespace ad9862;
+ 
+diff -Naur gnuradio-3.2-upstream/usrp/host/lib/legacy/usrp_standard.cc gnuradio-3.2/usrp/host/lib/legacy/usrp_standard.cc
+--- gnuradio-3.2-upstream/usrp/host/lib/legacy/usrp_standard.cc	2009-07-25 09:14:00.619447576 +0200
++++ gnuradio-3.2/usrp/host/lib/legacy/usrp_standard.cc	2009-07-25 09:20:09.756187465 +0200
+@@ -29,6 +29,7 @@
+ #include <assert.h>
+ #include <math.h>
+ #include <ad9862.h>
++#include <cstdio>
+ 
+ 
+ static const int OLD_CAPS_VAL = 0xaa55ff77;
+diff -Naur gnuradio-3.2-upstream/usrp2/host/apps/find_usrps.cc gnuradio-3.2/usrp2/host/apps/find_usrps.cc
+--- gnuradio-3.2-upstream/usrp2/host/apps/find_usrps.cc	2009-07-25 09:14:00.301437861 +0200
++++ gnuradio-3.2/usrp2/host/apps/find_usrps.cc	2009-07-25 17:14:41.128188741 +0200
+@@ -23,6 +23,7 @@
+ #include <usrp2/usrp2.h>
+ #include <iostream>
+ #include <getopt.h>
++#include <cstdio>
+ 
+ static void
+ usage(const char *progname)
+diff -Naur gnuradio-3.2-upstream/usrp2/host/apps/gpio.cc gnuradio-3.2/usrp2/host/apps/gpio.cc
+--- gnuradio-3.2-upstream/usrp2/host/apps/gpio.cc	2009-07-25 09:14:00.302450501 +0200
++++ gnuradio-3.2/usrp2/host/apps/gpio.cc	2009-07-25 17:18:14.131203844 +0200
+@@ -22,6 +22,7 @@
+ 
+ #include <usrp2/usrp2.h>
+ #include <iostream>
++#include <cstdio>
+ 
+ int
+ main(int argc, char **argv)
+diff -Naur gnuradio-3.2-upstream/usrp2/host/apps/rx_streaming_samples.cc gnuradio-3.2/usrp2/host/apps/rx_streaming_samples.cc
+--- gnuradio-3.2-upstream/usrp2/host/apps/rx_streaming_samples.cc	2009-07-25 09:14:00.302450501 +0200
++++ gnuradio-3.2/usrp2/host/apps/rx_streaming_samples.cc	2009-07-25 17:15:30.560205148 +0200
+@@ -27,6 +27,7 @@
+ #include <gruel/realtime.h>
+ #include <sys/time.h>
+ #include <iostream>
++#include <cstdio>
+ #include <string.h>
+ #include <boost/scoped_ptr.hpp>
+ #include <boost/shared_ptr.hpp>
+diff -Naur gnuradio-3.2-upstream/usrp2/host/apps/test_mimo_tx.cc gnuradio-3.2/usrp2/host/apps/test_mimo_tx.cc
+--- gnuradio-3.2-upstream/usrp2/host/apps/test_mimo_tx.cc	2009-07-25 09:14:00.301437861 +0200
++++ gnuradio-3.2/usrp2/host/apps/test_mimo_tx.cc	2009-07-25 17:17:26.239258963 +0200
+@@ -40,6 +40,7 @@
+ #include <string.h>
+ #include <stdexcept>
+ #include <math.h>
++#include <cstdio>
+ 
+ 
+ typedef std::complex<float> fcomplex;
+diff -Naur gnuradio-3.2-upstream/usrp2/host/apps/tx_samples.cc gnuradio-3.2/usrp2/host/apps/tx_samples.cc
+--- gnuradio-3.2-upstream/usrp2/host/apps/tx_samples.cc	2009-07-25 09:14:00.302450501 +0200
++++ gnuradio-3.2/usrp2/host/apps/tx_samples.cc	2009-07-25 17:16:51.973188827 +0200
+@@ -22,6 +22,7 @@
+ #include <usrp2/usrp2.h>
+ #include <usrp2/strtod_si.h>
+ #include <iostream>
++#include <cstdio>
+ #include <complex>
+ #include <getopt.h>
+ #include <gruel/realtime.h>
+diff -Naur gnuradio-3.2-upstream/usrp2/host/lib/eth_buffer.cc gnuradio-3.2/usrp2/host/lib/eth_buffer.cc
+--- gnuradio-3.2-upstream/usrp2/host/lib/eth_buffer.cc	2009-07-25 09:14:00.295439060 +0200
++++ gnuradio-3.2/usrp2/host/lib/eth_buffer.cc	2009-07-25 17:08:50.711203188 +0200
+@@ -32,6 +32,7 @@
+ #include <sys/poll.h>
+ #include <iostream>
+ #include <cmath>
++#include <cstdio>
+ #include <errno.h>
+ #include <stdexcept>
+ #include <string.h>
+diff -Naur gnuradio-3.2-upstream/usrp2/host/lib/ethernet.cc gnuradio-3.2/usrp2/host/lib/ethernet.cc
+--- gnuradio-3.2-upstream/usrp2/host/lib/ethernet.cc	2009-07-25 09:14:00.296436544 +0200
++++ gnuradio-3.2/usrp2/host/lib/ethernet.cc	2009-07-25 17:09:54.200210018 +0200
+@@ -25,6 +25,7 @@
+ #include <open_usrp2_socket.h>
+ 
+ #include <iostream>
++#include <cstdio>
+ #include <unistd.h>
+ #include <fcntl.h>
+ //#include <features.h>
+diff -Naur gnuradio-3.2-upstream/usrp2/host/lib/ethernet.h gnuradio-3.2/usrp2/host/lib/ethernet.h
+--- gnuradio-3.2-upstream/usrp2/host/lib/ethernet.h	2009-07-25 09:14:00.295439060 +0200
++++ gnuradio-3.2/usrp2/host/lib/ethernet.h	2009-07-25 17:12:39.574184059 +0200
+@@ -20,6 +20,7 @@
+ #define INCLUDED_USRP2_ETHERNET_H
+ 
+ #include <string>
++#include <stdint.h>
+ #include <vector>
+ #include <eth_common.h>
+ 
+diff -Naur gnuradio-3.2-upstream/usrp2/host/lib/find.cc gnuradio-3.2/usrp2/host/lib/find.cc
+--- gnuradio-3.2-upstream/usrp2/host/lib/find.cc	2009-07-25 09:14:00.299443453 +0200
++++ gnuradio-3.2/usrp2/host/lib/find.cc	2009-07-25 17:13:19.549453343 +0200
+@@ -29,6 +29,7 @@
+ #include <string.h>
+ #include <iostream>
+ #include <stdexcept>
++#include <cstdio>
+ 
+ #define FIND_DEBUG 0
+ 
+diff -Naur gnuradio-3.2-upstream/usrp2/host/lib/usrp2.cc gnuradio-3.2/usrp2/host/lib/usrp2.cc
+--- gnuradio-3.2-upstream/usrp2/host/lib/usrp2.cc	2009-07-25 09:14:00.298438985 +0200
++++ gnuradio-3.2/usrp2/host/lib/usrp2.cc	2009-07-25 17:13:54.453437924 +0200
+@@ -26,6 +26,7 @@
+ #include <boost/thread.hpp>
+ #include <boost/weak_ptr.hpp>
+ #include <string>
++#include <cstdio>
+ #include <stdexcept>
+ 
+ namespace usrp2 {

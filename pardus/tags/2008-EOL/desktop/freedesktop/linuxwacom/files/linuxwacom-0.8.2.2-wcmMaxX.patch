@@ -1,0 +1,38 @@
+From 988744b8ccb22d49c6971e15eac7ce414a037664 Mon Sep 17 00:00:00 2001
+From: Peter Hutterer <peter.hutterer@redhat.com>
+Date: Sat, 28 Feb 2009 01:57:10 +1000
+Subject: [PATCH] Don't assign priv->wcmMaxX/Y back into common->wcmMaxX/Y.
+
+Otherwise we overwrite the settings read from the tablet with a nice 0, which
+is rather pointless, isn't it?
+
+Signed-off-by: Peter Hutterer <peter.hutterer@redhat.com>
+---
+ src/xdrv/wcmConfig.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/xdrv/wcmConfig.c b/src/xdrv/wcmConfig.c
+index 1f03d34..9950932 100644
+--- a/src/xdrv/wcmConfig.c
++++ b/src/xdrv/wcmConfig.c
+@@ -872,7 +872,7 @@ xf86Msg(X_CONFIG, "%s (%s) is not a pad \n", local->name, dev->identifier);
+ 			common->wcmThreshold);
+ 
+ 	priv->wcmMaxX = xf86SetIntOption(local->options, "MaxX",
+-		priv->wcmMaxX);
++		common->wcmMaxX);
+ 	if (priv->wcmMaxX != 0)
+ 		xf86Msg(X_CONFIG, "%s: max x = %d\n", dev->identifier,
+ 			priv->wcmMaxX);
+@@ -881,7 +881,7 @@ xf86Msg(X_CONFIG, "%s (%s) is not a pad \n", local->name, dev->identifier);
+ 	if (!IsTouch(priv)) common->wcmMaxX = priv->wcmMaxX;
+ 
+ 	priv->wcmMaxY = xf86SetIntOption(local->options, "MaxY",
+-		priv->wcmMaxY);
++		common->wcmMaxY);
+ 	if (priv->wcmMaxY != 0)
+ 		xf86Msg(X_CONFIG, "%s: max y = %d\n", dev->identifier,
+ 			priv->wcmMaxY);
+-- 
+1.6.0.5
+

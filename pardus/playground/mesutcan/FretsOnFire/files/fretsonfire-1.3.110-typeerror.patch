@@ -1,0 +1,26 @@
+--- src/DummyAmanith.py
++++ src/DummyAmanith.py
+@@ -42,7 +42,9 @@
+     pass
+ 
+   def SetViewport(self, x, y, w, h):
+-    glViewport(int(x), int(y), int(w), int(h))
++    glw = int(w)
++    glh = int(h)
++    glViewport(int(x), int(y), int(glw), int(glh))
+ 
+   def SetProjection(self, left, right, bottom, top):
+     glMatrixMode(GL_PROJECTION)
+--- src/GameEngine.py
++++ src/GameEngine.py
+@@ -165,7 +165,9 @@
+     geometry = (0, 0, w, h)
+     self.svg = SvgContext(geometry)
+     self.svg.setRenderingQuality(self.config.get("opengl", "svgquality"))
+-    glViewport(int(viewport[0]), int(viewport[1]), int(viewport[2]), int(viewport[3]))
++    glw = int(viewport[2])
++    glh = int(viewport[3])
++    glViewport(int(viewport[0]), int(viewport[1]), int(glh), int(glh))
+ 
+     self.input     = Input()
+     self.view      = View(self, geometry)

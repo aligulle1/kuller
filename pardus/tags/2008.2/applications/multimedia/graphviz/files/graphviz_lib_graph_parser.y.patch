@@ -1,0 +1,28 @@
+--- graphviz-2.20.2/lib/graph/parser.y	2007-09-07 08:05:44.000000000 -0400
++++ graphviz-2.20.3/lib/graph/parser.y	2008-10-07 14:40:07.000000000 -0400
+@@ -1,4 +1,4 @@
+-/* $Id: parser.y,v 1.5 2007/09/07 12:05:44 ellson Exp $ $Revision: 1.5 $ */
++/* $Id: parser.y,v 1.5.2.1 2008/10/07 18:40:07 ellson Exp $ $Revision: 1.5.2.1 $ */
+ /* vim:set shiftwidth=4 ts=8: */
+ 
+ /**********************************************************
+@@ -31,7 +31,8 @@
+ static Agnode_t		*N;
+ static Agedge_t		*E;
+ static objstack_t	*SP;
+-static Agraph_t		*Gstack[32];
++#define GSTACK_SIZE 64
++static Agraph_t         *Gstack[GSTACK_SIZE];
+ static int			GSP;
+ 
+ static void subgraph_warn (void)
+@@ -44,6 +45,9 @@
+ 
+ static void push_subg(Agraph_t *g)
+ {
++	if (GSP >= GSTACK_SIZE) {
++		agerr (AGERR, "Gstack overflow in graph parser\n"); exit(1);
++	}
+ 	G = Gstack[GSP++] = g;
+ }
+ 

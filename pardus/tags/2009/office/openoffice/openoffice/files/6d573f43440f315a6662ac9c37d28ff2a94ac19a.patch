@@ -1,0 +1,37 @@
+From 6d573f43440f315a6662ac9c37d28ff2a94ac19a Mon Sep 17 00:00:00 2001
+From: Kohei Yoshida <kyoshida@novell.com>
+Date: Tue, 02 Jun 2009 03:29:18 +0000
+Subject: Fixed merged cell attribute flag corruption.
+
+Calc was corrupting the merged cell attribute flags when copied range
+was multi-range.  This caused copy-n-paste of merged cells to become
+weird because the overlapped cells were not properly marked as
+overlapped. (n#508867)
+
+* patches/dev300/calc-multi-range-copy-paste.diff:
+---
+diff --git a/patches/dev300/calc-multi-range-copy-paste.diff b/patches/dev300/calc-multi-range-copy-paste.diff
+index 3951e66..7db8a51 100644
+--- a/patches/dev300/calc-multi-range-copy-paste.diff
++++ b/patches/dev300/calc-multi-range-copy-paste.diff
+@@ -669,7 +669,7 @@ index 6a97fb5..2df6897 100644
+  			if (pTab[j] && pClipDoc->pTab[j])
+  				if ( bAllTabs || !pMarks || pMarks->GetTableSelect(j) )
+  				{
+-@@ -1441,10 +1427,50 @@ void ScDocument::CopyToClip(SCCOL nCol1, SCROW nRow1,
++@@ -1441,10 +1427,53 @@ void ScDocument::CopyToClip(SCCOL nCol1, SCROW nRow1,
+  					}
+  				}
+  
+@@ -717,6 +717,9 @@ index 6a97fb5..2df6897 100644
+ +            pDrawLayer->CopyToClip(pClipDoc, i, aObjRect);
+ +        }
+ +    }
+++
+++    // Make sure to mark overlapped cells.
+++    pClipDoc->ExtendMerge(aClipRange, true);
+ +}
+  
+  void ScDocument::CopyTabToClip(SCCOL nCol1, SCROW nRow1,
+--
+cgit v0.8.2

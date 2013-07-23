@@ -1,0 +1,70 @@
+Index: pm/functions
+===================================================================
+RCS file: /cvs/pm-utils/pm-utils/pm/functions,v
+retrieving revision 1.28
+diff -u -r1.28 functions
+--- pm/functions	31 Oct 2006 17:52:16 -0000	1.28
++++ pm/functions	8 Nov 2006 11:27:54 -0000
+@@ -4,10 +4,13 @@
+ 
+ # default values go here
+ HIBERNATE_RESUME_POST_VIDEO=no
++HIBERNATE_METHOD=""
+ SUSPEND_MODULES=""
+ # It is important to _not_ initialize RESUME_MODULES here.
+ PM_LOGFILE=${PM_LOGFILE:=/var/log/pm-suspend.log}
+ INHIBIT=/var/run/pm-utils.inhibit
++S2DISK_BIN=/usr/sbin/s2disk
++S2DISK_CONF=/var/lib/s2disk.conf
+ 
+ [ -f /etc/pm/config ] && . /etc/pm/config
+ 
+@@ -19,10 +22,13 @@
+ 
+ # export them all here
+ add_global HIBERNATE_RESUME_POST_VIDEO
++add_global HIBERNATE_METHOD
+ add_global SUSPEND_MODULES
+ add_global RESUME_MODULES
+ add_global PM_LOGFILE
+ add_global INHIBIT
++add_global S2DISK_BIN
++add_global S2DISK_CONF
+ 
+ source_configs()
+ {
+@@ -117,13 +123,31 @@
+ 
+ do_suspend()
+ {
+-	pm-pmu --suspend || echo -n "mem" > /sys/power/state
++	if [ -x /usr/sbin/s2ram ]; then
++		/usr/sbin/s2ram $S2RAM_OPTS
++	else
++		echo -n "mem" > /sys/power/state
++	fi
+ }
+ 
+ do_hibernate()
+ {
+-	echo -n "platform" > /sys/power/disk
+-	echo -n "disk" > /sys/power/state
++	if [ -z "$HIBERNATE_METHOD" ]; then
++		if [ -x $S2DISK_BIN -a -c /dev/snapshot ]; then
++			HIBERNATE_METHOD="userspace"
++		else
++			HIBERNATE_METHOD="kernel"
++		fi
++	fi
++	case $HIBERNATE_METHOD in
++		userspace)
++			$S2DISK_BIN -f $S2DISK_CONF
++			;;
++		kernel)
++			echo -n "platform" > /sys/power/disk
++			echo -n "disk" > /sys/power/state
++			;;
++	esac
+ }
+ 
+ pm_main()

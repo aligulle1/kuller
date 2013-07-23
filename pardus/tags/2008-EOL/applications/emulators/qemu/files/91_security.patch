@@ -1,0 +1,138 @@
+--- qemu-0.9.1.orig/debian/patches/91_security.patch
++++ qemu-0.9.1/debian/patches/91_security.patch
+@@ -0,0 +1,134 @@
++Patch based on commit 6677 of upstream SVN. It fixes CVE-2008-0928.
++
++diff -Nurdp qemu-0.9.1.orig/block.c qemu-0.9.1/block.c
++--- qemu-0.9.1.orig/block.c    2009-05-03 13:50:53.000000000 +0200
+++++ qemu-0.9.1/block.c 2009-05-03 14:09:42.000000000 +0200
++@@ -312,6 +312,7 @@ int bdrv_file_open(BlockDriverState **pb
++         bdrv_delete(bs);
++         return ret;
++     }
+++    bs->growable = 1;
++     *pbs = bs;
++     return 0;
++ }
++@@ -496,6 +497,39 @@ int bdrv_commit(BlockDriverState *bs)
++     return 0;
++ }
++ 
+++static int bdrv_check_byte_request(BlockDriverState *bs, int64_t offset,
+++                                   size_t size)
+++{
+++    int64_t len;
+++
+++    if (!bdrv_is_inserted(bs))
+++        return -ENOMEDIUM;
+++
+++    if (bs->growable)
+++        return 0;
+++
+++    len = bdrv_getlength(bs);
+++
+++    if ((offset + size) > len)
+++        return -EIO;
+++
+++    return 0;
+++}
+++
+++static int bdrv_check_request(BlockDriverState *bs, int64_t sector_num,
+++                              int nb_sectors)
+++{
+++    int64_t offset;
+++
+++    /* Deal with byte accesses */
+++    if (sector_num < 0)
+++        offset = -sector_num;
+++    else
+++        offset = sector_num * 512;
+++
+++    return bdrv_check_byte_request(bs, offset, nb_sectors * 512);
+++}
+++
++ /* return < 0 if error. See bdrv_write() for the return codes */
++ int bdrv_read(BlockDriverState *bs, int64_t sector_num,
++               uint8_t *buf, int nb_sectors)
++@@ -504,6 +538,8 @@ int bdrv_read(BlockDriverState *bs, int6
++ 
++     if (!drv)
++         return -ENOMEDIUM;
+++    if (bdrv_check_request(bs, sector_num, nb_sectors))
+++        return -EIO;
++ 
++     if (sector_num == 0 && bs->boot_sector_enabled && nb_sectors > 0) {
++             memcpy(buf, bs->boot_sector_data, 512);
++@@ -547,6 +583,8 @@ int bdrv_write(BlockDriverState *bs, int
++         return -EACCES;
++     if (sector_num < 0)
++         return -EINVAL;
+++    if (bdrv_check_request(bs, sector_num, nb_sectors))
+++        return -EIO;
++     if (sector_num == 0 && bs->boot_sector_enabled && nb_sectors > 0) {
++         memcpy(bs->boot_sector_data, buf, 512);
++     }
++@@ -676,6 +714,9 @@ int bdrv_pread(BlockDriverState *bs, int
++ 
++     if (!drv)
++         return -ENOMEDIUM;
+++    if (bdrv_check_byte_request(bs, offset, count1))
+++        return -EIO;
+++
++     if (!drv->bdrv_pread)
++         return bdrv_pread_em(bs, offset, buf1, count1);
++     return drv->bdrv_pread(bs, offset, buf1, count1);
++@@ -691,6 +732,9 @@ int bdrv_pwrite(BlockDriverState *bs, in
++ 
++     if (!drv)
++         return -ENOMEDIUM;
+++    if (bdrv_check_byte_request(bs, offset, count1))
+++        return -EIO;
+++
++     if (!drv->bdrv_pwrite)
++         return bdrv_pwrite_em(bs, offset, buf1, count1);
++     return drv->bdrv_pwrite(bs, offset, buf1, count1);
++@@ -959,6 +1003,9 @@ int bdrv_write_compressed(BlockDriverSta
++         return -ENOMEDIUM;
++     if (!drv->bdrv_write_compressed)
++         return -ENOTSUP;
+++    if (bdrv_check_request(bs, sector_num, nb_sectors))
+++        return -EIO;
+++
++     return drv->bdrv_write_compressed(bs, sector_num, buf, nb_sectors);
++ }
++ 
++@@ -1105,6 +1152,8 @@ BlockDriverAIOCB *bdrv_aio_read(BlockDri
++ 
++     if (!drv)
++         return NULL;
+++    if (bdrv_check_request(bs, sector_num, nb_sectors))
+++        return NULL;
++ 
++     /* XXX: we assume that nb_sectors == 0 is suppored by the async read */
++     if (sector_num == 0 && bs->boot_sector_enabled && nb_sectors > 0) {
++@@ -1136,6 +1185,9 @@ BlockDriverAIOCB *bdrv_aio_write(BlockDr
++         return NULL;
++     if (bs->read_only)
++         return NULL;
+++    if (bdrv_check_request(bs, sector_num, nb_sectors))
+++        return NULL;
+++
++     if (sector_num == 0 && bs->boot_sector_enabled && nb_sectors > 0) {
++         memcpy(bs->boot_sector_data, buf, 512);
++     }
++Les fichiers binaires qemu-0.9.1.orig/.block.c.swp et qemu-0.9.1/.block.c.swp sont différents.
++diff -Nurdp qemu-0.9.1.orig/block_int.h qemu-0.9.1/block_int.h
++--- qemu-0.9.1.orig/block_int.h    2008-01-06 20:38:42.000000000 +0100
+++++ qemu-0.9.1/block_int.h 2009-05-03 13:57:46.000000000 +0200
++@@ -124,6 +124,9 @@ struct BlockDriverState {
++     uint64_t rd_ops;
++     uint64_t wr_ops;
++ 
+++    /* Whether the disk can expand beyond total_sectors */
+++    int growable;
+++
++     /* NOTE: the following infos are only hints for real hardware
++        drivers. They are not used by the block driver */
++     int cyls, heads, secs, translation;
+

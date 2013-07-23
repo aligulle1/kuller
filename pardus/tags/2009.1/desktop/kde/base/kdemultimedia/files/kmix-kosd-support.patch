@@ -1,0 +1,114 @@
+Index: kdemultimedia-4.3.4/kmix/kmix.cpp
+===================================================================
+--- kdemultimedia-4.3.4.orig/kmix/kmix.cpp
++++ kdemultimedia-4.3.4/kmix/kmix.cpp
+@@ -79,6 +79,7 @@ KMixWindow::KMixWindow(bool invisible)
+     // disable delete-on-close because KMix might just sit in the background waiting for cards to be plugged in
+     setAttribute(Qt::WA_DeleteOnClose, false);
+ 
++   chooseOSDMethod();
+    initActions(); // init actions first, so we can use them in the loadConfig() already
+    loadConfig(); // Load config before initMixer(), e.g. due to "MultiDriver" keyword
+    initWidgets();
+@@ -96,13 +97,17 @@ KMixWindow::KMixWindow(bool invisible)
+    connect( kapp, SIGNAL( aboutToQuit()), SLOT( saveConfig()) );
+ }
+ 
+-
+ KMixWindow::~KMixWindow()
+ {
+    clearMixerWidgets();
+    MixerToolBox::instance()->deinitMixer();
+ }
+ 
++void KMixWindow::chooseOSDMethod()
++{
++  m_kOSDInterface = new QDBusInterface("org.kde.kosd", "/MainApplication", "org.kde.kosd.KOSD");
++  m_useKOSD = m_kOSDInterface->isValid()?true:false;
++}
+ 
+ void KMixWindow::initActions()
+ {
+@@ -641,24 +646,36 @@ void KMixWindow::showVolumeDisplay()
+   Mixer* mixer = Mixer::getGlobalMasterMixer();
+   MixDevice *md = Mixer::getGlobalMasterMD();
+   int currentVolume = mixer->volume(md->id());
++  QString icon = QString("audio-volume-high");
++
+   if (md->isMuted()) {
+     currentVolume = 0;
++    icon = QString("audio-volume-muted");
+   }
+-  volumeDisplay->setValue(currentVolume);
+-  volumeDisplay->show();
+ 
+-  //FIXME, how to get this to work before it is displayed for the first time?
+-  QDesktopWidget* desktop = KApplication::kApplication()->desktop();
+-  //Getting QRect of the screen where cursor is positioned
+-  QRect rect = desktop->screenGeometry(QCursor::pos());
+-  int width = (rect.width()/2) - (volumeDisplay->width()/2);
+-  int height = (rect.height()/2) - (volumeDisplay->height()/2);
+-  width += rect.x();
+-  height += rect.y();
+-  volumeDisplay->move(width, height);
++  if (m_useKOSD)
++    m_kOSDInterface->call("showCustom", icon, "", currentVolume);
+ 
+-  volumeDisplayTimer->setInterval(2000);
+-  volumeDisplayTimer->start();
++  else {
++
++      // Message not queued succesfully, fallback to the native OSD
++
++      volumeDisplay->setValue(currentVolume);
++      volumeDisplay->show();
++
++      //FIXME, how to get this to work before it is displayed for the first time?
++      QDesktopWidget* desktop = KApplication::kApplication()->desktop();
++      //Getting QRect of the screen where cursor is positioned
++      QRect rect = desktop->screenGeometry(QCursor::pos());
++      int width = (rect.width()/2) - (volumeDisplay->width()/2);
++      int height = (rect.height()/2) - (volumeDisplay->height()/2);
++      width += rect.x();
++      height += rect.y();
++      volumeDisplay->move(width, height);
++
++      volumeDisplayTimer->setInterval(2000);
++      volumeDisplayTimer->start();
++  }
+ }
+ 
+ void KMixWindow::slotHideVolumeDisplay()
+Index: kdemultimedia-4.3.4/kmix/kmix.h
+===================================================================
+--- kdemultimedia-4.3.4.orig/kmix/kmix.h
++++ kdemultimedia-4.3.4/kmix/kmix.h
+@@ -31,6 +31,7 @@ class QLabel;
+ #include <QVBoxLayout>
+ #include <QProgressBar>
+ #include <QTimer>
++#include <QDBusInterface>
+ class KTabWidget;
+ 
+ // KDE
+@@ -68,6 +69,7 @@ KMixWindow : public KXmlGuiWindow
+    void initActions();
+    void recreateGUI();
+    void initWidgets();
++   void chooseOSDMethod();
+    //void setErrorMixerWidget();
+ 
+    void clearMixerWidgets();
+@@ -105,8 +107,12 @@ KMixWindow : public KXmlGuiWindow
+ //   bool m_isVisible;
+    bool m_visibilityUpdateAllowed;
+    bool m_multiDriverMode;         // Not officially supported.
++   bool m_useKOSD;
+    Qt::Orientation m_toplevelOrientation;
+ 
++   /* For KOSD interaction */
++   QDBusInterface *m_kOSDInterface;
++
+    KTabWidget *m_wsMixers;
+    KMixPrefDlg *m_prefDlg;
+    KMixDockWidget *m_dockWidget;

@@ -1,0 +1,172 @@
+--- konversation-1.0.1-orig/po/tr/konversation.po	2006-11-10 16:43:09.000000000 +0200
++++ konversation-1.0.1/po/tr/konversation.po	2006-11-12 08:41:16.000000000 +0200
+@@ -6993,6 +6993,77 @@
+ msgid "Server:"
+ msgstr "Sunucu:"
+ 
++#. i18n: file ./scripts/media:32
++msgid "$title by $artist (eponymous)"
++msgstr ""
++
++#. i18n: file ./scripts/media:33
++msgid "${artist}'s self-titled album"
++msgstr ""
++
++#. i18n: file ./scripts/media:34
++msgid "$title by $artist on $album"
++msgstr "$album albümündeki $title by $artist"
++
++#. i18n: file ./scripts/media:35
++msgid "$title by $artist"
++msgstr ""
++
++#. i18n: file ./scripts/media:36
++msgid "$title from $album"
++msgstr "$album albümündeki $title"
++
++#. i18n: file ./scripts/media:37
++msgid "$album by $artist"
++msgstr "$album by $artist"
++
++#. i18n: file ./scripts/media:38
++msgid "$title"
++msgstr "$title"
++
++#. i18n: file ./scripts/media:39
++msgid "$artist"
++msgstr "$artist"
++
++#. i18n: file ./scripts/media:40
++msgid "$album"
++msgstr "$album"
++
++#. i18n: file ./scripts/media:45
++msgid "is listening to"
++msgstr "dinliyor:"
++
++#. i18n: file ./scripts/media:45
++msgid "is watching"
++msgstr "izliyor:"
++
++#. i18n: file ./scripts/media:80
++msgid "This script is intended to be run from within Konversation."
++msgstr "Bu betik Konversation içinden çalıştırılmak içindir."
++
++#. i18n: file ./scripts/media:84
++msgid "The media script requires Python 2.4."
++msgstr "Bu betik Python 2.4 gerektirir."
++
++#. i18n: file ./scripts/media:194
++msgid "is listening"
++msgstr "dinliyor:"
++
++#. i18n: file ./scripts/media:288
++#, python-format
++msgid "Nothing is playing in %s."
++msgstr "%s çalıcısı boşta."
++
++#. i18n: file ./scripts/media:290
++#, python-format
++msgid "No%splayers are running."
++msgstr "Hiç%sçalıcı çalışmıyor."
++
++#. i18n: file ./scripts/media:308
++#, python-format
++msgid "%s is not a supported player."
++msgstr "%s desteklenen bir çalıcı değil."
++
+ #~ msgid "%1%2 is %3%4."
+ #~ msgstr "%1%2 %3%4 olarak tanımlı"
+ 
+--- konversation-1.0.1/konversation/scripts/media	2007-01-05 00:48:15.584573272 +0200
++++ konversation-1.0.1/konversation/scripts/media	2007-01-05 00:51:58.695906004 +0200
+@@ -15,6 +15,10 @@
+ # Title, artist, and album will be set once the player is queried.
+ # See Player.format() for how these are used.
+ 
++import gettext
++gettext.bindtextdomain('konversation', '/usr/kde/3.5/share/locale')
++gettext.textdomain('konversation')
++_ = gettext.lgettext
+ 
+ #Changing these 3 values will likely cause the script to fail
+ Title =4
+@@ -22,23 +26,23 @@
+ Album =1
+ 
+ #To disable self-titled (eponymous) checking, subtract 8
+-SelfTitled=11
++SelfTitled=3
+ 
+ outputFormat="/me $intro $info [$player]"
+ formatStrings = {
+-    Title+SelfTitled   : "$title by $artist (eponymous)",
+-    SelfTitled         : "${artist}'s self-titled album",
+-    Title+Artist+Album : "$title by $artist on $album", #7,15
+-    Title+Artist       : "$title by $artist", #6,14
+-    Title+Album        : "$title from $album", #5,13
+-    Album+Artist       : "$album by $artist", #3,11
+-    Title              : "$title", #4,12
+-    Artist             : "$artist", #2,10
+-    Album              : "$album", #1,9
++    Title+SelfTitled   : _("$title by $artist (eponymous)"),
++    SelfTitled         : _("${artist}'s self-titled album"),
++    Title+Artist+Album : _("$title by $artist on $album"), #7,15
++    Title+Artist       : _("$title by $artist"), #6,14
++    Title+Album        : _("$title from $album"), #5,13
++    Album+Artist       : _("$album by $artist"), #3,11
++    Title              : _("$title"), #4,12
++    Artist             : _("$artist"), #2,10
++    Album              : _("$album"), #1,9
+ }
+ 
+ #Intro defaults to first type the player supports when a specific type was not demanded
+-formatVariables={'audio': 'is listening to', 'video': 'is watching'}
++formatVariables={'audio': _('is listening to'), 'video': _('is watching')}
+ 
+ ## Static player ranking list
+ ## If you add a new player, you must add it here or it won't get checked when in audio-only or video-only modes.
+@@ -74,11 +78,11 @@
+     IRC_SERVER = sys.argv[2]
+     TARGET = sys.argv[3]
+ except IndexError:
+-    print >>sys.stderr, "This script is intended to be run from within Konversation."
++    print >>sys.stderr, _("This script is intended to be run from within Konversation.")
+     sys.exit(0)
+ 
+ if (sys.hexversion >> 16) < 0x0204:
+-    err="The media script requires Python 2.4."
++    err=_("The media script requires Python 2.4.")
+     os.popen('dcop %s default error "%s"' %(APP_ID,err))
+     sys.exit(err)
+ 
+@@ -188,7 +192,7 @@
+             s.append(album)
+         else:
+             l.pop()
+-        t=["is listening"]
++        t=[_("is listening")]
+         while l:
+             t.append(l.pop(0))
+             t.append(s.pop(0))
+@@ -304,9 +308,9 @@
+     x=any([i.running for i in playerList])
+     if x:
+         l=[i.displayName for i in playerList if i.isRunning()]
+-        err= "Nothing is playing in %s."%(', '.join(l))
++        err= _("Nothing is playing in %s.")%(', '.join(l))
+     else:
+-        err= "No%splayers are running."%(kind,)
++        err= _("No%splayers are running.")%(kind,)
+     tell(err,'error')
+ 
+ def run(kind):
+@@ -324,7 +328,7 @@
+             try:
+                 kind=play[0].displayName
+             except IndexError:
+-                tell("%s is not a supported player."%(kind,),'error')
++                tell(_("%s is not a supported player.")%(kind,),'error')
+                 sys.exit(0)
+ 
+     if not playing(play, kind):

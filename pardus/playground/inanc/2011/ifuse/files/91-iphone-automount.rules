@@ -1,0 +1,11 @@
+#Detect type of iPhoneOS it is
+SUBSYSTEM=="usb", ENV{PRODUCT}=="5ac/129[13]/*", ENV{INTERFACE}=="255/*", ENV{dir_name}="ipod"
+SUBSYSTEM=="usb", ENV{PRODUCT}=="5ac/129[024]/*", ENV{INTERFACE}=="255/*", ENV{dir_name}="iphone"
+SUBSYSTEM=="usb", ATTR{idVendor}=="05ac", ATTR{idProduct}=="129[13]", ENV{dir_name}="ipod"
+SUBSYSTEM=="usb", ATTR{idVendor}=="05ac", ATTR{idProduct}=="129[024]", ENV{dir_name}="iphone"
+
+ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="05ac", ATTR{idProduct}=="129[0-9]", RUN+="/bin/mkdir -p '/media/%E{dir_name}'", RUN+="/usr/bin/ifuse '/media/%E{dir_name}' -u '%s{serial}' -o sync,allow_other"
+
+ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="05ac", ATTR{idProduct}=="129[0-9]", RUN+="/bin/mkdir -p '/media/iphone-root'", RUN+="/usr/bin/ifuse --root '/media/iphone-root' -u '%s{serial}' -o sync,allow_other"
+
+ACTION=="remove", SUBSYSTEM=="usb", ENV{PRODUCT}=="5ac/129[0-9]/*", ENV{INTERFACE}=="255/*", RUN+="/bin/umount -l '/media/%E{dir_name}'", RUN+="/bin/rmdir '/media/%E{dir_name}'"

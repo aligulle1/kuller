@@ -1,0 +1,235 @@
+Gcc 4.3 may not set memory size correctly on x86 when inlining string
+functions.  As the result, scheduler may move insns around and
+generate wrong code.  This backport works for me.  OK for 4.3?
+
+Thanks.
+
+
+H.J.
+----
+gcc/
+
+2009-01-19  H.J. Lu  <hongjiu.lu@intel.com>
+
+	Backport from mainline:
+	2008-12-23  Jakub Jelinek  <jakub@redhat.com>
+
+	* config/i386/i386.c (expand_movmem_via_rep_mov): Set MEM_SIZE
+	correctly.
+	(expand_setmem_via_rep_stos): Add ORIG_VALUE argument.  If
+	ORIG_VALUE is const0_rtx and COUNT is constant, set MEM_SIZE
+	on DESTMEM.
+	(ix86_expand_setmem): Adjust callers.
+
+gcc/testsuite/
+
+2009-01-19  Kees Cook  <kees@ubuntu.com>
+	    H.J. Lu  <hongjiu.lu@intel.com>
+
+	* gcc.dg/pr38902.c: New.
+
+--- gcc/config/i386/i386.c.size	2008-11-05 09:42:10.000000000 -0800
++++ gcc/config/i386/i386.c	2009-01-19 11:57:41.000000000 -0800
+@@ -14773,6 +14773,22 @@ expand_movmem_via_rep_mov (rtx destmem, 
+       destexp = gen_rtx_PLUS (Pmode, destptr, countreg);
+       srcexp = gen_rtx_PLUS (Pmode, srcptr, countreg);
+     }
++  if (CONST_INT_P (count))
++    {
++      count = GEN_INT (INTVAL (count)
++		       & ~((HOST_WIDE_INT) GET_MODE_SIZE (mode) - 1));
++      destmem = shallow_copy_rtx (destmem);
++      srcmem = shallow_copy_rtx (srcmem);
++      set_mem_size (destmem, count);
++      set_mem_size (srcmem, count);
++    }
++  else
++    {
++      if (MEM_SIZE (destmem))
++	set_mem_size (destmem, NULL_RTX);
++      if (MEM_SIZE (srcmem))
++	set_mem_size (srcmem, NULL_RTX);
++    }
+   emit_insn (gen_rep_mov (destptr, destmem, srcptr, srcmem, countreg,
+ 			  destexp, srcexp));
+ }
+@@ -14781,8 +14797,8 @@ expand_movmem_via_rep_mov (rtx destmem, 
+    Arguments have same meaning as for previous function */
+ static void
+ expand_setmem_via_rep_stos (rtx destmem, rtx destptr, rtx value,
+-			    rtx count,
+-			    enum machine_mode mode)
++			    rtx count, enum machine_mode mode,
++			    rtx orig_value)
+ {
+   rtx destexp;
+   rtx countreg;
+@@ -14799,6 +14815,15 @@ expand_setmem_via_rep_stos (rtx destmem,
+     }
+   else
+     destexp = gen_rtx_PLUS (Pmode, destptr, countreg);
++  if (orig_value == const0_rtx && CONST_INT_P (count))
++    {
++      count = GEN_INT (INTVAL (count)
++		       & ~((HOST_WIDE_INT) GET_MODE_SIZE (mode) - 1));
++      destmem = shallow_copy_rtx (destmem);
++      set_mem_size (destmem, count);
++    }
++  else if (MEM_SIZE (destmem))
++    set_mem_size (destmem, NULL_RTX);
+   emit_insn (gen_rep_stos (destptr, countreg, destmem, value, destexp));
+ }
+ 
+@@ -15871,15 +15896,15 @@ ix86_expand_setmem (rtx dst, rtx count_e
+       break;
+     case rep_prefix_8_byte:
+       expand_setmem_via_rep_stos (dst, destreg, promoted_val, count_exp,
+-				  DImode);
++				  DImode, val_exp);
+       break;
+     case rep_prefix_4_byte:
+       expand_setmem_via_rep_stos (dst, destreg, promoted_val, count_exp,
+-				  SImode);
++				  SImode, val_exp);
+       break;
+     case rep_prefix_1_byte:
+       expand_setmem_via_rep_stos (dst, destreg, promoted_val, count_exp,
+-				  QImode);
++				  QImode, val_exp);
+       break;
+     }
+   /* Adjust properly the offset of src and dest memory for aliasing.  */
+--- gcc/testsuite/gcc.dg/pr38902.c.size	2009-01-19 12:20:02.000000000 -0800
++++ gcc/testsuite/gcc.dg/pr38902.c	2009-01-19 12:19:34.000000000 -0800
+@@ -0,0 +1,131 @@
++/* PR target/38902 */
++/* { dg-do run } */
++/* { dg-options "-O2 -fstack-protector" } */
++/* { dg-require-effective-target fstack_protector } */
++
++#ifdef DEBUG
++#include <stdio.h>
++#define debug(format, args...) printf (format , ## args)
++#else
++extern int sprintf (char *, const char *, ...);
++#define debug(format, args...)
++#endif
++
++extern void abort (void);
++
++/*
++
++Copyright (C) 2009 Canonical, Ltd.
++Author: Kees Cook <kees@ubuntu.com>
++License: GPLv3
++
++http://gcc.gnu.org/bugzilla/show_bug.cgi?id=38616
++https://bugs.launchpad.net/ubuntu/+source/gcc-4.3/+bug/316019
++http://gcc.gnu.org/bugzilla/show_bug.cgi?id=38902
++
++gcc -O2 -fstack-protector truncate.c -o truncate
++
++    Broken:
++
++        Only the first operation fails, so create a new function for each test.
++        Source must be local (literal or stack)
++
++        __builtin_memmove
++        __builtin_memcpy
++        __builtin_strcpy  (optimized to __builtin_memcpy?)
++        sprintf (direct)  (optmized to __builtin_strcpy?)
++        sprintf (via %s)  (optmized to __builtin_strcpy?)
++
++    OK:
++        __builtin_strcat
++        sprintf (complex format)
++
++ */
++
++char *heap = "1234567890abcdefghijklmnopqrstuvwxyz";
++
++int failed = 0;
++
++#define CHECK(count, a...) \
++void test##count (void) \
++{ \
++  char *local = "1234567890abcdefghijklmnopqrstuvwxyz"; \
++  char buffer[1024]=""; \
++    a; \
++    if (__builtin_strcmp(buffer, heap) == 0) { \
++        debug("Okay(%d):\n\t%s\n", count, # a); \
++    } \
++    else { \
++        debug("Failed(%d):\n\t%s\n", count, # a); \
++	failed++; \
++    } \
++}
++
++
++CHECK( 0, __builtin_memcpy (buffer, "1234567890abcdefghijklmnopqrstuvwxyz", __builtin_strlen("1234567890abcdefghijklmnopqrstuvwxyz")+1);                                        );
++CHECK( 1, __builtin_memcpy (buffer, local, __builtin_strlen(local)+1);                );
++CHECK( 2, __builtin_memcpy (buffer, heap, __builtin_strlen(heap)+1);                );
++
++CHECK( 3, __builtin_memmove (buffer, "1234567890abcdefghijklmnopqrstuvwxyz", __builtin_strlen("1234567890abcdefghijklmnopqrstuvwxyz")+1);                                       );
++CHECK( 4, __builtin_memmove (buffer, local, __builtin_strlen(local)+1);               );
++CHECK( 5, __builtin_memmove (buffer, heap, __builtin_strlen(heap)+1);               );
++
++CHECK( 6, __builtin_strcpy (buffer, "1234567890abcdefghijklmnopqrstuvwxyz");          );
++CHECK( 7, __builtin_strcpy (buffer, local);                                      );
++CHECK( 8, __builtin_strcpy (buffer, heap);                                      );
++
++CHECK( 9,  sprintf (buffer, "1234567890abcdefghijklmnopqrstuvwxyz");         );
++CHECK(10,  sprintf (buffer, local);                                     );
++CHECK(11,  sprintf (buffer, heap);                                     );
++
++CHECK(12,  sprintf (buffer, "%s", "1234567890abcdefghijklmnopqrstuvwxyz");   );
++CHECK(13,  sprintf (buffer, "%s", local);                               );
++CHECK(14,  sprintf (buffer, "%s", heap);                               );
++
++CHECK(15, __builtin_strcat (buffer, "1234567890abcdefghijklmnopqrstuvwxyz");          );
++CHECK(16, __builtin_strcat (buffer, local);                                      );
++CHECK(17, __builtin_strcat (buffer, heap);                                       );
++
++void mongoose(void)
++{
++  char buffer[1024]="";
++  sprintf (buffer, "%s", "1234567890abcdefghijklmnopqrstuvwxyz");;
++    if (__builtin_strcmp(buffer, heap) == 0) {
++        debug("Okay(%d):\n\t%s\n", -1, "sprintf (buffer, \"%s\", \"1234567890abcdefghijklmnopqrstuvwxyz\");");
++    }
++    else {
++        debug("Failed(%d):\n\t%s\n", -1, "sprintf (buffer, \"%s\", \"1234567890abcdefghijklmnopqrstuvwxyz\");");
++	failed++;
++    }
++}
++
++int main (int argc, char *argv[])
++{
++  test0();
++  test1();
++  test2();
++  test3();
++  test4();
++  test5();
++  test6();
++  test7();
++  test8();
++  test9();
++  test10();
++  test11();
++
++  // wtf, why are these different?!
++  test12();
++  mongoose();
++
++  test13();
++  test14();
++  test15();
++  test16();
++  test17();
++
++  if (failed)
++    abort ();
++
++  return 0;
++}

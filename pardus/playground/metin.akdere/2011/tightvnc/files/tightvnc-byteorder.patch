@@ -1,0 +1,54 @@
+--- vnc_unixsrc.orig/vncviewer/colour.c
++++ vnc_unixsrc/vncviewer/colour.c
+@@ -102,7 +102,7 @@
+     myFormat.bitsPerPixel = visbpp;
+     myFormat.depth = visdepth;
+     myFormat.trueColour = 1;
+-    myFormat.bigEndian = (ImageByteOrder(dpy) == MSBFirst);
++    myFormat.bigEndian = (__BYTE_ORDER == __BIG_ENDIAN);
+     myFormat.redShift = ffs(vis->red_mask) - 1;
+     myFormat.greenShift = ffs(vis->green_mask) - 1;
+     myFormat.blueShift = ffs(vis->blue_mask) - 1;
+--- vnc_unixsrc.orig/vncviewer/desktop.c
++++ vnc_unixsrc/vncviewer/desktop.c
+@@ -98,6 +98,7 @@
+ 			 BitmapPad(dpy), 0);
+ 
+     image->data = malloc(image->bytes_per_line * image->height);
++    image->byte_order = (__BYTE_ORDER == __BIG_ENDIAN);
+     if (!image->data) {
+       fprintf(stderr,"malloc failed\n");
+       exit(1);
+--- vnc_unixsrc.orig/vncviewer/vncviewer.h
++++ vnc_unixsrc/vncviewer/vncviewer.h
+@@ -30,6 +30,8 @@
+ #include <sys/types.h>
+ #include <unistd.h>
+ #include <pwd.h>
++#include <endian.h>
++#include <byteswap.h>
+ #include <X11/IntrinsicP.h>
+ #include <X11/StringDefs.h>
+ #include <X11/Shell.h>
+@@ -42,14 +44,13 @@
+ 
+ extern int endianTest;
+ 
+-#define Swap16IfLE(s) \
+-    (*(char *)&endianTest ? ((((s) & 0xff) << 8) | (((s) >> 8) & 0xff)) : (s))
+-
+-#define Swap32IfLE(l) \
+-    (*(char *)&endianTest ? ((((l) & 0xff000000) >> 24) | \
+-			     (((l) & 0x00ff0000) >> 8)  | \
+-			     (((l) & 0x0000ff00) << 8)  | \
+-			     (((l) & 0x000000ff) << 24))  : (l))
++#if __BYTE_ORDER == __LITTLE_ENDIAN
++#define Swap16IfLE(s) bswap_16 (s)
++#define Swap32IfLE(l) bswap_32 (l)
++#else
++#define Swap16IfLE(s) (s)
++#define Swap32IfLE(l) (l)
++#endif
+ 
+ #define MAX_ENCODINGS 20
+ 

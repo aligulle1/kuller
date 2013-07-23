@@ -1,0 +1,19 @@
+--- lightfeather.build	2007-11-23 10:22:19.000000000 +0200
++++ lightfeather2.build	2007-11-23 20:29:16.000000000 +0200
+@@ -352,6 +352,16 @@
+   define MINGW;
+ }
+ 
++if (generator == "autotools" && internal-freetype == "no" ) {
++add raw-autoconf "if [test \"$LF_FT2_DONE\" != \"done\" ]; then";
++add raw-autoconf "  AC_CHECK_FT2";
++add raw-autoconf "  LF_FT2_DONE=\"done\"";
++add raw-autoconf "fi";
++add cflags       "$(FT2_CFLAGS)";
++add cxxflags     "$(FT2_CFLAGS)";
++add ldadd        "$(FT2_LIBS)";
++}
++
+ if (generator == "autotools" && wxcanvas == "yes") {
+   define LF_HAVE_WX = "1";
+   add raw-autoconf "if [test \"$wxcanvas\" == \"yes\" ]; then";

@@ -1,0 +1,59 @@
+diff -Nur AssaultCube-old/source/src/server.cpp AssaultCube/source/src/server.cpp
+--- AssaultCube-old/source/src/server.cpp	2007-06-10 23:10:20.380911399 +0300
++++ AssaultCube/source/src/server.cpp	2007-06-10 23:11:17.578216087 +0300
+@@ -762,6 +762,7 @@
+ ENetPacket *getmapserv(int n)
+ {
+     if(!copydata) return NULL;
++    if (strcmp(behindpath(smapname), behindpath(copyname))) return NULL;
+     ENetPacket *packet = enet_packet_create(NULL, MAXTRANS + copysize, ENET_PACKET_FLAG_RELIABLE);
+     ucharbuf p(packet->data, packet->dataLength);
+     putint(p, SV_RECVMAP);
+diff -Nur AssaultCube-old/source/src/tools.cpp AssaultCube/source/src/tools.cpp
+--- AssaultCube-old/source/src/tools.cpp	2007-06-10 23:10:20.378911703 +0300
++++ AssaultCube/source/src/tools.cpp	2007-06-10 23:11:17.578216087 +0300
+@@ -29,6 +29,13 @@
+     return s;
+ }
+ 
++char *behindpath(char *s)
++{
++    char *t = s;
++    for( ; (s = strpbrk(s, "/\\")); t = ++s);
++    return t;
++};
++
+ char *parentdir(char *directory)
+ {
+     char *p = strrchr(directory, '/');
+diff -Nur AssaultCube-old/source/src/tools.h AssaultCube/source/src/tools.h
+--- AssaultCube-old/source/src/tools.h	2007-06-10 23:10:20.379911551 +0300
++++ AssaultCube/source/src/tools.h	2007-06-10 23:11:17.579215935 +0300
+@@ -103,6 +103,7 @@
+ 
+ 
+ extern char *path(char *s);
++extern char *behindpath(char *s);
+ extern char *parentdir(char *directory);
+ extern char *loadfile(char *fn, int *size);
+ extern bool cmpb(void *b, int n, enet_uint32 c);
+diff -Nur AssaultCube-old/source/src/worldio.cpp AssaultCube/source/src/worldio.cpp
+--- AssaultCube-old/source/src/worldio.cpp	2007-06-10 23:10:20.379911551 +0300
++++ AssaultCube/source/src/worldio.cpp	2007-06-10 23:11:17.579215935 +0300
+@@ -207,6 +207,7 @@
+ }
+ 
+ extern void preparectf(bool cleanonly = false);
++extern void getmap();
+ 
+ void load_world(char *mname)        // still supports all map formats that have existed since the earliest cube betas!
+ {
+@@ -216,7 +217,7 @@
+     pruneundos();
+     setnames(mname);
+     gzFile f = gzopen(cgzname, "rb9");
+-    if(!f) { conoutf("could not read map %s", cgzname); return; }
++    if(!f) { conoutf("could not read map %s", cgzname); getmap(); return; }
+ 	loadingscreen();
+     gzread(f, &hdr, sizeof(header)-sizeof(int)*16);
+     endianswap(&hdr.version, sizeof(int), 4);

@@ -1,0 +1,44 @@
+--- Makefile.in~	2004-08-03 02:20:09.000000000 +0300
++++ Makefile.in	2008-01-11 16:06:57.000000000 +0200
+@@ -176,7 +176,7 @@
+ povlibdir = @datadir@/@PACKAGE@-@VERSION_BASE@
+ povdocdir = @datadir@/doc/@PACKAGE@-@VERSION_BASE@
+ povconfdir = @sysconfdir@/@PACKAGE@/@VERSION_BASE@
+-povconfuser = $(HOME)/.@PACKAGE@/@VERSION_BASE@
++povconfuser = $(DESTDIR)/etc/@PACKAGE@/@VERSION_BASE@
+ 
+ # Directories to build.
+ SUBDIRS = libraries source unix
+@@ -534,7 +534,7 @@
+ 
+ distdir: $(DISTFILES)
+ 	$(am__remove_distdir)
+-	mkdir $(distdir)
++	mkdir $(DESTDIR)$(distdir)
+ 	$(mkinstalldirs) $(distdir)/config
+ 	@srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`; \
+ 	topsrcdirstrip=`echo "$(top_srcdir)" | sed 's|.|.|g'`; \
+@@ -564,8 +564,8 @@
+ 	done
+ 	list='$(SUBDIRS)'; for subdir in $$list; do \
+ 	  if test "$$subdir" = .; then :; else \
+-	    test -d $(distdir)/$$subdir \
+-	    || mkdir $(distdir)/$$subdir \
++	    test -d $(DESTDIR)$(distdir)/$$subdir \
++	    || mkdir $(DESTDIR)$(distdir)/$$subdir \
+ 	    || exit 1; \
+ 	    (cd $$subdir && \
+ 	      $(MAKE) $(AM_MAKEFLAGS) \
+@@ -603,9 +603,9 @@
+ 	$(am__remove_distdir)
+ 	GZIP=$(GZIP_ENV) gunzip -c $(distdir).tar.gz | $(AMTAR) xf -
+ 	chmod -R a-w $(distdir); chmod a+w $(distdir)
+-	mkdir $(distdir)/_build
+-	mkdir $(distdir)/_inst
+-	chmod a-w $(distdir)
++	mkdir $(DESTDIR)$(distdir)/_build
++	mkdir $(DESTDIR)$(distdir)/_inst
++	chmod a-w $(DESTDIR)$(distdir)
+ 	dc_install_base=`$(am__cd) $(distdir)/_inst && pwd | sed -e 's,^[^:\\/]:[\\/],/,'` \
+ 	  && dc_destdir="$${TMPDIR-/tmp}/am-dc-$$$$/" \
+ 	  && cd $(distdir)/_build \

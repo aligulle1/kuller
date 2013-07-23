@@ -1,0 +1,220 @@
+Index: colibri-0.1.1_20100518/kcm/controlmodule.ui
+===================================================================
+--- colibri-0.1.1_20100518.orig/kcm/controlmodule.ui
++++ colibri-0.1.1_20100518/kcm/controlmodule.ui
+@@ -6,37 +6,66 @@
+    <rect>
+     <x>0</x>
+     <y>0</y>
+-    <width>400</width>
+-    <height>300</height>
++    <width>679</width>
++    <height>519</height>
+    </rect>
+   </property>
+   <layout class="QVBoxLayout" name="verticalLayout">
+    <item>
+-    <widget class="QLabel" name="label">
++    <widget class="QCheckBox" name="checkBox">
+      <property name="text">
+-      <string>Select the position where the bubble should appear:</string>
++      <string>Override Plasma Notifications</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+-    <layout class="QHBoxLayout" name="horizontalLayout">
+-     <item>
+-      <widget class="Colibri::AlignmentSelector" name="alignmentSelector" native="true"/>
+-     </item>
+-     <item>
+-      <spacer name="horizontalSpacer">
+-       <property name="orientation">
+-        <enum>Qt::Horizontal</enum>
+-       </property>
+-       <property name="sizeHint" stdset="0">
+-        <size>
+-         <width>40</width>
+-         <height>20</height>
+-        </size>
+-       </property>
+-      </spacer>
+-     </item>
+-    </layout>
++    <widget class="QGroupBox" name="groupBox">
++     <property name="enabled">
++      <bool>false</bool>
++     </property>
++     <property name="title">
++      <string>Select the position of notifications</string>
++     </property>
++     <layout class="QGridLayout" name="gridLayout">
++      <item row="0" column="1">
++       <layout class="QHBoxLayout" name="horizontalLayout_2">
++        <item>
++         <layout class="QHBoxLayout" name="horizontalLayout">
++          <item>
++           <widget class="Colibri::AlignmentSelector" name="alignmentSelector" native="true"/>
++          </item>
++         </layout>
++        </item>
++       </layout>
++      </item>
++      <item row="0" column="0">
++       <spacer name="horizontalSpacer">
++        <property name="orientation">
++         <enum>Qt::Horizontal</enum>
++        </property>
++        <property name="sizeHint" stdset="0">
++         <size>
++          <width>40</width>
++          <height>20</height>
++         </size>
++        </property>
++       </spacer>
++      </item>
++      <item row="0" column="2">
++       <spacer name="horizontalSpacer_2">
++        <property name="orientation">
++         <enum>Qt::Horizontal</enum>
++        </property>
++        <property name="sizeHint" stdset="0">
++         <size>
++          <width>40</width>
++          <height>20</height>
++         </size>
++        </property>
++       </spacer>
++      </item>
++     </layout>
++    </widget>
+    </item>
+    <item>
+     <spacer name="verticalSpacer">
+@@ -46,7 +75,7 @@
+      <property name="sizeHint" stdset="0">
+       <size>
+        <width>20</width>
+-       <height>242</height>
++       <height>40</height>
+       </size>
+      </property>
+     </spacer>
+@@ -62,5 +91,22 @@
+   </customwidget>
+  </customwidgets>
+  <resources/>
+- <connections/>
++ <connections>
++  <connection>
++   <sender>checkBox</sender>
++   <signal>clicked(bool)</signal>
++   <receiver>groupBox</receiver>
++   <slot>setEnabled(bool)</slot>
++   <hints>
++    <hint type="sourcelabel">
++     <x>119</x>
++     <y>17</y>
++    </hint>
++    <hint type="destinationlabel">
++     <x>121</x>
++     <y>42</y>
++    </hint>
++   </hints>
++  </connection>
++ </connections>
+ </ui>
+Index: colibri-0.1.1_20100518/kcm/controlmodule.cpp
+===================================================================
+--- colibri-0.1.1_20100518.orig/kcm/controlmodule.cpp
++++ colibri-0.1.1_20100518/kcm/controlmodule.cpp
+@@ -45,7 +45,9 @@ namespace Colibri
+ ControlModule::ControlModule(QWidget* parent, const QVariantList&)
+ : KCModule(ColibriModuleFactory::componentData(), parent)
+ , mConfig(new Config)
++, mPlasmaConfig(new KConfig("plasma-desktop-appletsrc"))
+ , mUi(new Ui::ControlModule)
++, mUseColibri(false)
+ {
+     KAboutData* about = new KAboutData(
+         "colibri", 0, ki18n("Colibri"),
+@@ -60,6 +62,8 @@ ControlModule::ControlModule(QWidget* pa
+ 
+     connect(mUi->alignmentSelector, SIGNAL(changed(Qt::Alignment)),
+         SLOT(updateUnmanagedWidgetChangeState()));
++
++    connect(mUi->checkBox, SIGNAL(stateChanged(int)), SLOT(checkBoxChanged()));
+ }
+ 
+ ControlModule::~ControlModule()
+@@ -68,9 +72,21 @@ ControlModule::~ControlModule()
+     delete mUi;
+ }
+ 
++void ControlModule::checkBoxChanged(int state)
++{
++    mUseColibri = (state == Qt::Checked)?true:false;
++    mPlasmaConfigGroup.writeEntry("ShowNotifications", !mUseColibri);
++}
++
+ void ControlModule::load()
+ {
+     mUi->alignmentSelector->setAlignment(Qt::Alignment(mConfig->alignment()));
++
++    mPlasmaConfigGroup = (mPlasmaConfig->group("AppletGlobals")).group("plasma_applet_systemtray");
++    mUseColibri = !mPlasmaConfigGroup.readEntry("ShowNotifications", true);
++
++    mUi->checkBox->setChecked(mUseColibri);
++
+     KCModule::load();
+ }
+ 
+@@ -78,6 +94,8 @@ void ControlModule::save()
+ {
+     mConfig->setAlignment(int(mUi->alignmentSelector->alignment()));
+     mConfig->writeConfig();
++    mPlasmaConfig->sync();
++
+     KCModule::save();
+ }
+ 
+@@ -97,7 +115,7 @@ void ControlModule::defaults()
+ void ControlModule::updateUnmanagedWidgetChangeState()
+ {
+     int alignment = int(mUi->alignmentSelector->alignment());
+-    unmanagedWidgetChangeState(alignment != mConfig->alignment());
++    unmanagedWidgetChangeState((alignment != mConfig->alignment()) || mUseColibri != !mPlasmaConfigGroup.readEntry("ShowNotifications", true));
+ }
+ 
+ } // namespace
+Index: colibri-0.1.1_20100518/kcm/controlmodule.h
+===================================================================
+--- colibri-0.1.1_20100518.orig/kcm/controlmodule.h
++++ colibri-0.1.1_20100518/kcm/controlmodule.h
+@@ -23,6 +23,8 @@ Foundation, Inc., 51 Franklin Street, Fi
+ 
+ // KDE
+ #include <KCModule>
++#include <KConfig>
++#include <KConfigGroup>
+ 
+ namespace Ui
+ {
+@@ -48,10 +50,16 @@ public Q_SLOTS:
+ 
+ private Q_SLOTS:
+     void updateUnmanagedWidgetChangeState();
+-
++    void checkBoxChanged(int);
+ private:
+     Config* mConfig;
++
++    KConfig* mPlasmaConfig;
++    KConfigGroup mPlasmaConfigGroup;
++
+     Ui::ControlModule* mUi;
++
++    bool mUseColibri;
+ };
+ 
+ } // namespace

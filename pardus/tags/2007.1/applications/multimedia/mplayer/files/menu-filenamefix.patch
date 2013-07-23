@@ -1,0 +1,79 @@
+diff -Nur mplayer-20060923-old/libmenu/menu_filesel.c mplayer-20060923/libmenu/menu_filesel.c
+--- mplayer-20060923-old/libmenu/menu_filesel.c	2006-09-24 19:04:25.824412448 +0300
++++ mplayer-20060923/libmenu/menu_filesel.c	2006-09-24 19:20:58.824453496 +0300
+@@ -78,7 +78,7 @@
+   free(entry);
+ }
+ 
+-static char* replace_path(char* title , char* dir) {
++static char* replace_path(char* title , char* dir , int escape) {
+   char *p = strstr(title,"%p");
+   if(p) {
+     int tl = strlen(title);
+@@ -88,16 +88,28 @@
+     char *r, *n, *d = dir;
+     char term = *(p-1);
+ 
++    if (escape) {
+     do {
+-      if (*d == '\\' || *d == term)
++      if (*d == '\\')
+         l++;
++      else if (*d == '\'') /* ' -> \'\\\'\' */
++        l+=7;
+     } while (*d++);
++    }
+     r = malloc(l + 1);
+     n = r + t1l;
+     memcpy(r,title,t1l);
+     do {
+-      if (*dir == '\\' || *dir == term)
++      if (escape) {
++      if (*dir == '\\')
++        *n++ = '\\';
++      else if (*dir == '\'') { /* ' -> \'\\\'\' */
++        *n++ = '\\'; *n++ = '\'';
++        *n++ = '\\'; *n++ = '\\';
++        *n++ = '\\'; *n++ = '\'';
+         *n++ = '\\';
++      }
++      }
+     } while ((*n++ = *dir++));
+     if(tl - t1l - 2 > 0)
+       strcpy(n-1,p+2);
+@@ -194,7 +206,7 @@
+     free(mpriv->p.title);
+   p = strstr(mpriv->title,"%p");
+ 
+-  mpriv->p.title = replace_path(mpriv->title,mpriv->dir);
++  mpriv->p.title = replace_path(mpriv->title,mpriv->dir,0);
+ 
+   if ((dirp = opendir (mpriv->dir)) == NULL){
+     mp_msg(MSGT_GLOBAL,MSGL_ERR,MSGTR_LIBMENU_OpendirError, strerror(errno));
+@@ -288,7 +300,7 @@
+ 	char filename[fname_len];
+ 	char* str;
+ 	sprintf(filename,"%s%s",mpriv->dir,mpriv->p.current->p.txt);
+-	str = replace_path(mpriv->dir_action,filename);
++	str = replace_path(mpriv->dir_action,filename,1);
+ 	c = mp_input_parse_cmd(str);
+ 	if(str != mpriv->dir_action)
+ 	  free(str);
+@@ -318,7 +330,7 @@
+       char filename[fname_len];
+       char *str;
+       sprintf(filename,"%s%s",mpriv->dir,mpriv->p.current->p.txt);
+-      str = replace_path(mpriv->file_action,filename);
++      str = replace_path(mpriv->file_action,filename,1);
+       c = mp_input_parse_cmd(str);
+       if(str != mpriv->file_action)
+ 	free(str);
+@@ -334,7 +346,7 @@
+     char filename[fname_len];
+     char *str;
+     sprintf(filename,"%s%s",mpriv->dir,mpriv->p.current->p.txt);
+-    str = replace_path(action, filename);
++    str = replace_path(action, filename, 1);
+     mp_input_queue_cmd(mp_input_parse_cmd(str));
+     if(str != action)
+       free(str);

@@ -1,0 +1,29 @@
+diff -p -up mc-4.6.2/src/main.c.homedir mc-4.6.2/src/main.c
+--- mc-4.6.2/src/main.c.homedir	2009-05-22 11:27:11.000000000 -0300
++++ mc-4.6.2/src/main.c	2009-05-22 11:52:10.000000000 -0300
+@@ -2148,6 +2148,8 @@ main (int argc, char *argv[])
+     /* Check whether we have UTF-8 locale */
+     char *lang = getenv("LANG");
+     size_t len = 0;
++    struct stat s;
++    char *mc_dir;
+ 
+     if ( lang )
+ 	len = strlen(lang);
+@@ -2215,6 +2217,16 @@ main (int argc, char *argv[])
+ 
+     init_curses ();
+ 
++    /* create home directory */
++    /* do it after the screen library initialization to show the error message */
++    mc_dir = g_strconcat (home_dir, MC_BASE, (char *) NULL);
++    canonicalize_pathname (mc_dir);
++    if ((stat (mc_dir, &s) != 0) && (errno == ENOENT)
++	&& mkdir (mc_dir, 0755) != 0)
++	message (D_ERROR, _("Warning"),
++		    _("Cannot create %s directory"), mc_dir);
++    g_free (mc_dir);
++
+     init_xterm_support ();
+ 
+ #ifdef HAVE_SUBSHELL_SUPPORT

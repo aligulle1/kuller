@@ -1,0 +1,77 @@
+diff -Nur lyx-1.6.3.orig/config/Makefile.in lyx-1.6.3/config/Makefile.in
+--- lyx-1.6.3.orig/config/Makefile.in	2009-06-03 15:45:51.000000000 +0300
++++ lyx-1.6.3/config/Makefile.in	2009-06-05 13:18:15.000000000 +0300
+@@ -34,7 +34,6 @@
+ DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in \
+ 	$(top_srcdir)/config/common.am config.guess config.rpath \
+ 	config.sub depcomp install-sh ltmain.sh missing mkinstalldirs \
+-	py-compile
+ subdir = config
+ ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
+ am__aclocal_m4_deps = $(top_srcdir)/config/libtool.m4 \
+diff -Nur lyx-1.6.3.orig/config/py-compile lyx-1.6.3/config/py-compile
+--- lyx-1.6.3.orig/config/py-compile	2005-07-15 19:38:59.000000000 +0300
++++ lyx-1.6.3/config/py-compile	2009-06-05 13:24:08.000000000 +0300
+@@ -102,40 +102,6 @@
+     filetrans="filepath = os.path.normpath('$destdir' + os.sep + path)"
+ fi
+ 
+-$PYTHON -c "
+-import sys, os, string, py_compile
+-
+-files = '''$files'''
+-
+-print 'Byte-compiling python modules...'
+-for file in string.split(files):
+-    $pathtrans
+-    $filetrans
+-    if not os.path.exists(filepath) or not (len(filepath) >= 3
+-                                            and filepath[-3:] == '.py'):
+-	continue
+-    print file,
+-    sys.stdout.flush()
+-    py_compile.compile(filepath, filepath + 'c', path)
+-print" || exit $?
+-
+-# this will fail for python < 1.5, but that doesn't matter ...
+-$PYTHON -O -c "
+-import sys, os, string, py_compile
+-
+-files = '''$files'''
+-print 'Byte-compiling python modules (optimized versions) ...'
+-for file in string.split(files):
+-    $pathtrans
+-    $filetrans
+-    if not os.path.exists(filepath) or not (len(filepath) >= 3
+-                                            and filepath[-3:] == '.py'):
+-	continue
+-    print file,
+-    sys.stdout.flush()
+-    py_compile.compile(filepath, filepath + 'o', path)
+-print" 2>/dev/null || :
+-
+ # Local Variables:
+ # mode: shell-script
+ # sh-indentation: 2
+diff -Nur lyx-1.6.3.orig/lib/lyx2lyx/Makefile.in lyx-1.6.3/lib/lyx2lyx/Makefile.in
+--- lyx-1.6.3.orig/lib/lyx2lyx/Makefile.in	2009-06-03 15:45:49.000000000 +0300
++++ lyx-1.6.3/lib/lyx2lyx/Makefile.in	2009-06-05 13:18:27.000000000 +0300
+@@ -70,7 +70,6 @@
+ am__strip_dir = `echo $$p | sed -e 's|^.*/||'`;
+ am__installdirs = "$(DESTDIR)$(lyx2lyxdir)"
+ dist_lyx2lyxPYTHON_INSTALL = $(INSTALL_DATA)
+-py_compile = $(top_srcdir)/config/py-compile
+ DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
+ pkgdatadir = @pkgdatadir@
+ ACLOCAL = @ACLOCAL@
+diff -Nur lyx-1.6.3.orig/lib/Makefile.in lyx-1.6.3/lib/Makefile.in
+--- lyx-1.6.3.orig/lib/Makefile.in	2009-06-03 15:45:49.000000000 +0300
++++ lyx-1.6.3/lib/Makefile.in	2009-06-05 13:18:32.000000000 +0300
+@@ -115,7 +115,6 @@
+ 	"$(DESTDIR)$(uidir)" "$(DESTDIR)$(ukexamplesdir)"
+ dist_pkgdataPYTHON_INSTALL = $(INSTALL_DATA)
+ dist_scriptsPYTHON_INSTALL = $(INSTALL_DATA)
+-py_compile = $(top_srcdir)/config/py-compile
+ dist_bindDATA_INSTALL = $(INSTALL_DATA)
+ dist_caexamplesDATA_INSTALL = $(INSTALL_DATA)
+ dist_commandsDATA_INSTALL = $(INSTALL_DATA)

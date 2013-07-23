@@ -1,0 +1,47 @@
+Index: rsibreak-0.9.0/CMakeLists.txt
+===================================================================
+--- rsibreak-0.9.0.orig/CMakeLists.txt	2009-01-13 14:46:43.000000000 -0500
++++ rsibreak-0.9.0/CMakeLists.txt	2009-01-13 14:47:12.000000000 -0500
+@@ -3,19 +3,13 @@
+ 
+ find_package (KDE4 REQUIRED)
+ include(KDE4Defaults)
+-macro_optional_find_package(Plasma)
+-
+-macro_log_feature(PLASMA_FOUND "Plasma" "Plasma libraries and header files" "http://plasma.kde.org/" FALSE "" "Plasma is needed for Plasma applet of rsibreak. Install kdebase-workspace.")
+-
+ 
+ 
+ add_definitions (${QT_DEFINITIONS} ${KDE4_DEFINITIONS})
+ include_directories ( ${KDE4_INCLUDES} ${BLITZ_INCLUDES} )
+ ADD_SUBDIRECTORY( icons ) 
+ ADD_SUBDIRECTORY( src ) 
+-if (PLASMA_FOUND)
+-  ADD_SUBDIRECTORY( plasma ) 
+-endif (PLASMA_FOUND)
++ADD_SUBDIRECTORY( plasma ) 
+ find_package(Msgfmt REQUIRED)
+ find_package(Gettext REQUIRED)
+ add_subdirectory( po )
+Index: rsibreak-0.9.0/plasma/CMakeLists.txt
+===================================================================
+--- rsibreak-0.9.0.orig/plasma/CMakeLists.txt	2009-01-13 14:48:34.000000000 -0500
++++ rsibreak-0.9.0/plasma/CMakeLists.txt	2009-01-13 14:48:56.000000000 -0500
+@@ -8,7 +8,7 @@
+     rsibreak_interface)
+ 
+ kde4_add_plugin(plasma_engine_rsibreak ${rsibreak_engine_SRCS})
+-target_link_libraries(plasma_engine_rsibreak ${PLASMA_LIBS} ${KDE4_KIO_LIBS})
++target_link_libraries(plasma_engine_rsibreak ${KDE4_PLASMA_LIBS} ${KDE4_KIO_LIBS})
+ 
+ install(TARGETS plasma_engine_rsibreak DESTINATION ${PLUGIN_INSTALL_DIR})
+ install(FILES plasma-engine-rsibreak.desktop DESTINATION ${SERVICES_INSTALL_DIR})
+@@ -17,7 +17,7 @@
+     rsibreak.cpp)
+ 
+ kde4_add_plugin(plasma_applet_rsibreak ${rsibreak_applet_SRCS})
+-target_link_libraries(plasma_applet_rsibreak ${PLASMA_LIBS} ${KDE4_KIO_LIBS})
++target_link_libraries(plasma_applet_rsibreak ${KDE4_PLASMA_LIBS} ${KDE4_KIO_LIBS})
+ 
+ install(TARGETS plasma_applet_rsibreak DESTINATION ${PLUGIN_INSTALL_DIR})
+ install(FILES plasma-applet-rsibreak.desktop DESTINATION ${SERVICES_INSTALL_DIR})

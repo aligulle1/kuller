@@ -1,0 +1,25 @@
+--- include/Make/Shlib.make.orig	2010-03-22 14:07:45.000000000 +0100
++++ include/Make/Shlib.make	2010-03-22 14:08:21.000000000 +0100
+@@ -1,6 +1,9 @@
+ # common dependencies and rules for building shared libraries
+ 
+-SHLIB = $(ARCH_LIBDIR)/$(SHLIB_PREFIX)$(SHLIB_NAME).$(GRASS_VERSION_NUMBER)$(SHLIB_SUFFIX)
++GRASS_MAJOR=6
++GRASS_MINOR=4
++
++SHLIB = $(ARCH_LIBDIR)/$(SHLIB_PREFIX)$(SHLIB_NAME)$(SHLIB_SUFFIX).$(GRASS_VERSION_NUMBER)
+ 
+ # Object that calls _setfmode(_O_BINARY) which must be linked to each DLL on Windows
+ ifdef MINGW
+@@ -15,8 +18,9 @@
+ LDFLAGS += $(SHLIB_LDFLAGS)
+ 
+ $(SHLIB): $(SHLIB_OBJS)
+-	$(SHLIB_LD) -o $@ $(LDFLAGS) $^ $(EXTRA_LIBS) $(DLLMAIN_OBJ) && \
+-	(cd $(ARCH_LIBDIR); ln -f -s $(notdir $@) $(patsubst %.$(GRASS_VERSION_NUMBER)$(SHLIB_SUFFIX),%$(SHLIB_SUFFIX),$@))
++	$(SHLIB_LD) -o $@ -Wl,-soname,lib$(SHLIB_NAME)$(SHLIB_SUFFIX).$(GRASS_MAJOR).$(GRASS_MINOR) $(LDFLAGS) $^ $(EXTRA_LIBS) && \
++		ln -f -s $(notdir $@) $(patsubst %$(SHLIB_SUFFIX).$(GRASS_VERSION_NUMBER),%$(SHLIB_SUFFIX),$@); \
++		ln -f -s $(notdir $@) $(patsubst %$(SHLIB_SUFFIX).$(GRASS_VERSION_NUMBER),%$(SHLIB_SUFFIX).$(GRASS_MAJOR).$(GRASS_MINOR),$@);
+ 
+ shlib: $(SHLIB)
+ 

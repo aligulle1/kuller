@@ -1,0 +1,48 @@
+Index: kdepimlibs-4.4.5/akonadi/agentmanager_p.h
+===================================================================
+--- kdepimlibs-4.4.5.orig/akonadi/agentmanager_p.h
++++ kdepimlibs-4.4.5/akonadi/agentmanager_p.h
+@@ -76,6 +76,8 @@ class AgentManagerPrivate
+     void synchronize( const AgentInstance& );
+     void synchronizeCollectionTree( const AgentInstance& );
+ 
++    void serviceOwnderChanged( const QString &name, const QString &oldOwner, const QString &newOwner );
++
+     AgentType fillAgentType( const QString &identifier ) const;
+     AgentInstance fillAgentInstance( const QString &identifier ) const;
+     AgentInstance fillAgentInstanceLight( const QString &identifier ) const;
+Index: kdepimlibs-4.4.5/akonadi/agentmanager.cpp
+===================================================================
+--- kdepimlibs-4.4.5.orig/akonadi/agentmanager.cpp
++++ kdepimlibs-4.4.5/akonadi/agentmanager.cpp
+@@ -22,6 +22,7 @@
+ 
+ #include "agenttype_p.h"
+ #include "agentinstance_p.h"
++#include <akonadi/private/protocol_p.h>
+ 
+ #include "collection.h"
+ 
+@@ -325,6 +326,13 @@ void AgentManagerPrivate::createDBusInte
+   }
+ }
+ 
++void AgentManagerPrivate::serviceOwnderChanged( const QString &service, const QString &oldOwner, const QString &newOwner )
++{
++  Q_UNUSED( newOwner );
++  if ( service == QLatin1String( AKONADI_DBUS_CONTROL_SERVICE ) && oldOwner.isEmpty() )
++    readAgentTypes();
++}
++
+ AgentManager* AgentManagerPrivate::mSelf = 0;
+ 
+ AgentManager::AgentManager()
+@@ -339,6 +347,8 @@ AgentManager::AgentManager()
+              SIGNAL(serviceOwnerChanged(QString,QString,QString)),
+              SLOT(serviceOwnerChanged(QString,QString,QString)) );
+   }
++
++  connect( QDBusConnection::sessionBus().interface(), SIGNAL(serviceOwnerChanged(QString,QString,QString)), SLOT(serviceOwnerChanged(QString,QString,QString)) );
+ }
+ 
+ // @endcond

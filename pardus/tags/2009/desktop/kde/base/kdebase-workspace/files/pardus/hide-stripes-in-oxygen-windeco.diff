@@ -1,0 +1,129 @@
+diff -Naur kdebase-workspace-4.2.3-orig/kwin/clients/oxygen/config/config.cpp kdebase-workspace-4.2.3/kwin/clients/oxygen/config/config.cpp
+--- kdebase-workspace-4.2.3-orig/kwin/clients/oxygen/config/config.cpp	2009-05-20 19:54:13.767509198 +0300
++++ kdebase-workspace-4.2.3/kwin/clients/oxygen/config/config.cpp	2009-05-20 20:04:11.275513326 +0300
+@@ -70,7 +70,7 @@
+ void OxygenConfig::load( const KConfigGroup&  )
+ {
+     KConfigGroup cg(c, "Windeco");
+-    ui->showStripes->setChecked( cg.readEntry("ShowStripes", true) );
++    ui->showStripes->setChecked( cg.readEntry("ShowStripes", false) );
+ 
+     QString titleAlignment = cg.readEntry("TitleAlignment", "Left");
+     ui->titleAlignmentLeft->setChecked( titleAlignment == "Left" );
+@@ -102,7 +102,7 @@
+ // Sets UI widget defaults which must correspond to style defaults
+ void OxygenConfig::defaults()
+ {
+-    ui->showStripes->setChecked( true );
++    ui->showStripes->setChecked( false );
+     ui->titleAlignmentLeft->setChecked( true );
+     
+     emit changed();
+diff -Naur kdebase-workspace-4.2.3-orig/kwin/clients/oxygen/oxygen.cpp kdebase-workspace-4.2.3/kwin/clients/oxygen/oxygen.cpp
+--- kdebase-workspace-4.2.3-orig/kwin/clients/oxygen/oxygen.cpp	2009-05-20 19:59:13.506509107 +0300
++++ kdebase-workspace-4.2.3/kwin/clients/oxygen/oxygen.cpp	2009-05-20 20:03:41.635510055 +0300
+@@ -50,7 +50,7 @@
+ 
+ bool OxygenFactory::initialized_ = false;
+ Qt::Alignment OxygenFactory::titleAlignment_ = Qt::AlignLeft;
+-bool OxygenFactory::showStripes_ = true;
++bool OxygenFactory::showStripes_ = false;
+ int OxygenFactory::borderSize_ = 4; // BorderSize::BorderNormal
+ 
+ //////////////////////////////////////////////////////////////////////////////
+@@ -175,7 +175,7 @@
+     }
+ 
+     bool oldstripes = showStripes_;    
+-    showStripes_ = group.readEntry( "ShowStripes", true );
++    showStripes_ = group.readEntry( "ShowStripes", false);
+ 
+     if (oldalign == titleAlignment_ && oldstripes == showStripes_
+             && oldBorderSize == borderSize_)
+diff -Naur kdebase-workspace-4.2.3-orig/kwin/clients/ozone/config/config.cpp kdebase-workspace-4.2.3/kwin/clients/ozone/config/config.cpp
+--- kdebase-workspace-4.2.3-orig/kwin/clients/ozone/config/config.cpp	2009-05-20 19:54:13.652509078 +0300
++++ kdebase-workspace-4.2.3/kwin/clients/ozone/config/config.cpp	2009-05-20 20:04:47.850578756 +0300
+@@ -72,7 +72,7 @@
+ void OxygenConfig::load( const KConfigGroup&  )
+ {
+     KConfigGroup cg(c, "Windeco");
+-    ui->showStripes->setChecked( cg.readEntry("ShowStripes", true) );
++    ui->showStripes->setChecked( cg.readEntry("ShowStripes", false) );
+     ui->blendTitlebarColors->setChecked( cg.readEntry("BlendTitlebarColors", true) );
+ 
+     QString titleAlignment = cg.readEntry("TitleAlignment", "Left");
+@@ -106,7 +106,7 @@
+ // Sets UI widget defaults which must correspond to style defaults
+ void OxygenConfig::defaults()
+ {
+-    ui->showStripes->setChecked( true );
++    ui->showStripes->setChecked( false );
+     ui->titleAlignmentLeft->setChecked( true );
+     ui->blendTitlebarColors->setChecked( true );
+     
+diff -Naur kdebase-workspace-4.2.3-orig/kwin/clients/ozone/oxygen.cpp kdebase-workspace-4.2.3/kwin/clients/ozone/oxygen.cpp
+--- kdebase-workspace-4.2.3-orig/kwin/clients/ozone/oxygen.cpp	2009-05-20 19:54:13.653509357 +0300
++++ kdebase-workspace-4.2.3/kwin/clients/ozone/oxygen.cpp	2009-05-20 20:05:07.763510444 +0300
+@@ -52,7 +52,7 @@
+ 
+ bool OxygenFactory::initialized_ = false;
+ Qt::Alignment OxygenFactory::titleAlignment_ = Qt::AlignLeft;
+-bool OxygenFactory::showStripes_ = true;
++bool OxygenFactory::showStripes_ = false;
+ bool OxygenFactory::blendTitlebarColors_ = true;
+ 
+ //////////////////////////////////////////////////////////////////////////////
+@@ -127,7 +127,7 @@
+         titleAlignment_ = Qt::AlignRight;
+ 
+     bool oldstripes = showStripes;    
+-    showStripes_ = group.readEntry( "ShowStripes", true );
++    showStripes_ = group.readEntry( "ShowStripes", false );
+ 
+     bool oldblend = blendTitlebarColors;    
+     blendTitlebarColors_ = group.readEntry( "BlendTitlebarColors", true );
+diff -Naur kdebase-workspace-4.2.3-orig/kwin/kcmkwin/kwindecoration/kwindecoration.cpp kdebase-workspace-4.2.3/kwin/kcmkwin/kwindecoration/kwindecoration.cpp
+--- kdebase-workspace-4.2.3-orig/kwin/kcmkwin/kwindecoration/kwindecoration.cpp	2009-05-20 19:54:14.429759073 +0300
++++ kdebase-workspace-4.2.3/kwin/kcmkwin/kwindecoration/kwindecoration.cpp	2009-05-20 20:01:18.540510317 +0300
+@@ -450,7 +450,7 @@
+ 
+ 	oldLibraryName = currentLibraryName;
+ 	currentLibraryName = conf.readEntry("PluginLib",
+-					((QPixmap::defaultDepth() > 8) ? "kwin3_ozone" : "kwin3_plastik"));
++					((QPixmap::defaultDepth() > 8) ? "kwin3_oxygen" : "kwin3_plastik"));
+ 	QString decoName = decorationName( currentLibraryName );
+ 
+ 	// If we are using the "default" kde client, use the "default" entry.
+diff -Naur kdebase-workspace-4.2.3-orig/kwin/lib/kdecoration.cpp kdebase-workspace-4.2.3/kwin/lib/kdecoration.cpp
+--- kdebase-workspace-4.2.3-orig/kwin/lib/kdecoration.cpp	2009-05-20 19:54:13.474509980 +0300
++++ kdebase-workspace-4.2.3/kwin/lib/kdecoration.cpp	2009-05-20 20:09:21.899760350 +0300
+@@ -502,7 +502,7 @@
+ 
+ QString KDecorationOptions::defaultTitleButtonsLeft()
+     {
+-    return "MS";
++    return "M";
+     }
+ 
+ QString KDecorationOptions::titleButtonsRight() const
+@@ -512,7 +512,7 @@
+ 
+ QString KDecorationOptions::defaultTitleButtonsRight()
+     {
+-    return "HIA__X";
++    return "HIA_X";
+     }
+ 
+ bool KDecorationOptions::showTooltips() const
+diff -Naur kdebase-workspace-4.2.3-orig/kwin/plugins.cpp kdebase-workspace-4.2.3/kwin/plugins.cpp
+--- kdebase-workspace-4.2.3-orig/kwin/plugins.cpp	2009-05-20 19:54:14.269759298 +0300
++++ kdebase-workspace-4.2.3/kwin/plugins.cpp	2009-05-20 20:01:19.146576578 +0300
+@@ -33,7 +33,7 @@
+     : KDecorationPlugins( KGlobal::config())
+     {
+     defaultPlugin = (QPixmap::defaultDepth() > 8) ?
+-            "kwin3_ozone" : "kwin3_plastik";
++            "kwin3_oxygen" : "kwin3_plastik";
+     loadPlugin( "" ); // load the plugin specified in cfg file
+     }
+ 

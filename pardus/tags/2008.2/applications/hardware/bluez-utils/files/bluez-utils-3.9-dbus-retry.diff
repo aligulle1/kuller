@@ -1,0 +1,49 @@
+--- common/dbus.c
++++ common/dbus.c
+@@ -45,6 +45,7 @@
+ #include "logging.h"
+ 
+ #define DISPATCH_TIMEOUT	0
++#define MAX_DBUS_RETRY		12
+ 
+ static int name_listener_initialized = 0;
+ 
+@@ -547,13 +548,27 @@
+ 
+ DBusConnection *init_dbus(const char *name, void (*disconnect_cb)(void *), void *user_data)
+ {
++	int retry = 0;
+ 	struct disconnect_data *dc_data;
+ 	DBusConnection *conn;
+ 	DBusError err;
+ 
+ 	dbus_error_init(&err);
+ 
+-	conn = dbus_bus_get(DBUS_BUS_SYSTEM, &err);
++	do {
++		if (dbus_error_is_set(&err))
++			dbus_error_free(&err);
++
++		conn = dbus_bus_get(DBUS_BUS_SYSTEM, &err);
++		if (conn)
++			break;
++
++		if (!retry)
++			info("Can't connect to DBUS. Will retry %i times.", MAX_DBUS_RETRY);
++
++		sleep(5);
++		retry++;
++	} while (!conn && retry < MAX_DBUS_RETRY);
+ 
+ 	if (dbus_error_is_set(&err)) {
+ 		error("Can't connect to system message bus: %s", err.message);
+--- hcid/dbus-common.c
++++ hcid/dbus-common.c
+@@ -64,6 +64,7 @@
+ #define BLUEZ_NAME "org.bluez"
+ 
+ #define MAX_CONN_NUMBER		10
++#define MAX_DBUS_RETRY		12
+ #define RECONNECT_RETRY_TIMEOUT	5000
+ 
+ static sdp_session_t *sess = NULL;

@@ -1,0 +1,48 @@
+--- ld/lexsup.c	2007-04-11 12:39:23.000000000 +0300
++++ ld/lexsup.c	2007-04-11 12:43:03.000000000 +0300
+@@ -162,7 +162,9 @@
+   OPTION_ERROR_UNRESOLVED_SYMBOLS,
+   OPTION_WARN_SHARED_TEXTREL,
+   OPTION_REDUCE_MEMORY_OVERHEADS,
+-  OPTION_DEFAULT_SCRIPT
++  OPTION_DEFAULT_SCRIPT,
++  OPTION_DIRECT,
++  OPTION_HASHVALS
+ };
+ 
+ /* The long options.  This structure is used for both the option
+@@ -548,6 +550,10 @@
+     TWO_DASHES },
+   { {"wrap", required_argument, NULL, OPTION_WRAP},
+     '\0', N_("SYMBOL"), N_("Use wrapper functions for SYMBOL"), TWO_DASHES },
++  { {"Bdirect", no_argument, NULL, OPTION_DIRECT},
++    '\0', NULL, N_("For Pardus 2007 compatibility, ignored"), ONE_DASH },
++  { {"hashvals", no_argument, NULL, OPTION_HASHVALS},
++    '\0', NULL, N_("For Pardus 2007 compatibility, ignored"), ONE_DASH },
+ };
+ 
+ #define OPTION_COUNT ARRAY_SIZE (ld_options)
+@@ -1413,6 +1419,10 @@
+ 	  link_info.fini_function = optarg;
+ 	  break;
+ 
++    case OPTION_DIRECT:
++    case OPTION_HASHVALS:
++      break;
++
+ 	case OPTION_REDUCE_MEMORY_OVERHEADS:
+ 	  link_info.reduce_memory_overheads = TRUE;
+ 	  if (config.hash_table_size == 0)
+--- ld/emultempl/elf32.em	2007-04-11 12:39:23.000000000 +0300
++++ ld/emultempl/elf32.em	2007-04-11 12:46:30.000000000 +0300
+@@ -1995,6 +1995,10 @@
+ 	  link_info.noexecstack = TRUE;
+ 	  link_info.execstack = FALSE;
+ 	}
++      else if (strcmp (optarg, "dynsort") == 0)
++    {
++        ; // Ignore
++    }
+ EOF
+ 
+   if test -n "$COMMONPAGESIZE"; then

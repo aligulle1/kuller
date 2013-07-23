@@ -1,0 +1,79 @@
+From 5a74f4b247acc1bb196881433791d83adfaf0eae Mon Sep 17 00:00:00 2001
+From: Mehmet Emre Atasever <memre@pardus.org.tr>
+Date: Tue, 12 Apr 2011 14:11:54 +0300
+Subject: [PATCH 1/5] fedora icu.8320.freeserif.crash.patch implementation
+
+---
+ layout/LookupProcessor.cpp |   14 ++++++++++++--
+ layout/LookupProcessor.h   |    1 +
+ 2 files changed, 13 insertions(+), 2 deletions(-)
+
+diff --git a/layout/LookupProcessor.cpp b/layout/LookupProcessor.cpp
+index 4d4347c..5f91607 100644
+--- a/layout/LookupProcessor.cpp
++++ b/layout/LookupProcessor.cpp
+@@ -70,8 +70,11 @@ le_int32 LookupProcessor::process(LEGlyphStorage &glyphStorage, GlyphPositionAdj
+ 
+         if (selectMask != 0) {
+             const LookupTable *lookupTable = lookupListTable->getLookupTable(lookup);
++
++            if (!lookupTable) continue;
++
+             le_uint16 lookupFlags = SWAPW(lookupTable->lookupFlags);
+-            
++
+             glyphIterator.reset(lookupFlags, selectMask);
+ 
+             while (glyphIterator.findFeatureTag()) {
+@@ -111,6 +114,8 @@ le_int32 LookupProcessor::selectLookups(const FeatureTable *featureTable, Featur
+     for (le_uint16 lookup = 0; lookup < lookupCount; lookup += 1) {
+         le_uint16 lookupListIndex = SWAPW(featureTable->lookupListIndexArray[lookup]);
+ 
++        if (lookupListIndex >= lookupSelectCount) continue;
++
+         lookupSelectArray[lookupListIndex] |= featureMask;
+         lookupOrderArray[store++] = lookupListIndex;
+     }
+@@ -122,7 +127,7 @@ LookupProcessor::LookupProcessor(const char *baseAddress,
+         Offset scriptListOffset, Offset featureListOffset, Offset lookupListOffset,
+         LETag scriptTag, LETag languageTag, const FeatureMap *featureMap, le_int32 featureMapCount, le_bool orderFeatures, 
+         LEErrorCode& success)
+-    : lookupListTable(NULL), featureListTable(NULL), lookupSelectArray(NULL),
++    : lookupListTable(NULL), featureListTable(NULL), lookupSelectArray(NULL), lookupSelectCount(0),
+       lookupOrderArray(NULL), lookupOrderCount(0)
+ {
+     const ScriptListTable *scriptListTable = NULL;
+@@ -170,6 +175,8 @@ LookupProcessor::LookupProcessor(const char *baseAddress,
+         lookupSelectArray[i] = 0;
+     }
+ 
++    lookupSelectCount = lookupListCount;
++
+     le_int32 count, order = 0;
+     le_int32 featureReferences = 0;
+     const FeatureTable *featureTable = NULL;
+@@ -186,6 +193,9 @@ LookupProcessor::LookupProcessor(const char *baseAddress,
+         le_uint16 featureIndex = SWAPW(langSysTable->featureIndexArray[feature]);
+ 
+         featureTable = featureListTable->getFeatureTable(featureIndex, &featureTag);
++
++        if (!featureTable) continue;
++
+         featureReferences += SWAPW(featureTable->lookupCount);
+     }
+ 
+diff --git a/layout/LookupProcessor.h b/layout/LookupProcessor.h
+index 080034c..dd2871e 100644
+--- a/layout/LookupProcessor.h
++++ b/layout/LookupProcessor.h
+@@ -65,6 +65,7 @@ protected:
+     const FeatureListTable  *featureListTable;
+ 
+     FeatureMask            *lookupSelectArray;
++    le_uint32              lookupSelectCount;
+ 
+     le_uint16               *lookupOrderArray;
+     le_uint32               lookupOrderCount;
+-- 
+1.7.3.4
+

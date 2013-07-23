@@ -1,0 +1,87 @@
+--- bin/hsqldb	2007-08-30 10:37:02.000000000 +0300
++++ bin/hsqldb2	2007-12-25 19:06:53.000000000 +0200
+@@ -95,11 +95,7 @@
+ # Will not necessarily be set correctly at system bootup invocations
+ # (where it is sometimes invoked like "sh... /path/to/hsqldb start"),
+ # but, in those cases there will be no recursion.
+-INVOC_PATH=`dirname "$0"` || {
+-    echo "'dirname' failed" 1>&2
+-    exit 2
+-}
+-[ -n "$INVOC_PATH" ] && INVOC_PATH="${INVOC_PATH}/"
++INVOC_PATH=/usr/sbin/
+ 
+ SYNTAX_MSG="SYNTAX:  ${INVOC_PATH}hsqldb start|stop|stopcompact|restart|restartcmpacted|status"
+ 
+@@ -133,36 +129,10 @@
+ SHUTDOWN_OPTION=
+ SERVER_ADDL_CLASSPATH=
+ INVOC_ADDL_ARGS=
+-case "`uname`" in
+-    Darwin)     # I.e. Mac OS X.  I don't know about older Mac OSes.
+-        LOGFILE=/var/log/hsqldb.log
+-        PIDFILE=/var/run/hsqldb.pid
+-    ;;
+-    Linux)
+-        LOGFILE=/var/log/hsqldb.log
+-        PIDFILE=/var/run/hsqldb.pid
+-    ;;
+-    FreeBSD)
+-        LOGFILE=/var/log/hsqldb.log
+-        PIDFILE=/var/run/hsqldb.pid
+-    ;;
+-    SunOS)
+-        LOGFILE=/var/log/hsqldb.log
+-        PIDFILE=/etc/hsqldb.pid
+-    ;;
+-    *)
+-        LOGFILE=/var/log/hsqldb.log
+-        PIDFILE=/etc/hsqldb.pid
+-    ;;
+-esac
++LOGFILE=/var/log/hsqldb/hsqldb.log
++PIDFILE=/var/run/hsqldb/hsqldb.pid
++CFGFILE=/etc/hsqldb/hsqldb.conf
+ 
+-for candidate in /etc/sysconfig/hsqldb /etc/hsqldb.conf /etc/hsqldb.cfg  \
+-    /usr/local/etc/hsqldb.cfg; do
+-    [ -f $candidate ] && {
+-        CFGFILE=$candidate
+-        break
+-    }
+-done
+ [ -n "$CFGFILE" ] || {
+     echo "No global config file found in any of allowed locations" 1>&2
+     exit 11
+@@ -186,22 +156,6 @@
+     exit 4
+ }
+ 
+-# Use bsd-style enable/disable if it's in place.
+-BSDCFG=
+-[ -r /etc/rc.conf ] && [ -f /etc/rc.conf ] && {
+-    . /etc/rc.conf
+-    BSDCFG=1
+-}
+-[ -r /etc/rc.conf.local ] && [ -f /etc/rc.conf.local ] && {
+-    . /etc/rc.conf.local
+-    BSDCFG=1
+-}
+-[ -n "$BSDCFG" ] && {
+-    case "$hsqldb_enable" in [Yy][Ee][Ss]);; [Oo][Nn]);; [Tt][Rr][Uu][Ee]);;
+-        *) exit 0;;  # Don't run if not enabled for BSD startup
+-    esac
+-}
+-
+ COMMAND="$1"; shift
+ 
+ [ -r "$CFGFILE" ] || {
+@@ -263,7 +217,7 @@
+ }
+ 
+ # "chown" lives here on some UNIXes.
+-PATH="$PATH:/usr/sbin"
++PATH="$PATH:/usr/bin"
+ 
+ # Make a good effort (but not bullet-proof) check on permissions of the
+ # auth file.  Unfortunately, if auth-file is not specified, this depends

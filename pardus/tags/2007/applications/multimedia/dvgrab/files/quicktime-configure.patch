@@ -1,0 +1,53 @@
+diff -Nur dvgrab-2.0-old/configure dvgrab-2.0/configure
+--- dvgrab-2.0-old/configure	2006-09-27 20:51:04.533815943 +0300
++++ dvgrab-2.0/configure	2006-09-27 20:51:13.356474697 +0300
+@@ -5669,7 +5669,7 @@
+ 
+ 
+ 
+-for ac_header in quicktime/quicktime.h
++for ac_header in lqt/quicktime.h
+ do
+ as_ac_Header=`echo "ac_cv_header_$ac_header" | $as_tr_sh`
+ if eval "test \"\${$as_ac_Header+set}\" = set"; then
+@@ -5826,7 +5826,7 @@
+ 
+ # add various libs if using quicktime4linux and not libquicktime
+ 
+-for ac_header in quicktime/lqt.h
++for ac_header in lqt/lqt.h
+ do
+ as_ac_Header=`echo "ac_cv_header_$ac_header" | $as_tr_sh`
+ if eval "test \"\${$as_ac_Header+set}\" = set"; then
+diff -Nur dvgrab-2.0-old/configure.in dvgrab-2.0/configure.in
+--- dvgrab-2.0-old/configure.in	2006-09-27 20:51:04.532816095 +0300
++++ dvgrab-2.0/configure.in	2006-09-27 20:51:13.356474697 +0300
+@@ -41,13 +41,13 @@
+ 	AC_ERROR(You need the pthread library to compile dvgrab)
+ ])
+ 
+-AC_CHECK_HEADERS(quicktime/quicktime.h,,
++AC_CHECK_HEADERS(lqt/quicktime.h,,
+ [
+ 	AC_WARN(quicktime headers missing; install libquicktime or quicktime4linux to support Quicktime files.)
+ ])
+ 
+ # add various libs if using quicktime4linux and not libquicktime
+-AC_CHECK_HEADERS(quicktime/lqt.h,
++AC_CHECK_HEADERS(lqt/lqt.h,
+ 	[AC_CHECK_LIB(quicktime, quicktime_open, ,
+ 		[AC_WARN(libquicktime missing; install libquicktime or quicktime4linux to support Quicktime files.)]
+ 	)],
+diff -Nur dvgrab-2.0-old/filehandler.h dvgrab-2.0/filehandler.h
+--- dvgrab-2.0-old/filehandler.h	2006-09-27 20:51:04.535815639 +0300
++++ dvgrab-2.0/filehandler.h	2006-09-27 20:51:24.539774575 +0300
+@@ -195,7 +195,8 @@
+ };
+ 
+ #ifdef HAVE_LIBQUICKTIME
+-#include <quicktime/quicktime.h>
++#include <lqt/quicktime.h>
++#include <lqt/lqt.h>
+ 
+ class QtHandler: public FileHandler
+ {

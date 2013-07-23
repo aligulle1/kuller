@@ -1,0 +1,18 @@
+diff -Naur mudur-2.1.1.orig/bin/mudur.py mudur-2.1.1/bin/mudur.py
+--- mudur-2.1.1.orig/bin/mudur.py	2009-05-26 14:13:04.000000000 +0300
++++ mudur-2.1.1/bin/mudur.py	2009-05-26 14:20:30.000000000 +0300
+@@ -654,7 +654,13 @@
+     need_remount = remoteMount(dry_run=True)
+     obj = bus.get_object("tr.org.pardus.comar", "/", introspect=False)
+     for script in obj.listModelApplications("Net.Link", dbus_interface="tr.org.pardus.comar"):
+-        db = pardus.iniutils.iniDB(os.path.join("/etc/network", script))
++        try:
++            db = pardus.iniutils.iniDB(os.path.join("/etc/network", script))
++        except:
++            # Parse error, INI file is corrupted.
++            shutil.copy(os.path.join("/etc/network", script), os.path.join("/etc/network", "%s.backup" % script))
++            file(os.path.join("/etc/network", script), "w").write("")
++            continue
+         for profile in db.listDB():
+             if db.getDB(profile).get("state", "down") == "up":
+                 device = db.getDB(profile).get("device", None)

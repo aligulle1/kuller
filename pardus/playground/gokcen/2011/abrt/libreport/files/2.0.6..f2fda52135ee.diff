@@ -1,0 +1,2683 @@
+commit 6b8ba25bd3caf0065805197a3b10e2697164ae3b
+Author: Miroslav Lichvar <mlichvar@redhat.com>
+Date:   Thu Sep 29 17:51:20 2011 +0200
+
+    report-newt: add option to display version (rhbz#741590)
+
+diff --git a/src/report-newt/report-newt.c b/src/report-newt/report-newt.c
+index b8cc020..b8dddbc 100644
+--- a/src/report-newt/report-newt.c
++++ b/src/report-newt/report-newt.c
+@@ -357,18 +357,29 @@ int main(int argc, char **argv)
+     enum {
+         OPT_o = 1 << 0, // report only
+         OPT_r = 1 << 1,
++        OPT_V = 1 << 2,
+     };
+     /* Keep enum above and order of options below in sync! */
+     struct options program_options[] = {
+         OPT_BOOL('o', "report-only", NULL, _("Skip analyze steps, go through report steps only")),
+         OPT_BOOL('d', "delete", NULL,      _("Remove DIR after reporting")),
++        OPT_BOOL('V', "version", NULL,     _("Display version and exit")),
+         OPT_END()
+     };
+     unsigned opts = parse_opts(argc, argv, program_options, program_usage_string);
+     argv += optind;
+-    if (!argv[0] || argv[1] || !(opts & OPT_o)) /* zero or >1 arguments */
++    /* zero or >1 arguments with -o, or >0 arguments with -V */
++    if (!(opts & (OPT_o | OPT_V)) ||
++            ((opts & OPT_o) && (!argv[0] || argv[1])) ||
++            ((opts & OPT_V) && argv[0]))
+         show_usage_and_die(program_usage_string, program_options);
+ 
++    if (opts & OPT_V)
++    {
++        printf("%s "VERSION"\n", g_progname);
++        return 0;
++    }
++
+     dump_dir_name = argv[0];
+ 
+     /* Get settings */
+
+commit 123741b4e05a23fda1767b5f78a5f1022877d6c7
+Author: Jiri Moskovcak <jmoskovc@redhat.com>
+Date:   Fri Sep 30 09:31:27 2011 +0200
+
+    free the string not the strbuf
+
+diff --git a/src/gui-wizard-gtk/wizard.c b/src/gui-wizard-gtk/wizard.c
+index 3b06425..0279f83 100644
+--- a/src/gui-wizard-gtk/wizard.c
++++ b/src/gui-wizard-gtk/wizard.c
+@@ -691,8 +691,9 @@ static void analyze_rb_was_toggled(GtkButton *button, gpointer user_data)
+ static void report_tb_was_toggled(GtkButton *button, gpointer user_data)
+ {
+     char *event_name = (char *)user_data;
+-    struct strbuf *reporters_string = strbuf_new();
+-    struct strbuf *reporters_event_string = strbuf_new();
++    struct strbuf *reporters_strbuf = strbuf_new();
++    struct strbuf *reporters_event_strbuf = strbuf_new();
++    char * reporters_string;
+ 
+     /* if ((button && user_data)
+      * prevents sigsegv which would happen when call from
+@@ -735,21 +736,22 @@ static void report_tb_was_toggled(GtkButton *button, gpointer user_data)
+     while (li != NULL)
+     {
+         event_config_t *cfg = get_event_config(li->data);
+-        strbuf_append_strf(reporters_event_string,
++        strbuf_append_strf(reporters_event_strbuf,
+                             "%s%s",
+-                            (reporters_event_string->len != 0 ? ", " : ""),
++                            (reporters_event_strbuf->len != 0 ? ", " : ""),
+                             (li->data ? li->data : "")
+                             );
+ 
+-        strbuf_append_strf(reporters_string,
++        strbuf_append_strf(reporters_strbuf,
+                             "%s%s",
+-                            (reporters_string->len != 0 ? ", " : ""),
++                            (reporters_strbuf->len != 0 ? ", " : ""),
+                             (cfg->screen_name ? cfg->screen_name : li->data)
+                             );
+         li = g_list_next(li);
+     }
+-    g_reporter_events_selected = strbuf_free_nobuf(reporters_event_string);
+-    gtk_label_set_text(g_lbl_reporters, strbuf_free_nobuf(reporters_string));
++    g_reporter_events_selected = strbuf_free_nobuf(reporters_event_strbuf);
++    reporters_string = strbuf_free_nobuf(reporters_strbuf);
++    gtk_label_set_text(g_lbl_reporters, reporters_string);
+     free(reporters_string); //we can, gtk copies the string
+ }
+ 
+
+commit fff24fb47435200ce6b51de9c43fe0c6d61c93d0
+Author: Denys Vlasenko <dvlasenk@redhat.com>
+Date:   Fri Sep 30 19:13:48 2011 +0200
+
+    reporter-mailx: set sendwait=1 in environment.
+    
+    This might improve error detection in sending emails
+    
+    Signed-off-by: Denys Vlasenko <dvlasenk@redhat.com>
+
+diff --git a/src/plugins/reporter-mailx.c b/src/plugins/reporter-mailx.c
+index 8e5ff41..ae7f774 100644
+--- a/src/plugins/reporter-mailx.c
++++ b/src/plugins/reporter-mailx.c
+@@ -99,6 +99,13 @@ static void create_and_send_email(
+     args = append_str_to_vector(args, &arg_size, email_from);
+     args = append_str_to_vector(args, &arg_size, email_to);
+ 
++    /* This makes (some versions of) mailx to wait for child process to finish,
++     * and to report its exit code, not useless "always 0" exit code.
++     * Sadly, usually this still doesn't help. See:
++     * https://bugzilla.redhat.com/show_bug.cgi?id=740895
++     */
++    putenv((char*)"sendwait=1");
++
+     log(_("Sending an email..."));
+     exec_and_feed_input(dsc, args);
+ 
+
+commit 57eb0c7c569ef06831ea90777f89920c96ee33b9
+Author: Denys Vlasenko <dvlasenk@redhat.com>
+Date:   Fri Sep 30 19:15:10 2011 +0200
+
+    reporter-mailx: use Bugzilla's output format. Closes rhbz#717321.
+    
+    Signed-off-by: Denys Vlasenko <dvlasenk@redhat.com>
+
+diff --git a/src/include/internal_libreport.h b/src/include/internal_libreport.h
+index afaf911..67a7ea3 100644
+--- a/src/include/internal_libreport.h
++++ b/src/include/internal_libreport.h
+@@ -548,8 +548,9 @@ char *make_description(problem_data_t *problem_data, char **names_to_skip, unsig
+ char* make_description_bz(problem_data_t *problem_data);
+ #define make_description_logger libreport_make_description_logger
+ char* make_description_logger(problem_data_t *problem_data);
+-#define make_description_mailx libreport_make_description_mailx
+-char* make_description_mailx(problem_data_t *problem_data);
++//UNUSED
++//#define make_description_mailx libreport_make_description_mailx
++//char* make_description_mailx(problem_data_t *problem_data);
+ 
+ #define parse_release_for_bz libreport_parse_release_for_bz
+ void parse_release_for_bz(const char *pRelease, char **product, char **version);
+diff --git a/src/lib/make_descr.c b/src/lib/make_descr.c
+index 7034526..2a6a973 100644
+--- a/src/lib/make_descr.c
++++ b/src/lib/make_descr.c
+@@ -184,6 +184,7 @@ char *make_description(problem_data_t *problem_data, char **names_to_skip, unsig
+     return strbuf_free_nobuf(buf_dsc);
+ }
+ 
++#ifdef UNUSED
+ char* make_description_mailx(problem_data_t *problem_data)
+ {
+     struct strbuf *buf_dsc = strbuf_new();
+@@ -227,6 +228,7 @@ char* make_description_mailx(problem_data_t *problem_data)
+ 
+     return strbuf_free_nobuf(buf_dsc);
+ }
++#endif
+ 
+ /* Items we don't want to include to bz / logger */
+ static const char *const blacklisted_items[] = {
+diff --git a/src/plugins/reporter-mailx.c b/src/plugins/reporter-mailx.c
+index ae7f774..f7d9cde 100644
+--- a/src/plugins/reporter-mailx.c
++++ b/src/plugins/reporter-mailx.c
+@@ -75,7 +75,8 @@ static void create_and_send_email(
+     unsigned arg_size = 0;
+     args = append_str_to_vector(args, &arg_size, "/bin/mailx");
+ 
+-    char *dsc = make_description_mailx(problem_data);
++    //char *dsc = make_description_mailx(problem_data);
++    char *dsc = make_description_bz(problem_data);
+ 
+     if (send_binary_data)
+     {
+
+commit 1c87d339771e49fb091303af3faa6a00c378a43e
+Author: Michal Toman <mtoman@redhat.com>
+Date:   Tue Oct 4 16:15:50 2011 +0200
+
+    logger: prompt for target file if default is not writable or symlink
+
+diff --git a/src/plugins/reporter-print.c b/src/plugins/reporter-print.c
+index 99e0fdf..502cf41 100644
+--- a/src/plugins/reporter-print.c
++++ b/src/plugins/reporter-print.c
+@@ -19,6 +19,7 @@
+     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ */
+ #include "internal_libreport.h"
++#include "client.h"
+ 
+ static const char *dump_dir_name = ".";
+ static const char *output_file = NULL;
+@@ -55,12 +56,68 @@ int main(int argc, char **argv)
+ 
+     export_abrt_envvars(0);
+ 
++    char *outfile = NULL;
++    FILE *outstream = NULL;
+     if (output_file)
+     {
++        outfile = xstrdup(output_file);
+         if (string_to_bool(append))
+             open_mode = "a";
+-        if (!freopen(output_file, open_mode, stdout))
+-            perror_msg_and_die("Can't open '%s'", output_file);
++        struct stat stbuf;
++        char *msg = NULL;
++        /* do not use freopen - ask() writes to stdout */
++        while (1)
++        {
++            /* prompt for another file name if needed */
++            if (msg)
++            {
++                free(outfile);
++                char response[256];
++                if (!ask(msg, response, sizeof(response)))
++                {
++                    free(msg);
++                    perror_msg_and_die("ask");
++                }
++                free(msg);
++                msg = NULL;
++
++                if (strcmp("\n", response) == 0)
++                    error_msg_and_die(_("Cancelled by user."));
++
++                outfile = xstrdup(strtrim(response));
++            }
++
++            /* do not consider ENOENT an error - file is going to be created */
++            if (lstat(outfile, &stbuf) < 0)
++            {
++                if (errno != ENOENT)
++                {
++                    VERB1 perror_msg("stat");
++                    msg = xasprintf(_("Unable to stat file '%s'. "
++                                      "Please select another file:"), outfile);
++                    continue;
++                }
++            }
++            /* do not allow symlinks */
++            else if (S_ISLNK(stbuf.st_mode))
++            {
++                msg = xasprintf(_("File '%s' is a symbolic link. "
++                                  "Please select a regular file:"), outfile);
++                continue;
++            }
++
++            if ((outstream = fopen(outfile, open_mode)) == NULL)
++            {
++                VERB1 perror_msg("fopen");
++                msg = xasprintf(_("Unable to open file '%s' for writing. "
++                                  "Please select another file:"), outfile);
++                continue;
++            }
++
++            break;
++        }
++        fclose(stdout);
++        stdout = outstream;
+     }
+ 
+     problem_data_t *problem_data = create_problem_data_for_reporting(dump_dir_name);
+@@ -74,21 +131,22 @@ int main(int argc, char **argv)
+     free(dsc);
+     free_problem_data(problem_data);
+ 
+-    if (output_file)
++    if (outfile)
+     {
+         if (opts & OPT_r)
+         {
+             struct dump_dir *dd = dd_opendir(dump_dir_name, /*flags:*/ 0);
+             if (dd)
+             {
+-                char *msg = xasprintf("file: %s", output_file);
++                char *msg = xasprintf("file: %s", outfile);
+                 add_reported_to(dd, msg);
+                 free(msg);
+                 dd_close(dd);
+             }
+         }
+         const char *format = (open_mode[0] == 'a' ? _("The report was appended to %s") : _("The report was stored to %s"));
+-        log(format, output_file);
++        log(format, outfile);
++        free(outfile);
+     }
+ 
+     return 0;
+
+commit bf87fac46c46c6d4c3eafab60f3cf54792b9064a
+Author: Jiri Moskovcak <jmoskovc@redhat.com>
+Date:   Wed Oct 5 08:53:40 2011 +0200
+
+    remove the default target from logger to make it ask for the first time
+
+diff --git a/src/plugins/report_Logger.conf b/src/plugins/report_Logger.conf
+index 45f6b5d..b5d33ba 100644
+--- a/src/plugins/report_Logger.conf
++++ b/src/plugins/report_Logger.conf
+@@ -1,2 +1,2 @@
+-Logger_Log_File=/tmp/abrt.log
++#Logger_Log_File=/tmp/abrt/log
+ Logger_Append=yes
+diff --git a/src/plugins/report_Logger.xml.in b/src/plugins/report_Logger.xml.in
+index a2027f9..e7b58ff 100644
+--- a/src/plugins/report_Logger.xml.in
++++ b/src/plugins/report_Logger.xml.in
+@@ -15,7 +15,6 @@
+             <_label>Log File</_label>
+             <allow-empty>no</allow-empty>
+             <_description>Name of the logfile</_description>
+-            <default-value>/tmp/abrt.log</default-value>
+         </option>
+         <option type="bool" name="Logger_Append">
+             <_label>Append</_label>
+
+commit fbcf816140baa534e390fc7d4124189a3d406659
+Author: Nikola Pajkovsky <npajkovs@redhat.com>
+Date:   Wed Oct 5 15:50:20 2011 +0200
+
+    refuse reporting when *not-reportable* file exist
+    
+    Signed-off-by: Nikola Pajkovsky <npajkovs@redhat.com>
+
+diff --git a/src/cli/cli-report.c b/src/cli/cli-report.c
+index 0011ebc..c8fa672 100644
+--- a/src/cli/cli-report.c
++++ b/src/cli/cli-report.c
+@@ -750,6 +750,26 @@ int report(const char *dump_dir_name, int flags)
+     if (!dd)
+         return -1;
+ 
++    char *not_reportable = dd_load_text_ext(dd, FILENAME_NOT_REPORTABLE, 0
++                                            | DD_LOAD_TEXT_RETURN_NULL_ON_FAILURE
++                                            | DD_FAIL_QUIETLY_ENOENT
++                                            | DD_FAIL_QUIETLY_EACCES);
++
++    if (not_reportable)
++    {
++        char *reason = dd_load_text_ext(dd, FILENAME_REASON, 0
++                                        | DD_LOAD_TEXT_RETURN_NULL_ON_FAILURE);
++        char *t = xasprintf("%s%s%s",
++                            not_reportable ?: "",
++                            not_reportable ? ": " : "",
++                            reason ?: _("(no description)"));
++
++        dd_close(dd);
++        error_msg("%s", t);
++        free(t);
++        xfunc_die();
++    }
++
+     if (!(flags & CLI_REPORT_ONLY))
+     {
+         char *analyze_events_as_lines = list_possible_events(dd, NULL, "analyze");
+diff --git a/src/gui-wizard-gtk/wizard.c b/src/gui-wizard-gtk/wizard.c
+index 0279f83..8bdc8d1 100644
+--- a/src/gui-wizard-gtk/wizard.c
++++ b/src/gui-wizard-gtk/wizard.c
+@@ -1032,7 +1032,16 @@ void update_gui_state_from_problem_data(void)
+     gtk_window_set_title(GTK_WINDOW(g_assistant), g_dump_dir_name);
+ 
+     const char *reason = get_problem_item_content_or_NULL(g_cd, FILENAME_REASON);
+-    gtk_label_set_text(g_lbl_cd_reason, reason ? reason : _("(no description)"));
++    const char *not_reportable = get_problem_item_content_or_NULL(g_cd,
++                                                                  FILENAME_NOT_REPORTABLE);
++
++    char *t = xasprintf("%s%s%s",
++                        not_reportable ?: "",
++                        not_reportable ? ": " : "",
++                        reason ?: _("(no description)"));
++
++    gtk_label_set_text(g_lbl_cd_reason, t);
++    free(t);
+ 
+     gtk_list_store_clear(g_ls_details);
+     struct cd_stats stats = { 0 };
+@@ -2281,12 +2290,21 @@ static void add_pages()
+             error_msg_and_die("Can't load %s: %s", g_glade_file, error->message);
+     }
+ 
++    struct dump_dir *dd = dd_opendir(g_dump_dir_name, DD_OPEN_READONLY | DD_FAIL_QUIETLY_EACCES);
++    if (!dd)
++        return;
++    char *not_reportable = dd_load_text_ext(dd, FILENAME_NOT_REPORTABLE, 0
++                                            | DD_LOAD_TEXT_RETURN_NULL_ON_FAILURE
++                                            | DD_FAIL_QUIETLY_ENOENT
++                                            | DD_FAIL_QUIETLY_EACCES);
++    dd_close(dd);
++
+     int i;
+     int page_no = 0;
+     for (i = 0; page_names[i] != NULL; i++)
+     {
+         char *delim = strrchr(page_names[i], '_');
+-        if (delim != NULL)
++        if (!not_reportable && delim)
+         {
+             if (g_report_only && (strncmp(delim + 1, "report", strlen("report"))) != 0)
+             {
+@@ -2308,10 +2326,14 @@ static void add_pages()
+         gtk_assistant_set_page_complete(g_assistant, page, true);
+ 
+         gtk_assistant_set_page_title(g_assistant, page, pages[i].title);
+-        gtk_assistant_set_page_type(g_assistant, page, pages[i].type);
++        if (not_reportable && i == 0)
++            gtk_assistant_set_page_type(g_assistant, pages[i].page_widget, GTK_ASSISTANT_PAGE_SUMMARY);
++        else
++            gtk_assistant_set_page_type(g_assistant, page, pages[i].type);
+ 
+         VERB1 log("added page: %s", page_names[i]);
+     }
++    free(not_reportable);
+ 
+     /* Set pointers to objects we might need to work with */
+     g_lbl_cd_reason        = GTK_LABEL(        gtk_builder_get_object(builder, "lbl_cd_reason"));
+@@ -2369,10 +2391,14 @@ static void add_pages()
+ 
+     /* Add "Close" button */
+     GtkWidget *w;
+-    w = gtk_button_new_from_stock(GTK_STOCK_CLOSE);
+-    g_signal_connect(w, "clicked", G_CALLBACK(gtk_main_quit), NULL);
+-    gtk_widget_show(w);
+-    gtk_assistant_add_action_widget(g_assistant, w);
++    if (!not_reportable)
++    {
++        w = gtk_button_new_from_stock(GTK_STOCK_CLOSE);
++        g_signal_connect(w, "clicked", G_CALLBACK(gtk_main_quit), NULL);
++        gtk_widget_show(w);
++        gtk_assistant_add_action_widget(g_assistant, w);
++    }
++
+     /* and hide "Cancel" button - "Close" is a better name for what we want */
+     gtk_assistant_commit(g_assistant);
+ 
+diff --git a/src/include/internal_libreport.h b/src/include/internal_libreport.h
+index 67a7ea3..5fc09c3 100644
+--- a/src/include/internal_libreport.h
++++ b/src/include/internal_libreport.h
+@@ -581,7 +581,7 @@ int delete_dump_dir_possibly_using_abrtd(const char *dump_dir_name);
+ struct dump_dir *steal_directory(const char *base_dir, const char *dump_dir_name);
+ 
+ #define kernel_tainted_short libreport_kernel_tainted_short
+-char *kernel_tainted_short(unsigned tainted);
++char *kernel_tainted_short(const char *kernel_bt);
+ #define kernel_tainted_long libreport_kernel_tainted_long
+ GList *kernel_tainted_long(unsigned tainted);
+ 
+@@ -635,6 +635,7 @@ GList *kernel_tainted_long(unsigned tainted);
+  */
+ #define FILENAME_REPORTED_TO  "reported_to"
+ #define FILENAME_EVENT_LOG    "event_log"
++#define FILENAME_NOT_REPORTABLE "not-reportable"
+ 
+ // Not stored as files, added "on the fly":
+ #define CD_DUMPDIR            "Directory"
+diff --git a/src/lib/kernel-tainted.c b/src/lib/kernel-tainted.c
+index 3595408..217587c 100644
+--- a/src/lib/kernel-tainted.c
++++ b/src/lib/kernel-tainted.c
+@@ -18,6 +18,12 @@
+ */
+ #include "internal_libreport.h"
+ 
++/* reading /proc/sys/kernel/tainted file after an oops is ALWAYS going
++ * to show it as tainted.
++ *
++ * https://bugzilla.redhat.com/show_bug.cgi?id=724838
++ */
++
+ /* From RHEL6 kernel/panic.c: */
+ static const int tnts_short[] = {
+ 	 'P' ,
+@@ -106,21 +112,16 @@ static const char *const tnts_long[] = {
+     "Tech_preview",
+ };
+ 
+-char *kernel_tainted_short(unsigned tainted)
++char *kernel_tainted_short(const char *kernel_bt)
+ {
+-    char *tnt = xzalloc(ARRAY_SIZE(tnts_short) + 1);
+-    int i = 0;
+-    while (tainted)
+-    {
+-        if (0x1 & tainted)
+-            tnt[i] = tnts_short[i];
+-        else
+-            tnt[i] = '-';
+ 
+-        ++i;
+-        tainted >>= 1;
+-    }
++    /* example of flags: |G    B      | */
++    char *tainted = strstr(kernel_bt, "Tainted: ");
++    if (!tainted)
++        return NULL;
+ 
++    /* 12 == count of flags */
++    char *tnt = xstrndup(tainted + strlen("Tainted: "), 12);
+     return tnt;
+ }
+ 
+diff --git a/src/report-newt/report-newt.c b/src/report-newt/report-newt.c
+index b8dddbc..02f75c8 100644
+--- a/src/report-newt/report-newt.c
++++ b/src/report-newt/report-newt.c
+@@ -318,6 +318,27 @@ static int report(const char *dump_dir_name)
+     if (!(dd = dd_opendir(dump_dir_name, 0)))
+         return -1;
+     events_as_lines = list_possible_events(dd, NULL, "report");
++
++    char *not_reportable = dd_load_text_ext(dd, FILENAME_NOT_REPORTABLE, 0
++                                            | DD_LOAD_TEXT_RETURN_NULL_ON_FAILURE
++                                            | DD_FAIL_QUIETLY_ENOENT
++                                            | DD_FAIL_QUIETLY_EACCES);
++
++    if (not_reportable)
++    {
++        char *reason = dd_load_text_ext(dd, FILENAME_REASON, 0
++                                        | DD_LOAD_TEXT_RETURN_NULL_ON_FAILURE);
++        char *t = xasprintf("%s%s%s",
++                            not_reportable ?: "",
++                            not_reportable ? ": " : "",
++                            reason ?: _("(no description)"));
++
++        dd_close(dd);
++        newtWinMessage(_("Error"), _("Ok"), "%s", t);
++        free(t);
++        return -1;
++    }
++
+     dd_close(dd);
+ 
+     reporters = get_available_reporters(events_as_lines);
+
+commit 2ef2ce1606bc64bc03d88389fbd0ff098e1e0caf
+Merge: bf87fac fbcf816
+Author: Nikola Pajkovsky <npajkovs@redhat.com>
+Date:   Wed Oct 5 16:57:15 2011 +0200
+
+    Merge branch 'dont-report-tainted-kernel'
+    
+    * dont-report-tainted-kernel:
+      refuse reporting when *not-reportable* file exist
+
+commit 84ac556ce91474f2ca8bd343947060bdd47d1a66
+Author: Miroslav Lichvar <mlichvar@redhat.com>
+Date:   Wed Oct 5 14:45:22 2011 +0200
+
+    wizard: keep problem data selectable after attaching file (trac#344)
+
+diff --git a/src/gui-wizard-gtk/main.c b/src/gui-wizard-gtk/main.c
+index 6c37139..66402f2 100644
+--- a/src/gui-wizard-gtk/main.c
++++ b/src/gui-wizard-gtk/main.c
+@@ -63,10 +63,16 @@ void reload_problem_data_from_dump_dir(void)
+             if (old_item)
+             {
+                 new_item->selected_by_user = old_item->selected_by_user;
++                new_item->allowed_by_reporter = old_item->allowed_by_reporter;
++                new_item->default_by_reporter = old_item->default_by_reporter;
++                new_item->required_by_reporter = old_item->required_by_reporter;
+             }
+             else
+             {
+                 new_item->selected_by_user = 0;
++                new_item->allowed_by_reporter = 0;
++                new_item->default_by_reporter = 0;
++                new_item->required_by_reporter = 0;
+             }
+             //log("%s: was ->selected_by_user=%d", __func__, new_item->selected_by_user);
+         }
+diff --git a/src/gui-wizard-gtk/wizard.c b/src/gui-wizard-gtk/wizard.c
+index 8bdc8d1..425675d 100644
+--- a/src/gui-wizard-gtk/wizard.c
++++ b/src/gui-wizard-gtk/wizard.c
+@@ -971,6 +971,17 @@ static void append_item_to_ls_details(gpointer name, gpointer value, gpointer da
+                               -1);
+         free(msg);
+     }
++
++    int cur_value;
++    if (item->selected_by_user == 0)
++        cur_value = item->default_by_reporter;
++    else
++        cur_value = !!(item->selected_by_user + 1); /* map -1,1 to 0,1 */
++
++    gtk_list_store_set(g_ls_details, &iter,
++            DETAIL_COLUMN_CHECKBOX, cur_value,
++            -1);
++}
+ }
+ 
+ /* Update collector/reporter checkboxes according to events parameter.
+@@ -2182,7 +2193,6 @@ static void on_btn_add_file(GtkButton *button)
+                     }
+                     if (!message)
+                     {
+-// FIXME: this destroys checkbox settings for each item!
+                         reload_problem_data_from_dump_dir();
+                         update_gui_state_from_problem_data();
+                     }
+
+commit ea654703d3f1022a9d746d6eaa831a7a6cd74b69
+Author: Miroslav Lichvar <mlichvar@redhat.com>
+Date:   Wed Oct 5 14:50:07 2011 +0200
+
+    wizard: select attached files
+
+diff --git a/src/gui-wizard-gtk/wizard.c b/src/gui-wizard-gtk/wizard.c
+index 425675d..10c2342 100644
+--- a/src/gui-wizard-gtk/wizard.c
++++ b/src/gui-wizard-gtk/wizard.c
+@@ -982,6 +982,80 @@ static void append_item_to_ls_details(gpointer name, gpointer value, gpointer da
+             DETAIL_COLUMN_CHECKBOX, cur_value,
+             -1);
+ }
++
++/* Based on selected reporter, update item checkboxes */
++static void update_ls_details_checkboxes()
++{
++    event_config_t *cfg = get_event_config(g_reporter_events_selected ? g_reporter_events_selected : "");
++    //log("%s: event:'%s', cfg:'%p'", __func__, g_reporter_events_selected, cfg);
++    GHashTableIter iter;
++    char *name;
++    struct problem_item *item;
++    g_hash_table_iter_init(&iter, g_cd);
++    while (g_hash_table_iter_next(&iter, (void**)&name, (void**)&item))
++    {
++        /* Decide whether item is allowed, required, and what's the default */
++        item->allowed_by_reporter = 1;
++        if (cfg)
++        {
++            if (is_in_comma_separated_list_of_glob_patterns(name, cfg->ec_exclude_items_always))
++                item->allowed_by_reporter = 0;
++            if ((item->flags & CD_FLAG_BIN) && cfg->ec_exclude_binary_items)
++                item->allowed_by_reporter = 0;
++        }
++
++        item->default_by_reporter = item->allowed_by_reporter;
++        if (cfg)
++        {
++            if (is_in_comma_separated_list_of_glob_patterns(name, cfg->ec_exclude_items_by_default))
++                item->default_by_reporter = 0;
++            if (is_in_comma_separated_list_of_glob_patterns(name, cfg->ec_include_items_by_default))
++                item->allowed_by_reporter = item->default_by_reporter = 1;
++        }
++
++        item->required_by_reporter = 0;
++        if (cfg)
++        {
++            if (is_in_comma_separated_list_of_glob_patterns(name, cfg->ec_requires_items))
++                item->default_by_reporter = item->allowed_by_reporter = item->required_by_reporter = 1;
++        }
++
++        int cur_value;
++        if (item->selected_by_user == 0)
++            cur_value = item->default_by_reporter;
++        else
++            cur_value = !!(item->selected_by_user + 1); /* map -1,1 to 0,1 */
++
++        //log("%s: '%s' allowed:%d reqd:%d def:%d user:%d", __func__, name,
++        //    item->allowed_by_reporter,
++        //    item->required_by_reporter,
++        //    item->default_by_reporter,
++        //    item->selected_by_user
++        //);
++
++        /* Find corresponding line and update checkbox */
++        GtkTreeIter iter;
++        if (gtk_tree_model_get_iter_first(GTK_TREE_MODEL(g_ls_details), &iter))
++        {
++            do {
++                gchar *item_name = NULL;
++                gtk_tree_model_get(GTK_TREE_MODEL(g_ls_details), &iter,
++                            DETAIL_COLUMN_NAME, &item_name,
++                            -1);
++                if (!item_name) /* paranoia, should never happen */
++                    continue;
++                int differ = strcmp(name, item_name);
++                g_free(item_name);
++                if (differ)
++                    continue;
++                gtk_list_store_set(g_ls_details, &iter,
++                        DETAIL_COLUMN_CHECKBOX, cur_value,
++                        -1);
++                //log("%s: changed gtk_list_store_set to %d", __func__, (item->allowed_by_reporter && item->selected_by_user >= 0));
++                break;
++            } while (gtk_tree_model_iter_next(GTK_TREE_MODEL(g_ls_details), &iter));
++        }
++    }
+ }
+ 
+ /* Update collector/reporter checkboxes according to events parameter.
+@@ -1906,77 +1980,7 @@ static void on_page_prepare(GtkAssistant *assistant, GtkWidget *page, gpointer u
+ 
+         if (pages[PAGENO_REVIEW_DATA].page_widget == page)
+         {
+-            /* Based on selected reporter, update item checkboxes */
+-            event_config_t *cfg = get_event_config(g_reporter_events_selected ? g_reporter_events_selected : "");
+-            //log("%s: event:'%s', cfg:'%p'", __func__, g_reporter_events_selected, cfg);
+-            GHashTableIter iter;
+-            char *name;
+-            struct problem_item *item;
+-            g_hash_table_iter_init(&iter, g_cd);
+-            while (g_hash_table_iter_next(&iter, (void**)&name, (void**)&item))
+-            {
+-                /* Decide whether item is allowed, required, and what's the default */
+-                item->allowed_by_reporter = 1;
+-                if (cfg)
+-                {
+-                    if (is_in_comma_separated_list_of_glob_patterns(name, cfg->ec_exclude_items_always))
+-                        item->allowed_by_reporter = 0;
+-                    if ((item->flags & CD_FLAG_BIN) && cfg->ec_exclude_binary_items)
+-                        item->allowed_by_reporter = 0;
+-                }
+-
+-                item->default_by_reporter = item->allowed_by_reporter;
+-                if (cfg)
+-                {
+-                    if (is_in_comma_separated_list_of_glob_patterns(name, cfg->ec_exclude_items_by_default))
+-                        item->default_by_reporter = 0;
+-                    if (is_in_comma_separated_list_of_glob_patterns(name, cfg->ec_include_items_by_default))
+-                        item->allowed_by_reporter = item->default_by_reporter = 1;
+-                }
+-
+-                item->required_by_reporter = 0;
+-                if (cfg)
+-                {
+-                    if (is_in_comma_separated_list_of_glob_patterns(name, cfg->ec_requires_items))
+-                        item->default_by_reporter = item->allowed_by_reporter = item->required_by_reporter = 1;
+-                }
+-
+-                int cur_value;
+-                if (item->selected_by_user == 0)
+-                    cur_value = item->default_by_reporter;
+-                else
+-                    cur_value = !!(item->selected_by_user + 1); /* map -1,1 to 0,1 */
+-
+-                //log("%s: '%s' allowed:%d reqd:%d def:%d user:%d", __func__, name,
+-                //    item->allowed_by_reporter,
+-                //    item->required_by_reporter,
+-                //    item->default_by_reporter,
+-                //    item->selected_by_user
+-                //);
+-
+-                /* Find corresponding line and update checkbox */
+-                GtkTreeIter iter;
+-                if (gtk_tree_model_get_iter_first(GTK_TREE_MODEL(g_ls_details), &iter))
+-                {
+-                    do {
+-                        gchar *item_name = NULL;
+-                        gtk_tree_model_get(GTK_TREE_MODEL(g_ls_details), &iter,
+-                                    DETAIL_COLUMN_NAME, &item_name,
+-                                    -1);
+-                        if (!item_name) /* paranoia, should never happen */
+-                            continue;
+-                        int differ = strcmp(name, item_name);
+-                        g_free(item_name);
+-                        if (differ)
+-                            continue;
+-                        gtk_list_store_set(g_ls_details, &iter,
+-                                DETAIL_COLUMN_CHECKBOX, cur_value,
+-                                -1);
+-                        //log("%s: changed gtk_list_store_set to %d", __func__, (item->allowed_by_reporter && item->selected_by_user >= 0));
+-                        break;
+-                    } while (gtk_tree_model_iter_next(GTK_TREE_MODEL(g_ls_details), &iter));
+-                }
+-            }
++            update_ls_details_checkboxes();
+         }
+     }
+ 
+@@ -2195,6 +2199,8 @@ static void on_btn_add_file(GtkButton *button)
+                     {
+                         reload_problem_data_from_dump_dir();
+                         update_gui_state_from_problem_data();
++                        /* Set flags for the new item */
++                        update_ls_details_checkboxes();
+                     }
+                 }
+                 free(new_name);
+
+commit 9b0b9447e7ef458c596bcf9325fbd67c29cc573b
+Author: Michal Toman <mtoman@redhat.com>
+Date:   Thu Oct 6 13:28:26 2011 +0200
+
+    nicer analyzer window
+
+diff --git a/src/gui-wizard-gtk/wizard.c b/src/gui-wizard-gtk/wizard.c
+index 10c2342..e299d2f 100644
+--- a/src/gui-wizard-gtk/wizard.c
++++ b/src/gui-wizard-gtk/wizard.c
+@@ -48,6 +48,7 @@ static GtkBox *g_box_analyzers;
+ static GList *g_list_analyzers;
+ static GtkLabel *g_lbl_analyze_log;
+ static GtkTextView *g_tv_analyze_log;
++static GtkProgressBar *g_pb_analyze;
+ 
+ static GtkBox *g_box_collectors;
+ /* List of event_gui_data's */
+@@ -104,6 +105,9 @@ static GtkEntry *g_search_entry_bt;
+ static GtkBuilder *builder;
+ static PangoFontDescription *monospace_font;
+ 
++static gboolean pb_pulse = false;
++static gint pb_pulse_speed = 150;
++
+ 
+ /* THE PAGE FLOW
+  * page_0:  introduction/summary
+@@ -1490,6 +1494,8 @@ static gboolean consume_cmd_output(GIOChannel *source, GIOCondition condition, g
+             {
+                 append_to_textview(evd->tv_log, msg);
+                 save_to_event_log(evd, msg);
++                /* cuts off \n from msg */
++                gtk_label_set_text(g_lbl_analyze_log, strtrim(msg));
+             }
+ 
+             strbuf_clear(line);
+@@ -1558,7 +1564,6 @@ static gboolean consume_cmd_output(GIOChannel *source, GIOCondition condition, g
+     ) {
+         VERB1 log("done running event on '%s': %d", g_dump_dir_name, retval);
+         append_to_textview(evd->tv_log, "\n");
+-
+         for (;;)
+         {
+             if (!evd->more_events)
+@@ -1571,6 +1576,9 @@ static gboolean consume_cmd_output(GIOChannel *source, GIOCondition condition, g
+                 strbuf_free(line);
+                 line = NULL;
+ 
++                /* hide progress bar */
++                pb_pulse = false;
++
+                 /* Enable (un-gray out) navigation buttons */
+                 gtk_widget_set_sensitive(GTK_WIDGET(g_assistant), true);
+ 
+@@ -1617,6 +1625,16 @@ static gboolean consume_cmd_output(GIOChannel *source, GIOCondition condition, g
+     return TRUE; /* "please don't remove this event (yet)" */
+ }
+ 
++/* pulse the progressbar */
++static gboolean pb_pulse_timeout(gpointer data)
++{
++    if (pb_pulse)
++        gtk_progress_bar_pulse(g_pb_analyze);
++    else
++        gtk_widget_hide(GTK_WIDGET(g_pb_analyze));
++    return pb_pulse;
++}
++
+ static void start_event_run(const char *event_name,
+                 GList *more_events,
+                 GtkWidget *page,
+@@ -1630,6 +1648,9 @@ static void start_event_run(const char *event_name,
+      */
+     struct run_event_state *state = new_run_event_state();
+ 
++    pb_pulse = true;
++    g_timeout_add(pb_pulse_speed, pb_pulse_timeout, NULL);
++
+     if (prepare_commands(state, g_dump_dir_name, event_name) == 0)
+     {
+  no_cmds:
+@@ -2356,6 +2377,7 @@ static void add_pages()
+     g_box_analyzers        = GTK_BOX(          gtk_builder_get_object(builder, "vb_analyzers"));
+     g_lbl_analyze_log      = GTK_LABEL(        gtk_builder_get_object(builder, "lbl_analyze_log"));
+     g_tv_analyze_log       = GTK_TEXT_VIEW(    gtk_builder_get_object(builder, "tv_analyze_log"));
++    g_pb_analyze           = GTK_PROGRESS_BAR( gtk_builder_get_object(builder, "pb_analyze"));
+     g_box_collectors       = GTK_BOX(          gtk_builder_get_object(builder, "vb_collectors"));
+     g_lbl_collect_log      = GTK_LABEL(        gtk_builder_get_object(builder, "lbl_collect_log"));
+     g_tv_collect_log       = GTK_TEXT_VIEW(    gtk_builder_get_object(builder, "tv_collect_log"));
+diff --git a/src/gui-wizard-gtk/wizard.glade b/src/gui-wizard-gtk/wizard.glade
+index 593d1d7..74dd967 100644
+--- a/src/gui-wizard-gtk/wizard.glade
++++ b/src/gui-wizard-gtk/wizard.glade
+@@ -51,7 +51,7 @@
+               <object class="GtkScrolledWindow" id="container_details1">
+                 <property name="visible">True</property>
+                 <property name="can_focus">True</property>
+-                <property name="shadow_type">GTK_SHADOW_OUT</property>
++                <property name="shadow_type">out</property>
+                 <child>
+                   <object class="GtkTreeView" id="tv_details">
+                     <property name="visible">True</property>
+@@ -108,7 +108,7 @@
+               <object class="GtkScrolledWindow" id="scrolledwindow4">
+                 <property name="visible">True</property>
+                 <property name="can_focus">True</property>
+-                <property name="shadow_type">GTK_SHADOW_OUT</property>
++                <property name="shadow_type">out</property>
+                 <child>
+                   <object class="GtkTextView" id="tv_comment">
+                     <property name="visible">True</property>
+@@ -167,20 +167,22 @@
+       </object>
+     </child>
+   </object>
+-  <object class="GtkWindow" id="window2">
++  <object class="GtkWindow" id="window10">
+     <property name="can_focus">False</property>
+     <child>
+-      <object class="GtkVBox" id="page_2">
++      <object class="GtkVBox" id="page_4">
+         <property name="visible">True</property>
+         <property name="can_focus">False</property>
+         <property name="border_width">10</property>
+         <property name="spacing">3</property>
+         <child>
+-          <object class="GtkLabel" id="lbl_page5">
++          <object class="GtkLabel" id="lbl_page7">
+             <property name="visible">True</property>
+             <property name="can_focus">False</property>
+             <property name="xalign">0</property>
+-            <property name="label" translatable="yes">Select how you would like to analyze the problem:</property>
++            <property name="label" translatable="yes">Select additional files to attach to the report:</property>
++            <property name="use_markup">True</property>
++            <property name="justify">fill</property>
+             <property name="wrap">True</property>
+           </object>
+           <packing>
+@@ -190,7 +192,7 @@
+           </packing>
+         </child>
+         <child>
+-          <object class="GtkVBox" id="vb_analyzers">
++          <object class="GtkVBox" id="vb_collectors">
+             <property name="visible">True</property>
+             <property name="can_focus">False</property>
+             <child>
+@@ -204,11 +206,11 @@
+           </packing>
+         </child>
+         <child>
+-          <object class="GtkHBox" id="hbox2">
++          <object class="GtkHBox" id="hbox4">
+             <property name="visible">True</property>
+             <property name="can_focus">False</property>
+             <child>
+-              <object class="GtkButton" id="button_cfg1">
++              <object class="GtkButton" id="button_cfg3">
+                 <property name="label">gtk-preferences</property>
+                 <property name="visible">True</property>
+                 <property name="can_focus">True</property>
+@@ -225,7 +227,7 @@
+               </packing>
+             </child>
+             <child>
+-              <object class="GtkAlignment" id="alignment3">
++              <object class="GtkAlignment" id="alignment5">
+                 <property name="visible">True</property>
+                 <property name="can_focus">False</property>
+                 <child>
+@@ -248,20 +250,20 @@
+       </object>
+     </child>
+   </object>
+-  <object class="GtkWindow" id="window3">
++  <object class="GtkWindow" id="window11">
+     <property name="can_focus">False</property>
+     <child>
+-      <object class="GtkVBox" id="page_3">
++      <object class="GtkVBox" id="page_5">
+         <property name="visible">True</property>
+         <property name="can_focus">False</property>
+         <property name="border_width">10</property>
+         <property name="spacing">3</property>
+         <child>
+-          <object class="GtkLabel" id="lbl_analyze_log">
++          <object class="GtkLabel" id="lbl_collect_log">
+             <property name="visible">True</property>
+             <property name="can_focus">False</property>
+             <property name="xalign">0</property>
+-            <property name="label" translatable="yes">Analyzing did not start yet</property>
++            <property name="label" translatable="yes">Collecting did not start yet</property>
+             <property name="use_markup">True</property>
+             <property name="wrap">True</property>
+           </object>
+@@ -272,12 +274,12 @@
+           </packing>
+         </child>
+         <child>
+-          <object class="GtkScrolledWindow" id="scrolledwindow1">
++          <object class="GtkScrolledWindow" id="scrolledwindow7">
+             <property name="visible">True</property>
+             <property name="can_focus">True</property>
+-            <property name="shadow_type">GTK_SHADOW_OUT</property>
++            <property name="shadow_type">out</property>
+             <child>
+-              <object class="GtkTextView" id="tv_analyze_log">
++              <object class="GtkTextView" id="tv_collect_log">
+                 <property name="visible">True</property>
+                 <property name="can_focus">True</property>
+                 <property name="editable">False</property>
+@@ -294,22 +296,20 @@
+       </object>
+     </child>
+   </object>
+-  <object class="GtkWindow" id="window10">
++  <object class="GtkWindow" id="window2">
+     <property name="can_focus">False</property>
+     <child>
+-      <object class="GtkVBox" id="page_4">
++      <object class="GtkVBox" id="page_2">
+         <property name="visible">True</property>
+         <property name="can_focus">False</property>
+         <property name="border_width">10</property>
+         <property name="spacing">3</property>
+         <child>
+-          <object class="GtkLabel" id="lbl_page7">
++          <object class="GtkLabel" id="lbl_page5">
+             <property name="visible">True</property>
+             <property name="can_focus">False</property>
+             <property name="xalign">0</property>
+-            <property name="label" translatable="yes">Select additional files to attach to the report:</property>
+-            <property name="use_markup">True</property>
+-            <property name="justify">fill</property>
++            <property name="label" translatable="yes">Select how you would like to analyze the problem:</property>
+             <property name="wrap">True</property>
+           </object>
+           <packing>
+@@ -319,7 +319,7 @@
+           </packing>
+         </child>
+         <child>
+-          <object class="GtkVBox" id="vb_collectors">
++          <object class="GtkVBox" id="vb_analyzers">
+             <property name="visible">True</property>
+             <property name="can_focus">False</property>
+             <child>
+@@ -333,11 +333,11 @@
+           </packing>
+         </child>
+         <child>
+-          <object class="GtkHBox" id="hbox4">
++          <object class="GtkHBox" id="hbox2">
+             <property name="visible">True</property>
+             <property name="can_focus">False</property>
+             <child>
+-              <object class="GtkButton" id="button_cfg3">
++              <object class="GtkButton" id="button_cfg1">
+                 <property name="label">gtk-preferences</property>
+                 <property name="visible">True</property>
+                 <property name="can_focus">True</property>
+@@ -354,7 +354,7 @@
+               </packing>
+             </child>
+             <child>
+-              <object class="GtkAlignment" id="alignment5">
++              <object class="GtkAlignment" id="alignment3">
+                 <property name="visible">True</property>
+                 <property name="can_focus">False</property>
+                 <child>
+@@ -377,22 +377,24 @@
+       </object>
+     </child>
+   </object>
+-  <object class="GtkWindow" id="window11">
++  <object class="GtkWindow" id="window3">
+     <property name="can_focus">False</property>
+     <child>
+-      <object class="GtkVBox" id="page_5">
++      <object class="GtkVBox" id="page_3">
+         <property name="visible">True</property>
+         <property name="can_focus">False</property>
+         <property name="border_width">10</property>
+         <property name="spacing">3</property>
+         <child>
+-          <object class="GtkLabel" id="lbl_collect_log">
++          <object class="GtkLabel" id="lbl_analyze_log">
+             <property name="visible">True</property>
+             <property name="can_focus">False</property>
+             <property name="xalign">0</property>
+-            <property name="label" translatable="yes">Collecting did not start yet</property>
++            <property name="label" translatable="yes">Analyzing did not start yet</property>
+             <property name="use_markup">True</property>
+-            <property name="wrap">True</property>
++            <property name="justify">fill</property>
++            <property name="single_line_mode">True</property>
++            <property name="max_width_chars">64</property>
+           </object>
+           <packing>
+             <property name="expand">False</property>
+@@ -401,23 +403,47 @@
+           </packing>
+         </child>
+         <child>
+-          <object class="GtkScrolledWindow" id="scrolledwindow7">
++          <object class="GtkProgressBar" id="pb_analyze">
++            <property name="visible">True</property>
++            <property name="can_focus">False</property>
++          </object>
++          <packing>
++            <property name="expand">False</property>
++            <property name="fill">True</property>
++            <property name="position">1</property>
++          </packing>
++        </child>
++        <child>
++          <object class="GtkExpander" id="expand_analyze">
+             <property name="visible">True</property>
+             <property name="can_focus">True</property>
+-            <property name="shadow_type">GTK_SHADOW_OUT</property>
+             <child>
+-              <object class="GtkTextView" id="tv_collect_log">
++              <object class="GtkScrolledWindow" id="scrolledwindow1">
+                 <property name="visible">True</property>
+                 <property name="can_focus">True</property>
+-                <property name="editable">False</property>
+-                <property name="accepts_tab">False</property>
++                <property name="shadow_type">out</property>
++                <child>
++                  <object class="GtkTextView" id="tv_analyze_log">
++                    <property name="visible">True</property>
++                    <property name="can_focus">True</property>
++                    <property name="editable">False</property>
++                    <property name="accepts_tab">False</property>
++                  </object>
++                </child>
++              </object>
++            </child>
++            <child type="label">
++              <object class="GtkLabel" id="lbl_analyze_show_log">
++                <property name="visible">True</property>
++                <property name="can_focus">False</property>
++                <property name="label" translatable="yes">Show log</property>
+               </object>
+             </child>
+           </object>
+           <packing>
+             <property name="expand">True</property>
+             <property name="fill">True</property>
+-            <property name="position">1</property>
++            <property name="position">2</property>
+           </packing>
+         </child>
+       </object>
+@@ -534,7 +560,7 @@
+           <object class="GtkScrolledWindow" id="scrolledwindow2">
+             <property name="visible">True</property>
+             <property name="can_focus">True</property>
+-            <property name="shadow_type">GTK_SHADOW_OUT</property>
++            <property name="shadow_type">out</property>
+             <child>
+               <object class="GtkTextView" id="tv_backtrace">
+                 <property name="visible">True</property>
+@@ -788,7 +814,7 @@
+           <object class="GtkScrolledWindow" id="container_details2">
+             <property name="visible">True</property>
+             <property name="can_focus">True</property>
+-            <property name="shadow_type">GTK_SHADOW_OUT</property>
++            <property name="shadow_type">out</property>
+             <child>
+               <placeholder/>
+             </child>
+@@ -875,7 +901,7 @@
+           <object class="GtkScrolledWindow" id="scrolledwindow6">
+             <property name="visible">True</property>
+             <property name="can_focus">True</property>
+-            <property name="shadow_type">GTK_SHADOW_OUT</property>
++            <property name="shadow_type">out</property>
+             <child>
+               <object class="GtkTextView" id="tv_report_log">
+                 <property name="visible">True</property>
+
+commit 53b100f7fa33ed67fb498ddb2634e6cc3801b2ad
+Author: Martin Milata <mmilata@redhat.com>
+Date:   Thu Oct 6 11:25:09 2011 +0200
+
+    Display reason and prgname in wizard title (#304)
+    
+    This should be more informative than the dump dir we are displaying now
+    (and which is still a fallback if there is no reason item).
+
+diff --git a/src/gui-wizard-gtk/wizard.c b/src/gui-wizard-gtk/wizard.c
+index e299d2f..d4200aa 100644
+--- a/src/gui-wizard-gtk/wizard.c
++++ b/src/gui-wizard-gtk/wizard.c
+@@ -330,6 +330,17 @@ static void show_event_opt_error_dialog(const char *event_name)
+         gtk_widget_destroy(wrong_settings);
+ }
+ 
++static void update_window_title(void)
++{
++    /* prgname can be null according to gtk documentation */
++    const char *prgname = g_get_prgname();
++    const char *reason = get_problem_item_content_or_NULL(g_cd, FILENAME_REASON);
++    char *title = xasprintf("%s - %s", (reason ? reason : g_dump_dir_name),
++            (prgname ? prgname : "report"));
++    gtk_window_set_title(GTK_WINDOW(g_assistant), title);
++    free(title);
++}
++
+ struct dump_dir *steal_if_needed(struct dump_dir *dd)
+ {
+     if (!dd)
+@@ -379,7 +390,7 @@ struct dump_dir *steal_if_needed(struct dump_dir *dd)
+     g_dump_dir_name = xstrdup(dd->dd_dirname);
+     dd_close(dd);
+ 
+-    gtk_window_set_title(GTK_WINDOW(g_assistant), g_dump_dir_name);
++    update_window_title();
+     delete_dump_dir_possibly_using_abrtd(old_name); //TODO: if (deletion_failed) error_msg("BAD")?
+     free(old_name);
+ 
+@@ -1118,7 +1129,7 @@ static void update_event_checkboxes(GList **events_gui_data,
+ 
+ void update_gui_state_from_problem_data(void)
+ {
+-    gtk_window_set_title(GTK_WINDOW(g_assistant), g_dump_dir_name);
++    update_window_title();
+ 
+     const char *reason = get_problem_item_content_or_NULL(g_cd, FILENAME_REASON);
+     const char *not_reportable = get_problem_item_content_or_NULL(g_cd,
+
+commit f549d601c29d63a6439396324053be80358cb201
+Author: Nikola Pajkovsky <npajkovs@redhat.com>
+Date:   Thu Oct 6 13:23:15 2011 +0200
+
+    move kernel-tainted.c to abrt.git
+    
+    Signed-off-by: Nikola Pajkovsky <npajkovs@redhat.com>
+
+diff --git a/src/include/internal_libreport.h b/src/include/internal_libreport.h
+index 5fc09c3..2114db0 100644
+--- a/src/include/internal_libreport.h
++++ b/src/include/internal_libreport.h
+@@ -580,12 +580,6 @@ int delete_dump_dir_possibly_using_abrtd(const char *dump_dir_name);
+ #define steal_directory libreport_steal_directory
+ struct dump_dir *steal_directory(const char *base_dir, const char *dump_dir_name);
+ 
+-#define kernel_tainted_short libreport_kernel_tainted_short
+-char *kernel_tainted_short(const char *kernel_bt);
+-#define kernel_tainted_long libreport_kernel_tainted_long
+-GList *kernel_tainted_long(unsigned tainted);
+-
+-
+ // Text bigger than this usually is attached, not added inline
+ // was 2k, now bumbed up to 20k:
+ #define CD_TEXT_ATT_SIZE (20*1024)
+diff --git a/src/lib/Makefile.am b/src/lib/Makefile.am
+index e914f8a..f80e2f7 100644
+--- a/src/lib/Makefile.am
++++ b/src/lib/Makefile.am
+@@ -44,7 +44,6 @@ libreport_la_SOURCES = \
+     steal_directory.c \
+     event_xml_parser.c \
+     event_config.c \
+-    kernel-tainted.c \
+     report.c \
+     client.c
+ libreport_la_CPPFLAGS = \
+diff --git a/src/lib/kernel-tainted.c b/src/lib/kernel-tainted.c
+deleted file mode 100644
+index 217587c..0000000
+--- a/src/lib/kernel-tainted.c
++++ /dev/null
+@@ -1,143 +0,0 @@
+-/*
+-    Copyright (C) 2011  ABRT team
+-    Copyright (C) 2011  RedHat Inc
+-
+-    This program is free software; you can redistribute it and/or modify
+-    it under the terms of the GNU General Public License as published by
+-    the Free Software Foundation; either version 2 of the License, or
+-    (at your option) any later version.
+-
+-    This program is distributed in the hope that it will be useful,
+-    but WITHOUT ANY WARRANTY; without even the implied warranty of
+-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-    GNU General Public License for more details.
+-
+-    You should have received a copy of the GNU General Public License along
+-    with this program; if not, write to the Free Software Foundation, Inc.,
+-    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+-*/
+-#include "internal_libreport.h"
+-
+-/* reading /proc/sys/kernel/tainted file after an oops is ALWAYS going
+- * to show it as tainted.
+- *
+- * https://bugzilla.redhat.com/show_bug.cgi?id=724838
+- */
+-
+-/* From RHEL6 kernel/panic.c: */
+-static const int tnts_short[] = {
+-	 'P' ,
+-	 'F' ,
+-	 'S' ,
+-	 'R' ,
+-	 'M' ,
+-	 'B' ,
+-	 'U' ,
+-	 'D' ,
+-	 'A' ,
+-	 'W' ,
+-	 'C' ,
+-	 'I' ,
+-	 '-' ,
+-	 '-' ,
+-	 '-' ,
+-	 '-' ,
+-	 '-' ,
+-	 '-' ,
+-	 '-' ,
+-	 '-' ,
+-	 '-' ,
+-	 '-' ,
+-	 '-' ,
+-	 '-' ,
+-	 '-' ,
+-	 '-' ,
+-	 '-' ,
+-	 '-' ,
+-	 'H' ,
+-	 'T' ,
+-};
+-
+-/**
+- *	print_tainted - return a string to represent the kernel taint state.
+- *
+- *  'P' - Proprietary module has been loaded.
+- *  'F' - Module has been forcibly loaded.
+- *  'S' - SMP with CPUs not designed for SMP.
+- *  'R' - User forced a module unload.
+- *  'M' - System experienced a machine check exception.
+- *  'B' - System has hit bad_page.
+- *  'U' - Userspace-defined naughtiness.
+- *  'D' - Kernel has oopsed before
+- *  'A' - ACPI table overridden.
+- *  'W' - Taint on warning.
+- *  'C' - modules from drivers/staging are loaded.
+- *  'I' - Working around severe firmware bug.
+- *  'H' - Hardware is unsupported.
+- *   T  - Tech_preview
+- */
+-
+-
+-static const char *const tnts_long[] = {
+-    "Proprietary module has been loaded.",
+-    "Module has been forcibly loaded.",
+-    "SMP with CPUs not designed for SMP.",
+-    "User forced a module unload.",
+-    "System experienced a machine check exception.",
+-    "System has hit bad_page.",
+-    "Userspace-defined naughtiness.",
+-    "Kernel has oopsed before.",
+-    "ACPI table overridden.",
+-    "Taint on warning.",
+-    "Modules from drivers/staging are loaded.",
+-    "Working around severe firmware bug.",
+-    NULL,
+-    NULL,
+-    NULL,
+-    NULL,
+-    NULL,
+-    NULL,
+-    NULL,
+-    NULL,
+-    NULL,
+-    NULL,
+-    NULL,
+-    NULL,
+-    NULL,
+-    NULL,
+-    NULL,
+-    NULL,
+-    NULL,
+-    "Hardware is unsupported.",
+-    "Tech_preview",
+-};
+-
+-char *kernel_tainted_short(const char *kernel_bt)
+-{
+-
+-    /* example of flags: |G    B      | */
+-    char *tainted = strstr(kernel_bt, "Tainted: ");
+-    if (!tainted)
+-        return NULL;
+-
+-    /* 12 == count of flags */
+-    char *tnt = xstrndup(tainted + strlen("Tainted: "), 12);
+-    return tnt;
+-}
+-
+-GList *kernel_tainted_long(unsigned tainted)
+-{
+-    int i = 0;
+-    GList *tnt = NULL;
+-
+-    while (tainted)
+-    {
+-        if (0x1 & tainted && tnts_long[i])
+-            tnt = g_list_append(tnt, xstrdup(tnts_long[i]));
+-
+-        ++i;
+-        tainted >>= 1;
+-    }
+-
+-    return tnt;
+-}
+
+commit aa4bb0a5df16f61dd4229fbb0ef9eb90cb432d19
+Author: Miroslav Lichvar <mlichvar@redhat.com>
+Date:   Fri Oct 7 16:28:27 2011 +0200
+
+    wizard: align close button to left (bz#741230)
+
+diff --git a/src/gui-wizard-gtk/wizard.c b/src/gui-wizard-gtk/wizard.c
+index d4200aa..5114b27 100644
+--- a/src/gui-wizard-gtk/wizard.c
++++ b/src/gui-wizard-gtk/wizard.c
+@@ -2442,6 +2442,12 @@ static void add_pages()
+     GtkWidget *w;
+     if (!not_reportable)
+     {
++        /* Align the "Close" button to left */   
++        w = gtk_alignment_new(0.0, 0.0, 1.0, 1.0);
++        gtk_assistant_add_action_widget(g_assistant, w);
++        gtk_box_set_child_packing(GTK_BOX(gtk_widget_get_parent(w)), w, TRUE, FALSE, 0, GTK_PACK_END);
++        gtk_widget_show(w);
++
+         w = gtk_button_new_from_stock(GTK_STOCK_CLOSE);
+         g_signal_connect(w, "clicked", G_CALLBACK(gtk_main_quit), NULL);
+         gtk_widget_show(w);
+
+commit 6e078b66adab26b5202051d7edce1538289eb5d4
+Author: Michal Toman <mtoman@redhat.com>
+Date:   Mon Oct 10 14:37:59 2011 +0200
+
+    progress bar for report step
+
+diff --git a/src/gui-wizard-gtk/wizard.c b/src/gui-wizard-gtk/wizard.c
+index 5114b27..decb5ee 100644
+--- a/src/gui-wizard-gtk/wizard.c
++++ b/src/gui-wizard-gtk/wizard.c
+@@ -62,6 +62,7 @@ static GList *g_list_reporters;
+ static GList *g_list_selected_reporters;
+ static GtkLabel *g_lbl_report_log;
+ static GtkTextView *g_tv_report_log;
++static GtkProgressBar *g_pb_report;
+ 
+ static GtkContainer *g_container_details1;
+ static GtkContainer *g_container_details2;
+@@ -86,6 +87,9 @@ static GtkTreeViewColumn *g_tv_details_col_checkbox;
+ static GtkListStore *g_ls_details;
+ static GtkWidget *g_top_most_window;
+ 
++static GtkLabel *g_active_lbl;
++static GtkProgressBar *g_active_pb;
++
+ enum
+ {
+     /* Note: need to update types in
+@@ -1506,7 +1510,7 @@ static gboolean consume_cmd_output(GIOChannel *source, GIOCondition condition, g
+                 append_to_textview(evd->tv_log, msg);
+                 save_to_event_log(evd, msg);
+                 /* cuts off \n from msg */
+-                gtk_label_set_text(g_lbl_analyze_log, strtrim(msg));
++                gtk_label_set_text(g_active_lbl, strtrim(msg));
+             }
+ 
+             strbuf_clear(line);
+@@ -1640,9 +1644,9 @@ static gboolean consume_cmd_output(GIOChannel *source, GIOCondition condition, g
+ static gboolean pb_pulse_timeout(gpointer data)
+ {
+     if (pb_pulse)
+-        gtk_progress_bar_pulse(g_pb_analyze);
++        gtk_progress_bar_pulse(g_active_pb);
+     else
+-        gtk_widget_hide(GTK_WIDGET(g_pb_analyze));
++        gtk_widget_hide(GTK_WIDGET(g_active_pb));
+     return pb_pulse;
+ }
+ 
+@@ -1659,6 +1663,8 @@ static void start_event_run(const char *event_name,
+      */
+     struct run_event_state *state = new_run_event_state();
+ 
++    if (g_active_pb)
++        gtk_widget_show(GTK_WIDGET(g_active_pb));
+     pb_pulse = true;
+     g_timeout_add(pb_pulse_speed, pb_pulse_timeout, NULL);
+ 
+@@ -1982,6 +1988,18 @@ static void on_page_prepare(GtkAssistant *assistant, GtkWidget *page, gpointer u
+     //            pages[PAGENO_REVIEW_DATA].page_widget == page
+     //);
+ 
++    if (pages[PAGENO_ANALYZE_PROGRESS].page_widget == page)
++    {
++        g_active_pb = g_pb_analyze;
++        g_active_lbl = g_lbl_analyze_log;
++    }
++
++    if (pages[PAGENO_REPORT_PROGRESS].page_widget == page)
++    {
++        g_active_pb = g_pb_report;
++        g_active_lbl = g_lbl_report_log;
++    }
++
+     if (pages[PAGENO_EDIT_BACKTRACE].page_widget == page)
+     {
+         check_bt_rating_and_allow_send();
+@@ -2395,6 +2413,7 @@ static void add_pages()
+     g_box_reporters        = GTK_BOX(          gtk_builder_get_object(builder, "vb_reporters"));
+     g_lbl_report_log       = GTK_LABEL(        gtk_builder_get_object(builder, "lbl_report_log"));
+     g_tv_report_log        = GTK_TEXT_VIEW(    gtk_builder_get_object(builder, "tv_report_log"));
++    g_pb_report            = GTK_PROGRESS_BAR( gtk_builder_get_object(builder, "pb_report"));
+     g_tv_backtrace         = GTK_TEXT_VIEW(    gtk_builder_get_object(builder, "tv_backtrace"));
+     g_tv_comment           = GTK_TEXT_VIEW(    gtk_builder_get_object(builder, "tv_comment"));
+     g_eb_comment           = GTK_EVENT_BOX(    gtk_builder_get_object(builder, "eb_comment"));
+diff --git a/src/gui-wizard-gtk/wizard.glade b/src/gui-wizard-gtk/wizard.glade
+index 74dd967..c1d6637 100644
+--- a/src/gui-wizard-gtk/wizard.glade
++++ b/src/gui-wizard-gtk/wizard.glade
+@@ -898,23 +898,47 @@
+           </packing>
+         </child>
+         <child>
+-          <object class="GtkScrolledWindow" id="scrolledwindow6">
++          <object class="GtkProgressBar" id="pb_report">
++            <property name="visible">True</property>
++            <property name="can_focus">False</property>
++          </object>
++          <packing>
++            <property name="expand">False</property>
++            <property name="fill">True</property>
++            <property name="position">1</property>
++          </packing>
++        </child>
++        <child>
++          <object class="GtkExpander" id="expand_report">
+             <property name="visible">True</property>
+             <property name="can_focus">True</property>
+-            <property name="shadow_type">out</property>
+             <child>
+-              <object class="GtkTextView" id="tv_report_log">
++              <object class="GtkScrolledWindow" id="scrolledwindow6">
+                 <property name="visible">True</property>
+                 <property name="can_focus">True</property>
+-                <property name="editable">False</property>
+-                <property name="accepts_tab">False</property>
++                <property name="shadow_type">out</property>
++                <child>
++                  <object class="GtkTextView" id="tv_report_log">
++                    <property name="visible">True</property>
++                    <property name="can_focus">True</property>
++                    <property name="editable">False</property>
++                    <property name="accepts_tab">False</property>
++                  </object>
++                </child>
++              </object>
++            </child>
++            <child type="label">
++              <object class="GtkLabel" id="lbl_report_show_log">
++                <property name="visible">True</property>
++                <property name="can_focus">False</property>
++                <property name="label" translatable="yes">Show log</property>
+               </object>
+             </child>
+           </object>
+           <packing>
+             <property name="expand">True</property>
+             <property name="fill">True</property>
+-            <property name="position">1</property>
++            <property name="position">2</property>
+           </packing>
+         </child>
+       </object>
+
+commit 67d0516033c7eb5613e0e1342ab3775a43ee2677
+Author: Denys Vlasenko <dvlasenk@redhat.com>
+Date:   Mon Oct 10 17:20:53 2011 +0200
+
+    plug memory leak in send_report_to_new_case()
+    
+    Signed-off-by: Denys Vlasenko <dvlasenk@redhat.com>
+
+diff --git a/src/plugins/abrt_rh_support.c b/src/plugins/abrt_rh_support.c
+index 3f14579..8e2e9f4 100644
+--- a/src/plugins/abrt_rh_support.c
++++ b/src/plugins/abrt_rh_support.c
+@@ -478,6 +478,7 @@ send_report_to_new_case(const char* baseURL,
+ 
+     free_abrt_post_state(case_state);
+     free(allocated);
++    free(case_data);
+     free(case_url);
+     return result;
+ }
+
+commit 33f542c97db586d40e02451c1a483ceac8d2abc8
+Author: Denys Vlasenko <dvlasenk@redhat.com>
+Date:   Mon Oct 10 17:21:21 2011 +0200
+
+    reporter-rhtsupport: don't add now redundant "abrt version: n.n.n" text
+    
+    Signed-off-by: Denys Vlasenko <dvlasenk@redhat.com>
+
+diff --git a/src/plugins/reporter-rhtsupport.c b/src/plugins/reporter-rhtsupport.c
+index 25bed1e..9cdadde 100644
+--- a/src/plugins/reporter-rhtsupport.c
++++ b/src/plugins/reporter-rhtsupport.c
+@@ -64,10 +64,7 @@ static void report_to_rhtsupport(const char *dump_dir_name)
+         if (reason)
+             strbuf_append_strf(buf_summary, ": %s", reason);
+         summary = strbuf_free_nobuf(buf_summary);
+-
+-        char *bz_dsc = make_description_bz(problem_data);
+-        dsc = xasprintf("abrt version: "VERSION"\n%s", bz_dsc);
+-        free(bz_dsc);
++        dsc = make_description_bz(problem_data);
+     }
+     file = new_reportfile();
+     const char *dt_string = iso_date_string(NULL);
+
+commit d310f5e7873c02abf9d41b0edb0160a05c71f2cf
+Author: Denys Vlasenko <dvlasenk@redhat.com>
+Date:   Mon Oct 10 17:22:24 2011 +0200
+
+    abrt_rh_support: add attach_file_to_case(), rename send_report_to_new_case() to create_new_case()
+    
+    We used to have two copies of "attach file to case" code, one of them
+    inside send_report_to_new_case(), and another in reporter-rhtsupport tool.
+    
+    This change factors out this code into attach_file_to_case() function.
+    
+    Signed-off-by: Denys Vlasenko <dvlasenk@redhat.com>
+
+diff --git a/src/plugins/abrt_rh_support.c b/src/plugins/abrt_rh_support.c
+index 8e2e9f4..28765eb 100644
+--- a/src/plugins/abrt_rh_support.c
++++ b/src/plugins/abrt_rh_support.c
+@@ -221,7 +221,7 @@ void free_rhts_result(rhts_result_t *p)
+ }
+ 
+ //
+-// send_report_to_new_case()
++// create_new_case()
+ //
+ 
+ static char*
+@@ -301,16 +301,20 @@ make_response(const char* title, const char* body,
+ //<response><title>Case Created and Report Attached</title><body></body><URL href="http://support-services-devel.gss.redhat.com:8080/Strata/cases/00005129/attachments/ccbf3e65-b941-3db7-a016-6a3831691a32">New Case URL</URL></response>
+ #endif
+ 
++static const char *headers[] = {
++    "Accept: text/plain",
++    NULL
++};
++
+ rhts_result_t*
+-send_report_to_new_case(const char* baseURL,
++create_new_case(const char* baseURL,
+                 const char* username,
+                 const char* password,
+                 bool ssl_verify,
+                 const char* release,
+                 const char* summary,
+                 const char* description,
+-                const char* component,
+-                const char* report_file_name)
++                const char* component)
+ {
+     rhts_result_t *result = xzalloc(sizeof(*result));
+ 
+@@ -340,11 +344,6 @@ send_report_to_new_case(const char* baseURL,
+     case_state->username = username;
+     case_state->password = password;
+ 
+-    static const char *headers[] = {
+-        "Accept: text/plain",
+-        NULL
+-    };
+-
+     abrt_post_string(case_state, case_url, "application/xml", headers, case_data);
+ 
+     char *case_location = find_header_in_abrt_post_state(case_state, "Location:");
+@@ -373,6 +372,20 @@ send_report_to_new_case(const char* baseURL,
+         /* fall through */
+ 
+     default:
++        // TODO: error messages in headers
++        // are observed to be more informative than the body:
++        //
++        // 'HTTP/1.1 400 Bad Request'
++        // 'Date: Mon, 10 Oct 2011 13:31:56 GMT^M'
++        // 'Server: Apache^M'
++        // 'Strata-Message: The supplied parameter Fedora value  can not be processed^M'
++        // ^^^^^^^^^^^^^^^^^^^^^^^^^ useful message
++        // 'Strata-Code: BAD_PARAMETER^M'
++        // 'Content-Length: 1^M'
++        // 'Content-Type: text/plain; charset=UTF-8^M'
++        // 'Connection: close^M'
++        // '^M'
++        // ' '  <------ body is useless
+         result->error = -1;
+         errmsg = case_state->curl_error_msg;
+         if (errmsg && errmsg[0])
+@@ -392,7 +405,7 @@ send_report_to_new_case(const char* baseURL,
+         break;
+ 
+     case 200:
+-    case 201: {
++    case 201:
+         if (!case_location) {
+             /* Case Creation returned valid code, but no location */
+             result->error = -1;
+@@ -401,84 +414,99 @@ send_report_to_new_case(const char* baseURL,
+             break;
+         }
+ 
+-        char *atch_url = concat_path_file(case_location, "attachments");
+-        abrt_post_state_t *atch_state;
++        /* Cose created successfully */
++        result->url = xstrdup(case_location);
++        //result->msg = xstrdup("Case created");
++    } /* switch (case HTTP code) */
++
++    free_abrt_post_state(case_state);
++    free(allocated);
++    free(case_data);
++    free(case_url);
++    return result;
++}
++
++rhts_result_t*
++attach_file_to_case(const char* baseURL,
++                const char* username,
++                const char* password,
++                bool ssl_verify,
++                const char *file_name)
++{
++    rhts_result_t *result = xzalloc(sizeof(*result));
++
++    int redirect_count = 0;
++    char *atch_url = concat_path_file(baseURL, "attachments");
++    abrt_post_state_t *atch_state;
++
+  redirect_attach:
+-        atch_state = new_abrt_post_state(0
+-                + ABRT_POST_WANT_HEADERS
+-                + ABRT_POST_WANT_BODY
+-                + ABRT_POST_WANT_ERROR_MSG
+-                + (ssl_verify ? ABRT_POST_WANT_SSL_VERIFY : 0)
+-        );
+-        atch_state->username = username;
+-        atch_state->password = password;
+-
+-        abrt_post_file_as_form(atch_state, atch_url, "application/binary", headers,
+-                               report_file_name);
+-
+-        switch (atch_state->http_resp_code)
++    atch_state = new_abrt_post_state(0
++            + ABRT_POST_WANT_HEADERS
++            + ABRT_POST_WANT_BODY
++            + ABRT_POST_WANT_ERROR_MSG
++            + (ssl_verify ? ABRT_POST_WANT_SSL_VERIFY : 0)
++    );
++    atch_state->username = username;
++    atch_state->password = password;
++    abrt_post_file_as_form(atch_state,
++        atch_url,
++        "application/binary",
++        headers,
++        file_name
++    );
++
++    switch (atch_state->http_resp_code)
++    {
++    case 305: /* "305 Use Proxy" */
+         {
+-        case 305: /* "305 Use Proxy" */
++            char *atch_location = find_header_in_abrt_post_state(atch_state, "Location:");
++            if (++redirect_count < 10 && atch_location)
+             {
+-                char *atch_location = find_header_in_abrt_post_state(atch_state, "Location:");
+-                if (++redirect_count < 10 && atch_location)
+-                {
+-                    free(atch_url);
+-                    atch_url = xstrdup(atch_location);
+-                    free_abrt_post_state(atch_state);
+-                    goto redirect_attach;
+-                }
++                free(atch_url);
++                atch_url = xstrdup(atch_location);
++                free_abrt_post_state(atch_state);
++                goto redirect_attach;
+             }
+-            /* fall through */
++        }
++        /* fall through */
+ 
+-        default:
+-            /* Case Creation Succeeded, attachement FAILED */
+-            errmsg = atch_state->curl_error_msg;
++    default:
++        /* Error */
++        {
++            char *allocated = NULL;
++            const char *errmsg = atch_state->curl_error_msg;
+             if (atch_state->body && atch_state->body[0])
+             {
+                 if (errmsg && errmsg[0]
+                  && strcmp(errmsg, atch_state->body) != 0
+                 ) /* both strata/curl error and body are present (and aren't the same) */
+-                    allocated = errmsg = xasprintf("%s. %s",
++                    errmsg = allocated = xasprintf("%s. %s",
+                             atch_state->body,
+                             errmsg);
+                 else /* only body exists */
+                     errmsg = atch_state->body;
+             }
+             result->error = -1;
+-            result->url = xstrdup(case_location);
+-            result->msg = xasprintf("Case created but report attachment failed (HTTP code %d)%s%s",
++            result->msg = xasprintf("Attachment failed (HTTP code %d)%s%s",
+                     atch_state->http_resp_code,
+                     errmsg ? ": " : "",
+                     errmsg ? errmsg : ""
+             );
+-            break;
+-
+-        case 200:
+-        case 201:
+-            // unused
+-            //char *body = atch_state->body;
+-            //if (case_state->body && case_state->body[0])
+-            //{
+-            //    body = case_state->body;
+-            //    if (atch_state->body && atch_state->body[0])
+-            //        allocated = body = xasprintf("%s\n%s",
+-            //                case_state->body,
+-            //                atch_state->body);
+-            //}
+-            result->url = xstrdup(case_location);
+-            result->msg = xstrdup("Case created");
+-        } /* switch (attach HTTP code) */
+-
+-        free_abrt_post_state(atch_state);
+-        free(atch_url);
+-    } /* case 200/201 */
++            free(allocated);
++        }
++        break;
+ 
+-    } /* switch (case HTTP code) */
++    case 200:
++    case 201:
++        {
++            char *loc = find_header_in_abrt_post_state(atch_state, "Location:");
++            if (loc)
++                result->url = xstrdup(loc);
++            //result->msg = xstrdup("File attached successfully");
++        }
++    } /* switch */
+ 
+-    free_abrt_post_state(case_state);
+-    free(allocated);
+-    free(case_data);
+-    free(case_url);
++    free_abrt_post_state(atch_state);
++    free(atch_url);
+     return result;
+ }
+diff --git a/src/plugins/abrt_rh_support.h b/src/plugins/abrt_rh_support.h
+index 884dc4c..deb2ab6 100644
+--- a/src/plugins/abrt_rh_support.h
++++ b/src/plugins/abrt_rh_support.h
+@@ -49,15 +49,23 @@ typedef struct rhts_result rhts_result_t;
+ void free_rhts_result(rhts_result_t *p);
+ 
+ rhts_result_t*
+-send_report_to_new_case(const char* baseURL,
++create_new_case(const char* baseURL,
+                 const char* username,
+                 const char* password,
+                 bool ssl_verify,
+                 const char* release,
+                 const char* summary,
+                 const char* description,
+-                const char* component,
+-                const char* report_file_name);
++                const char* component
++);
++
++rhts_result_t*
++attach_file_to_case(const char* baseURL,
++                const char* username,
++                const char* password,
++                bool ssl_verify,
++                const char* file_name
++);
+ 
+ #ifdef __cplusplus
+ }
+diff --git a/src/plugins/reporter-rhtsupport.c b/src/plugins/reporter-rhtsupport.c
+index 9cdadde..609a60e 100644
+--- a/src/plugins/reporter-rhtsupport.c
++++ b/src/plugins/reporter-rhtsupport.c
+@@ -42,6 +42,7 @@ static void report_to_rhtsupport(const char *dump_dir_name)
+     char *tempfile = NULL;
+     reportfile_t *file = NULL;
+     rhts_result_t *result = NULL;
++    rhts_result_t *result_atch = NULL;
+     char *dsc = NULL;
+     char *summary = NULL;
+     const char *function;
+@@ -186,15 +187,14 @@ static void report_to_rhtsupport(const char *dump_dir_name)
+ 
+     /* Send tempfile */
+     log(_("Creating a new case..."));
+-    result = send_report_to_new_case(url,
++    result = create_new_case(url,
+             login,
+             password,
+             ssl_verify,
+             release,
+             summary,
+             dsc,
+-            package,
+-            tempfile
++            package
+     );
+ 
+     if (result->error)
+@@ -222,7 +222,22 @@ static void report_to_rhtsupport(const char *dump_dir_name)
+         goto ret;
+     }
+ 
+-    /* No error */
++    /* No error in case creation. Attach the file. */
++    result_atch = attach_file_to_case(result->url,
++            login,
++            password,
++            ssl_verify,
++            tempfile
++    );
++    if (result_atch->error)
++    {
++        /* Error. Prepend "Case created" text to whatever error message there is,
++         * so that user knows that case _was_ created despite error in attaching.
++         */
++        log("Case created but report attachment failed: %s", result_atch->msg);
++    }
++
++    /* Record "reported_to" element */
+     struct dump_dir *dd = dd_opendir(dump_dir_name, /*flags:*/ 0);
+     if (dd)
+     {
+@@ -268,6 +283,7 @@ static void report_to_rhtsupport(const char *dump_dir_name)
+     free(summary);
+     free(dsc);
+ 
++    free_rhts_result(result_atch);
+     free_rhts_result(result);
+ 
+     free(url);
+@@ -276,81 +292,6 @@ static void report_to_rhtsupport(const char *dump_dir_name)
+     free_problem_data(problem_data);
+ }
+ 
+-/* TODO: move to send_report_to_new_case (it has similar code) */
+-static void attach_to_rhtsupport(const char *file_name)
+-{
+-    log(_("Attaching '%s' to case '%s'"), file_name, url);
+-
+-    static const char *headers[] = {
+-        "Accept: text/plain",
+-        NULL
+-    };
+-
+-    int redirect_count = 0;
+-    char *atch_url = concat_path_file(url, "attachments");
+-    abrt_post_state_t *atch_state;
+-
+- redirect_attach:
+-    atch_state = new_abrt_post_state(0
+-            + ABRT_POST_WANT_HEADERS
+-            + ABRT_POST_WANT_BODY
+-            + ABRT_POST_WANT_ERROR_MSG
+-            + (ssl_verify ? ABRT_POST_WANT_SSL_VERIFY : 0)
+-    );
+-    atch_state->username = login;
+-    atch_state->password = password;
+-    abrt_post_file_as_form(atch_state,
+-        atch_url,
+-        "application/binary",
+-        headers,
+-        file_name
+-    );
+-    free(atch_url);
+-
+-    char *atch_location = find_header_in_abrt_post_state(atch_state, "Location:");
+-    switch (atch_state->http_resp_code)
+-    {
+-    case 305: /* "305 Use Proxy" */
+-        if (++redirect_count < 10 && atch_location)
+-        {
+-            atch_url = xstrdup(atch_location);
+-            free_abrt_post_state(atch_state);
+-            goto redirect_attach;
+-        }
+-        /* fall through */
+-
+-    default:
+-        /* Error */
+-        {
+-            const char *errmsg = atch_state->curl_error_msg;
+-            if (atch_state->body && atch_state->body[0])
+-            {
+-                if (errmsg && errmsg[0]
+-                 && strcmp(errmsg, atch_state->body) != 0
+-                ) /* both strata/curl error and body are present (and aren't the same) */
+-                    errmsg = xasprintf("%s. %s",
+-                            atch_state->body,
+-                            errmsg);
+-                else /* only body exists */
+-                    errmsg = atch_state->body;
+-            }
+-            error_msg_and_die("Can't attach. HTTP code %d%s%s",
+-                    atch_state->http_resp_code,
+-                    errmsg ? ". " : "",
+-                    errmsg ? errmsg : ""
+-            );
+-        }
+-        break;
+-
+-    case 200:
+-    case 201:
+-        log("Attachment URL:%s", atch_location);
+-        log("File attached successfully");
+-    } /* switch */
+-
+-    free_abrt_post_state(atch_state);
+-}
+-
+ int main(int argc, char **argv)
+ {
+     abrt_init(argv);
+@@ -469,7 +410,21 @@ int main(int argc, char **argv)
+         }
+ 
+         while (*argv)
+-            attach_to_rhtsupport(*argv++);
++        {
++            log(_("Attaching '%s' to case '%s'"), *argv, url);
++            rhts_result_t *result = attach_file_to_case(url,
++                login,
++                password,
++                ssl_verify,
++                *argv
++            );
++            if (result->error)
++                error_msg_and_die("%s", result->msg);
++            log("Attachment URL:%s", result->url);
++            log("File attached successfully");
++            free_rhts_result(result);
++            argv++;
++        }
+ 
+         return 0;
+     }
+
+commit 2457348d8ed02267bda7c3d98106d5c9ea881d78
+Author: Jiri Moskovcak <jmoskovc@redhat.com>
+Date:   Tue Oct 11 10:03:34 2011 +0200
+
+    added test suite for parse_osrelease
+
+diff --git a/tests/Makefile.am b/tests/Makefile.am
+index 44bb6b4..8d7b82a 100644
+--- a/tests/Makefile.am
++++ b/tests/Makefile.am
+@@ -27,7 +27,8 @@ EXTRA_DIST = package.m4
+ TESTSUITE_AT = \
+   local.at \
+   testsuite.at \
+-  strbuf.at
++  strbuf.at \
++  osrelease.at
+ 
+ EXTRA_DIST += $(TESTSUITE_AT)
+ TESTSUITE = $(srcdir)/testsuite
+diff --git a/tests/osrelease.at b/tests/osrelease.at
+new file mode 100644
+index 0000000..733ac29
+--- /dev/null
++++ b/tests/osrelease.at
+@@ -0,0 +1,127 @@
++# -*- Autotest -*-
++
++AT_BANNER([osrelease - 730887])
++
++## ---------------------- ##
++## parse_release_for_bz ##
++## ---------------------- ##
++
++AT_TESTFUN([parse_release_for_bz],
++[[
++#include "internal_libreport.h"
++#include <assert.h>
++
++/* Test parsing different release strings */
++int test(char ***input)
++{
++    char * release_string = **input;
++    int retcode = 1;
++    log("release: >>%s<<\n", release_string);
++    char *product = NULL;
++    char *version = NULL;
++    parse_release_for_bz(release_string, &product, &version);
++    log("version: >>%s<<\n", version);
++    log("product: >>%s<<\n", product);
++
++    if(version == NULL || (strlen(version) == 0))
++    {
++        printf("version == NULL\n");
++        goto ret;
++    }
++
++    (*input)++; //expected product is +1 in the array
++    log("'%s' == '%s'", product, **input);
++    if (strcmp(product, **input) != 0)
++        goto ret;
++
++    (*input)++; //expected version is +2 in the array
++    log("'%s' == '%s'", version, **input);
++    if (strcmp(version, **input) == 0)
++        retcode = 0;
++
++ret:
++    log("retcode %i\n", retcode);
++    return retcode;
++}
++
++int main(void)
++{
++    char *releases_good[7][3] =
++    {
++        //"Fedora release 15.a (Lovelock)", //should fail
++        {"Fedora release 16 (Rawhide)", "Fedora", "rawhide"},
++        {"Fedora release 16 (Verne)", "Fedora", "16"},
++        {"Fedora 16-Alpha", "Fedora", "16"},// rhbz#730887
++        {"Fedora release 17 (Rawhide)", "Fedora", "rawhide"},
++        {"Red Hat Enterprise Linux Server release 6.2 Beta (Santiago)", "Red Hat Enterprise Linux 6", "6.2"},
++        {"Red Hat Enterprise Linux 6.2", "Red Hat Enterprise Linux 6", "6.2"},
++    };
++
++    char **tmp = (char **)releases_good;
++    while(*tmp)
++    {
++        assert(test(&tmp) == 0);
++        tmp++;
++    }
++}
++]])
++
++## --------------------- ##
++## parse_release_for_rhts##
++## --------------------- ##
++
++AT_TESTFUN([parse_release_for_rhts],
++[[
++#include "internal_libreport.h"
++#include <assert.h>
++
++/* Test parsing different release strings */
++/* Test parsing different release strings */
++int test(char ***input)
++{
++    char * release_string = **input;
++    int retcode = 1;
++    log("release: >>%s<<\n", release_string);
++    char *product = NULL;
++    char *version = NULL;
++    parse_release_for_rhts(release_string, &product, &version);
++    log("version: >>%s<<\n", version);
++    log("product: >>%s<<\n", product);
++
++    if(version == NULL || (strlen(version) == 0))
++    {
++        printf("version == NULL\n");
++        goto ret;
++    }
++
++    (*input)++; //expected product is +1 in the array
++    log("'%s' == '%s'", product, **input);
++    if (strcmp(product, **input) != 0)
++        goto ret;
++
++    (*input)++; //expected version is +2 in the array
++    log("'%s' == '%s'", version, **input);
++    if (strcmp(version, **input) == 0)
++        retcode = 0;
++
++ret:
++    log("retcode %i\n", retcode);
++    return retcode;
++}
++
++int main(void)
++{
++    char *releases_good[7][3] =
++    {
++        {"Red Hat Enterprise Linux Server release 6.2 Beta (Santiago)", "Red Hat Enterprise Linux", "6.2"},
++        {"Red Hat Enterprise Linux 6.2", "Red Hat Enterprise Linux", "6.2"},
++    };
++
++    char **tmp = (char **)releases_good;
++    while(*tmp)
++    {
++        assert(test(&tmp) == 0);
++        tmp++;
++    }
++}
++]])
+diff --git a/tests/testsuite.at b/tests/testsuite.at
+index 5137b41..d4b244f 100644
+--- a/tests/testsuite.at
++++ b/tests/testsuite.at
+@@ -2,3 +2,4 @@
+ # See http://www.gnu.org/software/hello/manual/autoconf/Writing-Testsuites.html
+ 
+ m4_include([strbuf.at])
++m4_include([osrelease.at])
+
+commit ea3b5e0569828d4eece616fb4068d5d34a51de03
+Author: Miroslav Lichvar <mlichvar@redhat.com>
+Date:   Tue Oct 11 15:34:19 2011 +0200
+
+    wizard: disable only button box when event is run (trac#352)
+
+diff --git a/src/gui-wizard-gtk/wizard.c b/src/gui-wizard-gtk/wizard.c
+index decb5ee..df45598 100644
+--- a/src/gui-wizard-gtk/wizard.c
++++ b/src/gui-wizard-gtk/wizard.c
+@@ -90,6 +90,8 @@ static GtkWidget *g_top_most_window;
+ static GtkLabel *g_active_lbl;
+ static GtkProgressBar *g_active_pb;
+ 
++static GtkBox *g_box_assist_nav;
++
+ enum
+ {
+     /* Note: need to update types in
+@@ -1595,7 +1597,7 @@ static gboolean consume_cmd_output(GIOChannel *source, GIOCondition condition, g
+                 pb_pulse = false;
+ 
+                 /* Enable (un-gray out) navigation buttons */
+-                gtk_widget_set_sensitive(GTK_WIDGET(g_assistant), true);
++                gtk_widget_set_sensitive(GTK_WIDGET(g_box_assist_nav), true);
+ 
+                 /*g_source_remove(evd->event_source_id);*/
+                 close(evd->fd);
+@@ -1730,7 +1732,7 @@ static void start_event_run(const char *event_name,
+     free(msg);
+ 
+     /* Disable (gray out) navigation buttons */
+-    gtk_widget_set_sensitive(GTK_WIDGET(g_assistant), false);
++    gtk_widget_set_sensitive(GTK_WIDGET(g_box_assist_nav), false);
+ }
+ 
+ 
+@@ -2457,16 +2459,19 @@ static void add_pages()
+     if (config_btn)
+         g_signal_connect(G_OBJECT(config_btn), "clicked", G_CALLBACK(on_show_event_list_cb), NULL);
+ 
+-    /* Add "Close" button */
+     GtkWidget *w;
++
++    /* Align "Close" button to left */   
++    w = gtk_alignment_new(0.0, 0.0, 1.0, 1.0);
++    gtk_assistant_add_action_widget(g_assistant, w);
++    /* Keep pointer to the button box so we can set sensitivity later */
++    g_box_assist_nav = GTK_BOX(gtk_widget_get_parent(w));
++    gtk_box_set_child_packing(g_box_assist_nav, w, TRUE, FALSE, 0, GTK_PACK_END);
++    gtk_widget_show(w);
++
++    /* Add "Close" button */
+     if (!not_reportable)
+     {
+-        /* Align the "Close" button to left */   
+-        w = gtk_alignment_new(0.0, 0.0, 1.0, 1.0);
+-        gtk_assistant_add_action_widget(g_assistant, w);
+-        gtk_box_set_child_packing(GTK_BOX(gtk_widget_get_parent(w)), w, TRUE, FALSE, 0, GTK_PACK_END);
+-        gtk_widget_show(w);
+-
+         w = gtk_button_new_from_stock(GTK_STOCK_CLOSE);
+         g_signal_connect(w, "clicked", G_CALLBACK(gtk_main_quit), NULL);
+         gtk_widget_show(w);
+
+commit 65f2f21a736ae3ecf4f5b786443b0f053ec3ec94
+Author: Denys Vlasenko <dvlasenk@redhat.com>
+Date:   Tue Oct 11 16:40:01 2011 +0200
+
+    Don't use he_IL.utf8 messages in CLI - use English instead. Partially closes 252
+    
+    Signed-off-by: Denys Vlasenko <dvlasenk@redhat.com>
+
+diff --git a/src/cli/cli.c b/src/cli/cli.c
+index 1b267e8..e7f80dc 100644
+--- a/src/cli/cli.c
++++ b/src/cli/cli.c
+@@ -34,6 +34,14 @@ int main(int argc, char** argv)
+     abrt_init(argv);
+ 
+     setlocale(LC_ALL, "");
++    /* Hack:
++     * Right-to-left scripts don't work properly in many terminals.
++     * Hebrew speaking people say he_IL.utf8 looks so mangled
++     * they prefer en_US.utf8 instead.
++     */
++    const char *msg_locale = setlocale(LC_MESSAGES, NULL);
++    if (msg_locale && strcmp(msg_locale, "he_IL.utf8") == 0)
++        setlocale(LC_MESSAGES, "en_US.utf8");
+ #if ENABLE_NLS
+     bindtextdomain(PACKAGE, LOCALEDIR);
+     textdomain(PACKAGE);
+diff --git a/src/report-newt/report-newt.c b/src/report-newt/report-newt.c
+index 02f75c8..8bd6840 100644
+--- a/src/report-newt/report-newt.c
++++ b/src/report-newt/report-newt.c
+@@ -364,6 +364,14 @@ int main(int argc, char **argv)
+     abrt_init(argv);
+ 
+     setlocale(LC_ALL, "");
++    /* Hack:
++     * Right-to-left scripts don't work properly in many terminals.
++     * Hebrew speaking people say he_IL.utf8 looks so mangled
++     * they prefer en_US.utf8 instead.
++     */
++    const char *msg_locale = setlocale(LC_MESSAGES, NULL);
++    if (msg_locale && strcmp(msg_locale, "he_IL.utf8") == 0)
++        setlocale(LC_MESSAGES, "en_US.utf8");
+ #if ENABLE_NLS
+     bindtextdomain(PACKAGE, LOCALEDIR);
+     textdomain(PACKAGE);
+
+commit 367d3d3c803d93bbef5d138ec4bf603c25f28839
+Author: Michal Toman <mtoman@redhat.com>
+Date:   Wed Oct 12 12:02:03 2011 +0200
+
+    add FILENAME_VMCORE and FILENAME_KERNEL_LOG
+
+diff --git a/src/include/internal_libreport.h b/src/include/internal_libreport.h
+index 2114db0..74085ce 100644
+--- a/src/include/internal_libreport.h
++++ b/src/include/internal_libreport.h
+@@ -618,6 +618,8 @@ struct dump_dir *steal_directory(const char *base_dir, const char *dump_dir_name
+ #define FILENAME_TAINTED      "kernel_tainted"
+ #define FILENAME_TAINTED_SHORT "kernel_tainted_short"
+ #define FILENAME_TAINTED_LONG  "kernel_tainted_long"
++#define FILENAME_VMCORE       "vmcore"
++#define FILENAME_KERNEL_LOG   "kernel_log"
+ 
+ #define FILENAME_UUID         "uuid"
+ #define FILENAME_COUNT        "count"
+
+commit 9021242138a1f107f678b7acd9333c8f5ac2ab5e
+Author: Jiri Moskovcak <jmoskovc@redhat.com>
+Date:   Wed Oct 12 13:53:36 2011 +0200
+
+    wizard: check the event settings only if the respective checkbox has focus
+
+diff --git a/src/gui-wizard-gtk/wizard.c b/src/gui-wizard-gtk/wizard.c
+index df45598..8829fb9 100644
+--- a/src/gui-wizard-gtk/wizard.c
++++ b/src/gui-wizard-gtk/wizard.c
+@@ -727,11 +727,17 @@ static void report_tb_was_toggled(GtkButton *button, gpointer user_data)
+         if (g_list_find_custom(g_list_selected_reporters, event_name, (GCompareFunc)g_strcmp0) == NULL)
+             g_list_selected_reporters = g_list_prepend(g_list_selected_reporters, xstrdup(event_name));
+ 
+-        GHashTable *errors = validate_event(event_name);
+-        if (errors != NULL)
++        /* check only if it wasn't toggeld by update_event_checkboxes
++           i.e: when user clicks "regenerate backtrace"
++        */
++        if(gtk_widget_has_focus(GTK_WIDGET(button)))
+         {
+-            g_hash_table_unref(errors);
+-            show_event_opt_error_dialog(event_name);
++            GHashTable *errors = validate_event(event_name);
++            if (errors != NULL)
++            {
++                g_hash_table_unref(errors);
++                show_event_opt_error_dialog(event_name);
++            }
+         }
+ 
+     }
+@@ -2461,7 +2467,7 @@ static void add_pages()
+ 
+     GtkWidget *w;
+ 
+-    /* Align "Close" button to left */   
++    /* Align "Close" button to left */
+     w = gtk_alignment_new(0.0, 0.0, 1.0, 1.0);
+     gtk_assistant_add_action_widget(g_assistant, w);
+     /* Keep pointer to the button box so we can set sensitivity later */
+
+commit f2fda52135ee71b7a3a42c4e1c82ff1d665019ab
+Author: Denys Vlasenko <dvlasenk@redhat.com>
+Date:   Thu Oct 13 13:27:40 2011 +0200
+
+    wizard: log event dialog text and responses too
+    
+    Eaxmple: this now goes to the log:
+    "Downloading 235.13Mb, installed size: 1103.04Mb. Continue? YES"
+    
+    Signed-off-by: Denys Vlasenko <dvlasenk@redhat.com>
+
+diff --git a/src/gui-wizard-gtk/wizard.c b/src/gui-wizard-gtk/wizard.c
+index 8829fb9..d39b795 100644
+--- a/src/gui-wizard-gtk/wizard.c
++++ b/src/gui-wizard-gtk/wizard.c
+@@ -190,7 +190,7 @@ static page_obj_t pages[NUM_PAGES];
+ 
+ static page_obj_t *added_pages[NUM_PAGES];
+ 
+-static struct strbuf *line = NULL;
++static struct strbuf *cmd_output = NULL;
+ 
+ /* Utility functions */
+ 
+@@ -1350,21 +1350,20 @@ static gboolean consume_cmd_output(GIOChannel *source, GIOCondition condition, g
+ 
+     /* Read and insert the output into the log pane */
+     char buf[257]; /* usually we get one line, no need to have big buf */
+-    char *msg; /* one line */
+-    char *newline;
+-    char *raw;
+     int r;
+-    if (!line)
+-        line = strbuf_new();
+-
+     int alert_prefix_len = strlen(REPORT_PREFIX_ALERT);
+     int ask_prefix_len = strlen(REPORT_PREFIX_ASK);
+     int ask_yes_no_prefix_len = strlen(REPORT_PREFIX_ASK_YES_NO);
+     int ask_password_prefix_len = strlen(REPORT_PREFIX_ASK_PASSWORD);
+ 
++    if (!cmd_output)
++        cmd_output = strbuf_new();
++
+     /* read buffered and split lines */
+     while ((r = read(evd->fd, buf, sizeof(buf) - 1)) > 0)
+     {
++        char *newline;
++        char *raw;
+         buf[r] = '\0';
+         raw = buf;
+ 
+@@ -1372,16 +1371,22 @@ static gboolean consume_cmd_output(GIOChannel *source, GIOCondition condition, g
+         while ((newline = strchr(raw, '\n')) != NULL)
+         {
+             *newline = '\0';
+-            /* finish line */
+-            strbuf_append_str(line, raw);
+-            strbuf_append_char(line, '\n');
+-
+-            msg = line->buf;
++            strbuf_append_str(cmd_output, raw);
++            char *msg = cmd_output->buf;
++
++            /* In the code below:
++             * response is always malloced,
++             * log_response is always set to response
++             * or to constant string.
++             */
++            char *response = NULL;
++            const char *log_response = response;
++            unsigned skip_chars = 0;
+ 
+             /* alert dialog */
+             if (strncmp(REPORT_PREFIX_ALERT, msg, alert_prefix_len) == 0)
+             {
+-                msg += alert_prefix_len;
++                skip_chars = alert_prefix_len;
+ 
+                 GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(g_assistant),
+                     GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
+@@ -1395,7 +1400,7 @@ static gboolean consume_cmd_output(GIOChannel *source, GIOCondition condition, g
+             /* ask dialog with textbox */
+             else if (strncmp(REPORT_PREFIX_ASK, msg, ask_prefix_len) == 0)
+             {
+-                msg += ask_prefix_len;
++                skip_chars = ask_prefix_len;
+ 
+                 GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(g_assistant),
+                     GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
+@@ -1408,36 +1413,24 @@ static gboolean consume_cmd_output(GIOChannel *source, GIOCondition condition, g
+                 gtk_entry_set_editable(GTK_ENTRY(textbox), TRUE);
+                 gtk_box_pack_start(GTK_BOX(vbox), textbox, TRUE, TRUE, 0);
+                 gtk_widget_show(textbox);
+-
+                 if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_OK)
+                 {
+                     const char *text = gtk_entry_get_text(GTK_ENTRY(textbox));
+-                    char *response = xasprintf("%s\n", text);
+-                    if (write(evd->run_state->command_in_fd, response, strlen(response)) < 0)
+-                    {
+-                        free(response);
+-                        VERB1 perror_msg("Unable to write %s\\n to child's stdin", text);
+-                        return FALSE;
+-                    }
+-
+-                    free(response);
++                    response = xstrdup(text);
++                    log_response = response;
+                 }
+                 else
+                 {
+-                    if (write(evd->run_state->command_in_fd, "\n", strlen("\n")) < 0)
+-                    {
+-                        VERB1 perror_msg("Unable to write \\n to child's stdin");
+-                        return FALSE;
+-                    }
++                    response = xstrdup("");
++                    log_response = "";
+                 }
+-
+                 gtk_widget_destroy(textbox);
+                 gtk_widget_destroy(dialog);
+             }
+             /* ask dialog with passwordbox */
+             else if (strncmp(REPORT_PREFIX_ASK_PASSWORD, msg, ask_password_prefix_len) == 0)
+             {
+-                msg += ask_password_prefix_len;
++                skip_chars = ask_password_prefix_len;
+ 
+                 GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(g_assistant),
+                     GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
+@@ -1451,84 +1444,78 @@ static gboolean consume_cmd_output(GIOChannel *source, GIOCondition condition, g
+                 gtk_entry_set_visibility(GTK_ENTRY(textbox), FALSE);
+                 gtk_box_pack_start(GTK_BOX(vbox), textbox, TRUE, TRUE, 0);
+                 gtk_widget_show(textbox);
+-
+                 if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_OK)
+                 {
+                     const char *text = gtk_entry_get_text(GTK_ENTRY(textbox));
+-                    char *response = xasprintf("%s\n", text);
+-                    if (write(evd->run_state->command_in_fd, response, strlen(response)) < 0)
+-                    {
+-                        free(response);
+-                        VERB1 perror_msg("Unable to write %s\\n to child's stdin", text);
+-                        return FALSE;
+-                    }
+-
+-                    free(response);
++                    response = xstrdup(text);
++                    log_response = "******"; /* don't log passwords! */
+                 }
+                 else
+                 {
+-                    if (write(evd->run_state->command_in_fd, "\n", strlen("\n")) < 0)
+-                    {
+-                        VERB1 perror_msg("Unable to write \\n to child's stdin");
+-                        return FALSE;
+-                    }
++                    response = xstrdup("");
++                    log_response = "";
+                 }
+-
+                 gtk_widget_destroy(textbox);
+                 gtk_widget_destroy(dialog);
+             }
+             /* yes/no dialog */
+             else if (strncmp(REPORT_PREFIX_ASK_YES_NO, msg, ask_yes_no_prefix_len) == 0)
+             {
+-                msg += ask_yes_no_prefix_len;
++                skip_chars = ask_yes_no_prefix_len;
+ 
+                 GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(g_assistant),
+                     GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
+                     GTK_MESSAGE_QUESTION,
+                     GTK_BUTTONS_YES_NO,
+                     msg);
+-
+                 if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_YES)
+                 {
+-                    char *yes = _("y");
+-                    char *response = xasprintf("%s\n", yes);
+-                    if (write(evd->run_state->command_in_fd, response, strlen(response)) < 0)
+-                    {
+-                        free(response);
+-                        VERB1 perror_msg("Unable to write %s\\n to child's stdin", yes);
+-                        return FALSE;
+-                    }
+-
+-                    free(response);
++                    response = xstrdup(_("y"));
++                    log_response = "YES";
+                 }
+                 else
+                 {
+-                    if (write(evd->run_state->command_in_fd, "\n", strlen("\n")) < 0)
+-                    {
+-                        VERB1 perror_msg("Unable to write \\n to child's stdin");
+-                        return FALSE;
+-                    }
++                    response = xstrdup("");
++                    log_response = "NO";
+                 }
+-
+                 gtk_widget_destroy(dialog);
+             }
+-            /* no special prefix - forward to log */
+-            else
++            /* else: no special prefix, just forward to log */
++
++            if (response)
+             {
+-                append_to_textview(evd->tv_log, msg);
+-                save_to_event_log(evd, msg);
+-                /* cuts off \n from msg */
+-                gtk_label_set_text(g_active_lbl, strtrim(msg));
++                unsigned len = strlen(response);
++                response[len++] = '\n';
++                if (full_write(evd->run_state->command_in_fd, response, len) != len)
++                {
++                    VERB1 perror_msg("Can't write %u bytes to child's stdin", len);
++                    free(response);
++                    response = xstrdup("<WRITE ERROR>");
++                    log_response = response;
++                }
++                strbuf_append_char(cmd_output, ' ');
++                strbuf_append_str(cmd_output, log_response);
++                free(response);
+             }
+ 
+-            strbuf_clear(line);
++            msg = cmd_output->buf;
++            msg += skip_chars;
++            gtk_label_set_text(g_active_lbl, msg);
++
++            strbuf_append_char(cmd_output, '\n');
++            msg = cmd_output->buf;
++            msg += skip_chars;
++            append_to_textview(evd->tv_log, msg);
++            save_to_event_log(evd, msg);
++
++            strbuf_clear(cmd_output);
+ 
+             /* jump to next line */
+             raw = newline + 1;
+         }
+ 
+         /* beginning of next line. the line continues by next read() */
+-        strbuf_append_str(line, raw);
++        strbuf_append_str(cmd_output, raw);
+     }
+ 
+     if (r < 0 && errno == EAGAIN)
+@@ -1537,6 +1524,8 @@ static gboolean consume_cmd_output(GIOChannel *source, GIOCondition condition, g
+ 
+     /* EOF/error */
+ 
++    strbuf_clear(cmd_output);
++
+     unexport_event_config(evd->env_list);
+     evd->env_list = NULL;
+ 
+@@ -1596,8 +1585,8 @@ static gboolean consume_cmd_output(GIOChannel *source, GIOCondition condition, g
+                 free(msg);
+ 
+                 /* free child output buffer */
+-                strbuf_free(line);
+-                line = NULL;
++                strbuf_free(cmd_output);
++                cmd_output = NULL;
+ 
+                 /* hide progress bar */
+                 pb_pulse = false;

@@ -1,0 +1,24 @@
+diff -Nur lirc-0.8.3pre1-old/drivers/lirc_i2c/lirc_i2c.c lirc-0.8.3pre1/drivers/lirc_i2c/lirc_i2c.c
+--- lirc-0.8.3pre1-old/drivers/lirc_i2c/lirc_i2c.c	2007-12-05 19:02:57.160589262 +0200
++++ lirc-0.8.3pre1/drivers/lirc_i2c/lirc_i2c.c	2007-12-05 19:06:26.494765630 +0200
+@@ -388,6 +388,7 @@
+ 		     unsigned short flags, int kind)
+ {
+ 	struct IR *ir;
++    int err;
+ 
+ 	client_template.adapter = adap;
+ 	client_template.addr = addr;
+@@ -478,7 +479,11 @@
+ 	       adap->id, addr, ir->c.name);
+ 
+ 	/* register device */
+-	i2c_attach_client(&ir->c);
++	err = i2c_attach_client(&ir->c);
++    if(err) {
++        kfree(ir);
++        return err;
++    }
+ 	ir->l.minor = lirc_register_plugin(&ir->l);
+ 
+ 	return 0;

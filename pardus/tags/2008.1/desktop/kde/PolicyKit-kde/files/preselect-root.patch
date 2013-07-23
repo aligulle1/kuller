@@ -1,0 +1,18 @@
+Index: service.cpp
+===================================================================
+--- src/service.cpp	(revision 19171)
++++ src/service.cpp	(revision 19172)
+@@ -386,7 +386,12 @@
+         m_self->m_dialog->setAdminUsers(list, username);
+     }
+     else
+-        m_self->m_dialog->setAdminUsers(list);
++    {
++        if (list.contains("root") == 1)
++            m_self->m_dialog->setAdminUsers(list, "root");
++        else
++            m_self->m_dialog->setAdminUsers(list);
++    }
+ 
+     Debug::printDebug("polkit_grant_select_admin_user: Done");
+ 

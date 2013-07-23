@@ -1,0 +1,15 @@
+--- poppler-0.10.7/poppler/SplashOutputDev.cc	2010-03-08 12:13:49.000000000 +0100
++++ poppler-0.10.7/poppler/SplashOutputDev.cc	2010-03-08 12:16:51.000000000 +0100
+@@ -2703,10 +2703,10 @@ void SplashOutputDev::setSoftMask(GfxSta
+   if (yMax + ty > bitmap->getHeight()) yMax = bitmap->getHeight() - ty;
+   for (y = 0; y < yMax; ++y) {
+     for (x = 0; x < xMax; ++x) {
+-      tBitmap->getPixel(x, y, color);
+       if (alpha) {
+-	//~ unimplemented
++	p[x] = tBitmap->getAlpha(x, y);
+       } else {
++        tBitmap->getPixel(x, y, color);
+ 	// convert to luminosity
+ 	switch (colorMode) {
+ 	case splashModeMono1:

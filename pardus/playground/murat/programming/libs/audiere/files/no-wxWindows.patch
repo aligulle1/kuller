@@ -1,0 +1,113 @@
+diff -Naur audiere-1.9.4.orig/configure.in audiere-1.9.4/configure.in
+--- audiere-1.9.4.orig/configure.in	2006-02-14 06:57:01.000000000 +0200
++++ audiere-1.9.4/configure.in	2007-10-15 15:21:46.000000000 +0300
+@@ -111,49 +111,6 @@
+     EXTRA_LIBS="-laudio $EXTRA_LIBS")
+ AM_CONDITIONAL(HAVE_AL, test "x$HAVE_AL" = "xtrue")
+ 
+-dnl Look for wxWindows
+-AC_PATH_PROG(WX_CONFIG, wx-config, no, $PATH:/usr/local/bin)
+-if [[ "$WX_CONFIG" = "no" ]] ; then
+-    AC_MSG_WARN([wxWindows not found, not building wxPlayer.
+-        See http://www.wxwindows.org/])
+-else
+-    old_CXXFLAGS="$CXXFLAGS"
+-    old_LIBS="$LIBS"
+-    WXFLAGS=`$WX_CONFIG --cxxflags`
+-    WXLIBS=`$WX_CONFIG --libs`
+-    CXXFLAGS="$WXFLAGS $CXXFLAGS"
+-    LIBS="$WXLIBS $LIBS"
+-
+-    AC_MSG_CHECKING(if small wxWindows application links)
+-    AC_LINK_IFELSE(AC_LANG_SOURCE([
+-        #include <wx/wx.h>
+-        class App : public wxApp {
+-        public:
+-          bool OnInit() {
+-            return false;
+-          }
+-        };
+-        IMPLEMENT_APP(App)
+-        ])
+-    ,
+-        AC_MSG_RESULT(yes)
+-        HAVE_WXWINDOWS=true
+-        AC_DEFINE(HAVE_WXWINDOWS)
+-        WX_LIBS=`$WX_CONFIG --libs`
+-        WX_CPPFLAGS=`$WX_CONFIG --cxxflags`
+-        AC_SUBST(WX_LIBS)
+-        AC_SUBST(WX_CPPFLAGS)
+-    ,
+-        AC_MSG_RESULT(no)
+-        AC_MSG_WARN([wx-config found but linking with wxWindows failed.
+-Maybe wxWindows was compiled with another compiler?]))
+-
+-    CXXFLAGS="$old_CXXFLAGS"
+-    LIBS="$old_LIBS"
+-fi
+-
+-AM_CONDITIONAL(HAVE_WXWINDOWS, test "x$HAVE_WXWINDOWS" = "xtrue")
+-
+ dnl Checks for header files.
+ 
+ AC_HEADER_STDC
+@@ -215,7 +172,6 @@
+ 	doc/Makefile
+         examples/Makefile
+         examples/simple/Makefile
+-        examples/wxPlayer/Makefile
+         src/Makefile
+         src/mpaudec/Makefile
+         test/Makefile
+diff -Naur audiere-1.9.4.orig/examples/Makefile.am audiere-1.9.4/examples/Makefile.am
+--- audiere-1.9.4.orig/examples/Makefile.am	2006-02-14 06:57:01.000000000 +0200
++++ audiere-1.9.4/examples/Makefile.am	2007-10-15 15:31:50.000000000 +0300
+@@ -1 +1 @@
+-SUBDIRS = simple wxPlayer
++SUBDIRS = simple
+diff -Naur audiere-1.9.4.orig/examples/Makefile.in audiere-1.9.4/examples/Makefile.in
+--- audiere-1.9.4.orig/examples/Makefile.in	2006-02-14 07:00:54.000000000 +0200
++++ audiere-1.9.4/examples/Makefile.in	2007-10-15 15:28:21.000000000 +0300
+@@ -182,7 +182,7 @@
+ target_cpu = @target_cpu@
+ target_os = @target_os@
+ target_vendor = @target_vendor@
+-SUBDIRS = simple wxPlayer
++SUBDIRS = simple
+ all: all-recursive
+ 
+ .SUFFIXES:
+diff -Naur audiere-1.9.4.orig/examples/wxPlayer/Makefile.in audiere-1.9.4/examples/wxPlayer/Makefile.in
+--- audiere-1.9.4.orig/examples/wxPlayer/Makefile.in	2006-02-14 07:00:55.000000000 +0200
++++ audiere-1.9.4/examples/wxPlayer/Makefile.in	2007-10-15 15:34:04.000000000 +0300
+@@ -39,7 +39,7 @@
+ target_triplet = @target@
+ LIBOBJDIR =
+ @HAVE_WXWINDOWS_TRUE@bin_PROGRAMS = wxPlayer$(EXEEXT)
+-subdir = examples/wxPlayer
++subdir =
+ DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
+ ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
+ am__aclocal_m4_deps = $(top_srcdir)/configure.in
+diff -Naur audiere-1.9.4.orig/Makefile.in audiere-1.9.4/Makefile.in
+--- audiere-1.9.4.orig/Makefile.in	2006-02-14 07:00:59.000000000 +0200
++++ audiere-1.9.4/Makefile.in	2007-10-15 15:21:25.000000000 +0300
+@@ -125,8 +125,6 @@
+ HAVE_SPEEX_TRUE = @HAVE_SPEEX_TRUE@
+ HAVE_WINMM_FALSE = @HAVE_WINMM_FALSE@
+ HAVE_WINMM_TRUE = @HAVE_WINMM_TRUE@
+-HAVE_WXWINDOWS_FALSE = @HAVE_WXWINDOWS_FALSE@
+-HAVE_WXWINDOWS_TRUE = @HAVE_WXWINDOWS_TRUE@
+ INSTALL_DATA = @INSTALL_DATA@
+ INSTALL_PROGRAM = @INSTALL_PROGRAM@
+ INSTALL_SCRIPT = @INSTALL_SCRIPT@
+@@ -152,9 +150,6 @@
+ STRIP = @STRIP@
+ VERSION = @VERSION@
+ WORDS_BIGENDIAN = @WORDS_BIGENDIAN@
+-WX_CONFIG = @WX_CONFIG@
+-WX_CPPFLAGS = @WX_CPPFLAGS@
+-WX_LIBS = @WX_LIBS@
+ ac_ct_AR = @ac_ct_AR@
+ ac_ct_CC = @ac_ct_CC@
+ ac_ct_CXX = @ac_ct_CXX@

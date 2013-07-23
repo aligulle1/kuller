@@ -1,0 +1,16 @@
+--- foo/urlgrabber/grabber.py~	2009-03-09 12:01:21.000000000 -0400
++++ foo/urlgrabber/grabber.py	2009-03-09 12:01:21.000000000 -0400
+@@ -913,6 +913,13 @@
+                 raise URLGrabError(3, 
+                               _('Not a normal file: %s') % (path, ))
+             elif not opts.range:
++                if not opts.checkfunc is None:
++                    cb_func, cb_args, cb_kwargs = \
++                             self._make_callback(opts.checkfunc)
++                    obj = CallbackObject()
++                    obj.filename = path
++                    obj.url = url
++                    apply(cb_func, (obj, )+cb_args, cb_kwargs)            
+                 return path
+         
+         def retryfunc(opts, url, filename):

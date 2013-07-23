@@ -1,0 +1,108 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+import os
+import sys
+import shutil
+import statvfs
+import gettext
+import subprocess
+
+__trans = gettext.translation('zeroradiant-wrapper', fallback=True)
+_ = __trans.ugettext
+
+homedir = os.getenv("HOME")
+
+radiant = "%s/ZeroRadiant/radiant.bin" % homedir
+
+def freespace():
+    s = os.statvfs(homedir)
+    return s[statvfs.F_BAVAIL] * long(s[statvfs.F_BSIZE]) / 1024
+
+class ConsoleUI:
+    def __ask(self, choices):
+        answer = 0
+        while not (0 < answer <= len(choices)):
+            for n, choice in enumerate(choices):
+                print "  [%d] %s" % (n + 1, choice)
+
+            try:
+                answer = int(raw_input("Your choice [1..%d] > " % len(choices)))
+            except ValueError:
+                pass
+            except (KeyboardInterrupt, EOFError):
+                print
+                sys.exit(1)
+
+        return answer - 1
+
+    def info(self, title, message):
+        print message
+
+    def warn(self, title, message, *buttons):
+        print message
+
+        if len(buttons) > 1:
+            return self.__ask(buttons)
+
+class QtUI:
+    def __init__(self):
+        QtGui.QApplication(sys.argv)
+
+    def info(self, title, message):
+        return QtGui.QMessageBox.information(None, title, message)
+
+    def warn(self, title, message, *buttons):
+        return QtGui.QMessageBox.warning(None, title, message, *buttons)
+
+try:
+    if "DISPLAY" not in os.environ:
+        ui = ConsoleUI()
+    else:
+        from PyQt4 import QtGui
+
+        ui = QtUI()
+
+except ImportError:
+    ui = ConsoleUI()
+
+
+def checkInstall():
+
+    dir = "%s/ZeroRadiant" % homedir
+
+    btn = ui.warn(_("Installation"),
+                  _("This script will install ZeroRadiant to your home directory (%s), if you want to install, please continue.") % homedir,
+                  _("Install ZeroRadiant to %s") % homedir, _("Cancel"))
+
+
+    if btn == 0:
+        if freespace() < 1500000:
+            ui.warn(_("Error"),
+                    _("Not enough free disk space in your home directory (%s). At least 1.5GB required." % homedir))
+            sys.exit(1)
+
+    if btn == 1:
+        sys.exit(1)
+
+    try:
+        shutil.copytree("/opt/ZeroRadiant", "%s/ZeroRadiant" % homedir)
+    except OSError:
+        ui.warn(_("Error"),
+                _("Error installing ZeroRadiant."))
+        sys.exit(1)
+
+    ui.info(_("Installation"),
+            _("ZeroRadiant is now installed in your home directory (%s), click OK to run ZeroRadiant now.") % homedir)
+
+    subprocess.Popen(radiant)
+    sys.exit(1)
+
+
+if __name__ == '__main__':
+
+    if os.path.isfile(radiant):
+        subprocess.Popen(radiant)
+        sys.exit()
+
+    checkInstall()

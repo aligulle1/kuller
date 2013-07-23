@@ -1,0 +1,65 @@
+Various LinuxThreads and NPTL fixes from Fedora.
+
+--- nptl/ChangeLog	22 Oct 2003 07:13:05 -0000	1.1.1.109
++++ nptl/ChangeLog	22 Oct 2003 07:18:38 -0000	1.22
+@@ -589,6 +589,11 @@
+ 
+ 	* Makefile [$(build-shared) = yes] (tests): Depend on $(test-modules).
+ 
++2003-07-22  Jakub Jelinek  <jakub@redhat.com>
++
++	* descr.h: Don't include lowlevellock.h, pthreaddef.h and dl-sysdep.h
++	if __need_struct_pthread_size, instead define lll_lock_t.
++
+ 2003-07-25  Jakub Jelinek  <jakub@redhat.com>
+ 
+ 	* tst-cancel17.c (do_test): Check if aio_cancel failed.
+--- nptl/Makefile	4 Oct 2003 11:53:45 -0000	1.1.1.67
++++ nptl/Makefile	4 Oct 2003 12:06:23 -0000	1.72
+@@ -465,15 +465,19 @@ $(addprefix $(objpfx), \
+     $(tests) $(test-srcs))): $(objpfx)libpthread.so \
+ 			     $(objpfx)libpthread_nonshared.a
+ $(objpfx)tst-unload: $(common-objpfx)dlfcn/libdl.so
+-# $(objpfx)../libc.so is used instead of $(common-objpfx)libc.so,
++# $(objpfx)linklibc.so is used instead of $(common-objpfx)libc.so,
+ # since otherwise libpthread.so comes before libc.so when linking.
+ $(addprefix $(objpfx), $(tests-reverse)): \
+-  $(objpfx)../libc.so $(objpfx)libpthread.so \
++  $(objpfx)linklibc.so $(objpfx)libpthread.so \
+   $(objpfx)libpthread_nonshared.a
+ $(objpfx)../libc.so: $(common-objpfx)libc.so ;
+ $(addprefix $(objpfx),$(tests-static) $(xtests-static)): $(objpfx)libpthread.a
+ 
+ $(objpfx)tst-atfork2.out: $(objpfx)tst-atfork2mod.so
++
++$(objpfx)linklibc.so: $(common-objpfx)libc.so
++	ln -s ../libc.so $@
++generated += libclink.so
+ else
+ $(addprefix $(objpfx),$(tests) $(test-srcs)): $(objpfx)libpthread.a
+ endif
+--- nptl/descr.h	28 Jul 2003 10:05:59 -0000	1.1.1.16
++++ nptl/descr.h	28 Jul 2003 10:42:00 -0000	1.2
+@@ -27,9 +27,13 @@
+ #include <sys/types.h>
+ #include <hp-timing.h>
+ #include <list.h>
++#ifdef __need_struct_pthread_size
++#define lll_lock_t int
++#else
+ #include <lowlevellock.h>
+ #include <pthreaddef.h>
+ #include <dl-sysdep.h>
++#endif
+ #include "../nptl_db/thread_db.h"
+ #include <tls.h>
+ #ifdef HAVE_FORCED_UNWIND
+--- nptl/sysdeps/unix/sysv/linux/kernel-features.h 1 Jan 1970 00:00:00 -0000
++++ nptl/sysdeps/unix/sysv/linux/kernel-features.h	12 Mar 2003 12:34:32 -0000	1.1
+@@ -0,0 +1,6 @@
++#include_next <kernel-features.h>
++
++/* NPTL can always assume all clone thread flags work.  */
++#ifndef __ASSUME_CLONE_THREAD_FLAGS
++# define __ASSUME_CLONE_THREAD_FLAGS	1
++#endif

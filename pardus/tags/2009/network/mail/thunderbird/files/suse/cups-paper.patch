@@ -1,0 +1,858 @@
+From: Wolfgang Rosenauer <stark@suse.de>, Arne John Glenstrup <panic@itu.dk>
+Subject: get paper sizes from CUPS
+References:
+https://bugzilla.novell.com/show_bug.cgi?id=65482
+https://bugzilla.mozilla.org/show_bug.cgi?id=324060
+
+
+================================================================================
+--- gfx/src/gtk/nsDeviceContextSpecG.cpp
++++ gfx/src/gtk/nsDeviceContextSpecG.cpp
+@@ -66,6 +66,7 @@
+ #ifdef USE_POSTSCRIPT
+ #include "nsPSPrinters.h"
+ #include "nsPaperPS.h"  /* Paper size list */
++#include "nsPaperFactoryPS.h"  /* Paper size list factory */
+ #endif /* USE_POSTSCRIPT */
+ 
+ /* Ensure that the result is always equal to either PR_TRUE or PR_FALSE */
+@@ -1210,34 +1211,38 @@
+ #ifdef SET_PRINTER_FEATURES_VIA_PREFS
+     printerFeatures.SetCanChangePaperSize(PR_TRUE);
+ #endif /* SET_PRINTER_FEATURES_VIA_PREFS */
+-    nsXPIDLCString papername;
+-    if (NS_SUCCEEDED(CopyPrinterCharPref(pPrefs, "postscript", printerName, "paper_size", getter_Copies(papername)))) {
+-      nsPaperSizePS paper;
+-
+-      if (paper.Find(papername)) {
+-        DO_PR_DEBUG_LOG(("setting default paper size to '%s' (%g mm/%g mm)\n",
+-              paper.Name(), paper.Width_mm(), paper.Height_mm()));
+-        aPrintSettings->SetPaperSizeUnit(paper.IsMetric() ?
+-            (int)nsIPrintSettings::kPaperSizeMillimeters :
+-            (int)nsIPrintSettings::kPaperSizeInches);
+-        aPrintSettings->SetPaperWidth(paper.Width_mm());
+-        aPrintSettings->SetPaperHeight(paper.Height_mm());
+-        aPrintSettings->SetPaperName(NS_ConvertASCIItoUCS2(paper.Name()).get());
+-      }
+-      else {
+-        DO_PR_DEBUG_LOG(("Unknown paper size '%s' given.\n", papername.get()));
++    {
++      nsIPaperSizePS* paper;
++      nsresult rv;
++      rv = nsPaperFactoryPS::CreatePaper
++        (fullPrinterName.get(), printerName.get(), paper);
++      if (NS_FAILED(rv)) return rv;
++      paper->FindDefault();
++
++      nsXPIDLCString papername;
++      if (NS_SUCCEEDED(CopyPrinterCharPref(pPrefs, "postscript", fullPrinterName, "print_paper_name", getter_Copies(papername)))) {
++        if (!paper->Find(papername)) {
++          DO_PR_DEBUG_LOG(("Unknown paper size '%s' given.\n", papername.get()));
++        }
+       }
++      DO_PR_DEBUG_LOG(("setting default paper size to '%s' (%g mm/%g mm)\n",
++              paper->Name(), paper->Width_mm(), paper->Height_mm()));
++      aPrintSettings->SetPaperSizeUnit(nsIPrintSettings::kPaperSizeMillimeters);
++      aPrintSettings->SetPaperWidth(paper->Width_mm());
++      aPrintSettings->SetPaperHeight(paper->Height_mm());
++      aPrintSettings->SetPaperName(NS_ConvertASCIItoUTF16(paper->Name()).get());
+ #ifdef SET_PRINTER_FEATURES_VIA_PREFS
+-      paper.First();
++      paper->First();
+       int count = 0;
+-      while (!paper.AtEnd())
++      while (!paper->AtEnd())
+       {
+-        printerFeatures.SetPaperRecord(count++, paper.Name(),
+-            (int)paper.Width_mm(), (int)paper.Height_mm(), !paper.IsMetric());
+-        paper.Next();
++        printerFeatures.SetPaperRecord(count++, paper->Name(),
++            (int)paper->Width_mm(), (int)paper->Height_mm(), !paper->IsMetric());
++        paper->Next();
+       }
+       printerFeatures.SetNumPaperSizeRecords(count);
+ #endif /* SET_PRINTER_FEATURES_VIA_PREFS */
++      delete(paper);
+     }
+ 
+     PRBool hasSpoolerCmd = (nsPSPrinterList::kTypePS ==
+--- gfx/src/ps/nsPrintJobPS.cpp
++++ gfx/src/ps/nsPrintJobPS.cpp
+@@ -364,6 +364,10 @@
+     const char *slash = strchr(printerName, '/');
+     mPrinterName = slash ? slash + 1 : printerName;
+     mJobTitle.SetIsVoid(PR_TRUE);
++    /* Paper name */
++    const char* paperName = nsnull;
++    aSpec->GetPaperName(&paperName);
++    mPaperName = paperName;
+     return NS_OK;
+ }
+ 
+@@ -445,6 +449,11 @@
+                                                        mNumCopies.get(),
+                                                        dest->num_options,
+                                                        &dest->options);
++        if (!mPaperName.IsEmpty())
++            dest->num_options = (mCups.mCupsAddOption)("media",
++                                                       mPaperName.get(),
++                                                       dest->num_options,
++                                                       &dest->options);
+         const char *title = mJobTitle.IsVoid() ?
+             "Untitled Document" : mJobTitle.get();
+         result = (mCups.mCupsPrintFile)(printer.CStringAt(0)->get(),
+--- gfx/src/ps/nsPrintJobPS.h
++++ gfx/src/ps/nsPrintJobPS.h
+@@ -179,6 +179,7 @@
+         nsCUPSShim mCups;
+         nsCString mPrinterName;
+         nsCString mNumCopies;
++        nsCString mPaperName;
+         nsCString mJobTitle;        // IsVoid() if no title
+ };
+ #endif  /* VMS */
+--- gfx/src/psshared/Makefile.in
++++ gfx/src/psshared/Makefile.in
+@@ -57,13 +57,16 @@
+ 
+ EXPORTS		= nsCUPSShim.h \
+ 		  nsPaperPS.h \
++		  nsIPaperPS.h \
+ 		  nsPSPrinters.h\
+ 		  psSharedCore.h \
++		  nsPaperFactoryPS.h \
+ 		  $(NULL)
+ 
+ CPPSRCS		= nsCUPSShim.cpp \
+ 		  nsPaperPS.cpp \
+ 		  nsPSPrinters.cpp \
++		  nsPaperFactoryPS.cpp \
+ 		  $(NULL)
+ 
+ EXTRA_DSO_LDOPTS = \
+--- gfx/src/psshared/nsCUPSShim.cpp
++++ gfx/src/psshared/nsCUPSShim.cpp
+@@ -45,13 +45,18 @@
+ // List of symbols to find in libcups. Must match symAddr[] defined in Init().
+ // Making this an array of arrays instead of pointers allows storing the
+ // whole thing in read-only memory.
+-static const char gSymName[][sizeof("cupsPrintFile")] = {
++static const char gSymName[][sizeof("ppdMarkDefaults")] = {
+     { "cupsAddOption" },
+     { "cupsFreeDests" },
+     { "cupsGetDest" },
+     { "cupsGetDests" },
+     { "cupsPrintFile" },
+     { "cupsTempFd" },
++    { "cupsGetPPD" },
++    { "ppdOpenFile" },
++    { "ppdClose" },
++    { "ppdMarkDefaults" },
++    { "ppdIsMarked" },
+ };
+ static const int gSymNameCt = sizeof(gSymName) / sizeof(gSymName[0]);
+ 
+@@ -71,6 +76,11 @@
+         (void **)&mCupsGetDests,
+         (void **)&mCupsPrintFile,
+         (void **)&mCupsTempFd,
++        (void **)&mCupsGetPPD,
++        (void **)&mPpdOpenFile,
++        (void **)&mPpdClose,
++        (void **)&mPpdMarkDefaults,
++        (void **)&mPpdIsMarked,
+     };
+ 
+     for (int i = gSymNameCt; i--; ) {
+--- gfx/src/psshared/nsCUPSShim.h
++++ gfx/src/psshared/nsCUPSShim.h
+@@ -62,6 +62,82 @@
+     cups_option_t *options;    /* Options */
+ } cups_dest_t;
+ 
++typedef enum			/**** Colorspaces ****/
++{
++  PPD_CS_CMYK = -4,		/* CMYK colorspace */
++  PPD_CS_CMY,			/* CMY colorspace */
++  PPD_CS_GRAY = 1,		/* Grayscale colorspace */
++  PPD_CS_RGB = 3,		/* RGB colorspace */
++  PPD_CS_RGBK,			/* RGBK (K = gray) colorspace */
++  PPD_CS_N			    /* DeviceN colorspace */
++} ppd_cs_t;
++
++typedef struct          /**** Page Sizes ****/
++{
++    int         marked;     /* Page size selected? */
++    char        name[41];
++    /* Media size option */
++    float       width,      /* Width of media in points */
++                length,     /* Length of media in points */
++                left,       /* Left printable margin in points */
++                bottom,     /* Bottom printable margin in points */
++                right,      /* Right printable margin in points */
++                top;        /* Top printable margin in points */
++} ppd_size_t;
++
++typedef struct			/**** Files ****/
++{
++    int         language_level,   /* Language level of device */
++                color_device,     /* 1 = color device, 0 = grayscale */
++                variable_sizes,   /* 1 = supports variable sizes, 0 = doesn't */
++                accurate_screens, /* 1 = supports accurate screens, 0 = not */
++                contone_only,     /* 1 = continuous tone only, 0 = not */
++                landscape,        /* -90 or 90 */
++                model_number,     /* Device-specific model number */
++                manual_copies,    /* 1 = Copies done manually, 0 = hardware */
++                throughput;       /* Pages per minute */
++    ppd_cs_t    colorspace;       /* Default colorspace */
++    char        *patches;         /* Patch commands to be sent to printer */
++    int         num_emulations;   /* Number of emulations supported */
++    void        *emulations;      /* Emulations and the code to invoke them */
++    char        *jcl_begin,       /* Start JCL commands */
++                *jcl_ps,          /* Enter PostScript interpreter */
++                *jcl_end,         /* End JCL commands */
++                *lang_encoding,   /* Language encoding */
++                *lang_version,    /* Language version (English, Spanish, etc.) */
++                *modelname,       /* Model name (general) */
++                *ttrasterizer,    /* Truetype rasterizer */
++                *manufacturer,    /* Manufacturer name */
++                *product,         /* Product name (from PS RIP/interpreter) */
++                *nickname,        /* Nickname (specific) */
++                *shortnickname;   /* Short version of nickname */
++    int         num_groups;       /* Number of UI groups */
++    void        *groups;          /* UI groups */
++    int         num_sizes;        /* Number of page sizes */
++    ppd_size_t  *sizes;           /* Page sizes */
++    float       custom_min[2],    /* Minimum variable page size */
++                custom_max[2],    /* Maximum variable page size */
++                custom_margins[4];/* Margins around page */
++    int         num_consts;       /* Number of UI/Non-UI constraints */
++    void        *consts;          /* UI/Non-UI constraints */
++    int         num_fonts;        /* Number of pre-loaded fonts */
++    char        **fonts;          /* Pre-loaded fonts */
++    int         num_profiles;     /* Number of sRGB color profiles */
++    void        *profiles;    /* sRGB color profiles */
++    int         num_filters;      /* Number of filters */
++    char        **filters;        /* Filter strings... */
++
++    /**** New in CUPS 1.1 ****/
++    int         flip_duplex;      /* 1 = Flip page for back sides */
++    
++    /**** New in CUPS 1.1.19 ****/
++    char        *protocols,       /* Protocols (BCP, TBCP) string */
++                *pcfilename;      /* PCFileName string */
++    int         num_attrs,        /* Number of attributes */
++                cur_attr;         /* Current attribute */
++    void        **attrs;          /* Attributes */
++} ppd_file_t;
++
+ typedef cups_dest_t* (PR_CALLBACK *CupsGetDestType)(const char *printer,
+                                                     const char *instance,
+                                                     int num_dests, 
+@@ -80,6 +156,11 @@
+                                              const char    *value,
+                                              int           num_options,
+                                              cups_option_t **options);
++typedef const char* (PR_CALLBACK *CupsGetPPDType) (const char* name);
++typedef ppd_file_t* (PR_CALLBACK *PPDOpenFileType) (const char* filename);
++typedef void (PR_CALLBACK *PPDCloseType) (ppd_file_t* ppd);
++typedef void (PR_CALLBACK *PPDMarkDefaultsType) (ppd_file_t* ppd);
++typedef int (PR_CALLBACK *PPDIsMarkedType) (ppd_file_t* ppd, const char* pname, const char* pname_clear);
+ 
+ struct PRLibrary;
+ 
+@@ -113,6 +194,11 @@
+         CupsGetDestsType    mCupsGetDests;
+         CupsPrintFileType   mCupsPrintFile;
+         CupsTempFdType      mCupsTempFd;
++        CupsGetPPDType      mCupsGetPPD;
++        PPDOpenFileType     mPpdOpenFile;
++        PPDCloseType        mPpdClose;
++        PPDMarkDefaultsType mPpdMarkDefaults;
++        PPDIsMarkedType     mPpdIsMarked;
+ 
+     private:
+         PRLibrary *mCupsLib;
+--- gfx/src/psshared/nsIPaperPS.h
++++ gfx/src/psshared/nsIPaperPS.h
+@@ -0,0 +1,102 @@
++/* -*- Mode: C; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
++/* ex: set tabstop=8 softtabstop=4 shiftwidth=4 expandtab: */
++/* ***** BEGIN LICENSE BLOCK *****
++ * Version: MPL 1.1/GPL 2.0/LGPL 2.1
++ *
++ * The contents of this file are subject to the Mozilla Public License Version
++ * 1.1 (the "License"); you may not use this file except in compliance with
++ * the License. You may obtain a copy of the License at
++ * http://www.mozilla.org/MPL/
++ *
++ * Software distributed under the License is distributed on an "AS IS" basis,
++ * WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
++ * for the specific language governing rights and limitations under the
++ * License.
++ *
++ * Contributor(s):
++ *   Arne John Glenstrup <panic@itu.dk>
++ *
++ * Alternatively, the contents of this file may be used under the terms of
++ * either the GNU General Public License Version 2 or later (the "GPL"), or
++ * the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
++ * in which case the provisions of the GPL or the LGPL are applicable instead
++ * of those above. If you wish to allow use of your version of this file only
++ * under the terms of either the GPL or the LGPL, and not to allow others to
++ * use your version of this file under the terms of the MPL, indicate your
++ * decision by deleting the provisions above and replace them with the notice
++ * and other provisions required by the GPL or the LGPL. If you do not delete
++ * the provisions above, a recipient may use your version of this file under
++ * the terms of any one of the MPL, the GPL or the LGPL.
++ *
++ * ***** END LICENSE BLOCK ***** */
++
++ 
++#ifndef _NSIPAPERPS_H_
++#define _NSIPAPERPS_H_
++
++#include "prtypes.h"
++#include "psSharedCore.h"
++
++class nsIPaperSizePS {
++    public:
++        /** ---------------------------------------------------
++         * Virtual destructor.
++         */
++        virtual ~nsIPaperSizePS();
++        
++        /* Allow the paper factory to create instances */
++        friend class nsPaperFactoryPS;
++        
++        /** ---------------------------------------------------
++         * @return PR_TRUE if the cursor points past the last item.
++         */
++        virtual PRBool AtEnd() = 0;
++
++        /** ---------------------------------------------------
++         * Position the cursor at the beginning of the paper size list.
++         * @return VOID
++         */
++        virtual void First() = 0;
++
++        /** ---------------------------------------------------
++         * Advance the cursor to the next item.
++         * @return VOID
++         */
++        virtual void Next() = 0;
++
++        /** ---------------------------------------------------
++         * Point the cursor to the entry with the given paper name.
++         * @return PR_TRUE if pointing to a valid entry.
++         */
++        virtual PRBool Find(const char *aName) = 0;
++
++        /** ---------------------------------------------------
++         * Point the cursor to a default  entry if available.
++         * Otherwise it's equivalent to First().
++         * @return PR_TRUE if pointing to a valid entry.
++         */
++        virtual PRBool FindDefault() = 0;
++        
++        /** ---------------------------------------------------
++         * @return a pointer to the name of the current paper size
++         */
++        virtual const char *Name() = 0;
++
++        /** ---------------------------------------------------
++         * @return the width of the page in millimeters
++         */
++        virtual float Width_mm() = 0;
++
++        /** ---------------------------------------------------
++         * @return the height of the page in millimeters
++         */
++        virtual float Height_mm() = 0;
++
++        /** ---------------------------------------------------
++         * @return PR_TRUE if the paper should be presented to
++         *                 the user in metric units.
++         */
++        virtual PRBool IsMetric() { return PR_TRUE; };
++};
++
++#endif /* _NSIPAPERPS_H_ */
+--- gfx/src/psshared/nsPSPrinters.h
++++ gfx/src/psshared/nsPSPrinters.h
+@@ -44,6 +44,7 @@
+ #include "prtypes.h"
+ #include "nsCUPSShim.h"
+ #include "psSharedCore.h"
++#include "nsCOMPtr.h"
+ 
+ class nsIPrefService;
+ class nsIPrefBranch;
+--- gfx/src/psshared/nsPaperFactoryPS.cpp
++++ gfx/src/psshared/nsPaperFactoryPS.cpp
+@@ -0,0 +1,65 @@
++/* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
++/* ex: set tabstop=8 softtabstop=4 shiftwidth=4 expandtab: */
++/* ***** BEGIN LICENSE BLOCK *****
++ * Version: MPL 1.1/GPL 2.0/LGPL 2.1
++ *
++ * The contents of this file are subject to the Mozilla Public License Version
++ * 1.1 (the "License"); you may not use this file except in compliance with
++ * the License. You may obtain a copy of the License at
++ * http://www.mozilla.org/MPL/
++ *
++ * Software distributed under the License is distributed on an "AS IS" basis,
++ * WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
++ * for the specific language governing rights and limitations under the
++ * License.
++ *
++ * The Original Code is mozilla.org code.
++ *
++ * The Initial Developer of the Original Code is
++ * Kenneth Herron <kherron@fastmail.us>.
++ * Portions created by the Initial Developer are Copyright (C) 2004
++ * the Initial Developer. All Rights Reserved.
++ *
++ * Contributor(s):
++ *   Arne John Glenstrup <panic@itu.dk>
++ *
++ * Alternatively, the contents of this file may be used under the terms of
++ * either the GNU General Public License Version 2 or later (the "GPL"), or
++ * the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
++ * in which case the provisions of the GPL or the LGPL are applicable instead
++ * of those above. If you wish to allow use of your version of this file only
++ * under the terms of either the GPL or the LGPL, and not to allow others to
++ * use your version of this file under the terms of the MPL, indicate your
++ * decision by deleting the provisions above and replace them with the notice
++ * and other provisions required by the GPL or the LGPL. If you do not delete
++ * the provisions above, a recipient may use your version of this file under
++ * the terms of any one of the MPL, the GPL or the LGPL.
++ *
++ * ***** END LICENSE BLOCK ***** */
++
++
++#include "nsDebug.h"
++#include "nsPaperFactoryPS.h"
++#include "nsIPaperPS.h"
++#include "nsPaperPS.h"
++#include "nsPSPrinters.h"
++
++nsresult
++nsPaperFactoryPS::CreatePaper(const char* fullPrinterName,
++                              const char* printerName,
++                              nsIPaperSizePS* &aPaper)
++{
++    nsIPaperSizePS *newPZ;
++
++    if (nsPSPrinterList::kTypeCUPS == nsPSPrinterList::GetPrinterType
++        (nsDependentCString(fullPrinterName)))
++        newPZ = new nsPaperSizeCUPS(fullPrinterName, printerName);
++    else
++        newPZ = new nsPaperSizePS();
++    
++    if (!newPZ)
++        return NS_ERROR_OUT_OF_MEMORY;
++
++    aPaper = newPZ;
++    return NS_OK;
++}
+--- gfx/src/psshared/nsPaperFactoryPS.h
++++ gfx/src/psshared/nsPaperFactoryPS.h
+@@ -0,0 +1,64 @@
++/* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
++/* ex: set tabstop=8 softtabstop=4 shiftwidth=4 expandtab: */
++/* ***** BEGIN LICENSE BLOCK *****
++ * Version: MPL 1.1/GPL 2.0/LGPL 2.1
++ *
++ * The contents of this file are subject to the Mozilla Public License Version
++ * 1.1 (the "License"); you may not use this file except in compliance with
++ * the License. You may obtain a copy of the License at
++ * http://www.mozilla.org/MPL/
++ *
++ * Software distributed under the License is distributed on an "AS IS" basis,
++ * WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
++ * for the specific language governing rights and limitations under the
++ * License.
++ *
++ * Contributor(s):
++ *   Arne John Glenstrup <panic@itu.dk>
++ *
++ * Alternatively, the contents of this file may be used under the terms of
++ * either the GNU General Public License Version 2 or later (the "GPL"), or
++ * the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
++ * in which case the provisions of the GPL or the LGPL are applicable instead
++ * of those above. If you wish to allow use of your version of this file only
++ * under the terms of either the GPL or the LGPL, and not to allow others to
++ * use your version of this file under the terms of the MPL, indicate your
++ * decision by deleting the provisions above and replace them with the notice
++ * and other provisions required by the GPL or the LGPL. If you do not delete
++ * the provisions above, a recipient may use your version of this file under
++ * the terms of any one of the MPL, the GPL or the LGPL.
++ *
++ * ***** END LICENSE BLOCK ***** */
++
++#ifndef nsPaperFactoryPS_h__
++#define nsPaperFactoryPS_h__
++
++#include "nscore.h"
++#include "nsIPaperPS.h"
++
++/* Factory class for the paper sizes. This class determines
++ * which paper size class should handle a request, and constructs
++ * an object of the appropriate class.
++ */
++
++class NS_PSSHARED nsPaperFactoryPS
++{
++public:
++    /**
++     * Construct a paper size object for the given device context spec.
++     * On success, the paper size object is owned by the caller and should
++     * be destroyed when no longer needed.
++     *
++     * @param fullPrinterName  Fully qualified name, e.g., "CUPS/myprinter"
++     * @param printerName      Stripped name, e.g., "myprinter"
++     * @param aPaper           If NS_OK is returned, this will be filled
++     *                         in with a pointer to a paper size object.
++     * @return NS_OK or a suitable error value.
++     */
++    static nsresult CreatePaper(const char* fullPrinterName,
++				const char* printerName,
++				nsIPaperSizePS* &aPaper);
++};
++
++
++#endif /* nsPaperFactoryPS_h__ */
+--- gfx/src/psshared/nsPaperPS.cpp
++++ gfx/src/psshared/nsPaperPS.cpp
+@@ -22,6 +22,7 @@
+  * the Initial Developer. All Rights Reserved.
+  *
+  * Contributor(s):
++ *   Arne John Glenstrup <panic@itu.dk>
+  *
+  * Alternatively, the contents of this file may be used under the terms of
+  * either the GNU General Public License Version 2 or later (the "GPL"), or
+@@ -37,9 +38,25 @@
+  *
+  * ***** END LICENSE BLOCK ***** */
+ 
+- 
++#ifdef MOZ_LOGGING
++#define FORCE_PR_LOG 1 /* Allow logging in the release build */
++#endif /* MOZ_LOGGING */
++#include "prlog.h"
++
+ #include "nsPaperPS.h"
+ #include "plstr.h"
++#include "nsPSPrinters.h"
++#include <math.h> 
++
++#ifdef PR_LOGGING 
++static PRLogModuleInfo *PaperSizePSLM = PR_NewLogModule("PaperSizePS");
++#endif /* PR_LOGGING */
++/* Macro to make lines shorter */
++#define DO_PR_DEBUG_LOG(x) PR_LOG(PaperSizePSLM, PR_LOG_DEBUG, x)
++
++#define MM_PER_PT (25.4 / 72.0)
++#define HALF_INCH_PT 36.0
++#define EPSILON 0.125
+ 
+ #define COUNTOF(x) (sizeof(x) / sizeof((x)[0]))
+ 
+@@ -57,7 +74,15 @@
+ #undef SIZE_MM
+ };
+ 
+-const unsigned int nsPaperSizePS::mCount = COUNTOF(mList);
++nsCUPSShim nsPaperSizeCUPS::mCups;
++
++/* ~nsIPaperSizePS() is virtual, so must implement a destructor. */
++nsIPaperSizePS::~nsIPaperSizePS () { }
++
++nsPaperSizePS::nsPaperSizePS() {
++    mCount = COUNTOF(mList);
++    mCurrent = 0;
++}
+ 
+ PRBool
+ nsPaperSizePS::Find(const char *aName)
+@@ -70,3 +95,125 @@
+     }
+     return PR_FALSE;
+ }
++
++nsPaperSizeCUPS::nsPaperSizeCUPS(const char* fullPrinterName,
++                                 const char* printerName) {
++    DO_PR_DEBUG_LOG(("nsPaperSizeCUPS::nsPaperSizeCUPS('%s', '%s')\n",
++                     fullPrinterName, printerName));
++    /* Don't use CUPS before we are sure we have access to the PPD */
++    mUsingCups = false;
++    mPPD = nsnull;
++    mCount = COUNTOF(mList);
++    mCurrent = 0;
++    if (!fullPrinterName || !printerName ||
++        nsPSPrinterList::kTypeCUPS !=
++        nsPSPrinterList::GetPrinterType(nsDependentCString(fullPrinterName))) 
++        return;
++    if (!mCups.IsInitialized()) { mCups.Init(); }
++    if (!mCups.IsInitialized()) {
++        DO_PR_DEBUG_LOG(("nsPaperSizeCUPS::nsPaperSizeCUPS: CUPS unavailable\n"));
++        return;
++    }
++    const char* ppdFileName = mCups.mCupsGetPPD(printerName);
++    if (!ppdFileName) {
++        DO_PR_DEBUG_LOG(("nsPaperSizeCUPS::nsPaperSizeCUPS: "
++                         "cannot get PPD file name for printer '%s'\n",
++                         printerName));
++        return;
++    }
++    mPPD = mCups.mPpdOpenFile(ppdFileName);
++    if (!mPPD)  {
++        DO_PR_DEBUG_LOG(("nsPaperSizeCUPS::nsPaperSizeCUPS: "
++                         "cannot open PPD file '%s'\n",
++                         ppdFileName));
++        return;
++    }
++    mCount = mPPD->num_sizes;
++    mUsingCups = true;
++}
++
++nsPaperSizeCUPS::~nsPaperSizeCUPS() {
++    if (mPPD) mCups.mPpdClose(mPPD);
++}
++
++void
++nsPaperSizeCUPS::SkipZeroSizes() {
++    if (!mUsingCups) return; 
++    while (mCurrent < mCount
++           && (mPPD->sizes[mCurrent].width == 0.0f || 
++               mPPD->sizes[mCurrent].length == 0.0f)) {
++        mCurrent++;
++    }
++}
++
++PRBool
++nsPaperSizeCUPS::Find(const char* aName) {
++    DO_PR_DEBUG_LOG(("nsPaperSizeCUPS::Find ('%s') ", aName));
++    if (!mUsingCups) return nsPaperSizePS::Find(aName);
++    for (int i = mCount; i--; ) {
++        if (!PL_strcasecmp(aName, mPPD->sizes[i].name)) {
++            DO_PR_DEBUG_LOG
++                (("found paper '%s' (%gx%gmm)\n",
++                  aName,
++                  round(mPPD->sizes[i].width * MM_PER_PT),
++                  round(mPPD->sizes[i].length * MM_PER_PT)));
++            mCurrent = i;
++            return PR_TRUE;
++        }
++    }
++    DO_PR_DEBUG_LOG(("did not find paper '%s'\n", aName));
++    return PR_FALSE;
++}
++
++PRBool
++nsPaperSizeCUPS::FindDefault() {
++    DO_PR_DEBUG_LOG(("nsPaperSizeCUPS::FindDefault"));
++    if (!mUsingCups) return nsPaperSizePS::FindDefault();
++    mCups.mPpdMarkDefaults(mPPD);
++    for (int i = mCount; i--; ) {
++        if (mCups.mPpdIsMarked(mPPD, "PageSize", mPPD->sizes[i].name )) {
++            DO_PR_DEBUG_LOG
++                (("found default paper '%s' (%gx%gmm)\n",
++                  mPPD->sizes[i].name,
++                  round(mPPD->sizes[i].width * MM_PER_PT),
++                  round(mPPD->sizes[i].length * MM_PER_PT)));
++            mCurrent = i;
++            return PR_TRUE;
++        }
++    }
++    mCurrent = 0;
++    DO_PR_DEBUG_LOG(("no default paper found, therefore set the first\n"));
++    return PR_TRUE;
++}
++
++const char*
++nsPaperSizeCUPS::Name() {
++    if (!mUsingCups) return nsPaperSizePS::Name();
++    NS_PRECONDITION(!AtEnd(), "Invalid current item");
++    return mPPD->sizes[mCurrent].name;
++}
++
++float
++nsPaperSizeCUPS::Width_mm() {
++    if (!mUsingCups) return nsPaperSizePS::Width_mm();
++    NS_PRECONDITION(!AtEnd(), "Invalid current item");
++    return round(mPPD->sizes[mCurrent].width * MM_PER_PT);
++}
++
++float
++nsPaperSizeCUPS::Height_mm() {
++    if (!mUsingCups) return nsPaperSizePS::Height_mm();
++    NS_PRECONDITION(!AtEnd(), "Invalid current item");
++    return round(mPPD->sizes[mCurrent].length * MM_PER_PT);
++}
++
++PRBool 
++nsPaperSizeCUPS::IsMetric() {
++    if (!mUsingCups) return nsPaperSizePS::IsMetric();
++    NS_PRECONDITION(!AtEnd(), "Invalid current item");
++    /* Educated guess: unless sizes are integral number    */
++    /* of half inches, present them to the user in metric. */
++    return
++        fabs(fmod(mPPD->sizes[mCurrent].width, HALF_INCH_PT)) > EPSILON ||
++        fabs(fmod(mPPD->sizes[mCurrent].length, HALF_INCH_PT)) > EPSILON;
++}
+--- gfx/src/psshared/nsPaperPS.h
++++ gfx/src/psshared/nsPaperPS.h
+@@ -40,9 +40,9 @@
+ #ifndef _PAPERPS_H_
+ #define _PAPERPS_H_
+ 
+-#include "prtypes.h"
++#include "nsIPaperPS.h"
+ #include "nsDebug.h"
+-#include "psSharedCore.h"
++#include "nsCUPSShim.h"
+ 
+ struct nsPaperSizePS_ {
+     const char *name;
+@@ -51,13 +51,13 @@
+     PRBool isMetric;        // Present to the user in metric, if possible
+ };
+ 
+-class NS_PSSHARED nsPaperSizePS {
++class NS_PSSHARED nsPaperSizePS : public nsIPaperSizePS {
+     public:
+         /** ---------------------------------------------------
+          * Constructor
+          */
+-        nsPaperSizePS() { mCurrent = 0; }
+-
++        nsPaperSizePS();
++        
+         /** ---------------------------------------------------
+          * @return PR_TRUE if the cursor points past the last item.
+          */
+@@ -85,6 +85,12 @@
+         PRBool Find(const char *aName);
+ 
+         /** ---------------------------------------------------
++         * Position the cursor at the beginning of the paper size list.
++         * @return PR_TRUE
++         */
++        PRBool FindDefault() { mCurrent = 0; return PR_TRUE; }
++        
++        /** ---------------------------------------------------
+          * @return a pointer to the name of the current paper size
+          */
+         const char *Name() {
+@@ -117,11 +123,83 @@
+             return mList[mCurrent].isMetric;
+         }
+ 
+-    private:
++    protected:
+         unsigned int mCurrent;
+         // the class visibility should export these, but it doesn't
+         static NS_PSSHARED_STATIC_MEMBER_(const nsPaperSizePS_) mList[];
+-        static NS_PSSHARED_STATIC_MEMBER_(const unsigned int) mCount;
++        unsigned int mCount;
++};
++
++class NS_PSSHARED nsPaperSizeCUPS : public nsPaperSizePS {
++    public:
++        /** ---------------------------------------------------
++         * Constructor for a specific CUPS printer.
++         * @param fullPrinterName  Fully qualified name, e.g., "CUPS/myprinter"
++         * @param printerName      Stripped name, e.g., "myprinter"
++         */
++        nsPaperSizeCUPS(const char* fullPrinterName, const char* printerName);
++        
++        /** ---------------------------------------------------
++         * Destructor.
++         */
++        ~nsPaperSizeCUPS();
++        
++        /** ---------------------------------------------------
++         * Position the cursor at the beginning of the paper size list.
++         * @return VOID
++         */
++        void First() {
++            nsPaperSizePS::First();
++            SkipZeroSizes();
++        }
++
++        /** ---------------------------------------------------
++         * Advance the cursor to the next item.
++         * @return VOID
++         */
++        void Next() {
++            nsPaperSizePS::Next();
++            SkipZeroSizes();
++        }
++
++        /** ---------------------------------------------------
++         * Point the cursor to the entry with the given paper name.
++         * @return PR_TRUE if pointing to a valid entry.
++         */
++        PRBool Find(const char *aName);
++
++        /** ---------------------------------------------------
++         * Point the cursor to the CUPS default entry for paper size.
++         * @return PR_TRUE if pointing to a valid entry.
++         */
++        PRBool FindDefault();
++        
++        /** ---------------------------------------------------
++         * @return a pointer to the name of the current paper size
++         */
++        const char *Name();
++
++        /** ---------------------------------------------------
++         * @return the width of the page in millimeters
++         */
++        float Width_mm();
++
++        /** ---------------------------------------------------
++         * @return the height of the page in millimeters
++         */
++        float Height_mm();
++
++        /** ---------------------------------------------------
++         * @return PR_TRUE if the paper should be presented to
++         *                 the user in metric units.
++         */
++        PRBool IsMetric();
++        
++    private:
++        void SkipZeroSizes();
++        PRBool mUsingCups;
++        static NS_PSSHARED_STATIC_MEMBER_(nsCUPSShim) mCups;
++        ppd_file_t* mPPD;
+ };
+ 
+ #endif
+--- gfx/src/xlib/nsDeviceContextSpecXlib.cpp
++++ gfx/src/xlib/nsDeviceContextSpecXlib.cpp
+@@ -1212,7 +1212,11 @@
+ #endif /* SET_PRINTER_FEATURES_VIA_PREFS */
+     nsXPIDLCString papername;
+     if (NS_SUCCEEDED(CopyPrinterCharPref(pPrefs, "postscript", printerName, "paper_size", getter_Copies(papername)))) {
+-      nsPaperSizePS paper;
++      nsIPaperSizePS* paper;
++      nsresult rv;
++      rv = nsPaperFactoryPS::CreatePaper
++        (fullPrinterName.get(), printerName.get(), paper);
++      if (NS_FAILED(rv)) return rv;
+ 
+       if (paper.Find(papername)) {
+         DO_PR_DEBUG_LOG(("setting default paper size to '%s' (%g mm/%g mm)\n",
+@@ -1238,6 +1242,7 @@
+       }
+       printerFeatures.SetNumPaperSizeRecords(count);
+ #endif /* SET_PRINTER_FEATURES_VIA_PREFS */
++      delete(paper);
+     }
+ 
+     PRBool hasSpoolerCmd = (nsPSPrinterList::kTypePS ==

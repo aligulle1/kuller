@@ -1,0 +1,98 @@
+From: Surbhi Palande <surbhi.palande@canonical.com>
+Date: Tue, 8 Dec 2009 09:44:34 +0000 (+0200)
+Subject: UBUNTU: SAUCE: Make populate_rootfs asynchronous
+X-Git-Tag: Ubuntu-2.6.32-8.12~28
+X-Git-Url: http://kernel.ubuntu.com/git?p=ubuntu%2Fubuntu-lucid.git;a=commitdiff_plain;h=29f1e2fdb1c62b0a7e27740d8480fbc371f76495;hp=148aa340d82abf616ffc5bce154bb9bb9ac9ac51
+
+UBUNTU: SAUCE: Make populate_rootfs asynchronous
+
+The expansion of the initramfs is completely independant of other
+boot activities.  The original data is already present at boot and the
+filesystem is not required until we are ready to start init.  It is
+therefore reasonable to populate the rootfs asynchronously.  Move this
+processing to an async call.
+
+This reduces kernel initialisation time (the time from bootloader to
+starting userspace) by several 10ths of a second on a selection of test
+hardware particularly SMP systems, although UP system also benefit.
+
+Signed-off-by: Surbhi Palande <surbhi.palande@canonical.com>
+Signed-off-by: Andy Whitcroft <apw@canonical.com>
+---
+
+diff --git a/include/linux/init.h b/include/linux/init.h
+index ff8bde5..b57935f 100644
+--- a/include/linux/init.h
++++ b/include/linux/init.h
+@@ -213,6 +213,8 @@ extern void (*late_time_init)(void);
+ 	static initcall_t __initcall_##fn \
+ 	__used __section(.security_initcall.init) = fn
+ 
++extern struct list_head  populate_rootfs_domain;
++
+ struct obs_kernel_param {
+ 	const char *str;
+ 	int (*setup_func)(char *);
+diff --git a/init/initramfs.c b/init/initramfs.c
+index 4c00edc..b8f9e3c 100644
+--- a/init/initramfs.c
++++ b/init/initramfs.c
+@@ -8,6 +8,7 @@
+ #include <linux/dirent.h>
+ #include <linux/syscalls.h>
+ #include <linux/utime.h>
++#include <linux/async.h>
+ 
+ static __initdata char *message;
+ static void __init error(char *x)
+@@ -565,7 +566,9 @@ static void __init clean_rootfs(void)
+ }
+ #endif
+ 
+-static int __init populate_rootfs(void)
++LIST_HEAD(populate_rootfs_domain);
++
++static void __init async_populate_rootfs(void)
+ {
+ 	char *err = unpack_to_rootfs(__initramfs_start,
+ 			 __initramfs_end - __initramfs_start);
+@@ -579,7 +582,7 @@ static int __init populate_rootfs(void)
+ 			initrd_end - initrd_start);
+ 		if (!err) {
+ 			free_initrd();
+-			return 0;
++			return;
+ 		} else {
+ 			clean_rootfs();
+ 			unpack_to_rootfs(__initramfs_start,
+@@ -603,6 +606,12 @@ static int __init populate_rootfs(void)
+ 		free_initrd();
+ #endif
+ 	}
+-	return 0;
++	return;
+ }
++
++static int __init populate_rootfs(void)
++{
++	async_schedule_domain(async_populate_rootfs, NULL, &populate_rootfs_domain);
++}
++
+ rootfs_initcall(populate_rootfs);
+diff --git a/init/main.c b/init/main.c
+index 21d8a05..174abe4 100644
+--- a/init/main.c
++++ b/init/main.c
+@@ -879,6 +879,12 @@ static int __init kernel_init(void * unused)
+ 	do_basic_setup();
+ 
+ 	/*
++	 * We need to ensure that the filesystem is ready by this point, wait for
++	 * async_populate_rootfs to complete.
++	 */
++	async_synchronize_full_domain(&populate_rootfs_domain);
++
++	/*
+ 	 * check if there is an early userspace init.  If yes, let it do all
+ 	 * the work
+ 	 */

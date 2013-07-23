@@ -1,0 +1,72 @@
+diff -Nuar wesnoth-1.0.2.orig/src/widgets/textbox.cpp wesnoth-1.0.2/src/widgets/textbox.cpp
+--- wesnoth-1.0.2.orig/src/widgets/textbox.cpp	2006-02-18 14:14:05.000000000 +0200
++++ wesnoth-1.0.2/src/widgets/textbox.cpp	2006-02-18 14:20:03.000000000 +0200
+@@ -491,7 +491,12 @@
+ 		}
+ 	}
+ 
+-	wchar_t character = key.unicode;
++        wchar_t character;
++        if (key.unicode == 0) //this means that your key stroke is not in SDL go and try to get it. ihsan
++                character = get_correct_unicode(key.mod, key.sym);
++        else
++                character = key.unicode;
++
+ 
+ 	//movement characters may have a "Unicode" field on some platforms, so ignore it.
+ 	if(!(c == SDLK_UP || c == SDLK_DOWN || c == SDLK_LEFT || c == SDLK_RIGHT ||
+@@ -567,4 +572,39 @@
+ 	set_dirty(true);
+ }
+ 
++int textbox::get_correct_unicode(int mod, int sym){
++
++       //to able to get fast run I escaped from if case
++       //to do it multiply mod by 1000 and add sym
++       //I'm not sure about 1000, maybe it is not enough, ihsan
++       int temp = 1000*mod + sym;
++
++       switch (temp) {
++               // to not show many messages on cerr
++               case (304) : //shift
++               case (306) : //L-Ctrl
++               case (305) : //R-Ctrl
++               case (308) : //alt
++               case (313) : //alt gr
++                       return 0;
++               //Turkish part, rest of the Turkish characters handled by SDL
++               case(1105):
++                       return 0x130; //İ
++               case(185) :
++                       return 0x131; //ı
++               case(1187):
++                       return 0x11E; //Ğ
++               case(187) :
++                       return 0x11F; //ğ
++               case(1186):
++                       return 0x15E; //Ş
++               case(186) :
++                       return 0x15F; //ş
++               //Other languages
++
++               default :
++                       return 0;
++       };
++}
++
+ } //end namespace gui
+diff -Nuar wesnoth-1.0.2.orig/src/widgets/textbox.hpp wesnoth-1.0.2/src/widgets/textbox.hpp
+--- wesnoth-1.0.2.orig/src/widgets/textbox.hpp	2006-02-18 14:14:05.000000000 +0200
++++ wesnoth-1.0.2/src/widgets/textbox.hpp	2006-02-18 14:18:02.000000000 +0200
+@@ -47,6 +47,11 @@
+ 	//an inline forwarding function instead
+ 	void set_location(int x, int y) { widget::set_location(x,y); }
+ 
++        //SDL does not return all utf characters
++        //this function need not to be here,
++        //it is independent of SDL, actually any library. ihsan
++        int get_correct_unicode(int mod, int sym);
++
+ protected:
+ 	virtual void draw_contents();
+ 	virtual void set_inner_location(SDL_Rect const &);

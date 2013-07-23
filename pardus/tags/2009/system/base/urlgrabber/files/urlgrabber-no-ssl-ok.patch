@@ -1,0 +1,47 @@
+Index: urlgrabber-3.1.0/urlgrabber/keepalive.py
+===================================================================
+--- urlgrabber-3.1.0.orig/urlgrabber/keepalive.py
++++ urlgrabber-3.1.0/urlgrabber/keepalive.py
+@@ -326,6 +326,7 @@ class KeepAliveHandler:
+     def _get_connection(self, host):
+         return NotImplementedError
+ 
++
+ class HTTPHandler(KeepAliveHandler, urllib2.HTTPHandler):
+     def __init__(self):
+         KeepAliveHandler.__init__(self)
+@@ -336,18 +337,23 @@ class HTTPHandler(KeepAliveHandler, urll
+     def _get_connection(self, host):
+         return HTTPConnection(host)
+ 
+-class HTTPSHandler(KeepAliveHandler, urllib2.HTTPSHandler):
+-    def __init__(self, ssl_factory=None):
+-        KeepAliveHandler.__init__(self)
+-        if not ssl_factory:
+-            ssl_factory = sslfactory.get_factory()
+-        self._ssl_factory = ssl_factory
+-    
+-    def https_open(self, req):
+-        return self.do_open(req)
+ 
+-    def _get_connection(self, host):
+-        return self._ssl_factory.create_https_connection(host, HTTPResponse)
++# If SSL isn't available, don't make urlgrabber completely unusable
++try:
++    class HTTPSHandler(KeepAliveHandler, urllib2.HTTPSHandler):
++        def __init__(self, ssl_factory=None):
++            KeepAliveHandler.__init__(self)
++            if not ssl_factory:
++                ssl_factory = sslfactory.get_factory()
++            self._ssl_factory = ssl_factory
++
++        def https_open(self, req):
++            return self.do_open(req)
++
++        def _get_connection(self, host):
++            return self._ssl_factory.create_https_connection(host, HTTPResponse)
++except:
++    pass
+ 
+ class HTTPResponse(httplib.HTTPResponse):
+     # we need to subclass HTTPResponse in order to

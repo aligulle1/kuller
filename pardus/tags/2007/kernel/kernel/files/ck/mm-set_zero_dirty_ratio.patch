@@ -1,0 +1,57 @@
+Set dirty_ratio to 0 by default. This makes processes doing file writes more
+responsible for any I/O induced delays by throttling them very early instead
+of handing off the workload to a pdflush thread. This improves latencies for
+small writes and any reads in the presence of heavy writes. It also helps
+preserve more mapped pages and useful pagecache by not ever having large
+amounts of dirty data taking up ram.
+
+Signed-off-by: Con Kolivas <kernel@kolivas.org>
+
+---
+ mm/page-writeback.c |   12 ++++++------
+ 1 files changed, 6 insertions(+), 6 deletions(-)
+
+Index: linux-2.6.18-ck1/mm/page-writeback.c
+===================================================================
+--- linux-2.6.18-ck1.orig/mm/page-writeback.c	2006-09-21 20:05:37.000000000 +1000
++++ linux-2.6.18-ck1/mm/page-writeback.c	2006-09-21 20:05:37.000000000 +1000
+@@ -64,33 +64,33 @@ static inline long sync_writeback_pages(
+ /*
+  * Start background writeback (via pdflush) at this percentage
+  */
+-int dirty_background_ratio = 10;
++int dirty_background_ratio __read_mostly = 10;
+ 
+ /*
+  * The generator of dirty data starts writeback at this percentage
+  */
+-int vm_dirty_ratio = 40;
++int vm_dirty_ratio __read_mostly;
+ 
+ /*
+  * The interval between `kupdate'-style writebacks, in jiffies
+  */
+-int dirty_writeback_interval = 5 * HZ;
++int dirty_writeback_interval __read_mostly = 5 * HZ;
+ 
+ /*
+  * The longest number of jiffies for which data is allowed to remain dirty
+  */
+-int dirty_expire_interval = 30 * HZ;
++int dirty_expire_interval __read_mostly = 30 * HZ;
+ 
+ /*
+  * Flag that makes the machine dump writes/reads and block dirtyings.
+  */
+-int block_dump;
++int block_dump __read_mostly;
+ 
+ /*
+  * Flag that puts the machine in "laptop mode". Doubles as a timeout in jiffies:
+  * a full sync is triggered after this time elapses without any disk activity.
+  */
+-int laptop_mode;
++int laptop_mode __read_mostly;
+ 
+ EXPORT_SYMBOL(laptop_mode);
+ 

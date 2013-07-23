@@ -1,0 +1,31 @@
+From: Andrea Arcangeli <andrea@suse.de>
+Subject: Race condition in userspace testcase
+References: 46948, LTC11574
+
+
+Additional Comment #103 From Andrea Arcangeli 2004-10-15 19:41
+the last patch I attached is the safest I believe.
+
+I'm not sure if a lock_unlock or lock_unlock is always guaranteed to happen
+after the I/O, and this makes sure no race can happen anymore.
+
+Index: linux-2.6.18/fs/bio.c
+===================================================================
+--- linux-2.6.18.orig/fs/bio.c
++++ linux-2.6.18/fs/bio.c
+@@ -1042,6 +1042,15 @@ void bio_endio(struct bio *bio, unsigned
+ 	bio->bi_size -= bytes_done;
+ 	bio->bi_sector += (bytes_done >> 9);
+ 
++	if (bio_data_dir(bio) == READ)
++		/*
++		 * If the current cpu has written to the page by hand
++		 * without dma, we must enforce ordering to be sure
++		 * this written data will be visible before we expose
++		 * the page contents to other cpus (for example with
++		 * a set_pte).
++		 */
++		smp_wmb();
+ 	if (bio->bi_end_io)
+ 		bio->bi_end_io(bio, bytes_done, error);
+ }

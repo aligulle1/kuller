@@ -1,0 +1,143 @@
+=== modified file 'lib/platform/CXWindowsEventQueueBuffer.cpp'
+--- lib/platform/CXWindowsEventQueueBuffer.cpp	2008-06-07 20:32:37 +0000
++++ lib/platform/CXWindowsEventQueueBuffer.cpp	2008-06-25 02:11:38 +0000
+@@ -17,6 +17,10 @@
+ #include "CThread.h"
+ #include "CEvent.h"
+ #include "IEventQueue.h"
++#include <fcntl.h>
++#if HAVE_UNISTD_H
++#	include <unistd.h>
++#endif
+ #if HAVE_POLL
+ #	include <poll.h>
+ #else
+@@ -29,9 +33,6 @@
+ #	if HAVE_SYS_TYPES_H
+ #		include <sys/types.h>
+ #	endif
+-#	if HAVE_UNISTD_H
+-#		include <unistd.h>
+-#	endif
+ #endif
+ 
+ //
+@@ -55,11 +56,22 @@
+ 	assert(m_window  != None);
+ 
+ 	m_userEvent = XInternAtom(m_display, "SYNERGY_USER_EVENT", False);
++	// set up for pipe hack
++	int result = pipe(m_pipefd);
++	assert(result == 0);
++
++	int pipeflags;
++	pipeflags = fcntl(m_pipefd[0], F_GETFL);
++	fcntl(m_pipefd[0], F_SETFL, pipeflags | O_NONBLOCK);
++	pipeflags = fcntl(m_pipefd[1], F_GETFL);
++	fcntl(m_pipefd[1], F_SETFL, pipeflags | O_NONBLOCK);
+ }
+ 
+ CXWindowsEventQueueBuffer::~CXWindowsEventQueueBuffer()
+ {
+-	// do nothing
++	// release pipe hack resources
++	close(m_pipefd[0]);
++	close(m_pipefd[1]);
+ }
+ 
+ void
+@@ -67,6 +79,11 @@
+ {
+ 	CThread::testCancel();
+ 
++	// clear out the pipe in preparation for waiting.
++
++	char buf[16];
++	read(m_pipefd[0], buf, 15);
++
+ 	{
+ 		CLock lock(&m_mutex);
+ 		// we're now waiting for events
+@@ -75,13 +92,20 @@
+ 		// push out pending events
+ 		flush();
+ 	}
++	// calling flush may have queued up a new event.
++	if (!CXWindowsEventQueueBuffer::isEmpty()) {
++		CThread::testCancel();
++		return;
++	}
+ 
+ 	// use poll() to wait for a message from the X server or for timeout.
+ 	// this is a good deal more efficient than polling and sleeping.
+ #if HAVE_POLL
+-	struct pollfd pfds[1];
++	struct pollfd pfds[2];
+ 	pfds[0].fd     = ConnectionNumber(m_display);
+ 	pfds[0].events = POLLIN;
++	pfds[1].fd     = m_pipefd[0];
++	pfds[1].events = POLLIN;
+ 	int timeout    = (dtimeout < 0.0) ? -1 :
+ 						static_cast<int>(1000.0 * dtimeout);
+ #else
+@@ -101,19 +125,33 @@
+ 	fd_set rfds;
+ 	FD_ZERO(&rfds);
+ 	FD_SET(ConnectionNumber(m_display), &rfds);
++	FD_SET(m_pipefd[0], &rfds);
++	int nfds;
++	if (ConnectionNumber(m_display) > m_pipefd[0]) {
++		nfds = ConnectionNumber(m_display) + 1;
++	}
++	else {
++		nfds = m_pipefd[0] + 1;
++	}
+ #endif
+ 
+ 	// wait for message from X server or for timeout.  also check
+ 	// if the thread has been cancelled.  poll() should return -1
+ 	// with EINTR when the thread is cancelled.
+ #if HAVE_POLL
+-	poll(pfds, 1, timeout);
++	poll(pfds, 2, timeout);
++	if (pfds[1].revents & POLLIN) {
++		read(m_pipefd[0], buf, 15);
++	}
+ #else
+-	select(ConnectionNumber(m_display) + 1,
++	select(nfds,
+ 						SELECT_TYPE_ARG234 &rfds,
+ 						SELECT_TYPE_ARG234 NULL,
+ 						SELECT_TYPE_ARG234 NULL,
+ 						SELECT_TYPE_ARG5   timeoutPtr);
++	if (FD_SET(m_pipefd[0], &rfds) {
++		read(m_pipefd[0], buf, 15);
++	}
+ #endif
+ 
+ 	{
+@@ -170,6 +208,11 @@
+ 	// too.
+ 	if (m_waiting) {
+ 		flush();
++		// Send a character through the round-trip pipe to wake a thread
++		// that is waiting for a ConnectionNumber() socket to be readable.
++		// The flush call can read incoming data from the socket and put
++		// it in Xlib's input buffer.  That sneaks it past the other thread.
++		write(m_pipefd[1], "!", 1);
+ 	}
+ 
+ 	return true;
+
+=== modified file 'lib/platform/CXWindowsEventQueueBuffer.h'
+--- lib/platform/CXWindowsEventQueueBuffer.h	2008-06-07 20:32:37 +0000
++++ lib/platform/CXWindowsEventQueueBuffer.h	2008-06-21 20:48:14 +0000
+@@ -52,6 +52,7 @@
+ 	XEvent				m_event;
+ 	CEventList			m_postedEvents;
+ 	bool				m_waiting;
++	int				m_pipefd[2];
+ };
+ 
+ #endif
+

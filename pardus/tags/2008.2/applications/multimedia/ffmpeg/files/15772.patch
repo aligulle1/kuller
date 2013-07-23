@@ -1,0 +1,28 @@
+Index: libavcodec/h263.c
+===================================================================
+--- libavcodec/h263.c	(revision 15771)
++++ libavcodec/h263.c	(revision 15772)
+@@ -5751,8 +5751,10 @@
+         s->divx_version= ver;
+         s->divx_build= build;
+         s->divx_packed= e==3 && last=='p';
+-        if(s->divx_packed)
++        if(s->divx_packed && !s->showed_packed_warning) {
+             av_log(s->avctx, AV_LOG_WARNING, "Invalid and inefficient vfw-avi packed B frames detected\n");
++            s->showed_packed_warning=1;
++        }
+     }
+ 
+     /* ffmpeg detection */
+Index: libavcodec/mpegvideo.h
+===================================================================
+--- libavcodec/mpegvideo.h	(revision 15771)
++++ libavcodec/mpegvideo.h	(revision 15772)
+@@ -487,6 +487,7 @@
+     /* H.263 specific */
+     int gob_index;
+     int obmc;                       ///< overlapped block motion compensation
++    int showed_packed_warning;      ///< flag for having shown the warning about divxs invalid b frames
+ 
+     /* H.263+ specific */
+     int umvplus;                    ///< == H263+ && unrestricted_mv

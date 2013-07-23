@@ -1,0 +1,28 @@
+diff -rup xen-3.2.0.orig/tools/xenstore/xenstore_client.c xen-3.2.0.new/tools/xenstore/xenstore_client.c
+--- xen-3.2.0.orig/tools/xenstore/xenstore_client.c	2008-02-06 13:18:04.000000000 -0500
++++ xen-3.2.0.new/tools/xenstore/xenstore_client.c	2008-02-06 13:17:43.000000000 -0500
+@@ -357,7 +357,9 @@ main(int argc, char **argv)
+ 
+     xsh = socket ? xs_daemon_open() : xs_domain_open();
+     if (xsh == NULL)
+-	err(1, socket ? "xs_daemon_open" : "xs_domain_open");
++	xsh = socket ? xs_domain_open() : xs_daemon_open();
++    if (xsh == NULL)
++	err(1, "xs_*_open");
+ 
+   again:
+     if (transaction) {
+diff -rup xen-3.2.0.orig/tools/xenstore/xsls.c xen-3.2.0.new/tools/xenstore/xsls.c
+--- xen-3.2.0.orig/tools/xenstore/xsls.c	2008-01-16 13:34:59.000000000 -0500
++++ xen-3.2.0.new/tools/xenstore/xsls.c	2008-02-06 13:19:09.000000000 -0500
+@@ -163,7 +163,9 @@ int main(int argc, char *argv[])
+ 
+     xsh = socket ? xs_daemon_open() : xs_domain_open();
+     if (xsh == NULL)
+-        err(1, socket ? "xs_daemon_open" : "xs_domain_open");
++       xsh = socket ? xs_domain_open() : xs_daemon_open();
++    if (xsh == NULL)
++       err(1, "xs_*_open");
+ 
+     print_dir(xsh, (argc - optind) == 1 ? argv[optind] : "/", 0, show_perm);
+ 

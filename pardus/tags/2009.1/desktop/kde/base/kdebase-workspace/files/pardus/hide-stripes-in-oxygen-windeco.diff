@@ -1,0 +1,136 @@
+Index: kdebase-workspace-4.3.0/kwin/clients/oxygen/config/config.cpp
+===================================================================
+--- kdebase-workspace-4.3.0.orig/kwin/clients/oxygen/config/config.cpp
++++ kdebase-workspace-4.3.0/kwin/clients/oxygen/config/config.cpp
+@@ -70,7 +70,7 @@ OxygenConfig::~OxygenConfig()
+ void OxygenConfig::load( const KConfigGroup&  )
+ {
+     KConfigGroup cg(c, "Windeco");
+-    ui->showStripes->setChecked( cg.readEntry("ShowStripes", true) );
++    ui->showStripes->setChecked( cg.readEntry("ShowStripes", false) );
+ 
+     QString titleAlignment = cg.readEntry("TitleAlignment", "Left");
+     ui->titleAlignmentLeft->setChecked( titleAlignment == "Left" );
+@@ -102,7 +102,7 @@ void OxygenConfig::save( KConfigGroup& )
+ // Sets UI widget defaults which must correspond to style defaults
+ void OxygenConfig::defaults()
+ {
+-    ui->showStripes->setChecked( true );
++    ui->showStripes->setChecked( false );
+     ui->titleAlignmentLeft->setChecked( true );
+     
+     emit changed();
+Index: kdebase-workspace-4.3.0/kwin/clients/oxygen/oxygen.cpp
+===================================================================
+--- kdebase-workspace-4.3.0.orig/kwin/clients/oxygen/oxygen.cpp
++++ kdebase-workspace-4.3.0/kwin/clients/oxygen/oxygen.cpp
+@@ -50,7 +50,7 @@ OxygenHelper *oxygenHelper(); // referen
+ 
+ bool OxygenFactory::initialized_ = false;
+ Qt::Alignment OxygenFactory::titleAlignment_ = Qt::AlignLeft;
+-bool OxygenFactory::showStripes_ = true;
++bool OxygenFactory::showStripes_ = false;
+ int OxygenFactory::borderSize_ = 4; // BorderSize::BorderNormal
+ 
+ //////////////////////////////////////////////////////////////////////////////
+@@ -175,7 +175,7 @@ bool OxygenFactory::readConfig()
+     }
+ 
+     bool oldstripes = showStripes_;    
+-    showStripes_ = group.readEntry( "ShowStripes", true );
++    showStripes_ = group.readEntry( "ShowStripes", false);
+ 
+     if (oldalign == titleAlignment_ && oldstripes == showStripes_
+             && oldBorderSize == borderSize_)
+Index: kdebase-workspace-4.3.0/kwin/clients/ozone/config/config.cpp
+===================================================================
+--- kdebase-workspace-4.3.0.orig/kwin/clients/ozone/config/config.cpp
++++ kdebase-workspace-4.3.0/kwin/clients/ozone/config/config.cpp
+@@ -72,7 +72,7 @@ OxygenConfig::~OxygenConfig()
+ void OxygenConfig::load( const KConfigGroup&  )
+ {
+     KConfigGroup cg(c, "Windeco");
+-    ui->showStripes->setChecked( cg.readEntry("ShowStripes", true) );
++    ui->showStripes->setChecked( cg.readEntry("ShowStripes", false) );
+     ui->blendTitlebarColors->setChecked( cg.readEntry("BlendTitlebarColors", true) );
+ 
+     QString titleAlignment = cg.readEntry("TitleAlignment", "Left");
+@@ -106,7 +106,7 @@ void OxygenConfig::save( KConfigGroup& )
+ // Sets UI widget defaults which must correspond to style defaults
+ void OxygenConfig::defaults()
+ {
+-    ui->showStripes->setChecked( true );
++    ui->showStripes->setChecked( false );
+     ui->titleAlignmentLeft->setChecked( true );
+     ui->blendTitlebarColors->setChecked( true );
+     
+Index: kdebase-workspace-4.3.0/kwin/clients/ozone/oxygen.cpp
+===================================================================
+--- kdebase-workspace-4.3.0.orig/kwin/clients/ozone/oxygen.cpp
++++ kdebase-workspace-4.3.0/kwin/clients/ozone/oxygen.cpp
+@@ -52,7 +52,7 @@ OxygenHelper *oxygenHelper(); // referen
+ 
+ bool OxygenFactory::initialized_ = false;
+ Qt::Alignment OxygenFactory::titleAlignment_ = Qt::AlignLeft;
+-bool OxygenFactory::showStripes_ = true;
++bool OxygenFactory::showStripes_ = false;
+ int OxygenFactory::borderSize_ = 4; // BorderSize::BorderNormal
+ bool OxygenFactory::blendTitlebarColors_ = true;
+ 
+@@ -178,7 +178,7 @@ bool OxygenFactory::readConfig()
+     }
+ 
+     bool oldstripes = showStripes_;    
+-    showStripes_ = group.readEntry( "ShowStripes", true );
++    showStripes_ = group.readEntry( "ShowStripes", false);
+ 
+     bool oldblend = blendTitlebarColors;    
+     blendTitlebarColors_ = group.readEntry( "BlendTitlebarColors", true );
+Index: kdebase-workspace-4.3.0/kwin/kcmkwin/kwindecoration/kwindecoration.cpp
+===================================================================
+--- kdebase-workspace-4.3.0.orig/kwin/kcmkwin/kwindecoration/kwindecoration.cpp
++++ kdebase-workspace-4.3.0/kwin/kcmkwin/kwindecoration/kwindecoration.cpp
+@@ -443,7 +443,7 @@ void KWinDecorationModule::readConfig( c
+ 
+ 	oldLibraryName = currentLibraryName;
+ 	currentLibraryName = conf.readEntry("PluginLib",
+-					((QPixmap::defaultDepth() > 8) ? "kwin3_ozone" : "kwin3_plastik"));
++					((QPixmap::defaultDepth() > 8) ? "kwin3_oxygen" : "kwin3_plastik"));
+ 	QString decoName = decorationName( currentLibraryName );
+ 
+ 	// If we are using the "default" kde client, use the "default" entry.
+Index: kdebase-workspace-4.3.0/kwin/lib/kdecoration.cpp
+===================================================================
+--- kdebase-workspace-4.3.0.orig/kwin/lib/kdecoration.cpp
++++ kdebase-workspace-4.3.0/kwin/lib/kdecoration.cpp
+@@ -464,7 +464,7 @@ QString KDecorationOptions::titleButtons
+ 
+ QString KDecorationOptions::defaultTitleButtonsLeft()
+     {
+-    return "MS";
++    return "M";
+     }
+ 
+ QString KDecorationOptions::titleButtonsRight() const
+@@ -474,7 +474,7 @@ QString KDecorationOptions::titleButtons
+ 
+ QString KDecorationOptions::defaultTitleButtonsRight()
+     {
+-    return "HIA__X";
++    return "HIA_X";
+     }
+ 
+ bool KDecorationOptions::showTooltips() const
+Index: kdebase-workspace-4.3.0/kwin/plugins.cpp
+===================================================================
+--- kdebase-workspace-4.3.0.orig/kwin/plugins.cpp
++++ kdebase-workspace-4.3.0/kwin/plugins.cpp
+@@ -33,7 +33,7 @@ PluginMgr::PluginMgr()
+     : KDecorationPlugins( KGlobal::config())
+     {
+     defaultPlugin = (QPixmap::defaultDepth() > 8) ?
+-            "kwin3_ozone" : "kwin3_plastik";
++            "kwin3_oxygen" : "kwin3_plastik";
+     loadPlugin( "" ); // load the plugin specified in cfg file
+     }
+ 

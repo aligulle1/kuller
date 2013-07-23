@@ -1,0 +1,170 @@
+diff -Nur hex-a-hop-old/gfx.cpp hex-a-hop/gfx.cpp
+--- hex-a-hop-old/gfx.cpp	2007-06-19 15:09:30.493658212 +0300
++++ hex-a-hop/gfx.cpp	2007-06-19 15:23:11.387863324 +0300
+@@ -1,4 +1,9 @@
+ #include "state.h"
++#include <libgen.h>
++#ifdef DATADIR
++	#include <dirent.h>
++	#include <sys/stat.h>
++#endif
+ 
+ #ifdef WIN32
+ 	#include <SDL_syswm.h>
+@@ -130,12 +135,21 @@
+ 	StateMakerBase::current->ScreenModeChanged();
+ }
+ 
+-char base_path[1024] = "";
++char base_gamedata_path[1024] = "";
++char base_userdata_path[1024] = "";
+ 
+ int main(int argc, char * argv[])
+ {
+-	strcpy( base_path, argv[0] );
+-	base_path[strlen(base_path)-9] = '\0';
++	#ifdef DATADIR
++		DIR *dirent;
++		strncpy (base_gamedata_path, DATADIR, 1023);
++		snprintf (base_userdata_path, 1023, "%s/.hex-a-hop/", getenv ("HOME"));
++		if ((dirent=opendir (base_userdata_path))!=NULL) closedir (dirent);
++		  else mkdir (base_userdata_path, 0700);
++	#else
++		snprintf (base_gamedata_path, 1023, "%s/", dirname (argv[0]));
++		strncpy (base_userdata_path, base_gamedata_path, 1023);
++	#endif
+ //	printf("SDL_Init\n");
+ 	
+ /*
+diff -Nur hex-a-hop-old/hex_puzzzle.cpp hex-a-hop/hex_puzzzle.cpp
+--- hex-a-hop-old/hex_puzzzle.cpp	2007-06-19 15:09:30.502656845 +0300
++++ hex-a-hop/hex_puzzzle.cpp	2007-06-19 15:23:14.221432557 +0300
+@@ -55,14 +55,14 @@
+ int keyState[SDLK_LAST] = {0};
+ 
+ //LINUX - fudge for paths
+-FILE *file_open( const char *file, const char *flags )
++FILE *file_open( const char *base_path, const char *file, const char *flags )
+ {
+-	printf("file_open( \"%s\", \"%s\" )\n", file, flags );
+-	extern char base_path[];
+ 	char filename[1024] = "";
+-	strcat( filename, base_path );
+-	strcat( filename, file );
+-	printf("   -> \"%s\"\n", filename );
++	snprintf (filename, 1023, "%s%s", base_path, file);
++	#ifdef DEBUG
++		printf("file_open( \"%s\", \"%s\" )\n", file, flags );
++		printf("   -> \"%s\"\n", filename );
++	#endif
+ 	
+ 	return fopen( filename, flags );
+ }
+@@ -1530,7 +1530,7 @@
+ #ifdef MAP_EDIT_HACKS
+ 	int GetAutoTile(const char * level, bool tiletype)
+ 	{
+-		FILE* f = file_open(filename, "rb");
++		FILE* f = file_open(base_gamedata_path, filename, "rb");
+ 		int tile = EMPTY;
+ 		int version;
+ 
+@@ -1791,7 +1791,7 @@
+ 			FILE* f = 0;
+ 		#else
+ 			loadPtr = 0;
+-			FILE* f = file_open(level, "rb");
++			FILE* f = file_open(base_gamedata_path, level, "rb");
+ 		#endif
+ 
+ 		typedef unsigned int _fn(void*, unsigned int, unsigned int, FILE*);
+@@ -1851,7 +1851,7 @@
+ 			}
+ 		#else
+ 			loadPtr = 0;
+-			FILE* f = file_open(filename, save ? "wb" : "rb");
++			FILE* f = file_open(base_userdata_path, filename, save ? "wb" : "rb");
+ 			if (f)
+ 			{
+ 				strcpy(currentFile, filename);
+@@ -2289,7 +2289,8 @@
+ 
+ 	void LoadSaveProgress(bool save)
+ 	{
+-		FILE* f = file_open(currentSlot, save ? "wb" : "rb");
++		extern char base_userdata_path[];
++		FILE* f = file_open(base_userdata_path, currentSlot, save ? "wb" : "rb");
+ 		if (f)
+ 		{
+ 			progress.LoadSave(f, save);
+@@ -2340,7 +2341,8 @@
+ 					h--;
+ 			}
+ 
+-			FILE* f = file_open(out, "wb");
++			extern char base_gamedata_path[];
++			FILE* f = file_open(base_gamedata_path, out, "wb");
+ 			fwrite(&w, sizeof(w), 1, f);
+ 			fwrite(&h, sizeof(h), 1, f);
+ 
+@@ -2371,7 +2373,8 @@
+ 		}
+ #endif			
+ 
+-		FILE* f = file_open(bmp, "rb");
++		extern char base_gamedata_path[];
++		FILE* f = file_open(base_gamedata_path, bmp, "rb");
+ 		if (!f) FATAL();
+ 
+ 		short w,h;
+@@ -2426,7 +2429,8 @@
+ 		time = 0;
+ 
+ 		#ifdef USE_LEVEL_PACKFILE
+-			FILE* f = file_open("levels.dat", "rb");
++			extern char base_gamedata_path[];
++			FILE* f = file_open(base_gamedata_path, "levels.dat", "rb");
+ 			if (!f)
+ 				FATAL();
+ 			levelFiles.Read(f);
+@@ -2959,7 +2963,7 @@
+ 				char * l = strstr(fn, "Levels");
+ 				if(l)
+ 				{
+-					FILE * f = file_open(l,"rb");
++					FILE * f = file_open(base_gamedata_path, l,"rb");
+ 					if (f) 
+ 						fclose(f);
+ 					if (f)
+@@ -3919,7 +3923,7 @@
+ 				char tmp[1000];
+ 				strcpy(tmp, currentFile);
+ 				ChangeSuffix(tmp, "sol");
+-				FILE* f = file_open(tmp, "wb");
++				FILE* f = file_open(base_userdata_path, tmp, "wb");
+ 				if (f)
+ 				{
+ 					for (int i=0; i<numUndo; i++)
+@@ -3958,7 +3962,7 @@
+ 					char tmp[1000];
+ 					strcpy(tmp, currentFile);
+ 					ChangeSuffix(tmp, "sol");
+-					FILE* f = file_open(tmp, "rb");
++					FILE* f = file_open(base_userdata_path, tmp, "rb");
+ 					if (f)
+ 					{
+ 						int dir;
+diff -Nur hex-a-hop-old/menus.h hex-a-hop/menus.h
+--- hex-a-hop-old/menus.h	2007-06-19 15:09:30.503656693 +0300
++++ hex-a-hop/menus.h	2007-06-19 15:23:23.053089940 +0300
+@@ -894,8 +894,9 @@
+ 		for (int i=0; i<MAX_GAMESLOT; i++)
+ 		{
+ 			char tmp[80];
++			extern char base_userdata_path[];
+ 			GetSlotName(i, tmp);
+-			FILE* f = file_open(tmp, "rb");
++			FILE* f = file_open(base_userdata_path, tmp, "rb");
+ 			if (f)
+ 			{
+ 				p.LoadSave(f, false);

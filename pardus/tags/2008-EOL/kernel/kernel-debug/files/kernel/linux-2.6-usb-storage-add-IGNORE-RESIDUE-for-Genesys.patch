@@ -1,0 +1,37 @@
+From: Alan Stern <stern <at> rowland.harvard.edu>
+
+commit 5126a2674ddac0804450f59da25a058cca629d38 upstream.
+
+This patch (as1219) adds the IGNORE_RESIDUE flag to the unusual_devs
+entries for Genesys Logic's USB-IDE adapter.  Although this device
+usually gets the residue correct, there is one command crucial to the
+operation of CD and DVD drives which it messes up.
+
+Tested-by: Mike Lampard <mike <at> mtgambier.net>
+Signed-off-by: Alan Stern <stern <at> rowland.harvard.edu>
+Signed-off-by: Greg Kroah-Hartman <gregkh <at> suse.de>
+
+---
+ drivers/usb/storage/unusual_devs.h |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+Index: linux-2.6.25/drivers/usb/storage/unusual_devs.h
+===================================================================
+--- linux-2.6.25.orig/drivers/usb/storage/unusual_devs.h
++++ linux-2.6.25/drivers/usb/storage/unusual_devs.h
+@@ -934,13 +934,13 @@ UNUSUAL_DEV(  0x05e3, 0x0701, 0x0000, 0x
+ 		"Genesys Logic",
+ 		"USB to IDE Optical",
+ 		US_SC_DEVICE, US_PR_DEVICE, NULL,
+-		US_FL_GO_SLOW | US_FL_MAX_SECTORS_64 ),
++		US_FL_GO_SLOW | US_FL_MAX_SECTORS_64 | US_FL_IGNORE_RESIDUE ),
+ 
+ UNUSUAL_DEV(  0x05e3, 0x0702, 0x0000, 0xffff,
+ 		"Genesys Logic",
+ 		"USB to IDE Disk",
+ 		US_SC_DEVICE, US_PR_DEVICE, NULL,
+-		US_FL_GO_SLOW | US_FL_MAX_SECTORS_64 ),
++		US_FL_GO_SLOW | US_FL_MAX_SECTORS_64 | US_FL_IGNORE_RESIDUE ),
+ 
+ /* Reported by Hanno Boeck <hanno@gmx.de>
+  * Taken from the Lycoris Kernel */

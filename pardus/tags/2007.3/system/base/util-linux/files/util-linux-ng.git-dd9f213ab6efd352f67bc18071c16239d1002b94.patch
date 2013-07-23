@@ -1,0 +1,92 @@
+From: Karel Zak <kzak@redhat.com>
+Date: Thu, 12 Apr 2007 12:35:46 +0000 (+0200)
+Subject: mount: add support for mtab "uhelper" option
+X-Git-Url: http://git.kernel.org/?p=utils%2Futil-linux-ng%2Futil-linux-ng.git;a=commitdiff_plain;h=dd9f213ab6efd352f67bc18071c16239d1002b94
+
+mount: add support for mtab "uhelper" option
+
+The helper is an external /sbin/umount.<suffix> program where the
+suffix is a value from the uhelper= option from /etc/mtab.
+
+The uhelper (unprivileged umount helper) is possible to used when
+non-root user wants to umount a mountpoint which is not defined in the
+/etc/fstab file (e.g devices mounted by HAL).
+
+This option is already supported by HAL upstream.
+
+Signed-off-by: Karel Zak <kzak@redhat.com>
+---
+
+diff --git a/mount/mount.c b/mount/mount.c
+index 1360d23..7c1f1bd 100644
+--- a/mount/mount.c
++++ b/mount/mount.c
+@@ -188,7 +188,7 @@ static const struct opt_map opt_map[] = {
+ };
+ 
+ static const char *opt_loopdev, *opt_vfstype, *opt_offset, *opt_encryption,
+-	*opt_speed, *opt_comment;
++	*opt_speed, *opt_comment, *opt_uhelper;
+ 
+ static struct string_opt_map {
+   char *tag;
+@@ -201,6 +201,7 @@ static struct string_opt_map {
+   { "encryption=", 0, &opt_encryption },
+   { "speed=", 0, &opt_speed },
+   { "comment=", 1, &opt_comment },
++  { "uhelper=", 0, &opt_uhelper },
+   { NULL, 0, NULL }
+ };
+ 
+diff --git a/mount/umount.8 b/mount/umount.8
+index fafbff2..5d38ac8 100644
+--- a/mount/umount.8
++++ b/mount/umount.8
+@@ -122,6 +122,19 @@ or when the \-d option was given.
+ Any pending loop devices can be freed using `losetup -d', see
+ .BR losetup (8).
+ 
++.SH NOTES
++The syntax of external umount helpers is:
++
++.br
++.BI "/sbin/umount.<suffix> [\-nlfvr] " "dir " | " device "
++.br
++
++where the <suffix> is filesystem type or a value from "uhelper=" mtab option.
++
++The uhelper (unprivileged umount helper) is possible to used when non-root user
++wants to umount a mountpoint which is not defined in the /etc/fstab file (e.g
++devices mounted by HAL).
++
+ .SH FILES
+ .I /etc/mtab
+ table of mounted file systems
+diff --git a/mount/umount.c b/mount/umount.c
+index 676ed8c..8a59f12 100644
+--- a/mount/umount.c
++++ b/mount/umount.c
+@@ -565,6 +565,23 @@ umount_file (char *arg) {
+ 			die(2,
+ 			    _("umount: %s is not mounted (according to mtab)"),
+ 			    file);
++		/*
++		 * uhelper - unprivileged umount helper
++		 * -- external umount (for example HAL mounts)
++		 */
++		if (external_allowed) {
++			char *uhelper = NULL;
++
++			if (mc->m.mnt_opts)
++				uhelper = get_value(mc->m.mnt_opts, "uhelper=");
++			if (uhelper) {
++				int status = 0;
++				if (check_special_umountprog(arg, arg,
++							uhelper, &status))
++					return status;
++			}
++		}
++
+ 		/* The 2.4 kernel will generally refuse to mount the same
+ 		   filesystem on the same mount point, but will accept NFS.
+ 		   So, unmounting must be possible. */

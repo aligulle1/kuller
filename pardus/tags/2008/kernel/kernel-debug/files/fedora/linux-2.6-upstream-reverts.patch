@@ -1,0 +1,347 @@
+ drivers/net/wireless/b43/b43.h  |    1 +
+ drivers/net/wireless/b43/dma.c  |   75 +++++++++++---------------------------
+ drivers/net/wireless/b43/main.c |   56 +++++------------------------
+ drivers/ssb/driver_pcicore.c    |    4 +-
+ drivers/ssb/pci.c               |    5 ---
+ net/mac80211/ieee80211_sta.c    |    5 ---
+ 6 files changed, 35 insertions(+), 111 deletions(-)
+
+diff --git a/drivers/net/wireless/b43/b43.h b/drivers/net/wireless/b43/b43.h
+index b14087b..44ebdea 100644
+--- a/drivers/net/wireless/b43/b43.h
++++ b/drivers/net/wireless/b43/b43.h
+@@ -596,6 +596,7 @@ struct b43_dma {
+ 
+ /* Context information for a noise calculation (Link Quality). */
+ struct b43_noise_calculation {
++	u8 channel_at_start;
+ 	bool calculation_running;
+ 	u8 nr_samples;
+ 	s8 samples[8][4];
+diff --git a/drivers/net/wireless/b43/dma.c b/drivers/net/wireless/b43/dma.c
+index f74dba2..48e9124 100644
+--- a/drivers/net/wireless/b43/dma.c
++++ b/drivers/net/wireless/b43/dma.c
+@@ -822,18 +822,6 @@ static u64 supported_dma_mask(struct b43_wldev *dev)
+ 	return DMA_30BIT_MASK;
+ }
+ 
+-static enum b43_dmatype dma_mask_to_engine_type(u64 dmamask)
+-{
+-	if (dmamask == DMA_30BIT_MASK)
+-		return B43_DMA_30BIT;
+-	if (dmamask == DMA_32BIT_MASK)
+-		return B43_DMA_32BIT;
+-	if (dmamask == DMA_64BIT_MASK)
+-		return B43_DMA_64BIT;
+-	B43_WARN_ON(1);
+-	return B43_DMA_30BIT;
+-}
+-
+ /* Main initialization function. */
+ static
+ struct b43_dmaring *b43_setup_dmaring(struct b43_wldev *dev,
+@@ -850,7 +838,6 @@ struct b43_dmaring *b43_setup_dmaring(struct b43_wldev *dev,
+ 	if (!ring)
+ 		goto out;
+ 	ring->type = type;
+-	ring->dev = dev;
+ 
+ 	nr_slots = B43_RXRING_SLOTS;
+ 	if (for_tx)
+@@ -902,6 +889,7 @@ struct b43_dmaring *b43_setup_dmaring(struct b43_wldev *dev,
+ 				 DMA_TO_DEVICE);
+ 	}
+ 
++	ring->dev = dev;
+ 	ring->nr_slots = nr_slots;
+ 	ring->mmio_base = b43_dmacontroller_base(type, controller_index);
+ 	ring->index = controller_index;
+@@ -994,42 +982,6 @@ void b43_dma_free(struct b43_wldev *dev)
+ 	dma->tx_ring0 = NULL;
+ }
+ 
+-static int b43_dma_set_mask(struct b43_wldev *dev, u64 mask)
+-{
+-	u64 orig_mask = mask;
+-	bool fallback = 0;
+-	int err;
+-
+-	/* Try to set the DMA mask. If it fails, try falling back to a
+-	 * lower mask, as we can always also support a lower one. */
+-	while (1) {
+-		err = ssb_dma_set_mask(dev->dev, mask);
+-		if (!err)
+-			break;
+-		if (mask == DMA_64BIT_MASK) {
+-			mask = DMA_32BIT_MASK;
+-			fallback = 1;
+-			continue;
+-		}
+-		if (mask == DMA_32BIT_MASK) {
+-			mask = DMA_30BIT_MASK;
+-			fallback = 1;
+-			continue;
+-		}
+-		b43err(dev->wl, "The machine/kernel does not support "
+-		       "the required %u-bit DMA mask\n",
+-		       (unsigned int)dma_mask_to_engine_type(orig_mask));
+-		return -EOPNOTSUPP;
+-	}
+-	if (fallback) {
+-		b43info(dev->wl, "DMA mask fallback from %u-bit to %u-bit\n",
+-			(unsigned int)dma_mask_to_engine_type(orig_mask),
+-			(unsigned int)dma_mask_to_engine_type(mask));
+-	}
+-
+-	return 0;
+-}
+-
+ int b43_dma_init(struct b43_wldev *dev)
+ {
+ 	struct b43_dma *dma = &dev->dma;
+@@ -1039,10 +991,27 @@ int b43_dma_init(struct b43_wldev *dev)
+ 	enum b43_dmatype type;
+ 
+ 	dmamask = supported_dma_mask(dev);
+-	type = dma_mask_to_engine_type(dmamask);
+-	err = b43_dma_set_mask(dev, dmamask);
+-	if (err)
+-		return err;
++	switch (dmamask) {
++	default:
++		B43_WARN_ON(1);
++	case DMA_30BIT_MASK:
++		type = B43_DMA_30BIT;
++		break;
++	case DMA_32BIT_MASK:
++		type = B43_DMA_32BIT;
++		break;
++	case DMA_64BIT_MASK:
++		type = B43_DMA_64BIT;
++		break;
++	}
++	err = ssb_dma_set_mask(dev->dev, dmamask);
++	if (err) {
++		b43err(dev->wl, "The machine/kernel does not support "
++		       "the required DMA mask (0x%08X%08X)\n",
++		       (unsigned int)((dmamask & 0xFFFFFFFF00000000ULL) >> 32),
++		       (unsigned int)(dmamask & 0x00000000FFFFFFFFULL));
++		return -EOPNOTSUPP;
++	}
+ 
+ 	err = -ENOMEM;
+ 	/* setup TX DMA channels. */
+diff --git a/drivers/net/wireless/b43/main.c b/drivers/net/wireless/b43/main.c
+index b4a2042..8f3d0c1 100644
+--- a/drivers/net/wireless/b43/main.c
++++ b/drivers/net/wireless/b43/main.c
+@@ -78,11 +78,6 @@ static int modparam_nohwcrypt;
+ module_param_named(nohwcrypt, modparam_nohwcrypt, int, 0444);
+ MODULE_PARM_DESC(nohwcrypt, "Disable hardware encryption.");
+ 
+-static int modparam_btcoex = 1;
+-module_param_named(btcoex, modparam_btcoex, int, 0444);
+-MODULE_PARM_DESC(btcoex, "Enable Bluetooth coexistance (default on)");
+-
+-
+ static const struct ssb_device_id b43_ssb_tbl[] = {
+ 	SSB_DEVICE(SSB_VENDOR_BROADCOM, SSB_DEV_80211, 5),
+ 	SSB_DEVICE(SSB_VENDOR_BROADCOM, SSB_DEV_80211, 6),
+@@ -1027,6 +1022,7 @@ static void b43_generate_noise_sample(struct b43_wldev *dev)
+ 	b43_jssi_write(dev, 0x7F7F7F7F);
+ 	b43_write32(dev, B43_MMIO_MACCMD,
+ 		    b43_read32(dev, B43_MMIO_MACCMD) | B43_MACCMD_BGNOISE);
++	B43_WARN_ON(dev->noisecalc.channel_at_start != dev->phy.channel);
+ }
+ 
+ static void b43_calculate_link_quality(struct b43_wldev *dev)
+@@ -1035,6 +1031,7 @@ static void b43_calculate_link_quality(struct b43_wldev *dev)
+ 
+ 	if (dev->noisecalc.calculation_running)
+ 		return;
++	dev->noisecalc.channel_at_start = dev->phy.channel;
+ 	dev->noisecalc.calculation_running = 1;
+ 	dev->noisecalc.nr_samples = 0;
+ 
+@@ -1051,16 +1048,9 @@ static void handle_irq_noise(struct b43_wldev *dev)
+ 
+ 	/* Bottom half of Link Quality calculation. */
+ 
+-	/* Possible race condition: It might be possible that the user
+-	 * changed to a different channel in the meantime since we
+-	 * started the calculation. We ignore that fact, since it's
+-	 * not really that much of a problem. The background noise is
+-	 * an estimation only anyway. Slightly wrong results will get damped
+-	 * by the averaging of the 8 sample rounds. Additionally the
+-	 * value is shortlived. So it will be replaced by the next noise
+-	 * calculation round soon. */
+-
+ 	B43_WARN_ON(!dev->noisecalc.calculation_running);
++	if (dev->noisecalc.channel_at_start != phy->channel)
++		goto drop_calculation;
+ 	*((__le32 *)noise) = cpu_to_le32(b43_jssi_read(dev));
+ 	if (noise[0] == 0x7F || noise[1] == 0x7F ||
+ 	    noise[2] == 0x7F || noise[3] == 0x7F)
+@@ -1101,10 +1091,11 @@ static void handle_irq_noise(struct b43_wldev *dev)
+ 			average -= 48;
+ 
+ 		dev->stats.link_noise = average;
++	      drop_calculation:
+ 		dev->noisecalc.calculation_running = 0;
+ 		return;
+ 	}
+-generate_new:
++      generate_new:
+ 	b43_generate_noise_sample(dev);
+ }
+ 
+@@ -3361,8 +3352,6 @@ static void b43_bluetooth_coext_enable(struct b43_wldev *dev)
+ 	struct ssb_sprom *sprom = &dev->dev->bus->sprom;
+ 	u32 hf;
+ 
+-	if (!modparam_btcoex)
+-		return;
+ 	if (!(sprom->boardflags_lo & B43_BFL_BTCOEXIST))
+ 		return;
+ 	if (dev->phy.type != B43_PHYTYPE_B && !dev->phy.gmode)
+@@ -3374,13 +3363,11 @@ static void b43_bluetooth_coext_enable(struct b43_wldev *dev)
+ 	else
+ 		hf |= B43_HF_BTCOEX;
+ 	b43_hf_write(dev, hf);
++	//TODO
+ }
+ 
+ static void b43_bluetooth_coext_disable(struct b43_wldev *dev)
+-{
+-	if (!modparam_btcoex)
+-		return;
+-	//TODO
++{				//TODO
+ }
+ 
+ static void b43_imcfglo_timeouts_workaround(struct b43_wldev *dev)
+@@ -3822,9 +3809,7 @@ static void b43_chip_reset(struct work_struct *work)
+ 			goto out;
+ 		}
+ 	}
+-out:
+-	if (err)
+-		wl->current_dev = NULL; /* Failed to init the dev. */
++      out:
+ 	mutex_unlock(&wl->mutex);
+ 	if (err)
+ 		b43err(wl, "Controller restart FAILED\n");
+@@ -3973,11 +3958,9 @@ static void b43_one_core_detach(struct ssb_device *dev)
+ 	struct b43_wldev *wldev;
+ 	struct b43_wl *wl;
+ 
+-	/* Do not cancel ieee80211-workqueue based work here.
+-	 * See comment in b43_remove(). */
+-
+ 	wldev = ssb_get_drvdata(dev);
+ 	wl = wldev->wl;
++	cancel_work_sync(&wldev->restart_work);
+ 	b43_debugfs_remove_device(wldev);
+ 	b43_wireless_core_detach(wldev);
+ 	list_del(&wldev->list);
+@@ -4038,16 +4021,8 @@ static int b43_one_core_attach(struct ssb_device *dev, struct b43_wl *wl)
+ 	return err;
+ }
+ 
+-#define IS_PDEV(pdev, _vendor, _device, _subvendor, _subdevice)		( \
+-	(pdev->vendor == PCI_VENDOR_ID_##_vendor) &&			\
+-	(pdev->device == _device) &&					\
+-	(pdev->subsystem_vendor == PCI_VENDOR_ID_##_subvendor) &&	\
+-	(pdev->subsystem_device == _subdevice)				)
+-
+ static void b43_sprom_fixup(struct ssb_bus *bus)
+ {
+-	struct pci_dev *pdev;
+-
+ 	/* boardflags workarounds */
+ 	if (bus->boardinfo.vendor == SSB_BOARDVENDOR_DELL &&
+ 	    bus->chip_id == 0x4301 && bus->boardinfo.rev == 0x74)
+@@ -4055,13 +4030,6 @@ static void b43_sprom_fixup(struct ssb_bus *bus)
+ 	if (bus->boardinfo.vendor == PCI_VENDOR_ID_APPLE &&
+ 	    bus->boardinfo.type == 0x4E && bus->boardinfo.rev > 0x40)
+ 		bus->sprom.boardflags_lo |= B43_BFL_PACTRL;
+-	if (bus->bustype == SSB_BUSTYPE_PCI) {
+-		pdev = bus->host_pci;
+-		if (IS_PDEV(pdev, BROADCOM, 0x4318, ASUSTEK, 0x100F) ||
+-		    IS_PDEV(pdev, BROADCOM, 0x4320, LINKSYS, 0x0015) ||
+-		    IS_PDEV(pdev, BROADCOM, 0x4320, LINKSYS, 0x0013))
+-			bus->sprom.boardflags_lo &= ~B43_BFL_BTCOEXIST;
+-	}
+ }
+ 
+ static void b43_wireless_exit(struct ssb_device *dev, struct b43_wl *wl)
+@@ -4160,10 +4128,6 @@ static void b43_remove(struct ssb_device *dev)
+ 	struct b43_wl *wl = ssb_get_devtypedata(dev);
+ 	struct b43_wldev *wldev = ssb_get_drvdata(dev);
+ 
+-	/* We must cancel any work here before unregistering from ieee80211,
+-	 * as the ieee80211 unreg will destroy the workqueue. */
+-	cancel_work_sync(&wldev->restart_work);
+-
+ 	B43_WARN_ON(!wl);
+ 	if (wl->current_dev == wldev)
+ 		ieee80211_unregister_hw(wl->hw);
+diff --git a/drivers/ssb/driver_pcicore.c b/drivers/ssb/driver_pcicore.c
+index 3c8239a..5d777f2 100644
+--- a/drivers/ssb/driver_pcicore.c
++++ b/drivers/ssb/driver_pcicore.c
+@@ -519,12 +519,12 @@ int ssb_pcicore_dev_irqvecs_enable(struct ssb_pcicore *pc,
+ 	int err = 0;
+ 	u32 tmp;
+ 
++	might_sleep();
++
+ 	if (!pdev)
+ 		goto out;
+ 	bus = pdev->bus;
+ 
+-	might_sleep_if(pdev->id.coreid != SSB_DEV_PCI);
+-
+ 	/* Enable interrupts for this device. */
+ 	if (bus->host_pci &&
+ 	    ((pdev->id.revision >= 6) || (pdev->id.coreid == SSB_DEV_PCIE))) {
+diff --git a/drivers/ssb/pci.c b/drivers/ssb/pci.c
+index 274a448..b434df7 100644
+--- a/drivers/ssb/pci.c
++++ b/drivers/ssb/pci.c
+@@ -482,11 +482,6 @@ static int sprom_extract(struct ssb_bus *bus, struct ssb_sprom *out,
+ 			goto unsupported;
+ 	}
+ 
+-	if (out->boardflags_lo == 0xFFFF)
+-		out->boardflags_lo = 0;  /* per specs */
+-	if (out->boardflags_hi == 0xFFFF)
+-		out->boardflags_hi = 0;  /* per specs */
+-
+ 	return 0;
+ unsupported:
+ 	ssb_printk(KERN_WARNING PFX "Unsupported SPROM revision %d "
+diff --git a/net/mac80211/ieee80211_sta.c b/net/mac80211/ieee80211_sta.c
+index 7d5c263..c170685 100644
+--- a/net/mac80211/ieee80211_sta.c
++++ b/net/mac80211/ieee80211_sta.c
+@@ -2723,7 +2723,6 @@ static int ieee80211_sta_join_ibss(struct net_device *dev,
+ 	struct rate_selection ratesel;
+ 	u8 *pos;
+ 	struct ieee80211_sub_if_data *sdata;
+-	union iwreq_data wrqu;
+ 
+ 	/* Remove possible STA entries from other IBSS networks. */
+ 	sta_info_flush(local, NULL);
+@@ -2864,10 +2863,6 @@ static int ieee80211_sta_join_ibss(struct net_device *dev,
+ 
+ 	ieee80211_rx_bss_put(dev, bss);
+ 
+-	memset(&wrqu, 0, sizeof(wrqu));
+-	memcpy(wrqu.ap_addr.sa_data, bss->bssid, ETH_ALEN);
+-	wireless_send_event(dev, SIOCGIWAP, &wrqu, NULL);
+-
+ 	return res;
+ }
+ 

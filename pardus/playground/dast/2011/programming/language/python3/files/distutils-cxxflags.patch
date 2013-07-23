@@ -1,0 +1,108 @@
+diff -uNBwp Lib/distutils/ccompiler.py.orig Lib/distutils/ccompiler.py
+--- Lib/distutils/ccompiler.py.orig	2010-11-06 00:51:56.000000000 +0100
++++ Lib/distutils/ccompiler.py	2011-02-17 21:04:58.560054431 +0100
+@@ -76,6 +76,8 @@ class CCompiler:
+     # what language to use when mixing source types. For example, if some
+     # extension has two files with ".c" extension, and one with ".cpp", it
+     # is still linked as c++.
++    # Language is the current language used.
++    language = "c"
+     language_map = {".c"   : "c",
+                     ".cc"  : "c++",
+                     ".cpp" : "c++",
+@@ -568,6 +570,9 @@ class CCompiler:
+                                     depends, extra_postargs)
+         cc_args = self._get_cc_args(pp_opts, debug, extra_preargs)
+ 
++        # Use a class variable, so overriding _compile works as expected.
++        self.language = self.detect_language(sources)
++
+         for obj in objects:
+             try:
+                 src, ext = build[obj]
+diff -uNBwp Lib/distutils/sysconfig.py.orig Lib/distutils/sysconfig.py
+--- Lib/distutils/sysconfig.py.orig	2010-11-24 20:43:47.000000000 +0100
++++ Lib/distutils/sysconfig.py	2011-02-17 21:13:42.927268011 +0100
+@@ -156,9 +156,9 @@ def customize_compiler(compiler):
+     varies across Unices and is stored in Python's Makefile.
+     """
+     if compiler.compiler_type == "unix":
+-        (cc, cxx, opt, cflags, ccshared, ldshared, so_ext, ar, ar_flags) = \
++        (cc, cxx, opt, cflags, ccshared, cxxflags, ldshared, so_ext, ar, ar_flags) = \
+             get_config_vars('CC', 'CXX', 'OPT', 'CFLAGS',
+-                            'CCSHARED', 'LDSHARED', 'SO', 'AR', 'ARFLAGS')
++                            'CCSHARED', 'CXXFLAGS', 'LDSHARED', 'SO', 'AR', 'ARFLAGS')
+ 
+         if 'CC' in os.environ:
+             cc = os.environ['CC']
+@@ -179,6 +179,8 @@ def customize_compiler(compiler):
+             cpp = cpp + ' ' + os.environ['CPPFLAGS']
+             cflags = cflags + ' ' + os.environ['CPPFLAGS']
+             ldshared = ldshared + ' ' + os.environ['CPPFLAGS']
++        if 'CXXFLAGS' in os.environ:
++            cxxflags = opt + ' ' + os.environ['CXXFLAGS']
+         if 'AR' in os.environ:
+             ar = os.environ['AR']
+         if 'ARFLAGS' in os.environ:
+@@ -187,11 +189,15 @@ def customize_compiler(compiler):
+             archiver = ar + ' ' + ar_flags
+ 
+         cc_cmd = cc + ' ' + cflags
++        cxx_cmd = cxx
++        if cxxflags is not None:
++            cxx_cmd = cxx_cmd + ' ' + cxxflags
+         compiler.set_executables(
+             preprocessor=cpp,
+             compiler=cc_cmd,
+             compiler_so=cc_cmd + ' ' + ccshared,
+-            compiler_cxx=cxx,
++            compiler_cxx=cxx_cmd,
++            compiler_cxx_so=cxx_cmd + ' ' + ccshared,
+             linker_so=ldshared,
+             linker_exe=cc,
+             archiver=archiver)
+@@ -541,7 +547,7 @@ def get_config_vars(*args):
+                 for key in ('LDFLAGS', 'BASECFLAGS',
+                         # a number of derived variables. These need to be
+                         # patched up as well.
+-                        'CFLAGS', 'PY_CFLAGS', 'BLDSHARED'):
++                        'CFLAGS', 'CXXFLAGS', 'PY_CFLAGS', 'BLDSHARED'):
+                     flags = _config_vars[key]
+                     flags = re.sub('-arch\s+\w+\s', ' ', flags, re.ASCII)
+                     flags = re.sub('-isysroot [^ \t]*', ' ', flags)
+@@ -560,7 +566,7 @@ def get_config_vars(*args):
+                     for key in ('LDFLAGS', 'BASECFLAGS',
+                         # a number of derived variables. These need to be
+                         # patched up as well.
+-                        'CFLAGS', 'PY_CFLAGS', 'BLDSHARED'):
++                        'CFLAGS', 'CXXFLAGS', 'PY_CFLAGS', 'BLDSHARED'):
+ 
+                         flags = _config_vars[key]
+                         flags = re.sub('-arch\s+\w+\s', ' ', flags)
+diff -uNBwp Lib/distutils/unixccompiler.py.orig Lib/distutils/unixccompiler.py
+--- Lib/distutils/unixccompiler.py.orig	2010-07-22 14:50:05.000000000 +0200
++++ Lib/distutils/unixccompiler.py	2011-02-17 21:02:02.314056213 +0100
+@@ -117,6 +117,7 @@ class UnixCCompiler(CCompiler):
+                    'compiler'     : ["cc"],
+                    'compiler_so'  : ["cc"],
+                    'compiler_cxx' : ["cc"],
++                   'compiler_cxx_so' : ["cc"],
+                    'linker_so'    : ["cc", "-shared"],
+                    'linker_exe'   : ["cc"],
+                    'archiver'     : ["ar", "-cr"],
+@@ -169,9 +170,15 @@ class UnixCCompiler(CCompiler):
+ 
+     def _compile(self, obj, src, ext, cc_args, extra_postargs, pp_opts):
+         compiler_so = self.compiler_so
++        compiler_cxx_so = self.compiler_cxx_so
+         if sys.platform == 'darwin':
+             compiler_so = _darwin_compiler_fixup(compiler_so, cc_args + extra_postargs)
+         try:
++            if self.language == "c++":
++                cc = compiler_cxx_so + cc_args
++            else:
++                cc = compiler_so + cc_args
++
+             self.spawn(compiler_so + cc_args + [src, '-o', obj] +
+                        extra_postargs)
+         except DistutilsExecError as msg:

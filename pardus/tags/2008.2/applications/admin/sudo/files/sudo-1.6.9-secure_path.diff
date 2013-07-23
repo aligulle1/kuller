@@ -1,0 +1,49 @@
+--- logging.c
++++ logging.c
+@@ -465,7 +465,7 @@
+ #ifndef NO_ROOT_MAILER
+     static char *root_envp[] = {
+ 	"HOME=/",
+-	"PATH=/usr/bin:/bin",
++	"PATH=/usr/sbin:/bin:/usr/bin:/sbin",
+ 	"LOGNAME=root",
+ 	"USERNAME=root",
+ 	"USER=root",
+--- pathnames.h.in
++++ pathnames.h.in
+@@ -41,9 +41,10 @@
+ #define _PATH_DEVNULL		"/dev/null"
+ #endif /* _PATH_DEVNULL */
+ 
+-#ifndef _PATH_DEFPATH
+-#define _PATH_DEFPATH		"/usr/bin:/bin"
+-#endif /* _PATH_DEFPATH */
++/*
++ * _PATH_DEFPATH included from <paths.h> contains only "/usr/bin:/bin"
++ */
++#define _PATH_DEFPATH		"/usr/sbin:/bin:/usr/bin:/sbin"
+ 
+ /*
+  * NOTE: _PATH_SUDOERS is usually overriden by the Makefile.
+--- env.c
++++ env.c
+@@ -529,7 +529,7 @@
+ 
+ #ifdef SECURE_PATH
+     /* Replace the PATH envariable with a secure one. */
+-    if (!user_is_exempt()) {
++    if (!user_is_exempt() && def_env_reset) {
+ 	insert_env(format_env("PATH", SECURE_PATH, VNULL), &env, 1);
+ 	SET(didvar, DID_PATH);
+     }
+--- find_path.c
++++ find_path.c
+@@ -93,7 +93,7 @@
+ 
+     /* Use PATH passed in unless SECURE_PATH is in effect.  */
+ #ifdef SECURE_PATH
+-    if (!user_is_exempt())
++    if (!user_is_exempt() && def_env_reset)
+ 	path = SECURE_PATH;
+ #endif /* SECURE_PATH */
+     if (path == NULL)

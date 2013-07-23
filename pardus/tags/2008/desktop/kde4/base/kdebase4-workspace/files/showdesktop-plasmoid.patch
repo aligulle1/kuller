@@ -1,0 +1,210 @@
+Index: plasma/applets/CMakeLists.txt
+===================================================================
+--- plasma/applets/CMakeLists.txt	(revision 763694)
++++ plasma/applets/CMakeLists.txt	(working copy)
+@@ -8,3 +8,4 @@
+ add_subdirectory(devicenotifier)
+ add_subdirectory(tasks)
+ add_subdirectory(lock_logout)
++add_subdirectory(showdesktop)
+Index: plasma/applets/showdesktop/showdesktop.h
+===================================================================
+--- plasma/applets/showdesktop/showdesktop.h	(revision 0)
++++ plasma/applets/showdesktop/showdesktop.h	(revision 0)
+@@ -0,0 +1,53 @@
++/***************************************************************************
++ *   Copyright 2007 by André Duffeck <duffeck@kde.org>                     *
++ *   Copyright 2007 by Alexis Ménard <darktears31@gmail.com>               *
++ *   Copyright 2007 by Marco Martin <notmart@gmail.com>                    *
++ *                                                                         *
++ *   This program is free software; you can redistribute it and/or modify  *
++ *   it under the terms of the GNU General Public License as published by  *
++ *   the Free Software Foundation; either version 2 of the License, or     *
++ *   (at your option) any later version.                                   *
++ *                                                                         *
++ *   This program is distributed in the hope that it will be useful,       *
++ *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
++ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
++ *   GNU General Public License for more details.                          *
++ *                                                                         *
++ *   You should have received a copy of the GNU General Public License     *
++ *   along with this program; if not, write to the                         *
++ *   Free Software Foundation, Inc.,                                       *
++ *   51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA .        *
++ ***************************************************************************/
++
++#ifndef SHOWDESKTOP_H
++#define SHOWDESKTOP_H
++
++
++//KDE
++#include <KIcon>
++
++// Plasma
++#include <plasma/applet.h>
++#include <plasma/widgets/icon.h>
++//Qt
++#include <QtGui/QGraphicsSceneEvent>
++#include <QtGui/QPainter>
++
++class ShowDesktop : public Plasma::Applet
++{
++    Q_OBJECT
++    public:
++        ShowDesktop(QObject *parent, const QVariantList &args);
++        ~ShowDesktop() {};
++        void init();
++	Qt::Orientations expandingDirections() const;
++        void constraintsUpdated(Plasma::Constraints constraints);
++    private:
++	Plasma::Icon * m_icon;
++    protected slots:
++        void toggleShowDesktop(bool);
++};
++
++K_EXPORT_PLASMA_APPLET(showdesktop, ShowDesktop)
++
++#endif
+Index: plasma/applets/showdesktop/plasma-applet-showdesktop.desktop
+===================================================================
+--- plasma/applets/showdesktop/plasma-applet-showdesktop.desktop	(revision 0)
++++ plasma/applets/showdesktop/plasma-applet-showdesktop.desktop	(revision 0)
+@@ -0,0 +1,30 @@
++[Desktop Entry]
++Encoding=UTF-8
++Name=Show Desktop
++Name[es]=Mostrar escritorio
++Name[et]=Töölaua näitamine
++Name[pt]=Mostrar o Ecrã
++Name[pt_BR]=Mostrar o Ecrã
++Name[sv]=Visa skrivbord
++Name[xx]=xxShow Desktopxx
++Comment=Lets you show the desktop
++Comment[es]=Permite mostrar el escritorio
++Comment[et]=Võimaldab näha töölauda
++Comment[pt]=Permite-lhe mostrar o seu ecrã
++Comment[pt_BR]=Permite-lhe mostrar o seu ecrã
++Comment[sv]=Låter dig visa skrivbordet
++Comment[xx]=xxLets you show the desktopxx
++Icon=user-desktop
++Type=Service
++ServiceTypes=Plasma/Applet
++
++X-KDE-Library=plasma_applet_showdesktop
++X-KDE-PluginInfo-Author=André Duffeck
++X-KDE-PluginInfo-Email=duffeck@kde.org
++X-KDE-PluginInfo-Name=showdesktop
++X-KDE-PluginInfo-Version=0.1
++X-KDE-PluginInfo-Website=http://plasma.kde.org/
++X-KDE-PluginInfo-Category=Windows and Tasks
++X-KDE-PluginInfo-Depends=
++X-KDE-PluginInfo-License=GPL
++X-KDE-PluginInfo-EnabledByDefault=true
+Index: plasma/applets/showdesktop/showdesktop.cpp
+===================================================================
+--- plasma/applets/showdesktop/showdesktop.cpp	(revision 0)
++++ plasma/applets/showdesktop/showdesktop.cpp	(revision 0)
+@@ -0,0 +1,85 @@
++/***************************************************************************
++ *   Copyright 2007 by André Duffeck <duffeck@kde.org>                     *
++ *   Copyright 2007 by Alexis Ménard <darktears31@gmail.com>               *
++ *   Copyright 2007 by Marco Martin <notmart@gmail.com>                    *
++ *                                                                         *
++ *   This program is free software; you can redistribute it and/or modify  *
++ *   it under the terms of the GNU General Public License as published by  *
++ *   the Free Software Foundation; either version 2 of the License, or     *
++ *   (at your option) any later version.                                   *
++ *                                                                         *
++ *   This program is distributed in the hope that it will be useful,       *
++ *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
++ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
++ *   GNU General Public License for more details.                          *
++ *                                                                         *
++ *   You should have received a copy of the GNU General Public License     *
++ *   along with this program; if not, write to the                         *
++ *   Free Software Foundation, Inc.,                                       *
++ *   51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA .        *
++ ***************************************************************************/
++
++#include "showdesktop.h"
++
++// Qt
++#include <QDBusInterface>
++
++// KDE
++#include <KWindowSystem>
++#include <KIconLoader>
++
++
++ShowDesktop::ShowDesktop(QObject *parent, const QVariantList &args)
++    : Plasma::Applet(parent, args)
++{
++
++}
++
++void ShowDesktop::init()
++{
++    setDrawStandardBackground(false);
++    m_icon = new Plasma::Icon(KIcon("user-desktop"),QString(),this);
++    connect(m_icon, SIGNAL(pressed(bool)),this, SLOT(toggleShowDesktop(bool)));
++
++}
++
++void ShowDesktop::constraintsUpdated(Plasma::Constraints constraints)
++{
++    setDrawStandardBackground(false);
++    if (constraints & Plasma::FormFactorConstraint) {
++        if (formFactor() == Plasma::Planar ||
++            formFactor() == Plasma::MediaCenter) {
++            m_icon->setText(i18n("Show Desktop"));
++            setMinimumContentSize(m_icon->sizeFromIconSize(IconSize(KIconLoader::Desktop)));
++            setMaximumContentSize(m_icon->sizeFromIconSize(IconSize(KIconLoader::Desktop)));
++        } else {
++            m_icon->setText(0);
++            m_icon->setInfoText(0);
++            setMinimumContentSize(m_icon->sizeFromIconSize(IconSize(KIconLoader::Desktop)));
++            setMaximumContentSize(m_icon->sizeFromIconSize(IconSize(KIconLoader::Panel)));
++	}
++    }
++    if (constraints & Plasma::SizeConstraint && m_icon) {
++        setContentSize(size());
++        m_icon->resize(size());
++    }
++
++    updateGeometry();
++}
++
++Qt::Orientations ShowDesktop::expandingDirections() const
++{
++    return Qt::Vertical;
++}
++
++void ShowDesktop::toggleShowDesktop(bool pressed)
++{
++    if (!pressed) {
++        return;
++    }
++    QDBusInterface plasmaApp( "org.kde.plasma", "/App" );
++    plasmaApp.call( "toggleDashboard" );
++}
++
++
++#include "showdesktop.moc"
+Index: plasma/applets/showdesktop/CMakeLists.txt
+===================================================================
+--- plasma/applets/showdesktop/CMakeLists.txt	(revision 0)
++++ plasma/applets/showdesktop/CMakeLists.txt	(revision 0)
+@@ -0,0 +1,13 @@
++project(showdesktop)
++
++set(showdesktop_SRCS showdesktop.cpp)
++
++kde4_add_plugin(plasma_applet_showdesktop ${showdesktop_SRCS})
++target_link_libraries(plasma_applet_showdesktop plasma ${KDE4_KDEUI_LIBS})
++ 
++install(TARGETS plasma_applet_showdesktop
++        DESTINATION ${PLUGIN_INSTALL_DIR})
++ 
++install(FILES plasma-applet-showdesktop.desktop
++        DESTINATION ${SERVICES_INSTALL_DIR})
++

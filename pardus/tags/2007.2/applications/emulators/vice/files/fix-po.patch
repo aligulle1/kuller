@@ -1,0 +1,60 @@
+diff -Naur vice-1.21.orig/po/intl2po.c vice-1.21/po/intl2po.c
+--- vice-1.21.orig/po/intl2po.c	2006-11-05 21:54:38.000000000 +0200
++++ vice-1.21/po/intl2po.c	2007-05-23 22:07:41.000000000 +0300
+@@ -54,7 +54,7 @@
+ 
+ static char line_buffer[512];
+ 
+-int getline(FILE *file)
++int intlpo_getline(FILE *file)
+ {
+   char c=0;
+   int counter=0;
+@@ -94,7 +94,7 @@
+   return UNKNOWN;
+ }
+ 
+-void getline_simple(FILE *file)
++void intlpo_getline_simple(FILE *file)
+ {
+   char c=0;
+   int counter=0;
+@@ -256,7 +256,7 @@
+ 
+   while (!feof(infile))
+   {
+-    found=getline(infile);
++    found=intlpo_getline(infile);
+     switch(found)
+     {
+       case FOUND_STRINGTABLE:
+@@ -273,7 +273,7 @@
+         else
+         {
+           fprintf(outfile,"%s",line_buffer);
+-          getline(infile);
++          intlpo_getline(infile);
+           if (!strncmp(line_buffer,"LANGUAGE LANG_ENGLISH",21))
+           {
+             status=STRINGTABLE_BEGIN_SCAN;
+@@ -416,7 +416,7 @@
+ 
+   while (!feof(infile))
+   {
+-    getline_simple(infile);
++    intlpo_getline_simple(infile);
+     if (!feof(infile))
+     {
+       if (!strncmp(line_buffer,"/* en */",8))
+diff -Naur vice-1.21.orig/po/Makefile.in.in vice-1.21/po/Makefile.in.in
+--- vice-1.21.orig/po/Makefile.in.in	2007-02-25 19:31:39.000000000 +0200
++++ vice-1.21/po/Makefile.in.in	2007-05-23 22:06:52.000000000 +0300
+@@ -20,7 +20,7 @@
+ exec_prefix = @exec_prefix@
+ datadir = $(DESTDIR)$(prefix)/@DATADIRNAME@
+ localedir = $(DESTDIR)$(datadir)/locale
+-gnulocaledir = $(DESTDIR)$(prefix)/share/locale
++gnulocaledir = $(DESTDIR)/usr/share/locale
+ gettextsrcdir = $(DESTDIR)$(prefix)/share/gettext/po
+ subdir = po
+ 

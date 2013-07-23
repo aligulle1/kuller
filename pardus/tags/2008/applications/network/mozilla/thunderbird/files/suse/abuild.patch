@@ -1,0 +1,127 @@
+From: Wolfgang Rosenauer <stark@suse.de>
+Subject: Fix compiler warnings which disturb autobuild
+References:
+
+### autobuild
+... testing for serious compiler warnings
+Program is using uninitialized variables. Note the difference between "is used" 
+and "may be used". Please investigate and fix.
+Problematic file(s) and their linenumbers:
+  nsUnicodeToJamoTTF.cpp: 855
+  nsObjectFrame.cpp: 1933
+###
+
+### autobuild
+... testing for serious compiler warnings
+Program returns random data in a function. Please fix.
+Problematic file(s) and their linenumbers:
+  nsWebShell.cpp: 562
+  Program is using uninitialized variables. Note the difference between "is used" and "may be used".
+  Please investigate and fix.
+  Problematic file(s) and their linenumbers:
+  nsFrame.cpp: 3536
+###
+
+--- gfx/src/gtk/nsFontMetricsUtils.cpp.old	2005-03-24 07:27:33.000000000 +0100
++++ gfx/src/gtk/nsFontMetricsUtils.cpp	2005-03-24 07:28:26.000000000 +0100
+@@ -75,6 +75,7 @@ NS_FontMetricsGetHints(void)
+ #ifdef MOZ_ENABLE_COREXFONTS
+     return nsFontMetricsGTK::GetHints();
+ #endif
++    return 1;
+ }
+ 
+ nsresult
+@@ -95,6 +96,7 @@ NS_FontMetricsFamilyExists(nsIDeviceCont
+ #ifdef MOZ_ENABLE_COREXFONTS
+     return nsFontMetricsGTK::FamilyExists(aDevice, aName);
+ #endif
++    return 1;
+ }
+ 
+ #ifdef MOZ_ENABLE_XFT
+Index: intl/uconv/ucvko/nsUnicodeToJamoTTF.cpp
+===================================================================
+RCS file: /cvsroot/mozilla/intl/uconv/ucvko/nsUnicodeToJamoTTF.cpp,v
+retrieving revision 1.10
+diff -u -p -6 -r1.10 nsUnicodeToJamoTTF.cpp
+--- intl/uconv/ucvko/nsUnicodeToJamoTTF.cpp	19 Feb 2005 07:27:54 -0000	1.10
++++ intl/uconv/ucvko/nsUnicodeToJamoTTF.cpp	7 Jun 2005 07:21:10 -0000
+@@ -842,12 +842,13 @@ PRInt16 JamoSrchReplace (const JamoNormM
+   // we don't need a separate range check here because the one in 
+   // for-loop is sufficient.
+   for (PRInt32 i = start; i <= end - clusterLen; i++)
+   {
+     const JamoNormMap *match;
+     JamoNormMap key;
++    key.liga = 0;
+ 
+     // cluster array is made up of PRUint8's to save memory
+     // and we have to subtract aOffset from the input before looking it up.
+     key.seq[0] = aIn[i] - aOffset;
+     key.seq[1] = aIn[i + 1] - aOffset;
+     key.seq[2] = clusterLen == 3 ? (aIn[i + 2] - aOffset) : 0;
+Index: layout/generic/nsObjectFrame.cpp
+===================================================================
+RCS file: /cvsroot/mozilla/layout/generic/nsObjectFrame.cpp,v
+retrieving revision 1.505
+diff -u -p -6 -r1.505 nsObjectFrame.cpp
+--- layout/generic/nsObjectFrame.cpp	6 May 2005 03:14:31 -0000	1.505
++++ layout/generic/nsObjectFrame.cpp	7 Jun 2005 07:23:27 -0000
+@@ -1850,12 +1850,13 @@ nsObjectFrame::Paint(nsPresContext*     
+     // now we need to setup the correct location for printing
+     nsresult rv;
+     nsPluginWindow    window;
+     nsPoint           origin;
+     float             t2p;
+     window.window =   nsnull;
++    window.ws_info =  nsnull;
+ 
+     // prepare embedded mode printing struct
+     nsPluginPrint npprint;
+     npprint.mode = nsPluginMode_Embedded;
+ 
+     // we need to find out if we are windowless or not
+Index: docshell/base/nsWebShell.cpp
+===================================================================
+RCS file: /cvsroot/mozilla/docshell/base/nsWebShell.cpp,v
+retrieving revision 1.656.2.1
+diff -u -p -6 -r1.656.2.1 nsWebShell.cpp
+--- docshell/base/nsWebShell.cpp	16 Sep 2005 19:11:52 -0000	1.656.2.1
++++ docshell/base/nsWebShell.cpp	22 Sep 2005 06:30:30 -0000
+@@ -556,12 +556,13 @@ nsWebShell::OnLinkClickSync(nsIContent *
+       // XXX TODO Should be similar to the HTML IMG ALT attribute handling
+       //          in NS 4.x
+     default:
+       NS_ABORT_IF_FALSE(0,"unexpected link verb");
+       return NS_ERROR_UNEXPECTED;
+   }
++  return NS_ERROR_UNEXPECTED;
+ }
+ 
+ NS_IMETHODIMP
+ nsWebShell::OnOverLink(nsIContent* aContent,
+                        nsIURI* aURI,
+                        const PRUnichar* aTargetSpec)
+Index: layout/generic/nsFrame.cpp
+===================================================================
+RCS file: /cvsroot/mozilla/layout/generic/nsFrame.cpp,v
+retrieving revision 3.574.2.4
+diff -u -p -6 -r3.574.2.4 nsFrame.cpp
+--- layout/generic/nsFrame.cpp	20 Sep 2005 06:32:09 -0000	3.574.2.4
++++ layout/generic/nsFrame.cpp	22 Sep 2005 06:31:42 -0000
+@@ -3528,13 +3528,13 @@ nsresult
+ nsFrame::PeekOffsetParagraph(nsPresContext* aPresContext,
+                              nsPeekOffsetStruct *aPos)
+ {
+ #ifdef DEBUG_paragraph
+   printf("Selecting paragraph\n");
+ #endif
+-  nsIFrame* blockFrame;
++  nsIFrame* blockFrame = NULL;
+   nsCOMPtr<nsILineIterator> iter (getter_AddRefs(GetBlockFrameAndLineIter(this, &blockFrame)));
+   if (!blockFrame || !iter)
+     return NS_ERROR_UNEXPECTED;
+ 
+   PRInt32 thisLine;
+   nsresult result = iter->FindLineContaining(this, &thisLine);

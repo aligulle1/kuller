@@ -1,0 +1,35 @@
+Index: kdebase/kdm/kfrontend/kgreeter.cpp
+===================================================================
+--- kdebase.orig/kdm/kfrontend/kgreeter.cpp
++++ kdebase/kdm/kfrontend/kgreeter.cpp
+@@ -1035,6 +1035,8 @@ KThemedGreeter::KThemedGreeter()
+ #endif
+ 
+ 	system_button = themer->findNode( "system_button" );
++    shutdown_button = themer->findNode( "shutdown_button" );
++    shutdown_button = themer->findNode( "shutdown_button" );
+ 	TQAccel *accel = new TQAccel( this );
+ 	accel->insertItem( ALT+Key_M, 0 );
+ 	connect( accel, TQT_SIGNAL(activated( int )), TQT_SLOT(slotActionMenu()) );
+@@ -1132,6 +1134,8 @@ KThemedGreeter::slotThemeActivated( cons
+ 		slotActionMenu();
+ 	else if (id == "admin_button")
+ 	        slotAskAdminPassword();
++    else if (id == "shutdown_button")
++        slotShutdown(-1);
+ }
+ 
+ void
+Index: kdebase/kdm/kfrontend/kgreeter.h
+===================================================================
+--- kdebase.orig/kdm/kfrontend/kgreeter.h
++++ kdebase/kdm/kfrontend/kgreeter.h
+@@ -159,7 +159,7 @@ class KThemedGreeter : public KGreeter {
+ 	KdmThemer *themer;
+ 	KdmItem *caps_warning, *xauth_warning, *pam_error, *timed_label,
+ 	        *console_rect, *userlist_rect,
+-	        *session_button, *system_button, *admin_button;
++	        *session_button, *system_button, *admin_button, *shutdown_button;
+ 
+   public: // from KGVerifyHandler
+ 	virtual void verifyFailed();

@@ -1,0 +1,13 @@
+--- kmail/kmheaders.cpp	(revision 669473)
++++ kmail/kmheaders.cpp	(revision 669474)
+@@ -2077,7 +2077,9 @@
+ void KMHeaders::resetCurrentTime()
+ {
+     mDate.reset();
+-    QTimer::singleShot( 1000, this, SLOT( resetCurrentTime() ) );
++    // only reset exactly during minute switch
++    QTimer::singleShot( ( 60-QTime::currentTime().second() ) * 1000, 
++        this, SLOT( resetCurrentTime() ) );
+ }
+ 
+ //-----------------------------------------------------------------------------

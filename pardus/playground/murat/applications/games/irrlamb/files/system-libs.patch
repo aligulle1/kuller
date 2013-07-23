@@ -1,0 +1,31 @@
+--- SConstruct.orig	2007-08-28 04:39:08.000000000 +0300
++++ SConstruct	2007-10-16 01:18:27.000000000 +0300
+@@ -14,7 +14,7 @@
+ # Compiler flags
+ #env.Append(CCFLAGS=Split("-O0 -g3 -Wall"))
+ if os.environ.has_key("CXXFLAGS"):
+-	env.Append(CCFLAGS=Split((os.environ["CXXFLAGS"]) + " -O3 -DNDEBUG"))
++	env.Append(CCFLAGS=Split((os.environ["CXXFLAGS"])))
+ else:
+ 	env.Append(CCFLAGS=Split(" -O3 -DNDEBUG"))
+ 
+@@ -22,14 +22,14 @@
+ lua_name = "lua"
+ lua_cpppath = "/usr/include"
+ for path in ["/usr/include","/usr/local/include"]:
+-	if os.path.isdir(os.path.join(path,'lua5.1')):
+-		lua_name = "lua5.1"
+-		lua_cpppath = lua_cpppath + "/lua5.1"
++	if os.path.isdir(os.path.join(path,'lua')):
++		lua_name = "lua"
++		lua_cpppath = lua_cpppath + "/lua"
+ 		break
+ 
+ # Paths
+-env.Append(CPPPATH=Split("./libraries/include ./libraries/include/bullet " + lua_cpppath ))
+-env.Append(LIBPATH="./libraries/lib")
++env.Append(CPPPATH=Split("/usr/include /usr/include/bullet " + lua_cpppath ))
++env.Append(LIBPATH="/usr/lib")
+ 
+ # Libraries
+ env.Append(LIBS=Split("GL GLU Irrlicht Xxf86vm Xext X11 bulletdynamics bulletcollision bulletmath audiere libboost_filesystem " + lua_name))

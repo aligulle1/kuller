@@ -1,0 +1,58 @@
+diff -ru urlgrabber-3.0.0-orig/urlgrabber/progress.py urlgrabber-3.0.0/urlgrabber/progress.py
+--- urlgrabber-3.0.0-orig/urlgrabber/progress.py	2009-04-08 10:24:52.000000000 -0400
++++ urlgrabber-3.0.0/urlgrabber/progress.py	2009-04-08 10:31:51.000000000 -0400
+@@ -34,7 +34,11 @@
+     try:
+         buf = 'abcdefgh'
+         buf = fcntl.ioctl(fd, termios.TIOCGWINSZ, buf)
+-        return struct.unpack('hhhh', buf)[1]
++        ret = struct.unpack('hhhh', buf)[1]
++        if ret == 0:
++            return 80
++        # Add minimum too?
++        return ret
+     except: # IOError
+         return 80
+ 
+@@ -237,7 +241,7 @@
+             ui_time = tl.add(' %9s' % fetime)
+             ui_end  = tl.add(' ' * 5)
+             ui_rate = tl.add(' %5sB/s' % ave_dl)
+-            out = '\r%-*.*s%s%s%s%s' % (tl.rest(), tl.rest(), text,
++            out = '%-*.*s%s%s%s%s\r' % (tl.rest(), tl.rest(), text,
+                                         ui_rate, ui_size, ui_time, ui_end)
+         else:
+             rtime = self.re.remaining_time()
+@@ -261,7 +265,7 @@
+             if (blen * frac) - int(blen * frac) >= 0.5:
+                 bar += '-'
+             ui_bar  = tl.add(' [%-*.*s]' % (blen, blen, bar))
+-            out = '\r%-*.*s%s%s%s%s%s%s%s' % (tl.rest(), tl.rest(), text,
++            out = '%-*.*s%s%s%s%s%s%s%s\r' % (tl.rest(), tl.rest(), text,
+                                               ui_sofar_pc, ui_pc, ui_bar,
+                                               ui_rate, ui_size, ui_time, ui_end)
+ 
+@@ -282,7 +286,12 @@
+         tl = TerminalLine(8)
+         ui_size = tl.add(' | %5sB' % total_size)
+         ui_time = tl.add(' %9s' % total_time)
+-        ui_end  = tl.add(' ' * 5)
++        not_done = self.size is not None and amount_read != self.size
++        if not_done:
++            ui_end  = tl.add(' ... ')
++        else:
++            ui_end  = tl.add(' ' * 5)
++        
+         out = '\r%-*.*s%s%s%s\n' % (tl.rest(), tl.rest(), text,
+                                     ui_size, ui_time, ui_end)
+         self.fo.write(out)
+@@ -290,7 +299,7 @@
+ 
+         # Don't add size to the sofar size until we have all of it.
+         # If we don't have a size, then just pretend/hope we got all of it.
+-        if self.size is not None and amount_read != self.size:
++        if not_done:
+             return
+ 
+         if _text_meter_total_size:
+Only in urlgrabber-3.0.0/urlgrabber: progress.py~

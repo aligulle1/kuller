@@ -1,0 +1,21 @@
+Index: utils/opcontrol
+===================================================================
+RCS file: /cvsroot/oprofile/oprofile/utils/opcontrol,v
+retrieving revision 1.139
+retrieving revision 1.140
+diff -U2 -u -r1.139 -r1.140
+--- utils/opcontrol	13 Jun 2007 15:04:13 -0000	1.139
++++ utils/opcontrol	25 Sep 2007 17:24:32 -0000	1.140
+@@ -490,9 +490,8 @@
+ 	fi
+ 
+-	# start at the start of .text and then continue to the end 
++	# start at the start of .text, and end at _etext
+ 	range_info=`objdump -h $FILE_IMAGE 2>/dev/null | grep " .text "`
+-	tmp1=`echo $range_info | awk '{print $4}'`	
+-	tmp_length=`echo $range_info | awk  '{print $3}'`
+-	tmp2=`objdump -h $FILE_IMAGE --adjust-vma=0x$tmp_length 2>/dev/null | grep " .text " | awk  '{print $4}'`
++	tmp1=`echo $range_info | awk '{print $4}'`
++	tmp2=`objdump -t $FILE_IMAGE 2>/dev/null | grep "_etext$" | awk '{ print $1 }'`
+ 
+ 	if test -z "$tmp1" -o -z "$tmp2"; then

@@ -1,0 +1,20 @@
+--- a/src/lastfmapplication.cpp
++++ b/src/lastfmapplication.cpp
+@@ -163,6 +163,17 @@
+         // First check settings
+         langCode = The::settings().appLanguage();
+ 
++      #ifdef LINUX
++        // Now check the environment including LC_MESSAGES
++        // This fixes Debian bug #432232
++        if ( langCode.isEmpty() )
++            langCode = qgetenv( "LC_ALL" );
++        if ( langCode.isEmpty() )
++            langCode = qgetenv( "LC_MESSAGES" );
++        if ( langCode.isEmpty() )
++            langCode = qgetenv( "LANG" );
++      #endif
++
+         if ( langCode.isEmpty() )
+         {
+             // If none found, use system locale

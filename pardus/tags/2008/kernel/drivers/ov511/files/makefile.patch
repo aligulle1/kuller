@@ -1,0 +1,42 @@
+--- ov511-2.32-old/Makefile
++++ ov511-2.32/Makefile
+@@ -1,7 +1,8 @@
+-ifeq ($(shell uname -r | cut -d . -f 1-2),2.4)
++KVERS = $(shell uname -r)
++ifeq ($(shell echo $(KVERS) | cut -d . -f 1-2),2.4)
+ #################################### OPTIONS ##################################
+ # Change this to /usr/include if you get header file errors
+-INCLUDEDIR = /lib/modules/`uname -r`/build/include
++INCLUDEDIR = /lib/modules/$(KVERS)/build/include
+ 
+ ACFILE = $(INCLUDEDIR)/linux/autoconf.h
+ 
+@@ -14,8 +15,8 @@
+ endif
+ 
+ # Detect extra required CFLAGS
+-EXTRA_CFLAGS := $(shell ./get_cflags.sh)
+-CFLAGS += $(EXTRA_CFLAGS)
++#EXTRA_CFLAGS := $(shell ./get_cflags.sh)
++#CFLAGS += $(EXTRA_CFLAGS)
+ 
+ CC = gcc
+ LD = ld
+@@ -94,7 +95,7 @@
+ endif  # End kernel version test
+ 
+ ############################ 2.6 kernel compile ###############################
+-ifeq ($(shell uname -r | cut -d . -f 1-2),2.6)
++ifeq ($(shell echo $(KVERS) | cut -d . -f 1-2),2.6)
+ 
+ ifneq ($(KERNELRELEASE),)
+ # We were called by kbuild
+@@ -114,7 +115,7 @@
+ 
+ else  # We were called from command line
+ 
+-KDIR := /lib/modules/$(shell uname -r)/build
++KDIR := /lib/modules/$(KVERS)/build
+ PWD  := $(shell pwd)
+ 
+ default:

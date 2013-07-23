@@ -1,0 +1,16 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+#
+# Licensed under the GNU General Public License, version 2.
+# See the file http://www.gnu.org/licenses/old-licenses/gpl-2.0.txt
+
+from pisi.actionsapi import pisitools
+from pisi.actionsapi import pythonmodules
+from pisi.actionsapi import get
+
+WorkDir="Supybot-plugins-20060723"
+
+def install():
+    for data in ["*"]:
+        pisitools.insinto("/usr/lib/python2.4/site-packages/supybot/plugins", data)
+    pisitools.removeDir("/usr/lib/%s/site-packages/supybot/plugins/ExternalNotice" % get.curPYTHON())

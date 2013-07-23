@@ -1,0 +1,365 @@
+# We need to ensure our host tools get run during build, not the freshly
+# built cross-tools (this will not work), so we introduce HOSTPYTHON and HOSTPGEN.
+# Signed-Off: Michael 'Mickey' Lauer <mickey@vanille-media.de>
+
+Index: Python-2.6.5/Makefile.pre.in
+===================================================================
+--- Python-2.6.5.orig/Makefile.pre.in
++++ Python-2.6.5/Makefile.pre.in
+@@ -175,6 +175,7 @@ UNICODE_OBJS=   @UNICODE_OBJS@
+ 
+ PYTHON=		python$(EXE)
+ BUILDPYTHON=	python$(BUILDEXE)
++HOSTPYTHON=	$(TOOLCHAINDIR)/bin/hostpython
+ 
+ # The task to run while instrument when building the profile-opt target
+ PROFILE_TASK=	$(srcdir)/Tools/pybench/pybench.py -n 2 --with-gc --with-syscheck
+@@ -205,7 +206,7 @@ GRAMMAR_INPUT=	$(srcdir)/Grammar/Grammar
+ ##########################################################################
+ # Parser
+ PGEN=		Parser/pgen$(EXE)
+-
++HOSTPGEN=	$(TOOLCHAINDIR)/bin/hostpgen
+ POBJS=		\
+ 		Parser/acceler.o \
+ 		Parser/grammar1.o \
+@@ -370,7 +371,7 @@ build_all_generate_profile:
+ 	$(MAKE) all CFLAGS="$(CFLAGS) -fprofile-generate" LIBS="$(LIBS) -lgcov"
+ 
+ run_profile_task:
+-	./$(BUILDPYTHON) $(PROFILE_TASK)
++	$(HOSTPYTHON) $(PROFILE_TASK)
+ 
+ build_all_use_profile:
+ 	$(MAKE) all CFLAGS="$(CFLAGS) -fprofile-use"
+@@ -388,14 +389,14 @@ $(BUILDPYTHON):	Modules/python.o $(LIBRA
+ 			$(BLDLIBRARY) $(LIBS) $(MODLIBS) $(SYSLIBS) $(LDLAST)
+ 
+ platform: $(BUILDPYTHON)
+-	$(RUNSHARED) ./$(BUILDPYTHON) -E -c 'import sys ; from distutils.util import get_platform ; print get_platform()+"-"+sys.version[0:3]' >platform
++	$(RUNSHARED) $(HOSTPYTHON) -E -c 'import sys ; from distutils.util import get_platform ; print get_platform()+"-"+sys.version[0:3]' >platform
+ 
+ 
+ # Build the shared modules
+ sharedmods: $(BUILDPYTHON)
+ 	@case $$MAKEFLAGS in \
+-	*s*) $(RUNSHARED) CC='$(CC)' LDSHARED='$(BLDSHARED)' OPT='$(OPT)' ./$(BUILDPYTHON) -E $(srcdir)/setup.py -q build;; \
+-	*) $(RUNSHARED) CC='$(CC)' LDSHARED='$(BLDSHARED)' OPT='$(OPT)' ./$(BUILDPYTHON) -E $(srcdir)/setup.py build;; \
++	*s*) $(RUNSHARED) CC='$(CC)' LDSHARED='$(BLDSHARED)' OPT='$(OPT)' $(HOSTPYTHON) -E $(srcdir)/setup.py -q build;; \
++	*) $(RUNSHARED) CC='$(CC)' LDSHARED='$(BLDSHARED)' OPT='$(OPT)' $(HOSTPYTHON) -E $(srcdir)/setup.py build;; \
+ 	esac
+ 
+ # Build static library
+@@ -517,7 +518,7 @@ Modules/python.o: $(srcdir)/Modules/pyth
+ 
+ $(GRAMMAR_H) $(GRAMMAR_C): $(PGEN) $(GRAMMAR_INPUT)
+ 		-@$(INSTALL) -d Include
+-		-$(PGEN) $(GRAMMAR_INPUT) $(GRAMMAR_H) $(GRAMMAR_C)
++		-$(HOSTPGEN) $(GRAMMAR_INPUT) $(GRAMMAR_H) $(GRAMMAR_C)
+ 
+ $(PGEN):	$(PGENOBJS)
+ 		$(CC) $(OPT) $(LDFLAGS) $(PGENOBJS) $(LIBS) -o $(PGEN)
+@@ -676,7 +677,7 @@ $(LIBRARY_OBJS) $(MODOBJS) Modules/pytho
+ 
+ TESTOPTS=	-l $(EXTRATESTOPTS)
+ TESTPROG=	$(srcdir)/Lib/test/regrtest.py
+-TESTPYTHON=	$(RUNSHARED) ./$(BUILDPYTHON) -E -tt
++TESTPYTHON=	$(RUNSHARED) $(HOSTPYTHON) -E -tt
+ test:		all platform
+ 		-find $(srcdir)/Lib -name '*.py[co]' -print | xargs rm -f
+ 		-$(TESTPYTHON) $(TESTPROG) $(TESTOPTS)
+@@ -699,7 +700,7 @@ testuniversal:	all platform
+ 		-find $(srcdir)/Lib -name '*.py[co]' -print | xargs rm -f
+ 		-$(TESTPYTHON) $(TESTPROG) $(TESTOPTS) -uall
+ 		$(TESTPYTHON) $(TESTPROG) $(TESTOPTS) -uall
+-		$(RUNSHARED) /usr/libexec/oah/translate ./$(BUILDPYTHON) -E -tt $(TESTPROG) $(TESTOPTS) -uall
++		$(RUNSHARED) /usr/libexec/oah/translate $(HOSTPYTHON) -E -tt $(TESTPROG) $(TESTOPTS) -uall
+ 
+ 
+ # Like testall, but with a single pass only
+@@ -887,23 +888,23 @@ libinstall:	build_all $(srcdir)/Lib/$(PL
+ 	done
+ 	$(INSTALL_DATA) $(srcdir)/LICENSE $(DESTDIR)$(LIBDEST)/LICENSE.txt
+ 	PYTHONPATH=$(DESTDIR)$(LIBDEST)  $(RUNSHARED) \
+-		./$(BUILDPYTHON) -Wi -tt $(DESTDIR)$(LIBDEST)/compileall.py \
++		$(HOSTPYTHON) -Wi -tt $(DESTDIR)$(LIBDEST)/compileall.py \
+ 		-d $(LIBDEST) -f \
+ 		-x 'bad_coding|badsyntax|site-packages' $(DESTDIR)$(LIBDEST)
+ 	PYTHONPATH=$(DESTDIR)$(LIBDEST) $(RUNSHARED) \
+-		./$(BUILDPYTHON) -Wi -tt -O $(DESTDIR)$(LIBDEST)/compileall.py \
++		$(HOSTPYTHON) -Wi -tt -O $(DESTDIR)$(LIBDEST)/compileall.py \
+ 		-d $(LIBDEST) -f \
+ 		-x 'bad_coding|badsyntax|site-packages' $(DESTDIR)$(LIBDEST)
+ 	-PYTHONPATH=$(DESTDIR)$(LIBDEST)  $(RUNSHARED) \
+-		./$(BUILDPYTHON) -Wi -t $(DESTDIR)$(LIBDEST)/compileall.py \
++		$(HOSTPYTHON) -Wi -t $(DESTDIR)$(LIBDEST)/compileall.py \
+ 		-d $(LIBDEST)/site-packages -f \
+ 		-x badsyntax $(DESTDIR)$(LIBDEST)/site-packages
+ 	-PYTHONPATH=$(DESTDIR)$(LIBDEST) $(RUNSHARED) \
+-		./$(BUILDPYTHON) -Wi -t -O $(DESTDIR)$(LIBDEST)/compileall.py \
++		$(HOSTPYTHON) -Wi -t -O $(DESTDIR)$(LIBDEST)/compileall.py \
+ 		-d $(LIBDEST)/site-packages -f \
+ 		-x badsyntax $(DESTDIR)$(LIBDEST)/site-packages
+ 	-PYTHONPATH=$(DESTDIR)$(LIBDEST) $(RUNSHARED) \
+-		./$(BUILDPYTHON) -Wi -t -c "import lib2to3.pygram, lib2to3.patcomp;lib2to3.patcomp.PatternCompiler()"
++		$(HOSTPYTHON) -Wi -t -c "import lib2to3.pygram, lib2to3.patcomp;lib2to3.patcomp.PatternCompiler()"
+ 
+ # Create the PLATDIR source directory, if one wasn't distributed..
+ $(srcdir)/Lib/$(PLATDIR):
+@@ -1001,7 +1002,8 @@ libainstall:	all
+ # Install the dynamically loadable modules
+ # This goes into $(exec_prefix)
+ sharedinstall:
+-	$(RUNSHARED) ./$(BUILDPYTHON) -E $(srcdir)/setup.py install \
++	CC='$(CC)' LDSHARED='$(BLDSHARED)' OPT='$(OPT)' CROSS_COMPILE='$(CROSS_COMPILE)' \
++	$(RUNSHARED) $(HOSTPYTHON) -E $(srcdir)/setup.py install \
+ 	   	--prefix=$(prefix) \
+ 		--install-scripts=$(BINDIR) \
+ 		--install-platlib=$(DESTSHARED) \
+@@ -1039,7 +1041,7 @@ frameworkinstallstructure:	$(LDLIBRARY)
+ 		fi; \
+ 	done
+ 	$(LN) -fsn include/python$(VERSION) $(DESTDIR)$(prefix)/Headers
+-	sed 's/%VERSION%/'"`$(RUNSHARED) ./$(BUILDPYTHON) -c 'import platform; print platform.python_version()'`"'/g' < $(RESSRCDIR)/Info.plist > $(DESTDIR)$(prefix)/Resources/Info.plist
++	sed 's/%VERSION%/'"`$(RUNSHARED) $(HOSTPYTHON) -c 'import platform; print platform.python_version()'`"'/g' < $(RESSRCDIR)/Info.plist > $(DESTDIR)$(prefix)/Resources/Info.plist
+ 	$(LN) -fsn $(VERSION) $(DESTDIR)$(PYTHONFRAMEWORKINSTALLDIR)/Versions/Current
+ 	$(LN) -fsn Versions/Current/$(PYTHONFRAMEWORK) $(DESTDIR)$(PYTHONFRAMEWORKINSTALLDIR)/$(PYTHONFRAMEWORK)
+ 	$(LN) -fsn Versions/Current/Headers $(DESTDIR)$(PYTHONFRAMEWORKINSTALLDIR)/Headers
+@@ -1082,7 +1084,7 @@ frameworkinstallextras:
+ # This installs a few of the useful scripts in Tools/scripts
+ scriptsinstall:
+ 	SRCDIR=$(srcdir) $(RUNSHARED) \
+-	./$(BUILDPYTHON) $(srcdir)/Tools/scripts/setup.py install \
++	$(HOSTPYTHON) $(srcdir)/Tools/scripts/setup.py install \
+ 	--prefix=$(prefix) \
+ 	--install-scripts=$(BINDIR) \
+ 	--root=/$(DESTDIR)
+@@ -1104,7 +1106,7 @@ config.status:	$(srcdir)/configure
+ 
+ # Run reindent on the library
+ reindent:
+-	./$(BUILDPYTHON) $(srcdir)/Tools/scripts/reindent.py -r $(srcdir)/Lib
++	$(HOSTPYTHON) $(srcdir)/Tools/scripts/reindent.py -r $(srcdir)/Lib
+ 
+ # Rerun configure with the same options as it was run last time,
+ # provided the config.status script exists
+@@ -1201,7 +1203,7 @@ funny:
+ 
+ # Perform some verification checks on any modified files.
+ patchcheck:
+-	$(RUNSHARED) ./$(BUILDPYTHON) $(srcdir)/Tools/scripts/patchcheck.py
++	$(RUNSHARED) $(HOSTPYTHON) $(srcdir)/Tools/scripts/patchcheck.py
+ 
+ # Dependencies
+ 
+Index: Python-2.6.5/setup.py
+===================================================================
+--- Python-2.6.5.orig/setup.py
++++ Python-2.6.5/setup.py
+@@ -1,5 +1,7 @@
+ # Autodetecting setup.py script for building the Python extensions
+ #
++# Modified for Pardus-ARM
++#
+ 
+ __version__ = "$Revision: 78785 $"
+ 
+@@ -19,6 +21,8 @@ from distutils.command.install_lib impor
+ # This global variable is used to hold the list of modules to be disabled.
+ disabled_module_list = []
+ 
++sysroot = os.environ["SYSROOT"]
++
+ def add_dir_to_list(dirlist, dir):
+     """Add the directory 'dir' to the list 'dirlist' (at the front) if
+     1) 'dir' is not already in 'dirlist'
+@@ -276,6 +280,7 @@ class PyBuildExt(build_ext):
+             self.failed.append(ext.name)
+             self.announce('*** WARNING: renaming "%s" since importing it'
+                           ' failed: %s' % (ext.name, why), level=3)
++            return
+             assert not self.inplace
+             basename, tail = os.path.splitext(ext_filename)
+             newname = basename + "_failed" + tail
+@@ -309,10 +314,6 @@ class PyBuildExt(build_ext):
+         return sys.platform
+ 
+     def detect_modules(self):
+-        # Ensure that /usr/local is always used
+-        add_dir_to_list(self.compiler.library_dirs, '/usr/local/lib')
+-        add_dir_to_list(self.compiler.include_dirs, '/usr/local/include')
+-
+         # Add paths specified in the environment variables LDFLAGS and
+         # CPPFLAGS for header and library files.
+         # We must get the values from the Makefile and not the environment
+@@ -347,11 +348,10 @@ class PyBuildExt(build_ext):
+                     for directory in reversed(options.dirs):
+                         add_dir_to_list(dir_list, directory)
+ 
+-        if os.path.normpath(sys.prefix) != '/usr':
+-            add_dir_to_list(self.compiler.library_dirs,
+-                            sysconfig.get_config_var("LIBDIR"))
+-            add_dir_to_list(self.compiler.include_dirs,
+-                            sysconfig.get_config_var("INCLUDEDIR"))
++        add_dir_to_list(self.compiler.library_dirs,
++                        sysconfig.get_config_var("LIBDIR"))
++        add_dir_to_list(self.compiler.include_dirs,
++                        sysconfig.get_config_var("INCLUDEDIR"))
+ 
+         try:
+             have_unicode = unicode
+@@ -361,11 +361,9 @@ class PyBuildExt(build_ext):
+         # lib_dirs and inc_dirs are used to search for files;
+         # if a file is found in one of those directories, it can
+         # be assumed that no additional -I,-L directives are needed.
+-        lib_dirs = self.compiler.library_dirs + [
+-            '/lib64', '/usr/lib64',
+-            '/lib', '/usr/lib',
+-            ]
+-        inc_dirs = self.compiler.include_dirs + ['/usr/include']
++        lib_dirs = self.compiler.library_dirs
++        inc_dirs = self.compiler.include_dirs
++
+         exts = []
+         missing = []
+ 
+@@ -410,6 +408,9 @@ class PyBuildExt(build_ext):
+ 
+         # XXX Omitted modules: gl, pure, dl, SGI-specific modules
+ 
++        lib_dirs = [ "%s/lib" % sysroot, "%s/usr/lib" % sysroot ]
++        inc_dirs = [ "%s/usr/include" % sysroot ]
++
+         #
+         # The following modules are all pretty straightforward, and compile
+         # on pretty much any POSIXish platform.
+Index: Python-2.6.5/configure.in
+===================================================================
+--- Python-2.6.5.orig/configure.in
++++ Python-2.6.5/configure.in
+@@ -2885,125 +2885,6 @@ AC_TRY_LINK([
+   AC_MSG_RESULT(no)
+ ])
+ 
+-# On OSF/1 V5.1, getaddrinfo is available, but a define
+-# for [no]getaddrinfo in netdb.h. 
+-AC_MSG_CHECKING(for getaddrinfo)
+-AC_TRY_LINK([
+-#include <sys/types.h>
+-#include <sys/socket.h>
+-#include <netdb.h>
+-#include <stdio.h>
+-],[
+-getaddrinfo(NULL, NULL, NULL, NULL);
+-], [
+-AC_MSG_RESULT(yes)
+-AC_MSG_CHECKING(getaddrinfo bug)
+-AC_TRY_RUN([
+-#include <sys/types.h>
+-#include <netdb.h>
+-#include <string.h>
+-#include <sys/socket.h>
+-#include <netinet/in.h>
+-
+-main()
+-{
+-  int passive, gaierr, inet4 = 0, inet6 = 0;
+-  struct addrinfo hints, *ai, *aitop;
+-  char straddr[INET6_ADDRSTRLEN], strport[16];
+-
+-  for (passive = 0; passive <= 1; passive++) {
+-    memset(&hints, 0, sizeof(hints));
+-    hints.ai_family = AF_UNSPEC;
+-    hints.ai_flags = passive ? AI_PASSIVE : 0;
+-    hints.ai_socktype = SOCK_STREAM;
+-    hints.ai_protocol = IPPROTO_TCP;
+-    if ((gaierr = getaddrinfo(NULL, "54321", &hints, &aitop)) != 0) {
+-      (void)gai_strerror(gaierr);
+-      goto bad;
+-    }
+-    for (ai = aitop; ai; ai = ai->ai_next) {
+-      if (ai->ai_addr == NULL ||
+-          ai->ai_addrlen == 0 ||
+-          getnameinfo(ai->ai_addr, ai->ai_addrlen,
+-                      straddr, sizeof(straddr), strport, sizeof(strport),
+-                      NI_NUMERICHOST|NI_NUMERICSERV) != 0) {
+-        goto bad;
+-      }
+-      switch (ai->ai_family) {
+-      case AF_INET:
+-        if (strcmp(strport, "54321") != 0) {
+-          goto bad;
+-        }
+-        if (passive) {
+-          if (strcmp(straddr, "0.0.0.0") != 0) {
+-            goto bad;
+-          }
+-        } else {
+-          if (strcmp(straddr, "127.0.0.1") != 0) {
+-            goto bad;
+-          }
+-        }
+-        inet4++;
+-        break;
+-      case AF_INET6:
+-        if (strcmp(strport, "54321") != 0) {
+-          goto bad;
+-        }
+-        if (passive) {
+-          if (strcmp(straddr, "::") != 0) {
+-            goto bad;
+-          }
+-        } else {
+-          if (strcmp(straddr, "::1") != 0) {
+-            goto bad;
+-          }
+-        }
+-        inet6++;
+-        break;
+-      case AF_UNSPEC:
+-        goto bad;
+-        break;
+-      default:
+-        /* another family support? */
+-        break;
+-      }
+-    }
+-  }
+-
+-  if (!(inet4 == 0 || inet4 == 2))
+-    goto bad;
+-  if (!(inet6 == 0 || inet6 == 2))
+-    goto bad;
+-
+-  if (aitop)
+-    freeaddrinfo(aitop);
+-  exit(0);
+-
+- bad:
+-  if (aitop)
+-    freeaddrinfo(aitop);
+-  exit(1);
+-}
+-],
+-AC_MSG_RESULT(good)
+-buggygetaddrinfo=no,
+-AC_MSG_RESULT(buggy)
+-buggygetaddrinfo=yes,
+-AC_MSG_RESULT(buggy)
+-buggygetaddrinfo=yes)], [
+-AC_MSG_RESULT(no)
+-buggygetaddrinfo=yes
+-])
+-
+-if test "$buggygetaddrinfo" = "yes"; then
+-	if test "$ipv6" = "yes"; then
+-		echo 'Fatal: You must get working getaddrinfo() function.'
+-		echo '       or you can specify "--disable-ipv6"'.
+-		exit 1
+-	fi
+-else
+-	AC_DEFINE(HAVE_GETADDRINFO, 1, [Define if you have the getaddrinfo function.])
+-fi
+ AC_CHECK_FUNCS(getnameinfo)
+ 
+ # checks for structures

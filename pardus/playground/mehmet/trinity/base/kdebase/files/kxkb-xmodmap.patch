@@ -1,0 +1,24 @@
+Index: kdebase/kxkb/extension.cpp
+===================================================================
+--- kdebase.orig/kxkb/extension.cpp
++++ kdebase/kxkb/extension.cpp
+@@ -111,6 +111,19 @@ bool XKBExtension::setXkbOptions(const T
+ 
+     p.start(KProcess::Block);
+ 
++    // Pardus bug #1829
++    QString modmap = QDir::homeDirPath() + "/.Xmodmap";
++    if( QFile::exists(modmap) ) {
++        exe = KGlobal::dirs()->findExe("xmodmap");
++        if( !exe.isEmpty() ) {
++            KProcess m;
++            m << exe;
++            m << modmap;
++
++            m.start(KProcess::Block);
++        }
++    }
++
+     return p.normalExit() && (p.exitStatus() == 0);
+ }
+ 

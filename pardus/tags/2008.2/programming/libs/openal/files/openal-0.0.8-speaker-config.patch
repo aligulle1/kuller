@@ -1,0 +1,220 @@
+# HG changeset patch
+# User tiwai
+# Date 1182858832 -7200
+# Node ID ccda65649e9791066e706f1c516c1e8daa921b70
+# Parent  0db436732d7dcfa45d2d25885eaf071d884a673b
+Add speaker-position configuration.
+
+diff -r 0db436732d7d -r ccda65649e97 src/alc/alc_speaker.c
+--- a/src/alc/alc_speaker.c	Tue Jun 26 11:55:47 2007 +0200
++++ b/src/alc/alc_speaker.c	Tue Jun 26 13:53:52 2007 +0200
+@@ -16,6 +16,7 @@
+ #include <AL/al.h>
+ #include <AL/alc.h>
+ 
++#include "al_config.h"
+ #include "al_debug.h"
+ #include "al_main.h"
+ #include "al_vector.h"
+@@ -110,6 +111,117 @@ void _alcSpeakerMove( ALuint cid ) {
+ 	return;
+ }
+ 
++struct speaker_preset {
++	ALfloat spk[_ALC_MAX_CHANNELS][3];
++};
++
++static struct speaker_preset speaker_pos_preset[_ALC_MAX_CHANNELS] = {
++	{  /* mono */
++		{ { 0, 0, 0 } }
++	},
++	{  /* stereo */
++		{ { -1, 0, 0 },
++		  { 1, 0, 0 } },
++	},
++	{  /* 2.1 */
++		{ { -M_SQRT1_2, 0, M_SQRT1_2 },
++		  { M_SQRT1_2, 0, M_SQRT1_2 },
++		  { 0, 0, 1 } },
++	},
++	{ /* 4.0 */
++		{ { -M_SQRT1_2, 0, M_SQRT1_2 },
++		  { M_SQRT1_2, 0, M_SQRT1_2 },
++		  { -M_SQRT1_2, 0, -M_SQRT1_2 },
++		  { M_SQRT1_2, 0, -M_SQRT1_2 } },
++	},
++	{ /* 5.0 */
++		{ { -0.5, 0, 0.8860254 },
++		  { 0.5, 0, 0.8860254 },
++		  { -0.93969262, 0, -0.34202014 },
++		  { 0.93969262, 0, -0.34202014 },
++		  { 0, 0, 1 } },
++	},
++	{ /* 5.1 */
++		{ { -0.5, 0, 0.8860254 },
++		  { 0.5, 0, 0.8860254 },
++		  { -0.93969262, 0, -0.34202014 },
++		  { 0.93969262, 0, -0.34202014 },
++		  { 0, 0, 1 },
++		  { 0, 0, 1 } },
++	},
++	{ /* 7.0 */
++		{ { -0.5, 0, 0.8860254 },
++		  { 0.5, 0, 0.8860254 },
++		  { -0.5, 0, -0.8860254 },
++		  { 0.5, 0, -0.8860254 },
++		  { 0, 0, 1 },
++		  { 0, 0, 1 },
++		  { -1, 0, 0 },
++		  { 1, 0, 0 } },
++	},
++	{ /* 7.1 */
++		{ { -0.5, 0, 0.8860254 },
++		  { 0.5, 0, 0.8860254 },
++		  { -0.5, 0, -0.8860254 },
++		  { 0.5, 0, -0.8860254 },
++		  { 0, 0, 1 },
++		  { 0, 0, 1 },
++		  { -1, 0, 0 },
++		  { 1, 0, 0 } },
++	},
++};
++
++static struct speaker_preset speaker_pos;
++static int speaker_init = 0;
++
++static void init_speaker_position(int num_speakers)
++{
++	Rcvar spos;
++	int ch, idx;
++
++	if (speaker_init == num_speakers)
++		return;
++
++	speaker_pos = speaker_pos_preset[num_speakers - 1];
++	speaker_init = num_speakers;
++
++	spos = rc_lookup("speaker-position");
++	if (!spos)
++		return;
++
++	ch = 0;
++	for (; spos; spos = rc_cdr(spos)) {
++		Rcvar pos = rc_car(spos);
++
++		if (rc_type(pos) != ALRC_CONSCELL) {
++			_alDebug(ALD_CONTEXT, __FILE__, __LINE__,
++				 "alc_speaker_init: bad type %s for speaker-position",
++				 rc_typestr(rc_type(pos)));
++			return;
++		}
++		idx = 0;
++		for (; pos; pos = rc_cdr(pos)) {
++			Rcvar valp = rc_car(pos);
++			ALfloat val;
++			if (rc_type(valp) != ALRC_INTEGER &&
++			    rc_type(valp) != ALRC_FLOAT) {
++				_alDebug(ALD_CONTEXT, __FILE__, __LINE__,
++					 "alc_speaker_init: bad type %s for speaker-position",
++					 rc_typestr(rc_type(valp)));
++				return;
++			}
++			val = rc_tofloat(valp);
++			speaker_pos.spk[ch][idx] = val;
++			if (idx == 2)
++				break;
++			idx++;
++		}
++		ch++;
++		if (ch >= num_speakers)
++			break;
++	}
++}
++
+ /*
+  * _alcSpeakerInit( ALuint cid )
+  *
+@@ -121,8 +233,8 @@ void _alcSpeakerInit( ALuint cid ) {
+ 	AL_context  *cc;
+ 	AL_listener *lis;
+ 	ALfloat *lpos;
+-	ALfloat sdis; /* scaled distance */
+-	ALuint i;
++	ALfloat sdis;
++	ALuint i, j;
+ 	ALuint num;
+ 
+ 	cc  = _alcGetContext( cid );
+@@ -142,64 +254,15 @@ void _alcSpeakerInit( ALuint cid ) {
+ 
+ 	lpos = lis->position;
+ 
+-	/*
+-	 * A speaker distance of one simplifies the math later.
+-	 */
+-	sdis = 1.0f;
+-
+-	_alDebug(ALD_CONTEXT, __FILE__, __LINE__,
+-		"_alcSpeakerInit: ( sdis %f )", sdis );
+-
+-	for (i = 0; i < _ALC_MAX_CHANNELS; i++)
+-	{
+-		cc->_speaker_pos[i].pos[0]   = lpos[0];
+-		cc->_speaker_pos[i].pos[1]   = lpos[1];
+-		cc->_speaker_pos[i].pos[2]   = lpos[2];
+-	}
+-
+ 	num = _alcGetNumSpeakers(cid);
+-
+-	switch (num) {
+-	case 5:
+-	case 6:
+-		/* 5.0 */
+-		cc->_speaker_pos[ALS_CENTER].pos[2] += sdis;
+-		cc->_speaker_pos[ALS_LFE].pos[2] += sdis;
+-		sdis *= 0.70710678;
+-		cc->_speaker_pos[ALS_LEFT].pos[0] -=sdis;
+-		cc->_speaker_pos[ALS_LEFT].pos[2] += sdis;
+-		cc->_speaker_pos[ALS_RIGHT].pos[0] += sdis;
+-		cc->_speaker_pos[ALS_RIGHT].pos[2] += sdis;
+-		cc->_speaker_pos[ALS_LEFTS].pos[0] -= sdis;
+-		cc->_speaker_pos[ALS_LEFTS].pos[2] -= sdis;
+-		cc->_speaker_pos[ALS_RIGHTS].pos[0] += sdis;
+-		cc->_speaker_pos[ALS_RIGHTS].pos[2] -= sdis;
+-		break;
+-
+-	case 4:
+-		/* fourpoint */
+-		sdis *= M_SQRT1_2;
+-
+-		cc->_speaker_pos[ALS_LEFT].pos[0] -= sdis;
+-		cc->_speaker_pos[ALS_LEFT].pos[2] += sdis;
+-		cc->_speaker_pos[ALS_RIGHT].pos[0] += sdis;
+-		cc->_speaker_pos[ALS_RIGHT].pos[2] += sdis;
+-
+-		cc->_speaker_pos[ALS_LEFTS].pos[0] -= sdis;
+-		cc->_speaker_pos[ALS_LEFTS].pos[2] -= sdis;
+-
+-		cc->_speaker_pos[ALS_RIGHTS].pos[0] += sdis;
+-		cc->_speaker_pos[ALS_RIGHTS].pos[2] -= sdis;
+-		break;
+-
+-	case 3:
+-	case 2:
+-		/* stereo */
+-		cc->_speaker_pos[ALS_LEFT].pos[0] -= sdis;
+-		cc->_speaker_pos[ALS_RIGHT].pos[0] += sdis;
+-		break;
+-	}
+-	return;
++	init_speaker_position(num);
++
++	sdis = 1.0;
++	for (i = 0; i < num; i++) {
++		for (j = 0; j < 3; j++)
++			cc->_speaker_pos[i].pos[j] = lpos[j] +
++				sdis * speaker_pos.spk[i][j];
++	}
+ }
+ 
+ /*

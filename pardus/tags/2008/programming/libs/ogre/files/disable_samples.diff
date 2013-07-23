@@ -1,0 +1,143 @@
+--- acinclude.m4.bak	2007-08-28 22:44:31.000000000 -0400
++++ acinclude.m4	2007-08-28 22:53:48.000000000 -0400
+@@ -450,14 +450,12 @@
+         AC_CONFIG_FILES([Samples/Common/CEGUIRenderer/Makefile \
+                          Samples/Common/CEGUIRenderer/CEGUI-OGRE.pc
+                          Samples/Common/CEGUIRenderer/src/Makefile \
+-                         Samples/Common/CEGUIRenderer/include/Makefile \
+-                         Samples/Gui/Makefile \
+-                         Samples/Gui/src/Makefile])
++                         Samples/Common/CEGUIRenderer/include/Makefile])
+         AC_SUBST(CEGUI_CFLAGS)
+         AC_SUBST(CEGUI_LIBS)
+-        AC_MSG_RESULT([CEGUI available, Gui and FacialAnimation samples will be built])
++        AC_MSG_RESULT([CEGUI available, Renderer will be built])
+     else
+-        AC_MSG_RESULT([CEGUI not available, Gui and FacialAnimation samples will not be built])
++        AC_MSG_RESULT([CEGUI not available, Renderer will not be built])
+     fi
+     AM_CONDITIONAL([HAVE_CEGUI], [test x$build_cegui_sample = xtrue])
+ ])
+--- configure.in.bak    2007-12-30 16:05:11.000000000 -0500
++++ configure.in        2007-12-30 16:06:36.000000000 -0500
+@@ -154,86 +154,6 @@
+     RenderSystems/Direct3D9/include/Makefile \
+     Samples/Makefile \
+     Samples/Common/Makefile \
+-    Samples/Common/include/Makefile \
+-    Samples/Common/bin/Makefile \
+-    Samples/BezierPatch/Makefile \
+-    Samples/BezierPatch/src/Makefile \
+-    Samples/BezierPatch/include/Makefile \
+-    Samples/CameraTrack/Makefile \
+-    Samples/CameraTrack/src/Makefile \
+-    Samples/CelShading/Makefile \
+-    Samples/CelShading/src/Makefile \
+-    Samples/Compositor/Makefile \
+-    Samples/Compositor/src/Makefile \
+-    Samples/Compositor/include/Makefile \
+-    Samples/CubeMapping/Makefile \
+-    Samples/CubeMapping/src/Makefile \
+-    Samples/CubeMapping/include/Makefile \
+-    Samples/DeferredShading/Makefile \
+-    Samples/DeferredShading/src/Makefile \
+-    Samples/DeferredShading/include/Makefile  \
+-    Samples/Dot3Bump/Makefile \
+-    Samples/Dot3Bump/src/Makefile \
+-    Samples/EnvMapping/Makefile \
+-    Samples/EnvMapping/src/Makefile \
+-    Samples/EnvMapping/include/Makefile \
+-    Samples/FacialAnimation/Makefile \
+-    Samples/FacialAnimation/src/Makefile \
+-    Samples/Fresnel/Makefile \
+-    Samples/Fresnel/src/Makefile \
+-    Samples/Grass/Makefile \
+-    Samples/Grass/src/Makefile \
+-    Samples/Transpacency/Makefile \
+-    Samples/Transpacency/src/Makefile \
+-    Samples/Transpacency/include/Makefile \
+-    Samples/Lighting/Makefile \
+-    Samples/Lighting/src/Makefile \
+-    Samples/Lighting/include/Makefile \
+-    Samples/OceanDemo/Makefile \
+-    Samples/OceanDemo/src/Makefile \
+-    Samples/OceanDemo/include/Makefile \
+-    Samples/ParticleFX/Makefile \
+-    Samples/ParticleFX/src/Makefile \
+-    Samples/ParticleFX/include/Makefile \
+-    Samples/RenderToTexture/Makefile \
+-    Samples/RenderToTexture/src/Makefile \
+-    Samples/TextureFX/Makefile \
+-    Samples/TextureFX/src/Makefile \
+-    Samples/TextureFX/include/Makefile \
+-    Samples/Shadows/Makefile \
+-    Samples/Shadows/src/Makefile \
+-    Samples/SkyBox/Makefile \
+-    Samples/SkyBox/src/Makefile \
+-    Samples/SkyBox/include/Makefile \
+-    Samples/SkyDome/Makefile \
+-    Samples/SkyDome/src/Makefile \
+-    Samples/SkyDome/include/Makefile \
+-    Samples/SkyPlane/Makefile \
+-    Samples/SkyPlane/src/Makefile \
+-    Samples/SkyPlane/include/Makefile \
+-    Samples/Smoke/Makefile \
+-    Samples/Smoke/src/Makefile \
+-    Samples/Smoke/include/Makefile \
+-    Samples/BSP/Makefile \
+-    Samples/BSP/src/Makefile \
+-    Samples/SkeletalAnimation/Makefile \
+-    Samples/SkeletalAnimation/src/Makefile \
+-    Samples/SkeletalAnimation/include/Makefile \
+-    Samples/Terrain/Makefile \
+-    Samples/Terrain/src/Makefile \
+-    Samples/Terrain/include/Makefile \
+-    Samples/Water/Makefile \
+-    Samples/Water/src/Makefile \
+-    Samples/Water/include/Makefile \
+-    Samples/DynTex/Makefile \
+-    Samples/DynTex/src/Makefile \
+-    Samples/DynTex/include/Makefile \
+-    Samples/VolumeTex/Makefile \
+-    Samples/VolumeTex/src/Makefile \
+-    Samples/VolumeTex/include/Makefile \
+-    Samples/Instancing/Makefile \
+-    Samples/Instancing/src/Makefile \
+-    Samples/Instancing/include/Makefile \
+     Tests/Makefile \
+     Tests/src/Makefile \
+     Tools/Makefile \
+@@ -269,7 +189,6 @@
+ echo "    Use FreeImage                   : $build_freeimage"
+ echo "    Use DevIL                       : $build_il"
+ echo "    Build OGRE demos                : $build_ogre_demos"
+-test "x$build_ogre_demos" == "xyes" && \
+ echo "    Build CEGUI demos               : $build_cegui_sample"
+ echo "    Build the OpenEXR plugin        : $build_exr"
+ echo "    Build the Cg plugin             : $build_cg"
+--- Samples/Common/Makefile.am.bak	2007-08-28 16:27:47.000000000 -0400
++++ Samples/Common/Makefile.am	2007-08-28 17:04:04.000000000 -0400
+@@ -1,5 +1,5 @@
+-SUBDIRS = include bin
+-
++CEGUI_SUBDIR = CEGUIRenderer
+ if HAVE_CEGUI
+-SUBDIRS += CEGUIRenderer
++INCLUDE_CEGUI = $(CEGUI_SUBDIR)
+ endif
++SUBDIRS = $(INCLUDE_CEGUI)
+--- Samples/Makefile.am.bak	2007-08-28 16:31:00.000000000 -0400
++++ Samples/Makefile.am	2007-08-28 17:05:34.000000000 -0400
+@@ -1,12 +1 @@
+ SUBDIRS = Common
+-
+-if OGRE_BUILDING_DEMOS
+- SUBDIRS += SkeletalAnimation BezierPatch EnvMapping Transpacency Lighting \
+-            ParticleFX TextureFX SkyDome BSP SkyPlane SkyBox CameraTrack Terrain \
+-            RenderToTexture Water CubeMapping Dot3Bump Smoke CelShading Fresnel \
+-            DynTex VolumeTex Grass DeferredShading
+-
+-if HAVE_CEGUI
+- SUBDIRS += Gui FacialAnimation OceanDemo Compositor Shadows Instancing
+-endif
+-endif

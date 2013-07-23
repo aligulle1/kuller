@@ -1,0 +1,25 @@
+--- a/source/Makefile.in	2008-10-24 13:26:13.000000000 +0300
++++ b/source/Makefile.in	2008-10-24 13:27:26.000000000 +0300
+@@ -118,6 +118,8 @@
+ INSTALLPERMS_BIN = 0755
+ INSTALLPERMS_DATA = 0644
+ 
++LAZYLDFLAGS=-Wl,-z,now
++
+ # set these to where to find various files
+ # These can be overridden by command line switches (see smbd(8))
+ # or in smb.conf (see smb.conf(5))
+@@ -1313,11 +1315,11 @@
+ 
+ bin/mount.cifs@EXEEXT@: $(BINARY_PREREQS) $(CIFS_MOUNT_OBJ) @BUILD_POPT@
+ 	@echo Linking $@
+-	@$(CC) $(FLAGS) -o $@ $(CIFS_MOUNT_OBJ) $(DYNEXP) $(LDFLAGS) $(POPT_LIBS)
++	@$(CC) $(FLAGS) -o $@ $(CIFS_MOUNT_OBJ) $(DYNEXP) $(LDFLAGS) $(POPT_LIBS) $(LAZYLDFLAGS)
+ 
+ bin/umount.cifs@EXEEXT@: $(BINARY_PREREQS) $(CIFS_UMOUNT_OBJ) @BUILD_POPT@
+ 	@echo Linking $@
+-	@$(CC) $(FLAGS) -o $@ $(CIFS_UMOUNT_OBJ) $(DYNEXP) $(LDFLAGS) $(POPT_LIBS)
++	@$(CC) $(FLAGS) -o $@ $(CIFS_UMOUNT_OBJ) $(DYNEXP) $(LDFLAGS) $(POPT_LIBS) $(LAZYLDFLAGS)
+ 
+ bin/cifs.upcall@EXEEXT@: $(BINARY_PREREQS) $(CIFS_UPCALL_OBJ) $(LIBSMBCLIENT_OBJ1) @BUILD_POPT@ @LIBTALLOC_SHARED@ @LIBTDB_SHARED@ @LIBWBCLIENT_SHARED@
+ 	@echo Linking $@

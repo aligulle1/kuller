@@ -1,0 +1,160 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>ccache</Name>
+        <Homepage>http://ccache.samba.org/</Homepage>
+        <Packager>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Packager>
+        <License>GPLv3+</License>
+        <IsA>app:console</IsA>
+        <Summary>Fast C/C++ compiler cache</Summary>
+        <Description>ccache is a compiler cache. It speeds up recompilation of C/C++ code by caching previous compiles and detecting when the same compile is being done.</Description>
+        <Archive sha1sum="9ed36cf97511f7e0fb7ec30176ebba0b7d9dccf4" type="targz">http://samba.org/ftp/ccache/ccache-3.1.6.tar.gz</Archive>
+        <Patches>
+            <Patch level="1">increase-default-cache.patch</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>ccache</Name>
+        <RuntimeDependencies>
+            <Dependency>gcc</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="executable">/usr/bin</Path>
+            <Path fileType="executable">/usr/lib/ccache/bin</Path>
+            <Path fileType="doc">/usr/share/doc</Path>
+            <Path fileType="man">/usr/share/man</Path>
+        </Files>
+    </Package>
+
+    <History>
+        <Update release="12">
+            <Date>2011-09-27</Date>
+            <Version>3.1.6</Version>
+            <Comment>Add clang and clang++ to compiler list.</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="11">
+            <Date>2011-09-27</Date>
+            <Version>3.1.6</Version>
+            <Comment>
+               -  Version bump to 3.1.6:
+               -  ccache now falls back to preprocessor mode when a non-regular include file (device, socket, etc) has been detected so that potential hanging due to blocking reads is avoided.
+               -  CRC errors are now detected when decompressing compressed files in the cache.
+               -  Fixed potential object file corruption race on NFS.
+               -  Minor documentation corrections.
+               -  Fixed configure detection of ar.
+               -  ccache development version (set by dev.mk) now works with gits whose describe command doesn’t understand --dirty.
+               -  Bail out on too hard compiler options -fdump-*.
+               -  NULL return values from malloc/calloc of zero bytes are now handled correctly.
+               -  Fixed issue when parsing precompiler output on AIX.
+               -  Improved documentation on which information is included in the hash sum.
+               -  Made the "too new header file" test case work on file systems with unsynchronized clocks.
+               -  The test suite now also works on systems that lack a /dev/zero.
+               -  The -MFarg, -MTarg and -MQarg compiler options (i.e, without space between option and argument) are now handled correctly.
+               -  Made a work-around for a bug in gzputc() in zlib 1.2.5.
+               -  Corrupt manifest files are now removed so that they won’t block direct mode hits.
+               -  ccache now copes with file systems that don’t know about symbolic links.
+               -  The file handle in now correctly closed on write error when trying to create a cache dir tag.
+               -  The -MF/-MT/-MQ options with concatenated argument are now handled correctly when they are last on the command line.
+               -  ccache is now bug compatible with GCC for the -MT/-MQ options with concatenated arguments.
+               -  Fixed a minor memory leak.
+               -  Systems that lack (and don't need to be linked with) libm are now supported.
+               -  Added a new statistics counter named "called for preprocessing".
+               -  The original command line is now logged to the file specified with CCACHE_LOGFILE.
+               -  Improved error logging when system calls fail.
+               -  Added support for rewriting absolute paths in -F/-iframework GCC options.
+               -  Improved order of statistics counters in ccache -s output.
+               -  Rewrite argument to --sysroot if CCACHE_BASEDIR is used.
+               -  Don't crash if getcwd() fails.
+               -  Fixed alignment of "called for preprocessing" counter.
+            </Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="10">
+            <Date>2010-10-11</Date>
+            <Version>3.1</Version>
+            <Comment>Mass rebuild for Pardus 2011 Beta</Comment>
+            <Name>Fatih Aşıcı</Name>
+            <Email>fatih@pardus.org.tr</Email>
+        </Update>
+        <Update release="9">
+            <Date>2010-09-20</Date>
+            <Version>3.1</Version>
+            <Comment>Version bump</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="8">
+            <Date>2010-07-19</Date>
+            <Version>3.0.1</Version>
+            <Comment>
+                - Version bump to 3.0.1,
+                - Increase default cache size to 3G,
+                - Create links in actions.py instead of postInstall,
+                - Drop all the patches as they were all upstreamed.
+            </Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="7">
+            <Date>2009-02-06</Date>
+            <Version>2.4</Version>
+            <Comment>
+                Prefer utimes if available as utime may cause truncation of sub-second portions of timestamps
+                Make package respect LDFLAGS
+                Update ignore profile parameters list
+            </Comment>
+            <Name>Onur Küçük</Name>
+            <Email>onur@pardus.org.tr</Email>
+        </Update>
+        <Update release="6">
+            <Date>2008-01-29</Date>
+            <Version>2.4</Version>
+            <Comment>Correctly enable ccache for root</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="5">
+            <Date>2008-01-12</Date>
+            <Version>2.4</Version>
+            <Comment>Don't fail if HOME is not set</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="4">
+            <Date>2007-06-16</Date>
+            <Version>2.4</Version>
+            <Comment>Stable update</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="3">
+            <Date>2005-12-21</Date>
+            <Version>2.3</Version>
+            <Comment>in order to create needed symlinks install after gcc</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="2">
+            <Date>2005-11-08</Date>
+            <Version>2.3</Version>
+            <Comment>Fix #1102</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="1">
+            <Date>2005-10-15</Date>
+            <Version>2.3</Version>
+            <Comment>First release.</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+    </History>
+</PISI>

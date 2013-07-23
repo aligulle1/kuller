@@ -1,0 +1,63 @@
+Index: kdebase/kxkb/kxkbconfig.cpp
+===================================================================
+--- kdebase.orig/kxkb/kxkbconfig.cpp
++++ kdebase/kxkb/kxkbconfig.cpp
+@@ -14,6 +14,7 @@
+ #include <tqregexp.h>
+ #include <tqstringlist.h>
+ #include <tqdict.h>
++#include <tqfile.h>
+ 
+ #include <kconfig.h>
+ #include <kdebug.h>
+@@ -33,12 +34,32 @@ const char* DEFAULT_MODEL = "pc104";
+ LayoutUnit KxkbConfig::getDefaultLayout()
+ {
+ 	if( m_layouts.size() == 0 )
+-		return DEFAULT_LAYOUT_UNIT;
+-	
++          {
++            TQString line,layout;
++            TQFile file("/etc/X11/xorg.conf");
++
++            if ( file.open( IO_ReadOnly ) ) {
++              TQTextStream stream( &file );
++              while (!stream.atEnd()) {
++                line = stream.readLine();
++                if (line.contains("XkbLayout"))
++                  {
++                    layout = line.section("\"",3);
++                    break;
++                  }
++              }
++            }
++
++            if (!layout.isEmpty())
++              return LayoutUnit(layout, "");
++            else
++              return DEFAULT_LAYOUT_UNIT;
++          }
++
+ 	return m_layouts[0];
+ }
+ 
+-bool KxkbConfig::load(int loadMode) 
++bool KxkbConfig::load(int loadMode)
+ {
+ 	KConfig *config = new KConfig("kxkbrc", true, false);
+ 	config->setGroup("Layout");
+@@ -68,12 +89,11 @@ bool KxkbConfig::load(int loadMode)
+ 		layoutList = config->readListEntry("LayoutList");
+ 	}
+ 	else { // old config
+-		TQString mainLayout = config->readEntry("Layout", DEFAULT_LAYOUT_UNIT.toPair());
++		TQString mainLayout = config->readEntry("Layout", getDefaultLayout().toPair());
+ 		layoutList = config->readListEntry("Additional");
++        layoutList.prepend("us");
+ 		layoutList.prepend(mainLayout);
+ 	}
+-	if( layoutList.count() == 0 )
+-		layoutList.append("us");
+ 	
+ 	m_layouts.clear();
+ 	for(TQStringList::ConstIterator it = layoutList.begin(); it != layoutList.end() ; ++it) {

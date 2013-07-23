@@ -1,0 +1,136 @@
+# Copyright (C) 2007  Miriam Ruiz <little_miry@yahoo.es>
+# Distributed under the same license as the game. See debian/copyright.
+
+Index: digiband-1.0.1/Source/settings.cpp
+===================================================================
+--- digiband-1.0.1.orig/Source/settings.cpp	2007-09-15 13:27:56.000000000 +0000
++++ digiband-1.0.1/Source/settings.cpp	2007-09-15 20:08:26.000000000 +0000
+@@ -18,6 +18,15 @@
+ *      59 Temple Place - Suite 330
+ *      Boston, MA 02111-1307, USA
+ */
++
++#ifndef _WIN32
++#include <unistd.h>
++#include <limits.h>
++#include <fcntl.h>
++#include <sys/stat.h>
++#include <sys/types.h>
++#endif
++
+ gamesettings::gamesettings(){}
+ gamesettings::~gamesettings(){}
+ void gamesettings::load(){
+@@ -25,8 +34,26 @@
+ 	printf("gamesettings::load\n");
+ 	#endif
+ 	ifstream settingsfile;
++#ifndef _WIN32
++	char file[PATH_MAX+1];
++	char *home;
++	if (!(home = getenv("HOME"))){
++		printf("$HOME is not defined. Using /tmp for game data storage.\n");
++		home = "/tmp";
++	}
++	snprintf(file, sizeof(file)-1, "$s/.digiband", home);
++	mkdir(file, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) == 0;
++	strncat(file, "/settings.ini", sizeof(file)-1);
++	struct stat stat_buf;
++	stat(file, &stat_buf);
++	if (stat(file, &stat_buf) == -1){
++		int settings_fd = creat(file, O_WRONLY);
++		close(settings_fd);
++	}
++#else
+ 	char file[21];
+-	snprintf(file,20,"./Data/settings.ini");
++	snprintf(file, sizeof(file)-1, "./Data/settings.ini");
++#endif
+ 	while(fstreampotty>0){}
+ 	fstreampotty++;
+ 	settingsfile.open(file,ifstream::in);
+@@ -240,9 +267,27 @@
+ 	printf("gamesettings::save\n");
+ 	#endif
+ 	ofstream settingsfile;
++#ifndef _WIN32
++	char file[PATH_MAX+1];
++	char *home;
++	if (!(home = getenv("HOME"))){
++		printf("$HOME is not defined. Using /tmp for game data storage.\n");
++		home = "/tmp";
++	}
++	snprintf(file, sizeof(file)-1, "$s/.digiband", home);
++	mkdir(file, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) == 0;
++	strncat(file, "/settings.ini", sizeof(file)-1);
++	struct stat stat_buf;
++	stat(file, &stat_buf);
++	if (stat(file, &stat_buf) == -1){
++		int settings_fd = creat(file, O_WRONLY);
++		close(settings_fd);
++	}
++#else
+ 	char file[21];
++	snprintf(file, sizeof(file)-1, "./Data/settings.ini");
++#endif
+ 	char thefile[1024];
+-	snprintf(file,20,"./Data/settings.ini");
+ 	while(fstreampotty>0){}
+ 	fstreampotty++;
+ 	settingsfile.open(file,ofstream::out);
+@@ -497,8 +542,26 @@
+ 	printf("gamesettings::loadscores\n");
+ 	#endif
+ 	ifstream settingsfile;
++#ifndef _WIN32
++	char file[PATH_MAX+1];
++	char *home;
++	if (!(home = getenv("HOME"))){
++		printf("$HOME is not defined. Using /tmp for game data storage.\n");
++		home = "/tmp";
++	}
++	snprintf(file, sizeof(file)-1, "$s/.digiband", home);
++	mkdir(file, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) == 0;
++	strncat(file, "/hiscores.dat", sizeof(file)-1);
++	struct stat stat_buf;
++	stat(file, &stat_buf);
++	if (stat(file, &stat_buf) == -1){
++		int hiscores_fd = creat(file, O_WRONLY);
++		close(hiscores_fd);
++	}
++#else
+ 	char file[21];
+-	snprintf(file,20,"./Data/hiscores.dat");
++	snprintf(file, sizeof(file)-1, "./Data/hiscores.dat");
++#endif
+ 	if (!testfile(file)){
+         printf("Holy shit, what the fuck did you do with the high scores?\nYou could try creating a new blank hiscores.dat file in the data directory if you want to start new, or replace the settings.ini file.\nIf all else fails, reinstall or check directory permissions.\n");
+ 		appisrunning=false;
+@@ -605,8 +668,26 @@
+ 
+ 	
+ 	ofstream settingsfile;
++#ifndef _WIN32
++	char file[PATH_MAX+1];
++	char *home;
++	if (!(home = getenv("HOME"))){
++		printf("$HOME is not defined. Using /tmp for game data storage.\n");
++		home = "/tmp";
++	}
++	snprintf(file, sizeof(file)-1, "$s/.digiband", home);
++	mkdir(file, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) == 0;
++	strncat(file, "/hiscores.dat", sizeof(file)-1);
++	struct stat stat_buf;
++	stat(file, &stat_buf);
++	if (stat(file, &stat_buf) == -1){
++		int hiscores_fd = creat(file, O_WRONLY);
++		close(hiscores_fd);
++	}
++#else
+ 	char file[21];
+-	snprintf(file,20,"./Data/hiscores.dat");
++	snprintf(file, sizeof(file)-1, "./Data/hiscores.dat");
++#endif
+   	if (!testfile(file)){
+         printf("Holy shit, what the fuck did you do with the hiscores?\nYou could try creating a new blank hiscores.dat file in the data directory if you want to start new, or replace the settings.ini file.\nIf all else fails, reinstall or check directory permissions.\n");
+ 		appisrunning=false;

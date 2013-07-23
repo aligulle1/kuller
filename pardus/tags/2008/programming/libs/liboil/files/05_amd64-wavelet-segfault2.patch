@@ -1,0 +1,80 @@
+From: David Schleef <ds@ginger.bigkitten.com>
+Date: Wed, 23 Apr 2008 01:38:56 +0000 (-0700)
+Subject: Fix some impls that read outside their arrays.  Turns out to cause segfaults.
+X-Git-Url: http://gitweb.freedesktop.org/?p=liboil.git;a=commitdiff;h=4d9d3c35cca4840b545819ace906b2f171a6d0d8
+
+Fix some impls that read outside their arrays.  Turns out to cause segfaults.
+---
+
+--- a/liboil/amd64/wavelet.c
++++ b/liboil/amd64/wavelet.c
+@@ -1353,9 +1353,9 @@ multiply_and_add_s16_u8_mmx_2(int16_t *d
+   asm volatile ("\n"
+       "  pxor %%mm7, %%mm7\n"
+       "1:\n"
+-      "  movq 0(%3), %%mm0\n"
++      "  movd 0(%3), %%mm0\n"
+       "  punpcklbw %%mm7, %%mm0\n"
+-      "   movq 4(%3), %%mm1\n"
++      "   movd 4(%3), %%mm1\n"
+       "  pmullw 0(%2), %%mm0\n"
+       "   punpcklbw %%mm7, %%mm1\n"
+       "  paddw 0(%1), %%mm0\n"
+--- a/liboil/i386/wavelet.c
++++ b/liboil/i386/wavelet.c
+@@ -1542,7 +1542,7 @@ multiply_and_add_s16_u8_mmx(int16_t *d1,
+   asm volatile ("\n"
+       "  pxor %%mm7, %%mm7\n"
+       "1:\n"
+-      "  movq 0(%3), %%mm0\n"
++      "  movd 0(%3), %%mm0\n"
+       "  punpcklbw %%mm7, %%mm0\n"
+       "  pmullw 0(%2), %%mm0\n"
+       "  paddw 0(%1), %%mm0\n"
+@@ -1578,9 +1578,9 @@ multiply_and_add_s16_u8_mmx_2(int16_t *d
+   asm volatile ("\n"
+       "  pxor %%mm7, %%mm7\n"
+       "1:\n"
+-      "  movq 0(%3), %%mm0\n"
++      "  movd 0(%3), %%mm0\n"
+       "  punpcklbw %%mm7, %%mm0\n"
+-      "   movq 4(%3), %%mm1\n"
++      "   movd 4(%3), %%mm1\n"
+       "  pmullw 0(%2), %%mm0\n"
+       "   punpcklbw %%mm7, %%mm1\n"
+       "  paddw 0(%1), %%mm0\n"
+--- a/liboil/i386_amd64/multiply_and_acc.c
++++ b/liboil/i386_amd64/multiply_and_acc.c
+@@ -6,7 +6,6 @@ void
+ multiply_and_acc_6xn_s16_u8_mmx (int16_t *i1, int is1, int16_t *s1,
+     int ss1, uint8_t *s2, int ss2, int n)
+ {
+-  /* FIXME this reads outside the arrays.  Bad. */
+   if (n==0) return;
+   __asm__ __volatile__ ("\n"
+       "  pxor %%mm7, %%mm7\n"
+@@ -16,10 +15,11 @@ multiply_and_acc_6xn_s16_u8_mmx (int16_t
+       "  pmullw 0(%1), %%mm0\n"
+       "  paddw 0(%0), %%mm0\n"
+       "  movq %%mm0, 0(%0)\n"
+-      "   movd 4(%2), %%mm1\n"
++      "   movd 2(%2), %%mm1\n"
+       "   punpcklbw %%mm7, %%mm1\n"
+-      "   pmullw 8(%1), %%mm1\n"
+-      "   paddw 8(%0), %%mm1\n"
++      "   pmullw 4(%1), %%mm1\n"
++      "   paddw 4(%0), %%mm1\n"
++      "   pshufw $0xee, %%mm1, %%mm1\n"
+       "   movd %%mm1, 8(%0)\n"
+ 
+       "  add %4, %0\n"
+@@ -37,7 +37,7 @@ multiply_and_acc_6xn_s16_u8_mmx (int16_t
+       );
+ }
+ OIL_DEFINE_IMPL_FULL (multiply_and_acc_6xn_s16_u8_mmx,
+-    multiply_and_acc_6xn_s16_u8, OIL_IMPL_FLAG_MMX);
++    multiply_and_acc_6xn_s16_u8, OIL_IMPL_FLAG_MMX | OIL_IMPL_FLAG_MMXEXT);
+ 
+ void
+ multiply_and_acc_8xn_s16_u8_mmx (int16_t *i1, int is1, int16_t *s1,
+

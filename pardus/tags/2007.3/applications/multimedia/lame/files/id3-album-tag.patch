@@ -1,0 +1,366 @@
+--- include/lame.h	2006-09-24 13:53:32.000000000 +0000
++++ include/lame.h	2007-03-25 23:58:56.000000000 +0000
+@@ -1070,6 +1070,17 @@
+         lame_global_flags*  gfp,
+         const char*         genre );
+ 
++/* return non-zero result if image type is invalid */
++extern int id3tag_set_albumart(
++        lame_global_flags*  gfp,
++        const char*         image,
++        unsigned long       size );
++
++/* return non-zero result if field name is invalid */
++extern int id3tag_set_fieldvalue(
++        lame_global_flags*  gfp,
++        const char*         fieldvalue);
++
+ /***********************************************************************
+ *
+ *  list of valid bitrates [kbps] & sample frequencies [Hz].
+@@ -1081,11 +1092,14 @@
+ extern const int      samplerate_table [3] [ 4];
+ 
+ 
++/* maximum size of albumart image (128KB), which affects LAME_MAXMP3BUFFER
++   as well since lame_encode_buffer() also returns ID3v2 tag data */
++#define LAME_MAXALBUMART    (128 * 1024)
+ 
+ /* maximum size of mp3buffer needed if you encode at most 1152 samples for
+    each call to lame_encode_buffer.  see lame_encode_buffer() below  
+    (LAME_MAXMP3BUFFER is now obsolete)  */
+-#define LAME_MAXMP3BUFFER   16384
++#define LAME_MAXMP3BUFFER   (16384 + LAME_MAXALBUMART)
+ 
+ 
+ typedef enum {
+--- libmp3lame/id3tag.c	2006-09-24 13:53:32.000000000 +0000
++++ libmp3lame/id3tag.c	2007-03-25 23:58:58.000000000 +0000
+@@ -309,6 +309,57 @@
+     return 0;
+ }
+ 
++int
++id3tag_set_albumart(lame_global_flags* gfp, const char* image, unsigned long size)
++{
++    int mimetype = 0;
++    unsigned char *data = (unsigned char *)image;
++    lame_internal_flags *gfc = gfp->internal_flags;
++
++    /* make sure the image size is no larger than the maximum value */
++    if (LAME_MAXALBUMART < size) {
++        return -1;
++    }
++    /* determine MIME type from the actual image data */
++    if (2 < size && data[0] == 0xFF && data[1] == 0xD8) {
++        mimetype = MIMETYPE_JPEG;
++    } else if (4 < size && data[0] == 0x89 && strncmp((const char *)&data[1], "PNG", 3) == 0) {
++        mimetype = MIMETYPE_PNG;
++    } else if (4 < size && strncmp((const char *)data, "GIF8", 4) == 0) { 
++        mimetype = MIMETYPE_GIF;
++    } else {
++        return -1;
++    }
++
++    gfc->tag_spec.albumart = (unsigned char *)image;
++    gfc->tag_spec.albumart_size = size;
++    gfc->tag_spec.albumart_mimetype = mimetype;
++    gfc->tag_spec.flags |= CHANGED_FLAG;
++    id3tag_add_v2(gfp);
++    return 0;
++}
++
++int
++id3tag_set_fieldvalue(lame_global_flags * gfp, const char *fieldvalue)
++{
++    lame_internal_flags *gfc = gfp->internal_flags;
++    if (fieldvalue && *fieldvalue) {
++        char **p = NULL;
++        if (strlen(fieldvalue) < 5 || fieldvalue[4] != '=') {
++            return -1;
++        }
++        p = (char **)realloc(gfc->tag_spec.values, sizeof(char*) * (gfc->tag_spec.num_values + 1));
++        if (!p) {
++            return -1;
++        }
++        gfc->tag_spec.values = (char const**)p;
++        gfc->tag_spec.values[gfc->tag_spec.num_values++] = fieldvalue;
++        gfc->tag_spec.flags |= CHANGED_FLAG;
++    }
++    id3tag_add_v2(gfp);
++    return 0;
++}
++
+ static unsigned char *
+ set_4_byte_value(unsigned char *bytes, unsigned long value)
+ {
+@@ -366,6 +417,65 @@
+     return frame;
+ }
+ 
++static unsigned char *
++set_frame_apic(unsigned char *frame, const char *mimetype, const unsigned char *data, size_t size)
++{
++    /* ID3v2.3 standard APIC frame:
++     *     <Header for 'Attached picture', ID: "APIC">
++     *     Text encoding    $xx
++     *     MIME type        <text string> $00
++     *     Picture type     $xx
++     *     Description      <text string according to encoding> $00 (00)
++     *     Picture data     <binary data>
++     */
++    if (mimetype && data && size) {
++        frame = set_4_byte_value(frame, FRAME_ID('A', 'P', 'I', 'C'));
++        frame = set_4_byte_value(frame, 4 + strlen(mimetype) + size);
++        /* clear 2-byte header flags */
++        *frame++ = 0;
++        *frame++ = 0;
++        /* clear 1 encoding descriptor byte to indicate ISO-8859-1 format */
++        *frame++ = 0;
++        /* copy mime_type */
++        while (*mimetype) {
++            *frame++ = *mimetype++;
++        }
++        *frame++ = 0;
++        /* set picture type to 0 */
++        *frame++ = 0;
++        /* empty description field */
++        *frame++ = 0;
++        /* copy the image data */
++        while (size--) {
++            *frame++ = *data++;
++        }
++    }
++    return frame;
++}
++
++static unsigned char *
++set_frame_custom(unsigned char *frame, const char *fieldvalue)
++{
++    if (fieldvalue && *fieldvalue) {
++        const char *value = fieldvalue + 5;
++        size_t length = strlen(value);
++        *frame++ = *fieldvalue++;
++        *frame++ = *fieldvalue++;
++        *frame++ = *fieldvalue++;
++        *frame++ = *fieldvalue++;
++        frame = set_4_byte_value(frame, strlen(value) + 1);
++        /* clear 2-byte header flags */
++        *frame++ = 0;
++        *frame++ = 0;
++        /* clear 1 encoding descriptor byte to indicate ISO-8859-1 format */
++        *frame++ = 0;
++        while (length--) {
++            *frame++ = *value++;
++        }
++    }
++    return frame;
++}
++
+ int
+ id3tag_write_v2(lame_global_flags *gfp)
+ {
+@@ -400,6 +510,10 @@
+             unsigned char *p;
+             size_t adjusted_tag_size;
+             unsigned int index;
++            const char *albumart_mime = NULL;
++            static const char *mime_jpeg = "image/jpeg";
++            static const char *mime_png = "image/png";
++            static const char *mime_gif = "image/gif";
+             /* calulate size of tag starting with 10-byte tag header */
+             tag_size = 10;
+ #if defined(__hpux) || defined(__svr4__) || defined(M_UNIX) || defined(_AIX)
+@@ -448,6 +562,23 @@
+             } else {
+                 genre_length = 0;
+             }
++            if (gfc->tag_spec.albumart && gfc->tag_spec.albumart_size) {
++                switch (gfc->tag_spec.albumart_mimetype) {
++                case MIMETYPE_JPEG:
++                    albumart_mime = mime_jpeg;
++                    break;
++                case MIMETYPE_PNG:
++                    albumart_mime = mime_png;
++                    break;
++                case MIMETYPE_GIF:
++                    albumart_mime = mime_gif;
++                    break;
++                }
++                tag_size += 10 + 4 + strlen(albumart_mime) + gfc->tag_spec.albumart_size;
++            }
++            for (index = 0;index < gfc->tag_spec.num_values;++index) {
++                tag_size += 6 + strlen(gfc->tag_spec.values[index]);
++            }
+             if (gfc->tag_spec.flags & PAD_V2_FLAG) {
+                 /* add 128 bytes of padding */
+                 tag_size += 128;
+@@ -493,6 +624,10 @@
+                     comment_length);
+             p = set_frame(p, TRACK_FRAME_ID, track, track_length);
+             p = set_frame(p, GENRE_FRAME_ID, genre, genre_length);
++            for (index = 0;index < gfc->tag_spec.num_values;++index) {
++                p = set_frame_custom(p, gfc->tag_spec.values[index]);
++            }
++            p = set_frame_apic(p, albumart_mime, gfc->tag_spec.albumart, gfc->tag_spec.albumart_size);
+             /* clear any padding bytes */
+             memset(p, 0, tag_size - (p - tag));
+             /* write tag directly into bitstream at current position */
+--- libmp3lame/id3tag.h	2006-09-24 13:53:32.000000000 +0000
++++ libmp3lame/id3tag.h	2007-03-25 23:58:58.000000000 +0000
+@@ -12,6 +12,13 @@
+ #define SPACE_V1_FLAG   (1U << 4)
+ #define PAD_V2_FLAG     (1U << 5)
+ 
++enum {
++    MIMETYPE_NONE = 0,
++    MIMETYPE_JPEG,
++    MIMETYPE_PNG,
++    MIMETYPE_GIF,
++};
++
+ struct id3tag_spec
+ {
+     /* private data members */
+@@ -23,6 +30,11 @@
+     const char *comment;
+     int track;
+     int genre;
++    const unsigned char *albumart;
++    int     albumart_size;
++    int     albumart_mimetype;
++    char const* *values;
++    int     num_values;
+ };
+ 
+ 
+--- frontend/main.c	2007-03-26 00:07:44.000000000 +0000
++++ frontend/main.c	2007-03-25 23:58:51.000000000 +0000
+@@ -711,6 +711,7 @@
+     }
+     if (argc <= 1) {
+         usage(stderr, argv[0]); /* no command-line args, print usage, exit  */
++        parse_close();
+         return 1;
+     }
+ 
+@@ -722,8 +723,10 @@
+      */
+     parse_args_from_string(gf, getenv("LAMEOPT"), inPath, outPath);
+     ret = parse_args(gf, argc, argv, inPath, outPath, nogap_inPath, &max_nogap);
+-    if (ret < 0)
++    if (ret < 0) {
++        parse_close();
+         return ret == -2 ? 0 : 1;
++    }
+ 
+     if (update_interval < 0.)
+         update_interval = 2.;
+@@ -745,6 +748,7 @@
+         outf = init_files(gf, inPath, outPath, &enc_delay, &enc_padding);
+     }
+     if (outf == NULL) {
++        parse_close();
+         return -1;
+     }
+ 
+@@ -757,6 +761,7 @@
+             display_bitrates(stderr);
+         }
+         fprintf(stderr, "fatal error during initialization\n");
++        parse_close();
+         return i;
+     }
+ 
+@@ -830,6 +835,7 @@
+             lame_close(gf);
+         }
+     }
++    parse_close();
+     return ret;
+ }
+ 
+--- frontend/parse.c	2007-03-26 00:07:44.000000000 +0000
++++ frontend/parse.c	2007-03-25 23:58:51.000000000 +0000
+@@ -107,6 +107,8 @@
+ int in_endian=order_littleEndian;
+ int in_bitwidth=16;
+ 
++/* MODULE VARIABLES.  set by parse_args() */
++char*   albumart = NULL;
+ 
+ 
+ /**  
+@@ -634,6 +636,8 @@
+               "    --tc <comment>  user-defined text (max 30 chars for v1 tag, 28 for v1.1)\n"
+               "    --tn <track>    audio/song track number (1 to 255, creates v1.1 tag)\n"
+               "    --tg <genre>    audio/song genre (name or number in list)\n"
++              "    --ti <file>     audio/song albumart (JPEG/PNG/GIF file, 128KB max, v2.3)\n"
++              "    --tv <id=value> user-defined frame specified by ID and value (v2.3 tag)\n"
+               );
+     fprintf ( fp,
+               "    --add-id3v2     force addition of version 2 tag\n"
+@@ -1359,6 +1363,40 @@
+                         }
+                     }
+ 
++                T_ELIF("ti")
++                    argUsed = 1;
++                    if (nextArg) {
++                        FILE *fpi = fopen(nextArg, "rb");
++                        size_t size = 0;
++                        if (!fpi) {
++                            fprintf(stderr, "Could not find: '%s'.\n", nextArg);
++                            return -1;
++                        }
++                        fseek(fpi, 0, SEEK_END);
++                        size = ftell(fpi);
++                        fseek(fpi, 0, SEEK_SET);
++                        free(albumart); /* free albumart in case a user specifies multiple times */
++                        albumart = (char *)malloc(size);
++                        if (!albumart) {
++                            fprintf(stderr, "Insufficient memory for reading the albumart.\n");
++                            return -1;
++                        }
++                        if (fread(albumart, 1, size, fpi) != size) {
++                            fprintf(stderr, "Read error: '%s'.\n", nextArg);
++                            return -1;
++                        }
++                        fclose(fpi);
++                        if (id3tag_set_albumart(gfp, albumart, size)) {
++                            fprintf(stderr, "Unsupported image: '%s'.\nSpecify JPEG/PNG/GIF image (128KB maximum)\n",
++                                         nextArg);
++                            return -1;
++                        }
++                   }
++
++                T_ELIF("tv")
++                    argUsed = 1;
++                    id3tag_set_fieldvalue(gfp, nextArg);
++
+                 T_ELIF ("add-id3v2")
+                     id3tag_add_v2(gfp);
+                 
+@@ -2000,6 +2038,12 @@
+     return 0;
+ }
+ 
++void parse_close()
++{
++    free(albumart);
++    albumart = NULL;
++}
++
+ /* end of parse.c */
+ 
+ 
+--- frontend/parse.h	2006-09-24 13:53:32.000000000 +0000
++++ frontend/parse.h	2007-03-25 23:58:51.000000000 +0000
+@@ -6,5 +6,7 @@
+ 
+ int  parse_args(lame_global_flags* gfp, int argc, char** argv, char * const inPath, char * const outPath, char * nogap_inPath[], int *max_nogap);
+ 
++void    parse_close();
++
+ /* end of parse.h */
+ 

@@ -1,0 +1,140 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>docbook-utils</Name>
+        <Homepage>http://www.linuxfromscratch.org/blfs/view/stable/pst/docbook-utils.html</Homepage>
+        <Packager>
+            <Name>Pardus</Name>
+            <Email>admins@pardus.org.tr</Email>
+        </Packager>
+        <License>GPLv2+</License>
+        <IsA>app:console</IsA>
+        <Summary>Shell scripts for managing DocBook documents</Summary>
+        <Description>docbook-utils contains scripts for easy conversion from DocBook files to other formats and for comparing SGML files.</Description>
+        <Archive sha1sum="aae596844930e0e4bb7f8824024be0982cc4fa85" type="targz">ftp://sources.redhat.com/pub/docbook-tools/new-trials/SOURCES/docbook-utils-0.6.14.tar.gz</Archive>
+        <BuildDependencies>
+            <Dependency>links</Dependency>
+            <Dependency>SGMLSpm</Dependency>
+            <Dependency>jadetex</Dependency>
+            <Dependency>docbook-dsssl</Dependency>
+            <Dependency>docbook-sgml3_1</Dependency>
+            <Dependency>docbook-sgml4_1</Dependency>
+            <Dependency>docbook-xml4_1_2</Dependency>
+            <Dependency releaseFrom="5">openjade</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <Patch level="1">docbook-utils-spaces.patch</Patch>
+            <Patch level="1">docbook-utils-2ndspaces.patch</Patch>
+            <Patch level="1">docbook-utils-w3mtxtconvert.patch</Patch>
+            <Patch level="1">docbook-utils-grepnocolors.patch</Patch>
+            <Patch level="1">docbook-utils-sgmlinclude.patch</Patch>
+            <Patch level="1">docbook-utils-rtfmanpage.patch</Patch>
+            <Patch level="1">docbook-utils-papersize.patch</Patch>
+            <Patch level="1">docbook-utils-nofinalecho.patch</Patch>
+            <Patch level="1">docbook-utils-newgrep.patch</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>docbook-utils</Name>
+        <RuntimeDependencies>
+            <Dependency>links</Dependency>
+            <Dependency>jadetex</Dependency>
+            <Dependency>SGMLSpm</Dependency>
+            <Dependency>openjade</Dependency>
+            <Dependency>docbook-dsssl</Dependency>
+            <Dependency>docbook-sgml3_1</Dependency>
+            <Dependency>docbook-sgml4_1</Dependency>
+            <!--Dependency>docbook-xml4_1_2</Dependency-->
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="executable">/usr/bin</Path>
+            <Path fileType="doc">/usr/share/doc/docbook-utils</Path>
+            <Path fileType="data">/usr/share/sgml</Path>
+            <Path fileType="man">/usr/share/man</Path>
+        </Files>
+        <AdditionalFiles>
+            <AdditionalFile owner="root" permission="0755" target="/usr/bin/db2html">db2html</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/usr/share/sgml/docbook/utils-0.6.14/docbook-utils.dsl">gdp-both.dsl</AdditionalFile>
+            <AdditionalFile owner="root" permission="0755" target="/usr/share/sgml/docbook/utils-0.6.14/docbook2man-spec.pl">docbook2man-spec.pl</AdditionalFile>
+        </AdditionalFiles>
+    </Package>
+
+    <Package>
+        <Name>docbook-utils-pdf</Name>
+        <Summary>A script for converting DocBook documents to PDF format</Summary>
+        <RuntimeDependencies>
+            <Dependency>jadetex</Dependency>
+            <!-- For dvips -->
+            <Dependency>texlive-core</Dependency>
+            <Dependency>docbook-utils</Dependency>
+        </RuntimeDependencies>
+        <Conflicts>
+            <Package releaseTo="5">docbook-utils</Package>
+        </Conflicts>
+        <Files>
+            <Path fileType="executable">/usr/bin/docbook2pdf</Path>
+            <Path fileType="executable">/usr/bin/docbook2dvi</Path>
+            <Path fileType="executable">/usr/bin/docbook2ps</Path>
+            <Path fileType="executable">/usr/bin/db2pdf</Path>
+            <Path fileType="executable">/usr/bin/db2dvi</Path>
+            <Path fileType="executable">/usr/bin/db2ps</Path>
+            <Path fileType="man">/usr/share/man/man1/db2pdf.*</Path>
+            <Path fileType="man">/usr/share/man/man1/docbook2pdf.*</Path>
+            <Path fileType="man">/usr/share/man/man1/docbook2dvi.*</Path>
+            <Path fileType="man">/usr/share/man/man1/docbook2ps.*</Path>
+        </Files>
+    </Package>
+
+    <History>
+        <Update release="6">
+            <Date>2010-11-01</Date>
+            <Version>0.6.14</Version>
+            <Comment>Mass rebuild for Pardus Corporate 2 Alpha 3</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="5">
+            <Date>2009-08-20</Date>
+            <Version>0.6.14</Version>
+            <Comment>docbook2texi-spec.pl and docbook2man-spec.pl files are needed for compilations</Comment>
+            <Name>Faik Uygur</Name>
+            <Email>faik@pardus.org.tr</Email>
+        </Update>
+        <Update release="4">
+            <Date>2009-07-01</Date>
+            <Version>0.6.14</Version>
+            <Comment>Adding jadetex build dep.</Comment>
+            <Name>Semen Cirit</Name>
+            <Email>scirit@pardus.org.tr</Email>
+        </Update>
+        <Update release="3">
+            <Date>2009-04-29</Date>
+            <Version>0.6.14</Version>
+            <Comment>
+                - New dependencies added.
+                - Install is changed with rawInstall.
+                - Copyright date changed.
+                - Missing docs added.
+                - Package name is added to doc path.
+            </Comment>
+            <Name>Semen Cirit</Name>
+            <Email>semen@pardus.org.tr</Email>
+        </Update>
+        <Update release="2">
+            <Date>2007-03-22</Date>
+            <Version>0.6.14</Version>
+            <Comment>Depend on jadetex and links</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="1">
+            <Date>2007-03-16</Date>
+            <Version>0.6.14</Version>
+            <Comment>First release.</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+    </History>
+</PISI>

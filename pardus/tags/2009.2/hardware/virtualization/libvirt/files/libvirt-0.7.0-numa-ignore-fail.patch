@@ -1,0 +1,85 @@
+commit 19bac57b26c2d46ac8a7601158f210f34acdceac
+Author: Daniel P. Berrange <berrange@redhat.com>
+Date:   Thu Aug 13 11:56:31 2009 +0100
+
+    Make LXC / UML drivers robust against NUMA topology brokenness
+    
+    Some kernel versions expose broken NUMA topology for some machines.
+    This causes the LXC/UML drivers to fail to start. QEMU driver was
+    already fixed for this problem
+    
+    * src/lxc_conf.c: Log and ignore failure to populate NUMA info
+    * src/uml_conf.c: Log and ignore failure to populate NUMA info
+    * src/capabilities.c: Reset nnumaCell to 0 after freeing
+
+diff --git a/src/capabilities.c b/src/capabilities.c
+index c6766b6..193a9fe 100644
+--- a/src/capabilities.c
++++ b/src/capabilities.c
+@@ -139,6 +139,7 @@ virCapabilitiesFreeNUMAInfo(virCapsPtr caps)
+     for (i = 0 ; i < caps->host.nnumaCell ; i++)
+         virCapabilitiesFreeHostNUMACell(caps->host.numaCell[i]);
+     VIR_FREE(caps->host.numaCell);
++    caps->host.nnumaCell = 0;
+ }
+ 
+ /**
+diff --git a/src/lxc_conf.c b/src/lxc_conf.c
+index d06a024..fef60ba 100644
+--- a/src/lxc_conf.c
++++ b/src/lxc_conf.c
+@@ -30,6 +30,8 @@
+ #include "lxc_conf.h"
+ #include "nodeinfo.h"
+ #include "virterror_internal.h"
++#include "logging.h"
++
+ 
+ #define VIR_FROM_THIS VIR_FROM_LXC
+ 
+@@ -46,8 +48,14 @@ virCapsPtr lxcCapsInit(void)
+                                    0, 0)) == NULL)
+         goto no_memory;
+ 
+-    if (nodeCapsInitNUMA(caps) < 0)
+-        goto no_memory;
++    /* Some machines have problematic NUMA toplogy causing
++     * unexpected failures. We don't want to break the QEMU
++     * driver in this scenario, so log errors & carry on
++     */
++    if (nodeCapsInitNUMA(caps) < 0) {
++        virCapabilitiesFreeNUMAInfo(caps);
++        VIR_WARN0("Failed to query host NUMA topology, disabling NUMA capabilities");
++    }
+ 
+     /* XXX shouldn't 'borrow' KVM's prefix */
+     virCapabilitiesSetMacPrefix(caps, (unsigned char []){ 0x52, 0x54, 0x00 });
+diff --git a/src/uml_conf.c b/src/uml_conf.c
+index 48e05a8..4f756d4 100644
+--- a/src/uml_conf.c
++++ b/src/uml_conf.c
+@@ -45,6 +45,7 @@
+ #include "nodeinfo.h"
+ #include "verify.h"
+ #include "bridge.h"
++#include "logging.h"
+ 
+ #define VIR_FROM_THIS VIR_FROM_UML
+ 
+@@ -63,8 +64,14 @@ virCapsPtr umlCapsInit(void) {
+                                    0, 0)) == NULL)
+         goto no_memory;
+ 
+-    if (nodeCapsInitNUMA(caps) < 0)
+-        goto no_memory;
++    /* Some machines have problematic NUMA toplogy causing
++     * unexpected failures. We don't want to break the QEMU
++     * driver in this scenario, so log errors & carry on
++     */
++    if (nodeCapsInitNUMA(caps) < 0) {
++        virCapabilitiesFreeNUMAInfo(caps);
++        VIR_WARN0("Failed to query host NUMA topology, disabling NUMA capabilities");
++    }
+ 
+     if ((guest = virCapabilitiesAddGuest(caps,
+                                          "uml",

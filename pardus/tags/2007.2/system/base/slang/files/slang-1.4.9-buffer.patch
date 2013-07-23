@@ -1,0 +1,45 @@
+--- slang-1.4.9/src/sltermin.c.orig	2003-03-23 02:06:40.000000000 -0500
++++ slang-1.4.9/src/sltermin.c	2004-11-03 11:36:14.011905385 -0500
+@@ -287,7 +287,7 @@
+ 	     if (*tidir == 0)
+ 	       break;		       /* last one */
+ 
+-	     if (sizeof (file) > strlen (tidir) + 2 + strlen (term))
++	     if (sizeof (file) >= strlen (tidir) + 4 + strlen (term))
+ 	       {
+ 		  sprintf (file, "%s/%c/%s", tidir, *term, term);
+ 		  if (NULL != (fp = open_terminfo (file, ti)))
+--- slang-1.4.9/src/slerr.c.orig	2004-11-03 11:34:28.862279283 -0500
++++ slang-1.4.9/src/slerr.c	2004-11-03 11:34:50.597308040 -0500
+@@ -78,24 +78,25 @@
+    else
+      {
+ 	char *sle = "S-Lang Error: ";
+-	unsigned int len;
+-	char *fmt;
++	unsigned int len = 0;
++	char *fmt = "%s%s%s";
+ 
+ 	str = get_error_string ();
+ 
+-	fmt = "%s%s%s";
+ 	if ((error == NULL) || (*error == 0))
+ 	  error = "";
+ 	else if (SLang_Error == SL_UNKNOWN_ERROR)
+ 	  /* Do not display an unknown error message if error is non-NULL */
+ 	  str = "";
+-	else
++	else {
+ 	  fmt = "%s%s: %s";
++	  len = 2;	/* ": " */
++	}
+ 
+-	len = strlen (sle) + strlen (str) + strlen(error) + 1;
++	len += strlen (sle) + strlen (str) + strlen(error) + 1 /* trailing 0 */;
+ 
+ 	err = err_buf;
+-	if (len >= sizeof (err_buf))
++	if (len > sizeof (err_buf))
+ 	  {
+ 	     if (NULL == (malloced_err_buf = SLmalloc (len)))
+ 	       err = NULL;

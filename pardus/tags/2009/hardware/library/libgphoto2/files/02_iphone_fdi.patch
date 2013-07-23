@@ -1,0 +1,56 @@
+# Description: Detect iPhones in hal FDI properly.
+# Ubuntu: https://launchpad.net/bugs/386002
+# Upstream: Taken from SVN
+
+Index: print-camera-list.c
+===================================================================
+--- a/packaging/generic/print-camera-list.c	(Revision 12133)
++++ b/packaging/generic/print-camera-list.c	(Revision 12148)
+@@ -859,9 +859,14 @@
+ 		if (a->usb_vendor) { /* usb product id might be 0! */
+ 			printf("   <match key=\"usb.vendor_id\" int=\"%d\">\n", a->usb_vendor);
+ 			printf("    <match key=\"usb.product_id\" int=\"%d\">\n", a->usb_product);
++			if (a->usb_vendor == 0x05ac) { /* Apple iPhone */
++				printf("     <match key=\"usb.interface.class\" int=\"6\">\n");
++				printf("      <match key=\"usb.interface.subclass\" int=\"1\">\n");
++				printf("       <match key=\"usb.interface.protocol\" int=\"1\">\n");
++			}
+ 			if (a->device_type & GP_DEVICE_AUDIO_PLAYER) {
+ 				printf("     <merge key=\"info.category\" type=\"string\">portable_audio_player</merge>\n");
+-				printf("     <append key=\"info.capabilities\" type=\"strlist\">portable_audio_player</append>\n");
++				printf("     <addset key=\"info.capabilities\" type=\"strlist\">portable_audio_player</addset>\n");
+ 				printf("     <merge key=\"portable_audio_player.access_method\" type=\"string\">user</merge>\n");
+ 				printf("     <merge key=\"portable_audio_player.type\" type=\"string\">mtp</merge>\n");
+ 				
+@@ -869,8 +874,8 @@
+ 				printf("     <append key=\"portable_audio_player.output_formats\" type=\"strlist\">audio/mpeg</append>\n");
+ 			} else {
+ 				printf("     <merge key=\"info.category\" type=\"string\">camera</merge>\n");
+-				printf("     <append key=\"info.capabilities\" type=\"strlist\">camera</append>\n");
+-				
++				printf("     <addset key=\"info.capabilities\" type=\"strlist\">camera</addset>\n");
++
+ 				/* HACK alert ... but the HAL / gnome-volume-manager guys want that */
+ 				if (NULL!=strstr(a->library,"ptp"))
+ 					printf("     <merge key=\"camera.access_method\" type=\"string\">ptp</merge>\n");
+@@ -880,6 +885,11 @@
+ 			/* leave them here even for audio players */
+ 			printf("     <merge key=\"camera.libgphoto2.name\" type=\"string\">%s</merge>\n", model);
+ 			printf("     <merge key=\"camera.libgphoto2.support\" type=\"bool\">true</merge>\n");
++			if (a->usb_vendor == 0x05ac) { /* Apple iPhone */
++				printf("       </match>\n");
++				printf("      </match>\n");
++				printf("     </match>\n");
++			}
+ 			printf("    </match>\n");
+ 			printf("   </match>\n");
+ 			
+@@ -888,7 +898,7 @@
+ 			printf("    <match key=\"usb.interface.subclass\" int=\"%d\">\n", a->usb_subclass);
+ 			printf("     <match key=\"usb.interface.protocol\" int=\"%d\">\n", a->usb_protocol);
+ 			printf("      <merge key=\"info.category\" type=\"string\">camera</merge>\n");
+-			printf("      <append key=\"info.capabilities\" type=\"strlist\">camera</append>\n");
++			printf("      <addset key=\"info.capabilities\" type=\"strlist\">camera</addset>\n");
+ 			if (a->usb_class == 6) {
+ 				printf("      <merge key=\"camera.access_method\" type=\"string\">ptp</merge>\n");
+ 			} else {

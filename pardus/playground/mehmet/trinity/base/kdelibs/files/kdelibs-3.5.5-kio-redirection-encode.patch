@@ -1,0 +1,44 @@
+Index: kdelibs/kio/kio/job.cpp
+===================================================================
+--- kdelibs.orig/kio/kio/job.cpp
++++ kdelibs/kio/kio/job.cpp
+@@ -936,17 +936,21 @@ void TransferJob::slotData( const TQByte
+ // Slave got a redirection request
+ void TransferJob::slotRedirection( const KURL &url)
+ {
+-     kdDebug(7007) << "TransferJob::slotRedirection(" << url << ")" << endl;
+-     if (!kapp->authorizeURLAction("redirect", m_url, url))
++     // Copy url and encode in a locale-specific format
++     KURL newUrl=url;
++     newUrl.setPath(QString::fromLocal8Bit(url.path().latin1()));
++
++     kdDebug(7007) << "TransferJob::slotRedirection(" << newUrl << ")" << endl;
++     if (!kapp->authorizeURLAction("redirect", m_url, newUrl))
+      {
+-       kdWarning(7007) << "TransferJob: Redirection from " << m_url << " to " << url << " REJECTED!" << endl;
++       kdWarning(7007) << "TransferJob: Redirection from " << m_url << " to " << newUrl << " REJECTED!" << endl;
+        return;
+      }
+ 
+     // Some websites keep redirecting to themselves where each redirection
+     // acts as the stage in a state-machine. We define "endless redirections"
+     // as 5 redirections to the same URL.
+-    if (m_redirectionList.contains(url) > 5)
++    if (m_redirectionList.contains(newUrl) > 5)
+     {
+        kdDebug(7007) << "TransferJob::slotRedirection: CYCLIC REDIRECTION!" << endl;
+        m_error = ERR_CYCLIC_LINK;
+@@ -954,10 +958,10 @@ void TransferJob::slotRedirection( const
+     }
+     else
+     {
+-       m_redirectionURL = url; // We'll remember that when the job finishes
+-       if (m_url.hasUser() && !url.hasUser() && (m_url.host().lower() == url.host().lower()))
++       m_redirectionURL = newUrl; // We'll remember that when the job finishes
++       if (m_url.hasUser() && !newUrl.hasUser() && (m_url.host().lower() == newUrl.host().lower()))
+           m_redirectionURL.setUser(m_url.user()); // Preserve user
+-       m_redirectionList.append(url);
++       m_redirectionList.append(newUrl);
+        m_outgoingMetaData["ssl_was_in_use"] = m_incomingMetaData["ssl_in_use"];
+        // Tell the user that we haven't finished yet
+        emit redirection(this, m_redirectionURL);

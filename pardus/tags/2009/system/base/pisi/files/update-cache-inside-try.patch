@@ -1,0 +1,17 @@
+Index: pisi/api.py
+===================================================================
+--- pisi/api.py	(revision 24933)
++++ pisi/api.py	(working copy)
+@@ -67,9 +67,10 @@
+ 
+         try:
+             pisi.db.invalidate_caches()
+-            return func(*__args,**__kw)
++            ret = func(*__args,**__kw)
++            pisi.db.update_caches()
++            return ret
+         finally:
+-            pisi.db.update_caches()
+             lock.close()
+     return wrapper
+ 

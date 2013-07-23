@@ -1,0 +1,465 @@
+diff -Naur kdebase-workspace-4.3.4-orig/CMakeLists.txt kdebase-workspace-4.3.4/CMakeLists.txt
+--- kdebase-workspace-4.3.4-orig/CMakeLists.txt	2009-12-09 14:09:47.158140976 +0200
++++ kdebase-workspace-4.3.4/CMakeLists.txt	2009-12-09 14:10:33.646144909 +0200
+@@ -244,3 +244,6 @@
+         NAMESPACE ${KDE4WORKSPACE_TARGET_PREFIX}
+         DESTINATION ${_KDE4WorkspaceConfig_INSTALL_DIR}
+         FILE KDE4WorkspaceLibraryTargets.cmake )
++
++add_subdirectory( freespacenotifier )
++
+diff -Naur kdebase-workspace-4.3.4-orig/freespacenotifier/CMakeLists.txt kdebase-workspace-4.3.4/freespacenotifier/CMakeLists.txt
+--- kdebase-workspace-4.3.4-orig/freespacenotifier/CMakeLists.txt	1970-01-01 02:00:00.000000000 +0200
++++ kdebase-workspace-4.3.4/freespacenotifier/CMakeLists.txt	2009-12-09 14:10:33.645266384 +0200
+@@ -0,0 +1,19 @@
++add_definitions (-DQT3_SUPPORT -DQT3_SUPPORT_WARNINGS)
++
++
++########### next target ###############
++
++set(kded_freespacenotifier_SRCS freespacenotifier.cpp module.cpp)
++
++kde4_add_ui_files(kded_freespacenotifier_SRCS freespacewidget.ui)
++
++kde4_add_plugin(kded_freespacenotifier ${kded_freespacenotifier_SRCS})
++
++target_link_libraries(kded_freespacenotifier ${KDE4_KIO_LIBS} )
++
++install(TARGETS kded_freespacenotifier  DESTINATION ${PLUGIN_INSTALL_DIR} )
++
++
++########### install files ###############
++
++install( FILES freespacenotifier.desktop  DESTINATION  ${SERVICES_INSTALL_DIR}/kded )
+diff -Naur kdebase-workspace-4.3.4-orig/freespacenotifier/freespacenotifier.cpp kdebase-workspace-4.3.4/freespacenotifier/freespacenotifier.cpp
+--- kdebase-workspace-4.3.4-orig/freespacenotifier/freespacenotifier.cpp	1970-01-01 02:00:00.000000000 +0200
++++ kdebase-workspace-4.3.4/freespacenotifier/freespacenotifier.cpp	2009-12-09 14:15:54.355181208 +0200
+@@ -0,0 +1,164 @@
++/* This file is part of the KDE Project
++   Copyright (c) 2006 Lukas Tinkl <ltinkl@suse.cz>
++   Copyright (c) 2008 Lubos Lunak <l.lunak@suse.cz>
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 2 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.
++*/
++
++#include "freespacenotifier.h"
++
++#include <sys/vfs.h>
++#include <unistd.h>
++
++#include <Qt/qdir.h>
++#include <Qt/qfile.h>
++#include <Qt/qlabel.h>
++#include <Qt/qspinbox.h>
++
++#include <kconfig.h>
++#include <kdebug.h>
++#include <klocale.h>
++#include <krun.h>
++
++#include "ui_freespacewidget.h"
++
++
++FreeSpaceNotifier::FreeSpaceNotifier( QObject* parent )
++    : QObject( parent )
++    , lastAvailTimer( NULL )
++    , dialog( NULL )
++    , lastAvail( -1 )
++{
++    connect( &timer, SIGNAL( timeout() ), SLOT( checkFreeDiskSpace() ) );
++    KConfig cfg( "lowspace" );
++    KConfigGroup group( &cfg, "General" );
++    limit = group.readEntry( "WarnMinimumFreeSpace", 200 ); // MiB
++    //if we are on live medium, do not start timer
++    bool liveMedia = QFile::exists("/var/run/pardus/livemedia");
++    if( limit != 0 && !liveMedia)
++        timer.start( 1000 * 60 /* 1 minute */ );
++}
++
++FreeSpaceNotifier::~FreeSpaceNotifier()
++{
++    delete dialog;
++}
++
++void FreeSpaceNotifier::checkFreeDiskSpace()
++{
++    if ( dialog )
++        return;
++    struct statfs sfs;
++    if ( statfs( QFile::encodeName( QDir::homeDirPath() ), &sfs ) == 0 )
++    {
++        long avail = ( getuid() ? sfs.f_bavail : sfs.f_bfree );
++
++        if (avail < 0 || sfs.f_blocks <= 0)
++            return; // we better do not say anything about it
++
++        int availpct = int( 100 * avail / sfs.f_blocks );
++        avail = ((long long)avail) * sfs.f_bsize / ( 1024 * 1024 ); // to MiB
++        bool warn = false;
++        if( avail < limit ) // avail disk space dropped under a limit
++        {
++            if( lastAvail < 0 ) // always warn the first time
++            {
++                lastAvail = avail;
++                warn = true;
++            }
++            else if( avail > lastAvail ) // the user freed some space
++                lastAvail = avail;       // so warn if it goes low again
++            else if( avail < lastAvail * 0.5 ) // available dropped to a half of previous one, warn again
++            {
++                warn = true;
++                lastAvail = avail;
++            }
++            // do not change lastAvail otherwise, to handle free space slowly going down
++        }
++        if ( warn )
++        {
++            dialog = new KDialog;
++            dialog->setCaption( i18n( "Low Disk Space" ));
++            QWidget* mainwidget = new QWidget(dialog);
++            dialog->setMainWidget(mainwidget);
++            dialog->setButtons( KDialog::Yes | KDialog::No | KDialog::Cancel );
++            dialog->setDefaultButton( KDialog::Yes );
++            dialog->setEscapeButton( KDialog::No );
++            dialog->setButtonText( KDialog::Yes, i18n( "Open File Manager" ));
++            dialog->setButtonText( KDialog::No, i18n( "Do Nothing" ));
++            dialog->setButtonText( KDialog::Cancel, i18n( "Disable Warning" ));
++            widget = new Ui_FreeSpaceWidget();
++            widget->setupUi( mainwidget );
++
++            QString text = i18n( "You are running low on disk space on your home partition (currently %2%, %1 MiB free).",
++                avail, availpct );
++            widget->warningLabel->setText( text );
++            widget->spinbox->setMinValue( 0 );
++            widget->spinbox->setMaxValue( 100000 );
++            widget->spinbox->setValue( limit );
++            connect( dialog, SIGNAL( yesClicked() ), SLOT( slotYes() ) );
++            connect( dialog, SIGNAL( noClicked() ), SLOT( slotNo() ) );
++            connect( dialog, SIGNAL( cancelClicked() ), SLOT( slotCancel() ) );
++            dialog->show();
++        }
++    }
++}
++
++void FreeSpaceNotifier::slotYes()
++{
++    ( void ) new KRun( KUrl::fromPathOrUrl( QDir::homeDirPath() ), dialog );
++    cleanupDialog( widget->spinbox->value());
++}
++
++void FreeSpaceNotifier::slotNo()
++{
++    cleanupDialog( widget->spinbox->value());
++}
++
++void FreeSpaceNotifier::slotCancel()
++{
++    cleanupDialog( 0 ); // set limit to zero
++}
++
++void FreeSpaceNotifier::cleanupDialog( long newLimit )
++{
++    dialog->deleteLater();
++    dialog = NULL;
++    if( limit != newLimit )
++    {
++        KConfig cfg( "lowspace" );
++        KConfigGroup group( &cfg, "General" );
++        limit = newLimit;
++        group.writeEntry( "WarnMinimumFreeSpace", int( limit ));
++        if( limit == 0 )
++            timer.stop();
++    }
++    if( limit != 0 )
++    { // warn again if constanly below limit for too long
++        if( lastAvailTimer == NULL )
++        { 
++            lastAvailTimer = new QTimer( this );
++            connect( lastAvailTimer, SIGNAL( timeout()), SLOT( resetLastAvailable()));
++        }
++        lastAvailTimer->start( 1000 * 60 * 60 /* 1 hour*/ ); 
++    }
++}
++
++void FreeSpaceNotifier::resetLastAvailable()
++{
++    lastAvail = -1;
++    lastAvailTimer->deleteLater();
++    lastAvailTimer = NULL;
++}
++
+diff -Naur kdebase-workspace-4.3.4-orig/freespacenotifier/freespacenotifier.desktop kdebase-workspace-4.3.4/freespacenotifier/freespacenotifier.desktop
+--- kdebase-workspace-4.3.4-orig/freespacenotifier/freespacenotifier.desktop	1970-01-01 02:00:00.000000000 +0200
++++ kdebase-workspace-4.3.4/freespacenotifier/freespacenotifier.desktop	2009-12-09 14:10:33.644266777 +0200
+@@ -0,0 +1,7 @@
++[Desktop Entry]
++Name=Free Space Notifier
++Type=Service
++X-KDE-ServiceTypes=KDEDModule
++X-KDE-Library=freespacenotifier
++X-KDE-DBus-ModuleName=freespacenotifier
++X-KDE-Kded-autoload=true
+diff -Naur kdebase-workspace-4.3.4-orig/freespacenotifier/freespacenotifier.h kdebase-workspace-4.3.4/freespacenotifier/freespacenotifier.h
+--- kdebase-workspace-4.3.4-orig/freespacenotifier/freespacenotifier.h	1970-01-01 02:00:00.000000000 +0200
++++ kdebase-workspace-4.3.4/freespacenotifier/freespacenotifier.h	2009-12-09 14:10:33.644266777 +0200
+@@ -0,0 +1,51 @@
++/* This file is part of the KDE Project
++   Copyright (c) 2006 Lukas Tinkl <ltinkl@suse.cz>
++   Copyright (c) 2008 Lubos Lunak <l.lunak@suse.cz>
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 2 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.
++*/
++
++#ifndef _FREESPACENOTIFIER_H_
++#define _FREESPACENOTIFIER_H_
++
++#include <Qt/qtimer.h>
++
++#include <kdialog.h>
++
++class Ui_FreeSpaceWidget;
++
++class FreeSpaceNotifier
++: public QObject
++{
++    Q_OBJECT
++    public:
++        FreeSpaceNotifier( QObject* parent = NULL );
++        virtual ~FreeSpaceNotifier();
++    private slots:
++        void checkFreeDiskSpace();
++        void resetLastAvailable();
++        void slotYes();
++        void slotNo();
++        void slotCancel();
++    private:
++        void cleanupDialog( long newLimit );
++        QTimer timer;
++        QTimer* lastAvailTimer;
++        KDialog* dialog;
++        Ui_FreeSpaceWidget* widget;
++        long limit;
++        long lastAvail; // used to supress repeated warnings when available space hasn't changed
++};
++
++#endif
+diff -Naur kdebase-workspace-4.3.4-orig/freespacenotifier/freespacewidget.ui kdebase-workspace-4.3.4/freespacenotifier/freespacewidget.ui
+--- kdebase-workspace-4.3.4-orig/freespacenotifier/freespacewidget.ui	1970-01-01 02:00:00.000000000 +0200
++++ kdebase-workspace-4.3.4/freespacenotifier/freespacewidget.ui	2009-12-09 14:10:33.645266384 +0200
+@@ -0,0 +1,111 @@
++<ui version="4.0" >
++ <class>FreeSpaceWidget</class>
++ <widget class="QWidget" name="FreeSpaceWidget" >
++  <property name="geometry" >
++   <rect>
++    <x>0</x>
++    <y>0</y>
++    <width>489</width>
++    <height>108</height>
++   </rect>
++  </property>
++  <property name="windowTitle" >
++   <string>FreeSpaceWidget</string>
++  </property>
++  <layout class="QVBoxLayout" >
++   <item>
++    <widget class="QLabel" name="warningLabel" >
++     <property name="text" >
++      <string/>
++     </property>
++     <property name="wordWrap" >
++      <bool>false</bool>
++     </property>
++    </widget>
++   </item>
++   <item>
++    <widget class="QLabel" name="textLabel2" >
++     <property name="text" >
++      <string>Would you like to run a file manager to free some disk space and fix the problem?</string>
++     </property>
++     <property name="wordWrap" >
++      <bool>false</bool>
++     </property>
++    </widget>
++   </item>
++   <item>
++    <spacer name="spacer3" >
++     <property name="orientation" >
++      <enum>Qt::Vertical</enum>
++     </property>
++     <property name="sizeType" >
++      <enum>QSizePolicy::Expanding</enum>
++     </property>
++     <property name="sizeHint" stdset="0" >
++      <size>
++       <width>20</width>
++       <height>40</height>
++      </size>
++     </property>
++    </spacer>
++   </item>
++   <item>
++    <layout class="QHBoxLayout" >
++     <item>
++      <widget class="QLabel" name="textLabel3" >
++       <property name="text" >
++        <string>Warn again when the free space is below</string>
++       </property>
++       <property name="wordWrap" >
++        <bool>false</bool>
++       </property>
++      </widget>
++     </item>
++     <item>
++      <widget class="QSpinBox" name="spinbox" >
++       <property name="suffix" >
++        <string> MiB</string>
++       </property>
++      </widget>
++     </item>
++     <item>
++      <spacer name="spacer1" >
++       <property name="orientation" >
++        <enum>Qt::Horizontal</enum>
++       </property>
++       <property name="sizeType" >
++        <enum>QSizePolicy::Expanding</enum>
++       </property>
++       <property name="sizeHint" stdset="0" >
++        <size>
++         <width>30</width>
++         <height>20</height>
++        </size>
++       </property>
++      </spacer>
++     </item>
++    </layout>
++   </item>
++   <item>
++    <spacer name="spacer2" >
++     <property name="orientation" >
++      <enum>Qt::Vertical</enum>
++     </property>
++     <property name="sizeType" >
++      <enum>QSizePolicy::Expanding</enum>
++     </property>
++     <property name="sizeHint" stdset="0" >
++      <size>
++       <width>20</width>
++       <height>16</height>
++      </size>
++     </property>
++    </spacer>
++   </item>
++  </layout>
++ </widget>
++ <layoutdefault spacing="6" margin="11" />
++ <pixmapfunction>qPixmapFromMimeSource</pixmapfunction>
++ <resources/>
++ <connections/>
++</ui>
+diff -Naur kdebase-workspace-4.3.4-orig/freespacenotifier/module.cpp kdebase-workspace-4.3.4/freespacenotifier/module.cpp
+--- kdebase-workspace-4.3.4-orig/freespacenotifier/module.cpp	1970-01-01 02:00:00.000000000 +0200
++++ kdebase-workspace-4.3.4/freespacenotifier/module.cpp	2009-12-09 14:10:33.645266384 +0200
+@@ -0,0 +1,37 @@
++/* This file is part of the KDE Project
++   Copyright (c) 2006 Lukas Tinkl <ltinkl@suse.cz>
++   Copyright (c) 2008 Lubos Lunak <l.lunak@suse.cz>
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 2 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.
++*/
++
++#include "module.h"
++
++#include <kpluginfactory.h>
++#include <kpluginloader.h>
++
++K_PLUGIN_FACTORY(FreeSpaceNotifierModuleFactory,
++                 registerPlugin<FreeSpaceNotifierModule>();
++    )
++K_EXPORT_PLUGIN(FreeSpaceNotifierModuleFactory("freespacenotifier"))
++
++
++// KhotKeysModule
++
++FreeSpaceNotifierModule::FreeSpaceNotifierModule(QObject* parent, const QList<QVariant>&)
++    : KDEDModule(parent)
++{
++}
++
++#include "module.moc"
+diff -Naur kdebase-workspace-4.3.4-orig/freespacenotifier/module.h kdebase-workspace-4.3.4/freespacenotifier/module.h
+--- kdebase-workspace-4.3.4-orig/freespacenotifier/module.h	1970-01-01 02:00:00.000000000 +0200
++++ kdebase-workspace-4.3.4/freespacenotifier/module.h	2009-12-09 14:10:33.645266384 +0200
+@@ -0,0 +1,38 @@
++/* This file is part of the KDE Project
++   Copyright (c) 2006 Lukas Tinkl <ltinkl@suse.cz>
++   Copyright (c) 2008 Lubos Lunak <l.lunak@suse.cz>
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 2 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.
++*/
++
++#ifndef MODULE_H
++#define MODULE_H
++
++#include <kdedmodule.h>
++#include <QtCore/QObject>
++#include <QtDBus/QtDBus>
++
++#include "freespacenotifier.h"
++
++class FreeSpaceNotifierModule
++    : public KDEDModule
++    {
++    Q_OBJECT
++    public:
++        FreeSpaceNotifierModule(QObject* parent, const QList<QVariant>&);
++    private:
++        FreeSpaceNotifier notifier;
++    };
++
++#endif

@@ -1,0 +1,409 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>thunderbird</Name>
+        <Homepage>http://www.mozilla.org/projects/thunderbird/</Homepage>
+        <Packager>
+            <Name>Pınar Yanardağ</Name>
+            <Email>pinar@pardus.org.tr</Email>
+        </Packager>
+        <License>MPL-1.1</License>
+        <License>NPL-1.1</License>
+        <License>GPLv2</License>
+        <IsA>app:gui</IsA>
+        <Summary>Thunderbird Email Client</Summary>
+        <Description>Thunderbird is an email client with advanced features like skinning and plugin support.</Description>
+        <Archive sha1sum="185ac34109febd7f472ad3e8b4a803bb17fde8db" type="targz">http://cekirdek.pardus.org.tr/~pinar/dist/thunderbird-3.0b1-pardus.tar.gz</Archive>
+        <BuildDependencies>
+            <Dependency>xorg-server</Dependency>
+            <Dependency versionFrom="2.4.2">fontconfig</Dependency>
+            <Dependency versionFrom="1.0.0">libmng</Dependency>
+            <Dependency versionFrom="2.8.7">gtk2</Dependency>
+            <Dependency versionFrom="1.10.0">pango</Dependency>
+            <Dependency versionFrom="0.8.0">libIDL</Dependency>
+            <Dependency>cairo</Dependency>
+            <Dependency versionFrom="3.11.5">nss</Dependency>
+            <Dependency>nspr</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <Patch level="1">embed-typeaheadfind.patch</Patch>
+            <Patch level="1">mozconfig.patch</Patch>
+            <Patch level="1">utf8-username.patch</Patch>
+            <Patch>suse/replytolist.patch</Patch>
+            <Patch>suse/locale.patch</Patch>
+            <Patch>suse/abuild.patch</Patch>
+            <Patch>suse/gcc-undefined-ops.patch</Patch>
+            <Patch>suse/nss-opt.patch</Patch>
+            <Patch>suse/html-compose.patch</Patch>
+            <Patch>suse/list-replyto-clobber.patch</Patch>
+            <Patch>suse/postscript.patch</Patch>
+            <Patch>suse/cups-paper.patch</Patch>
+            <Patch level="1">zemberek-thunderbird2.patch</Patch>
+            <Patch>suse/mozilla-gcc4.3-fixes.patch</Patch>
+            <Patch level="1">suse/mozilla-path_len.patch</Patch>
+            <Patch>suse/visibility.patch</Patch>
+            <Patch>suse/thunderbird-1.5.0.8-uninitalized-vars-232305.patch</Patch>
+            <Patch>secureconnection-translation.diff</Patch>
+            <Patch>turkish.patch</Patch>
+
+            <!-- Add default sound in Thunderbird -->
+            <Patch level="1">replace-beep-with-wav.patch</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>thunderbird</Name>
+        <RuntimeDependencies>
+            <Dependency>xorg-server</Dependency>
+            <Dependency versionFrom="2.4.2">fontconfig</Dependency>
+            <Dependency versionFrom="1.0.0">libmng</Dependency>
+            <Dependency versionFrom="1.10.0">pango</Dependency>
+            <Dependency versionFrom="0.8.0">libIDL</Dependency>
+            <Dependency>cairo</Dependency>
+            <Dependency versionFrom="3.11.5">nss</Dependency>
+            <Dependency>nspr</Dependency>
+            <Dependency>esound</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="executable">/usr/bin</Path>
+            <Path fileType="data">/usr/lib/MozillaThunderbird</Path>
+            <Path fileType="library">/usr/lib/MozillaThunderbird/*.so</Path>
+            <Path fileType="library">/usr/lib/MozillaThunderbird/components/*.so</Path>
+            <Path fileType="executable">/usr/lib/MozillaThunderbird/thunderbird-bin</Path>
+            <Path fileType="data">/usr/share/applications</Path>
+            <Path fileType="doc">/usr/share/doc</Path>
+            <Path fileType="config">/etc</Path>
+        </Files>
+        <AdditionalFiles>
+            <!-- wrapper -->
+            <AdditionalFile target="/usr/bin/thunderbird" permission="0755" owner="root">thunderbird</AdditionalFile>
+            <!-- Default options -->
+            <AdditionalFile target="/usr/lib/MozillaThunderbird/greprefs/all-pardus.js" permission="0644" owner="root">default-prefs.js</AdditionalFile>
+            <AdditionalFile target="/usr/lib/MozillaThunderbird/defaults/pref/all-pardus.js" permission="0644" owner="root">default-prefs.js</AdditionalFile>
+            <!-- env.d -->
+            <AdditionalFile target="/etc/env.d/10MozillaThunderbird" permission="0644" owner="root">10MozillaThunderbird</AdditionalFile>
+            <!-- Desktop file -->
+            <AdditionalFile target="/usr/share/applications/mozillathunderbird.desktop" permission="0755" owner="root">mozillathunderbird.desktop</AdditionalFile>
+            <!-- Notification sound file -->
+            <AdditionalFile target="/usr/lib/MozillaThunderbird/sound.wav" permission="0644" owner="root">sound.wav</AdditionalFile>
+        </AdditionalFiles>
+    </Package>
+
+    <History>
+        <Update release="44">
+            <Date>2009-02-19</Date>
+            <Version>3.0_beta1</Version>
+            <Comment>Version bump to 3.0 beta 1.</Comment>
+            <Name>Pınar Yanardağ</Name>
+            <Email>pinar@pardus.org.tr</Email>
+        </Update>
+        <Update release="43">
+            <Date>2008-12-26</Date>
+            <Version>2.0.0.19</Version>
+            <Comment>
+                * Desktop file revised. Name changed to Thunderbird, Comment key added.
+                * Vendor name is set to Pardus 2008 in default-prefs.js
+            </Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="42" type="security">
+            <Date>2008-12-18</Date>
+            <Version>2.0.0.19</Version>
+            <Comment>Version bump to fix multiple vulnerabilities (CVE-2008-{5500,5501,5502,5503,5504,5505,5506,5507,5508,5510,5511,5512,5513})</Comment>
+            <Name>Pınar Yanardağ</Name>
+            <Email>pinar@pardus.org.tr</Email>
+        </Update>
+        <Update release="41">
+            <Date>2008-11-24</Date>
+            <Version>2.0.0.18</Version>
+            <Comment>
+                - Thunderbird needs esound for playing sound files. Add esound as runtime dependency,
+                - Add default sound file for mail notifications and patch Thunderbird (Fixes #8102).
+            </Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="40" type="security">
+            <Date>2008-11-13</Date>
+            <Version>2.0.0.18</Version>
+            <Comment>Version bump to fix multiple vulnerabilities (bug#8639) and enable filtering by list-id.</Comment>
+            <Name>Pınar Yanardağ</Name>
+            <Email>pinar@pardus.org.tr</Email>
+        </Update>
+        <Update release="39" type="security">
+            <Date>2008-09-27</Date>
+            <Version>2.0.0.17</Version>
+            <Comment>Version bump to fix multiple vulnerabilities (bug#8278)</Comment>
+            <Name>Pınar Yanardağ</Name>
+            <Email>pinar@pardus.org.tr</Email>
+        </Update>
+        <Update release="38">
+            <Date>2008-09-23</Date>
+            <Version>2.0.0.16</Version>
+            <Comment>Fix Turkish translation of Security and Authentication part of SMTP Server section #6704</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="37" type="security">
+            <Date>2008-07-26</Date>
+            <Version>2.0.0.16</Version>
+            <Comment>Version bump to new security release</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="36" type="security">
+            <Date>2008-06-12</Date>
+            <Version>2.0.0.14</Version>
+            <Comment>Version bump and some patches added to compile under gcc 4.3</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="35">
+            <Date>2008-03-03</Date>
+            <Version>2.0.0.12</Version>
+            <Comment>Fix filetypes, all files are not executable</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="34" type="security">
+            <Date>2008-02-29</Date>
+            <Version>2.0.0.12</Version>
+            <Comment>Stable update</Comment>
+            <Name>Bahadır Kandemir</Name>
+            <Email>bahadir@pardus.org.tr</Email>
+        </Update>
+        <Update release="33">
+            <Date>2007-11-15</Date>
+            <Version>2.0.0.9</Version>
+            <Comment>Stable update</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="32" type="security">
+            <Date>2007-11-11</Date>
+            <Version>2.0.0.9_rc1</Version>
+            <Comment>Security update</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="31" type="security">
+            <Date>2007-08-02</Date>
+            <Version>2.0.0.6</Version>
+            <Comment>Security update</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="30" type="security">
+            <Date>2007-07-20</Date>
+            <Version>2.0.0.5</Version>
+            <Comment>Security update</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="29">
+            <Date>2007-07-05</Date>
+            <Version>2.0.0.4</Version>
+            <Comment>Sync Zemberek patch with Firefox</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="28">
+            <Date>2007-06-17</Date>
+            <Version>2.0.0.4</Version>
+            <Comment>Stable update</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="27" type="security">
+            <Date>2007-06-07</Date>
+            <Version>2.0.0.4_rc1</Version>
+            <Comment>Security update</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="26">
+            <Date>2007-04-29</Date>
+            <Version>2.0.0.0</Version>
+            <Comment>Fix Mozilla bug #368112 and #377900</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="25">
+            <Date>2007-04-26</Date>
+            <Version>2.0.0.0</Version>
+            <Comment>Version bump</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="24" type="security">
+            <Date>2007-02-03</Date>
+            <Version>1.5.0.10</Version>
+            <Comment>Security update</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="23">
+            <Date>2006-12-21</Date>
+            <Version>1.5.0.9</Version>
+            <Comment>Mimetype fixes</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="22" type="security">
+            <Date>2006-12-20</Date>
+            <Version>1.5.0.9</Version>
+            <Comment>Security update</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="21">
+            <Date>2006-12-12</Date>
+            <Version>1.5.0.8</Version>
+            <Comment>Support OpenOffice 1.x files</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="20">
+            <Date>2006-11-25</Date>
+            <Version>1.5.0.8</Version>
+            <Comment>Fix #3792</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="19">
+            <Date>2006-11-08</Date>
+            <Version>1.5.0.8</Version>
+            <Comment>Stable update</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="18">
+            <Date>2006-11-05</Date>
+            <Version>1.5.0.7</Version>
+            <Comment>Fix #1562</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="17">
+            <Date>2006-11-02</Date>
+            <Version>1.5.0.7</Version>
+            <Comment>Fix #3167</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="16">
+            <Date>2006-09-23</Date>
+            <Version>1.5.0.7</Version>
+            <Comment>Enable localization</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="15" type="security">
+            <Date>2006-09-15</Date>
+            <Version>1.5.0.7</Version>
+            <Comment>Security/Bugfix release</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="14" type="security">
+            <Date>2006-08-08</Date>
+            <Version>1.5.0.5</Version>
+            <Comment>Security/Bugfix release</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="13" type="security">
+            <Date>2006-06-02</Date>
+            <Version>1.5.0.4</Version>
+            <Comment>Security/Bugfix release</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="12">
+            <Date>2006-02-24</Date>
+            <Version>1.5.0.2</Version>
+            <Comment>Really use system nspr</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="11" type="security">
+            <Date>2006-02-24</Date>
+            <Version>1.5.0.2</Version>
+            <Comment>Security update</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="10">
+            <Date>2006-02-03</Date>
+            <Version>1.5.0</Version>
+            <Comment>Fix crashes</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="9">
+            <Date>2006-01-28</Date>
+            <Version>1.5.0</Version>
+            <Comment>Make all fonts Sans</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="8">
+            <Date>2006-01-12</Date>
+            <Version>1.5.0</Version>
+            <Comment>Final stable release for 1.5 same as rc2</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="7">
+            <Date>2006-01-01</Date>
+            <Version>1.5_rc2</Version>
+            <Comment>Fix thunderbird's fonts</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="6">
+            <Date>2005-12-25</Date>
+            <Version>1.5_rc2</Version>
+            <Comment>New release</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="5">
+            <Date>2005-11-28</Date>
+            <Version>1.5_rc1</Version>
+            <Comment>Really fix http://bugs.pardus.org.tr/show_bug.cgi?id=770</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="4">
+            <Date>2005-11-25</Date>
+            <Version>1.5_rc1</Version>
+            <Comment>Default mimetypes for Thunderbird</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="3">
+            <Date>2005-11-18</Date>
+            <Version>1.5_rc1</Version>
+            <Comment>Fix GTK+ 2.8 problems</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="2">
+            <Date>2005-11-05</Date>
+            <Version>1.5_rc1</Version>
+            <Comment>Update to version 1.5rc1, update translations and fix #501</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="1">
+            <Date>2005-10-17</Date>
+            <Version>1.5_beta2</Version>
+            <Comment>Initial import</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+    </History>
+</PISI>

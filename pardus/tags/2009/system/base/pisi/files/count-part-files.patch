@@ -1,0 +1,37 @@
+Index: pisi/operations/helper.py
+===================================================================
+--- pisi/operations/helper.py	(revision 24898)
++++ pisi/operations/helper.py	(revision 24913)
+@@ -80,6 +80,12 @@
+     installdb = pisi.db.installdb.InstallDB()
+     packagedb = pisi.db.packagedb.PackageDB()
+ 
++    try:
++        cached_packages_dir = ctx.config.cached_packages_dir()
++    except OSError:
++        # happens when cached_packages_dir tried to be created by an unpriviledged user
++        cached_packages_dir = None
++
+     for pkg in [packagedb.get_package(name) for name in order]:
+ 
+         delta = None
+@@ -100,12 +106,14 @@
+             pkg_hash = pkg.packageHash
+             pkg_size = pkg.packageSize
+ 
+-        path = util.join_path(ctx.config.cached_packages_dir(), fn)
++        if cached_packages_dir:
++            path = util.join_path(cached_packages_dir, fn)
++            # check the file and sha1sum to be sure it _is_ the cached package
++            if os.path.exists(path) and util.sha1_file(path) == pkg_hash:
++                cached_size += pkg_size
++            elif os.path.exists("%s.part" % path):
++                cached_size += os.stat("%s.part" % path).st_size
+ 
+-        # check the file and sha1sum to be sure it _is_ the cached package
+-        if os.path.exists(path) and util.sha1_file(path) == pkg_hash:
+-            cached_size += pkg_size
+-
+         total_size += pkg_size
+ 
+     ctx.ui.notify(ui.cached, total=total_size, cached=cached_size)

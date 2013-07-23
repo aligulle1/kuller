@@ -1,0 +1,553 @@
+From 7c7e6af37dad30632103497a72a1273d18ec55fe Mon Sep 17 00:00:00 2001
+From: Andrea Merello <andrea.merello@gmail.com>
+Date: Fri, 25 Jul 2008 19:08:11 +0200
+Subject: [PATCH] Rtl8187 PATCH add usb ID for asus wireless link
+
+This patch from Davide Cavalca adds a usb ID for an rtl8187L device.
+
+Signed-off-by: John W. Linville <linville@tuxdriver.com>
+
+diff --git a/drivers/net/wireless/rtl8187_dev.c b/drivers/net/wireless/rtl8187_dev.c
+index 177988e..461aa26 100644
+--- a/drivers/net/wireless/rtl8187_dev.c
++++ b/drivers/net/wireless/rtl8187_dev.c
+@@ -31,6 +31,8 @@ MODULE_DESCRIPTION("RTL8187/RTL8187B USB wireless driver");
+ MODULE_LICENSE("GPL");
+ 
+ static struct usb_device_id rtl8187_table[] __devinitdata = {
++	/* Asus */
++	{USB_DEVICE(0x0b05, 0x171d), .driver_info = DEVICE_RTL8187},
+ 	/* Realtek */
+ 	{USB_DEVICE(0x0bda, 0x8187), .driver_info = DEVICE_RTL8187},
+ 	{USB_DEVICE(0x0bda, 0x8189), .driver_info = DEVICE_RTL8187B},
+
+From 7dcdd073bf78bb6958bbc12a1a47754a0f3c4721 Mon Sep 17 00:00:00 2001
+From: Larry Finger <Larry.Finger@lwfinger.net>
+Date: Thu, 31 Jul 2008 19:30:48 -0500
+Subject: [PATCH] rtl8187: Fix lockups due to concurrent access to config routine
+
+Some users of the RTL8187B have experienced difficulties since commit
+49292d56352a6ab90d04c3448dd8b6106dfef2d6 that introduced the power
+management wext hooks. This difficulty has not made much sense until
+it was realized that it was possible for mac80211 to make a call to the
+config routine while that routine was already being executed. On this
+device, it is necessary to loopback the TX when changing channels. Unless
+this is properly restored, the device will lockup. A mutex now protects
+the device state, and the private data in several places.
+
+The problem was found by Herton Ronaldo Krzesinski <herton@mandriva.com.br>,
+who also suggested this type of fix.
+
+Signed-off-by: Larry Finger <Larry.Finger@lwfinger.net>
+Acked-by: Herton Ronaldo Krzesinski <herton@mandriva.com.br>
+Acked-by: Hin-Tak Leung <htl10@users.sourceforge.net>
+Signed-off-by: John W. Linville <linville@tuxdriver.com>
+
+diff --git a/drivers/net/wireless/rtl8187.h b/drivers/net/wireless/rtl8187.h
+index 1b0d750..5a9515c 100644
+--- a/drivers/net/wireless/rtl8187.h
++++ b/drivers/net/wireless/rtl8187.h
+@@ -94,6 +94,10 @@ struct rtl8187_priv {
+ 	const struct rtl818x_rf_ops *rf;
+ 	struct ieee80211_vif *vif;
+ 	int mode;
++	/* The mutex protects the TX loopback state.
++	 * Any attempt to set channels concurrently locks the device.
++	 */
++	struct mutex conf_mutex;
+ 
+ 	/* rtl8187 specific */
+ 	struct ieee80211_channel channels[14];
+diff --git a/drivers/net/wireless/rtl8187_dev.c b/drivers/net/wireless/rtl8187_dev.c
+index 461aa26..57376fb 100644
+--- a/drivers/net/wireless/rtl8187_dev.c
++++ b/drivers/net/wireless/rtl8187_dev.c
+@@ -728,6 +728,7 @@ static int rtl8187_start(struct ieee80211_hw *dev)
+ 	if (ret)
+ 		return ret;
+ 
++	mutex_lock(&priv->conf_mutex);
+ 	if (priv->is_rtl8187b) {
+ 		reg = RTL818X_RX_CONF_MGMT |
+ 		      RTL818X_RX_CONF_DATA |
+@@ -749,6 +750,7 @@ static int rtl8187_start(struct ieee80211_hw *dev)
+ 				  (7 << 0  /* long retry limit */) |
+ 				  (7 << 21 /* MAX TX DMA */));
+ 		rtl8187_init_urbs(dev);
++		mutex_unlock(&priv->conf_mutex);
+ 		return 0;
+ 	}
+ 
+@@ -792,6 +794,7 @@ static int rtl8187_start(struct ieee80211_hw *dev)
+ 	reg |= RTL818X_CMD_TX_ENABLE;
+ 	reg |= RTL818X_CMD_RX_ENABLE;
+ 	rtl818x_iowrite8(priv, &priv->map->CMD, reg);
++	mutex_unlock(&priv->conf_mutex);
+ 
+ 	return 0;
+ }
+@@ -803,6 +806,7 @@ static void rtl8187_stop(struct ieee80211_hw *dev)
+ 	struct sk_buff *skb;
+ 	u32 reg;
+ 
++	mutex_lock(&priv->conf_mutex);
+ 	rtl818x_iowrite16(priv, &priv->map->INT_MASK, 0);
+ 
+ 	reg = rtl818x_ioread8(priv, &priv->map->CMD);
+@@ -822,7 +826,7 @@ static void rtl8187_stop(struct ieee80211_hw *dev)
+ 		usb_kill_urb(info->urb);
+ 		kfree_skb(skb);
+ 	}
+-	return;
++	mutex_unlock(&priv->conf_mutex);
+ }
+ 
+ static int rtl8187_add_interface(struct ieee80211_hw *dev,
+@@ -842,6 +846,7 @@ static int rtl8187_add_interface(struct ieee80211_hw *dev,
+ 		return -EOPNOTSUPP;
+ 	}
+ 
++	mutex_lock(&priv->conf_mutex);
+ 	priv->vif = conf->vif;
+ 
+ 	rtl818x_iowrite8(priv, &priv->map->EEPROM_CMD, RTL818X_EEPROM_CMD_CONFIG);
+@@ -850,6 +855,7 @@ static int rtl8187_add_interface(struct ieee80211_hw *dev,
+ 				 ((u8 *)conf->mac_addr)[i]);
+ 	rtl818x_iowrite8(priv, &priv->map->EEPROM_CMD, RTL818X_EEPROM_CMD_NORMAL);
+ 
++	mutex_unlock(&priv->conf_mutex);
+ 	return 0;
+ }
+ 
+@@ -857,8 +863,10 @@ static void rtl8187_remove_interface(struct ieee80211_hw *dev,
+ 				     struct ieee80211_if_init_conf *conf)
+ {
+ 	struct rtl8187_priv *priv = dev->priv;
++	mutex_lock(&priv->conf_mutex);
+ 	priv->mode = IEEE80211_IF_TYPE_MNTR;
+ 	priv->vif = NULL;
++	mutex_unlock(&priv->conf_mutex);
+ }
+ 
+ static int rtl8187_config(struct ieee80211_hw *dev, struct ieee80211_conf *conf)
+@@ -866,6 +874,7 @@ static int rtl8187_config(struct ieee80211_hw *dev, struct ieee80211_conf *conf)
+ 	struct rtl8187_priv *priv = dev->priv;
+ 	u32 reg;
+ 
++	mutex_lock(&priv->conf_mutex);
+ 	reg = rtl818x_ioread32(priv, &priv->map->TX_CONF);
+ 	/* Enable TX loopback on MAC level to avoid TX during channel
+ 	 * changes, as this has be seen to causes problems and the
+@@ -898,6 +907,7 @@ static int rtl8187_config(struct ieee80211_hw *dev, struct ieee80211_conf *conf)
+ 	rtl818x_iowrite16(priv, &priv->map->ATIMTR_INTERVAL, 100);
+ 	rtl818x_iowrite16(priv, &priv->map->BEACON_INTERVAL, 100);
+ 	rtl818x_iowrite16(priv, &priv->map->BEACON_INTERVAL_TIME, 100);
++	mutex_unlock(&priv->conf_mutex);
+ 	return 0;
+ }
+ 
+@@ -909,6 +919,7 @@ static int rtl8187_config_interface(struct ieee80211_hw *dev,
+ 	int i;
+ 	u8 reg;
+ 
++	mutex_lock(&priv->conf_mutex);
+ 	for (i = 0; i < ETH_ALEN; i++)
+ 		rtl818x_iowrite8(priv, &priv->map->BSSID[i], conf->bssid[i]);
+ 
+@@ -922,6 +933,7 @@ static int rtl8187_config_interface(struct ieee80211_hw *dev,
+ 		rtl818x_iowrite8(priv, &priv->map->MSR, reg);
+ 	}
+ 
++	mutex_unlock(&priv->conf_mutex);
+ 	return 0;
+ }
+ 
+@@ -1189,6 +1201,7 @@ static int __devinit rtl8187_probe(struct usb_interface *intf,
+ 		printk(KERN_ERR "rtl8187: Cannot register device\n");
+ 		goto err_free_dev;
+ 	}
++	mutex_init(&priv->conf_mutex);
+ 
+ 	printk(KERN_INFO "%s: hwaddr %s, %s V%d + %s\n",
+ 	       wiphy_name(dev->wiphy), print_mac(mac, dev->wiphy->perm_addr),
+
+From fcd7cc1496681f7241ef8b80f32bb35d72a4e78b Mon Sep 17 00:00:00 2001
+From: =?utf-8?q?matthieu=20Barth=C3=A9lemy?= <bonsouere@gmail.com>
+Date: Sun, 10 Aug 2008 23:34:59 -0500
+Subject: [PATCH] rtl8187: Add USB ID for Netgear WG111V3
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: 8bit
+
+Add the USB ID for a Netgear WG111v3.
+
+Signed-off-by: matthieu Barthélemy <bonsouere@gmail.com>
+Signed-off-by: Larry Finger <Larry.Finger@lwfinger.net>
+Signed-off-by: John W. Linville <linville@tuxdriver.com>
+
+diff --git a/drivers/net/wireless/rtl8187_dev.c b/drivers/net/wireless/rtl8187_dev.c
+index 57376fb..ca5deb6 100644
+--- a/drivers/net/wireless/rtl8187_dev.c
++++ b/drivers/net/wireless/rtl8187_dev.c
+@@ -40,6 +40,7 @@ static struct usb_device_id rtl8187_table[] __devinitdata = {
+ 	/* Netgear */
+ 	{USB_DEVICE(0x0846, 0x6100), .driver_info = DEVICE_RTL8187},
+ 	{USB_DEVICE(0x0846, 0x6a00), .driver_info = DEVICE_RTL8187},
++	{USB_DEVICE(0x0846, 0x4260), .driver_info = DEVICE_RTL8187B},
+ 	/* HP */
+ 	{USB_DEVICE(0x03f0, 0xca02), .driver_info = DEVICE_RTL8187},
+ 	/* Sitecom */
+
+From 38e3b0d86eaa0bf90a74677b6d6c442ec66daa0c Mon Sep 17 00:00:00 2001
+From: Herton Ronaldo Krzesinski <herton@mandriva.com.br>
+Date: Wed, 16 Jul 2008 11:44:18 -0300
+Subject: [PATCH] rtl818x: merge tx/rx descriptor flags
+
+Tx/Rx descriptor flags are common between rtl818x devices, only with
+additions for newer chips, thus use same flags in the code.
+
+Signed-off-by: Herton Ronaldo Krzesinski <herton@mandriva.com.br>
+Signed-off-by: John W. Linville <linville@tuxdriver.com>
+
+diff --git a/drivers/net/wireless/rtl8180.h b/drivers/net/wireless/rtl8180.h
+index 082a11f..8721282 100644
+--- a/drivers/net/wireless/rtl8180.h
++++ b/drivers/net/wireless/rtl8180.h
+@@ -24,20 +24,6 @@
+ #define ANAPARAM_PWR1_SHIFT	20
+ #define ANAPARAM_PWR1_MASK	(0x7F << ANAPARAM_PWR1_SHIFT)
+ 
+-enum rtl8180_tx_desc_flags {
+-	RTL8180_TX_DESC_FLAG_NO_ENC	= (1 << 15),
+-	RTL8180_TX_DESC_FLAG_TX_OK	= (1 << 15),
+-	RTL8180_TX_DESC_FLAG_SPLCP	= (1 << 16),
+-	RTL8180_TX_DESC_FLAG_RX_UNDER	= (1 << 16),
+-	RTL8180_TX_DESC_FLAG_MOREFRAG	= (1 << 17),
+-	RTL8180_TX_DESC_FLAG_CTS	= (1 << 18),
+-	RTL8180_TX_DESC_FLAG_RTS	= (1 << 23),
+-	RTL8180_TX_DESC_FLAG_LS		= (1 << 28),
+-	RTL8180_TX_DESC_FLAG_FS		= (1 << 29),
+-	RTL8180_TX_DESC_FLAG_DMA	= (1 << 30),
+-	RTL8180_TX_DESC_FLAG_OWN	= (1 << 31)
+-};
+-
+ struct rtl8180_tx_desc {
+ 	__le32 flags;
+ 	__le16 rts_duration;
+@@ -52,23 +38,6 @@ struct rtl8180_tx_desc {
+ 	u32 reserved[2];
+ } __attribute__ ((packed));
+ 
+-enum rtl8180_rx_desc_flags {
+-	RTL8180_RX_DESC_FLAG_ICV_ERR	= (1 << 12),
+-	RTL8180_RX_DESC_FLAG_CRC32_ERR	= (1 << 13),
+-	RTL8180_RX_DESC_FLAG_PM		= (1 << 14),
+-	RTL8180_RX_DESC_FLAG_RX_ERR	= (1 << 15),
+-	RTL8180_RX_DESC_FLAG_BCAST	= (1 << 16),
+-	RTL8180_RX_DESC_FLAG_PAM	= (1 << 17),
+-	RTL8180_RX_DESC_FLAG_MCAST	= (1 << 18),
+-	RTL8180_RX_DESC_FLAG_SPLCP	= (1 << 25),
+-	RTL8180_RX_DESC_FLAG_FOF	= (1 << 26),
+-	RTL8180_RX_DESC_FLAG_DMA_FAIL	= (1 << 27),
+-	RTL8180_RX_DESC_FLAG_LS		= (1 << 28),
+-	RTL8180_RX_DESC_FLAG_FS		= (1 << 29),
+-	RTL8180_RX_DESC_FLAG_EOR	= (1 << 30),
+-	RTL8180_RX_DESC_FLAG_OWN	= (1 << 31)
+-};
+-
+ struct rtl8180_rx_desc {
+ 	__le32 flags;
+ 	__le32 flags2;
+diff --git a/drivers/net/wireless/rtl8180_dev.c b/drivers/net/wireless/rtl8180_dev.c
+index b7172a1..861c76a 100644
+--- a/drivers/net/wireless/rtl8180_dev.c
++++ b/drivers/net/wireless/rtl8180_dev.c
+@@ -110,12 +110,12 @@ static void rtl8180_handle_rx(struct ieee80211_hw *dev)
+ 		struct sk_buff *skb = priv->rx_buf[priv->rx_idx];
+ 		u32 flags = le32_to_cpu(entry->flags);
+ 
+-		if (flags & RTL8180_RX_DESC_FLAG_OWN)
++		if (flags & RTL818X_RX_DESC_FLAG_OWN)
+ 			return;
+ 
+-		if (unlikely(flags & (RTL8180_RX_DESC_FLAG_DMA_FAIL |
+-				      RTL8180_RX_DESC_FLAG_FOF |
+-				      RTL8180_RX_DESC_FLAG_RX_ERR)))
++		if (unlikely(flags & (RTL818X_RX_DESC_FLAG_DMA_FAIL |
++				      RTL818X_RX_DESC_FLAG_FOF |
++				      RTL818X_RX_DESC_FLAG_RX_ERR)))
+ 			goto done;
+ 		else {
+ 			u32 flags2 = le32_to_cpu(entry->flags2);
+@@ -140,7 +140,7 @@ static void rtl8180_handle_rx(struct ieee80211_hw *dev)
+ 			rx_status.band = dev->conf.channel->band;
+ 			rx_status.mactime = le64_to_cpu(entry->tsft);
+ 			rx_status.flag |= RX_FLAG_TSFT;
+-			if (flags & RTL8180_RX_DESC_FLAG_CRC32_ERR)
++			if (flags & RTL818X_RX_DESC_FLAG_CRC32_ERR)
+ 				rx_status.flag |= RX_FLAG_FAILED_FCS_CRC;
+ 
+ 			ieee80211_rx_irqsafe(dev, skb, &rx_status);
+@@ -154,10 +154,10 @@ static void rtl8180_handle_rx(struct ieee80211_hw *dev)
+ 
+ 	done:
+ 		entry->rx_buf = cpu_to_le32(*((dma_addr_t *)skb->cb));
+-		entry->flags = cpu_to_le32(RTL8180_RX_DESC_FLAG_OWN |
++		entry->flags = cpu_to_le32(RTL818X_RX_DESC_FLAG_OWN |
+ 					   MAX_RX_SIZE);
+ 		if (priv->rx_idx == 31)
+-			entry->flags |= cpu_to_le32(RTL8180_RX_DESC_FLAG_EOR);
++			entry->flags |= cpu_to_le32(RTL818X_RX_DESC_FLAG_EOR);
+ 		priv->rx_idx = (priv->rx_idx + 1) % 32;
+ 	}
+ }
+@@ -173,7 +173,7 @@ static void rtl8180_handle_tx(struct ieee80211_hw *dev, unsigned int prio)
+ 		struct ieee80211_tx_info *info;
+ 		u32 flags = le32_to_cpu(entry->flags);
+ 
+-		if (flags & RTL8180_TX_DESC_FLAG_OWN)
++		if (flags & RTL818X_TX_DESC_FLAG_OWN)
+ 			return;
+ 
+ 		ring->idx = (ring->idx + 1) % ring->entries;
+@@ -185,7 +185,7 @@ static void rtl8180_handle_tx(struct ieee80211_hw *dev, unsigned int prio)
+ 		memset(&info->status, 0, sizeof(info->status));
+ 
+ 		if (!(info->flags & IEEE80211_TX_CTL_NO_ACK)) {
+-			if (flags & RTL8180_TX_DESC_FLAG_TX_OK)
++			if (flags & RTL818X_TX_DESC_FLAG_TX_OK)
+ 				info->flags |= IEEE80211_TX_STAT_ACK;
+ 			else
+ 				info->status.excessive_retries = 1;
+@@ -252,20 +252,20 @@ static int rtl8180_tx(struct ieee80211_hw *dev, struct sk_buff *skb)
+ 	mapping = pci_map_single(priv->pdev, skb->data,
+ 				 skb->len, PCI_DMA_TODEVICE);
+ 
+-	tx_flags = RTL8180_TX_DESC_FLAG_OWN | RTL8180_TX_DESC_FLAG_FS |
+-		   RTL8180_TX_DESC_FLAG_LS |
++	tx_flags = RTL818X_TX_DESC_FLAG_OWN | RTL818X_TX_DESC_FLAG_FS |
++		   RTL818X_TX_DESC_FLAG_LS |
+ 		   (ieee80211_get_tx_rate(dev, info)->hw_value << 24) |
+ 		   skb->len;
+ 
+ 	if (priv->r8185)
+-		tx_flags |= RTL8180_TX_DESC_FLAG_DMA |
+-			    RTL8180_TX_DESC_FLAG_NO_ENC;
++		tx_flags |= RTL818X_TX_DESC_FLAG_DMA |
++			    RTL818X_TX_DESC_FLAG_NO_ENC;
+ 
+ 	if (info->flags & IEEE80211_TX_CTL_USE_RTS_CTS) {
+-		tx_flags |= RTL8180_TX_DESC_FLAG_RTS;
++		tx_flags |= RTL818X_TX_DESC_FLAG_RTS;
+ 		tx_flags |= ieee80211_get_rts_cts_rate(dev, info)->hw_value << 19;
+ 	} else if (info->flags & IEEE80211_TX_CTL_USE_CTS_PROTECT) {
+-		tx_flags |= RTL8180_TX_DESC_FLAG_CTS;
++		tx_flags |= RTL818X_TX_DESC_FLAG_CTS;
+ 		tx_flags |= ieee80211_get_rts_cts_rate(dev, info)->hw_value << 19;
+ 	}
+ 
+@@ -446,10 +446,10 @@ static int rtl8180_init_rx_ring(struct ieee80211_hw *dev)
+ 		*mapping = pci_map_single(priv->pdev, skb_tail_pointer(skb),
+ 					  MAX_RX_SIZE, PCI_DMA_FROMDEVICE);
+ 		entry->rx_buf = cpu_to_le32(*mapping);
+-		entry->flags = cpu_to_le32(RTL8180_RX_DESC_FLAG_OWN |
++		entry->flags = cpu_to_le32(RTL818X_RX_DESC_FLAG_OWN |
+ 					   MAX_RX_SIZE);
+ 	}
+-	entry->flags |= cpu_to_le32(RTL8180_RX_DESC_FLAG_EOR);
++	entry->flags |= cpu_to_le32(RTL818X_RX_DESC_FLAG_EOR);
+ 	return 0;
+ }
+ 
+diff --git a/drivers/net/wireless/rtl8187.h b/drivers/net/wireless/rtl8187.h
+index 5a9515c..e82bb4d 100644
+--- a/drivers/net/wireless/rtl8187.h
++++ b/drivers/net/wireless/rtl8187.h
+@@ -58,12 +58,6 @@ struct rtl8187b_rx_hdr {
+ 
+ /* {rtl8187,rtl8187b}_tx_info is in skb */
+ 
+-/* Tx flags are common between rtl8187 and rtl8187b */
+-#define RTL8187_TX_FLAG_NO_ENCRYPT	(1 << 15)
+-#define RTL8187_TX_FLAG_MORE_FRAG	(1 << 17)
+-#define RTL8187_TX_FLAG_CTS		(1 << 18)
+-#define RTL8187_TX_FLAG_RTS		(1 << 23)
+-
+ struct rtl8187_tx_hdr {
+ 	__le32 flags;
+ 	__le16 rts_duration;
+diff --git a/drivers/net/wireless/rtl8187_dev.c b/drivers/net/wireless/rtl8187_dev.c
+index ca5deb6..060a265 100644
+--- a/drivers/net/wireless/rtl8187_dev.c
++++ b/drivers/net/wireless/rtl8187_dev.c
+@@ -187,18 +187,18 @@ static int rtl8187_tx(struct ieee80211_hw *dev, struct sk_buff *skb)
+ 	}
+ 
+ 	flags = skb->len;
+-	flags |= RTL8187_TX_FLAG_NO_ENCRYPT;
++	flags |= RTL818X_TX_DESC_FLAG_NO_ENC;
+ 
+ 	flags |= ieee80211_get_tx_rate(dev, info)->hw_value << 24;
+ 	if (ieee80211_has_morefrags(((struct ieee80211_hdr *)skb->data)->frame_control))
+-		flags |= RTL8187_TX_FLAG_MORE_FRAG;
++		flags |= RTL818X_TX_DESC_FLAG_MOREFRAG;
+ 	if (info->flags & IEEE80211_TX_CTL_USE_RTS_CTS) {
+-		flags |= RTL8187_TX_FLAG_RTS;
++		flags |= RTL818X_TX_DESC_FLAG_RTS;
+ 		flags |= ieee80211_get_rts_cts_rate(dev, info)->hw_value << 19;
+ 		rts_dur = ieee80211_rts_duration(dev, priv->vif,
+ 						 skb->len, info);
+ 	} else if (info->flags & IEEE80211_TX_CTL_USE_CTS_PROTECT) {
+-		flags |= RTL8187_TX_FLAG_CTS;
++		flags |= RTL818X_TX_DESC_FLAG_CTS;
+ 		flags |= ieee80211_get_rts_cts_rate(dev, info)->hw_value << 19;
+ 	}
+ 
+@@ -354,7 +354,7 @@ static void rtl8187_rx_cb(struct urb *urb)
+ 	rx_status.freq = dev->conf.channel->center_freq;
+ 	rx_status.band = dev->conf.channel->band;
+ 	rx_status.flag |= RX_FLAG_TSFT;
+-	if (flags & (1 << 13))
++	if (flags & RTL818X_RX_DESC_FLAG_CRC32_ERR)
+ 		rx_status.flag |= RX_FLAG_FAILED_FCS_CRC;
+ 	ieee80211_rx_irqsafe(dev, skb, &rx_status);
+ 
+diff --git a/drivers/net/wireless/rtl818x.h b/drivers/net/wireless/rtl818x.h
+index 00900fe..3538b15 100644
+--- a/drivers/net/wireless/rtl818x.h
++++ b/drivers/net/wireless/rtl818x.h
+@@ -193,4 +193,39 @@ struct rtl818x_rf_ops {
+ 	void (*set_chan)(struct ieee80211_hw *, struct ieee80211_conf *);
+ };
+ 
++/* Tx/Rx flags are common between RTL818X chips */
++
++enum rtl818x_tx_desc_flags {
++	RTL818X_TX_DESC_FLAG_NO_ENC	= (1 << 15),
++	RTL818X_TX_DESC_FLAG_TX_OK	= (1 << 15),
++	RTL818X_TX_DESC_FLAG_SPLCP	= (1 << 16),
++	RTL818X_TX_DESC_FLAG_RX_UNDER	= (1 << 16),
++	RTL818X_TX_DESC_FLAG_MOREFRAG	= (1 << 17),
++	RTL818X_TX_DESC_FLAG_CTS	= (1 << 18),
++	RTL818X_TX_DESC_FLAG_RTS	= (1 << 23),
++	RTL818X_TX_DESC_FLAG_LS		= (1 << 28),
++	RTL818X_TX_DESC_FLAG_FS		= (1 << 29),
++	RTL818X_TX_DESC_FLAG_DMA	= (1 << 30),
++	RTL818X_TX_DESC_FLAG_OWN	= (1 << 31)
++};
++
++enum rtl818x_rx_desc_flags {
++	RTL818X_RX_DESC_FLAG_ICV_ERR	= (1 << 12),
++	RTL818X_RX_DESC_FLAG_CRC32_ERR	= (1 << 13),
++	RTL818X_RX_DESC_FLAG_PM		= (1 << 14),
++	RTL818X_RX_DESC_FLAG_RX_ERR	= (1 << 15),
++	RTL818X_RX_DESC_FLAG_BCAST	= (1 << 16),
++	RTL818X_RX_DESC_FLAG_PAM	= (1 << 17),
++	RTL818X_RX_DESC_FLAG_MCAST	= (1 << 18),
++	RTL818X_RX_DESC_FLAG_QOS	= (1 << 19), /* RTL8187(B) only */
++	RTL818X_RX_DESC_FLAG_TRSW	= (1 << 24), /* RTL8187(B) only */
++	RTL818X_RX_DESC_FLAG_SPLCP	= (1 << 25),
++	RTL818X_RX_DESC_FLAG_FOF	= (1 << 26),
++	RTL818X_RX_DESC_FLAG_DMA_FAIL	= (1 << 27),
++	RTL818X_RX_DESC_FLAG_LS		= (1 << 28),
++	RTL818X_RX_DESC_FLAG_FS		= (1 << 29),
++	RTL818X_RX_DESC_FLAG_EOR	= (1 << 30),
++	RTL818X_RX_DESC_FLAG_OWN	= (1 << 31)
++};
++
+ #endif /* RTL818X_H */
+
+From 746db510395e32ff57b9f8582e520df6b3fac618 Mon Sep 17 00:00:00 2001
+From: John W. Linville <linville@tuxdriver.com>
+Date: Fri, 10 Oct 2008 14:16:46 -0400
+Subject: [PATCH] rtl8187: add device ID 0bda:8198
+
+Reported by zOOmER.gm@gmail.com to work here:
+
+	http://bugzilla.kernel.org/show_bug.cgi?id=11728
+
+Signed-off-by: John W. Linville <linville@tuxdriver.com>
+
+diff --git a/drivers/net/wireless/rtl8187_dev.c b/drivers/net/wireless/rtl8187_dev.c
+index e990261..7823277 100644
+--- a/drivers/net/wireless/rtl8187_dev.c
++++ b/drivers/net/wireless/rtl8187_dev.c
+@@ -37,6 +37,7 @@ static struct usb_device_id rtl8187_table[] __devinitdata = {
+ 	{USB_DEVICE(0x0bda, 0x8187), .driver_info = DEVICE_RTL8187},
+ 	{USB_DEVICE(0x0bda, 0x8189), .driver_info = DEVICE_RTL8187B},
+ 	{USB_DEVICE(0x0bda, 0x8197), .driver_info = DEVICE_RTL8187B},
++	{USB_DEVICE(0x0bda, 0x8198), .driver_info = DEVICE_RTL8187B},
+ 	/* Netgear */
+ 	{USB_DEVICE(0x0846, 0x6100), .driver_info = DEVICE_RTL8187},
+ 	{USB_DEVICE(0x0846, 0x6a00), .driver_info = DEVICE_RTL8187},
+
+From eaca90dab6ab9853223029deffdd226f41b2028c Mon Sep 17 00:00:00 2001
+From: Florent Fourcot <florent.fourcot@enst-bretagne.fr>
+Date: Mon, 13 Oct 2008 16:34:26 -0700
+Subject: [PATCH] rtl8187: Add USB ID for Belkin F5D7050 with RTL8187B chip
+
+The Belkin F5D7050rev5000de (id 050d:705e) has the Realtek RTL8187B chip
+and works with the 2.6.27 driver.
+
+Signed-off-by: Larry Finger <Larry.Finger@lwfinger.net>
+Signed-off-by: John W. Linville <linville@tuxdriver.com>
+
+diff --git a/drivers/net/wireless/rtl8187_dev.c b/drivers/net/wireless/rtl8187_dev.c
+index 7823277..431e3c7 100644
+--- a/drivers/net/wireless/rtl8187_dev.c
++++ b/drivers/net/wireless/rtl8187_dev.c
+@@ -33,6 +33,8 @@ MODULE_LICENSE("GPL");
+ static struct usb_device_id rtl8187_table[] __devinitdata = {
+ 	/* Asus */
+ 	{USB_DEVICE(0x0b05, 0x171d), .driver_info = DEVICE_RTL8187},
++	/* Belkin */
++	{USB_DEVICE(0x050d, 0x705e), .driver_info = DEVICE_RTL8187B},
+ 	/* Realtek */
+ 	{USB_DEVICE(0x0bda, 0x8187), .driver_info = DEVICE_RTL8187},
+ 	{USB_DEVICE(0x0bda, 0x8189), .driver_info = DEVICE_RTL8187B},
+
+From 8f7c41d4cec91cdbfa89b4a77d5a628938875366 Mon Sep 17 00:00:00 2001
+From: Ivan Kuten <ivan.kuten@promwad.com>
+Date: Mon, 10 Nov 2008 19:39:25 -0600
+Subject: [PATCH] rtl8187: Add Abocom USB ID
+
+Signed-off-by: Ivan Kuten <ivan.kuten@promwad.com>
+Signed-off-by: Larry Finger <Larry.Finger@lwfinger.net>
+Signed-off-by: John W. Linville <linville@tuxdriver.com>
+
+diff --git a/drivers/net/wireless/rtl8187_dev.c b/drivers/net/wireless/rtl8187_dev.c
+index 431e3c7..0ce9fb0 100644
+--- a/drivers/net/wireless/rtl8187_dev.c
++++ b/drivers/net/wireless/rtl8187_dev.c
+@@ -48,6 +48,8 @@ static struct usb_device_id rtl8187_table[] __devinitdata = {
+ 	{USB_DEVICE(0x03f0, 0xca02), .driver_info = DEVICE_RTL8187},
+ 	/* Sitecom */
+ 	{USB_DEVICE(0x0df6, 0x000d), .driver_info = DEVICE_RTL8187},
++	/* Abocom */
++	{USB_DEVICE(0x13d1, 0xabe6), .driver_info = DEVICE_RTL8187},
+ 	{}
+ };
+ 
+
+From f3c769185a28b7947d97b3552a977102c1fac3f2 Mon Sep 17 00:00:00 2001
+From: Bob Jolliffe <bobjolliffe@gmail.com>
+Date: Wed, 12 Nov 2008 20:16:59 +0000
+Subject: [PATCH] rtl8187 : support for Sitecom WL-168 0001 v4
+
+the Sitecom 0001 v4 with product id 0x0df6:0028, uses Realtek's
+RTL8187B and work fine with new 2.6.27 driver.
+
+Signed-off-by: John W. Linville <linville@tuxdriver.com>
+
+diff --git a/drivers/net/wireless/rtl8187_dev.c b/drivers/net/wireless/rtl8187_dev.c
+index 0ce9fb0..69eb013 100644
+--- a/drivers/net/wireless/rtl8187_dev.c
++++ b/drivers/net/wireless/rtl8187_dev.c
+@@ -48,6 +48,7 @@ static struct usb_device_id rtl8187_table[] __devinitdata = {
+ 	{USB_DEVICE(0x03f0, 0xca02), .driver_info = DEVICE_RTL8187},
+ 	/* Sitecom */
+ 	{USB_DEVICE(0x0df6, 0x000d), .driver_info = DEVICE_RTL8187},
++	{USB_DEVICE(0x0df6, 0x0028), .driver_info = DEVICE_RTL8187B},
+ 	/* Abocom */
+ 	{USB_DEVICE(0x13d1, 0xabe6), .driver_info = DEVICE_RTL8187},
+ 	{}

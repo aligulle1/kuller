@@ -1,0 +1,348 @@
+http://cgit.freedesktop.org/poppler/poppler/commit/?id=0131f0a01c
+http://cgit.freedesktop.org/poppler/poppler/commit/?id=7b2d314a61
+http://cgit.freedesktop.org/poppler/poppler/commit/?id=c399b2d512
+http://cgit.freedesktop.org/poppler/poppler/commit/?id=9cf2325fb2
+http://cgit.freedesktop.org/poppler/poppler/commit/?id=284a928996
+http://cgit.freedesktop.org/poppler/poppler/commit/?id=5d328282da
+
+CVE-2009-0791/CVE-2009-3605 CVE-2009-3604 CVE-2009-3606
+
+diff -pruN poppler-0.10.7.orig/glib/poppler-page.cc poppler-0.10.7/glib/poppler-page.cc
+--- poppler-0.10.7.orig/glib/poppler-page.cc	2009-05-02 14:14:57.000000000 +0200
++++ poppler-0.10.7/glib/poppler-page.cc	2009-10-24 20:01:57.000000000 +0200
+@@ -291,7 +291,7 @@ poppler_page_prepare_output_dev (Poppler
+ 
+   output_dev = page->document->output_dev;
+   cairo_rowstride = cairo_width * 4;
+-  cairo_data = (guchar *) gmalloc (cairo_height * cairo_rowstride);
++  cairo_data = (guchar *) gmallocn (cairo_height, cairo_rowstride);
+   if (transparent)
+       memset (cairo_data, 0x00, cairo_height * cairo_rowstride);
+   else
+diff -pruN poppler-0.10.7.orig/goo/gmem.cc poppler-0.10.7/goo/gmem.cc
+--- poppler-0.10.7.orig/goo/gmem.cc	2009-05-02 14:14:57.000000000 +0200
++++ poppler-0.10.7/goo/gmem.cc	2009-10-24 20:01:57.000000000 +0200
+@@ -206,6 +206,32 @@ void *gmallocn_checkoverflow(int nObjs, 
+   return gmalloc(n);
+ }
+ 
++void *gmallocn3(int a, int b, int c) GMEM_EXCEP {
++  int n = a * b;
++  if (b <= 0 || a < 0 || a >= INT_MAX / b) {
++#if USE_EXCEPTIONS
++    throw GMemException();
++#else
++    fprintf(stderr, "Bogus memory allocation size\n");
++    exit(1);
++#endif
++  }
++  return gmallocn(n, c);
++}
++
++void *gmallocn3_checkoverflow(int a, int b, int c) GMEM_EXCEP {
++  int n = a * b;
++  if (b <= 0 || a < 0 || a >= INT_MAX / b) {
++#if USE_EXCEPTIONS
++    throw GMemException();
++#else
++    fprintf(stderr, "Bogus memory allocation size\n");
++    return NULL;
++#endif
++  }
++  return gmallocn_checkoverflow(n, c);
++}
++
+ void *greallocn(void *p, int nObjs, int objSize) GMEM_EXCEP {
+   int n;
+ 
+diff -pruN poppler-0.10.7.orig/goo/gmem.h poppler-0.10.7/goo/gmem.h
+--- poppler-0.10.7.orig/goo/gmem.h	2009-05-02 14:14:57.000000000 +0200
++++ poppler-0.10.7/goo/gmem.h	2009-10-24 20:01:57.000000000 +0200
+@@ -70,6 +70,8 @@ extern void *grealloc(void *p, size_t si
+  */
+ extern void *gmallocn(int nObjs, int objSize) GMEM_EXCEP;
+ extern void *gmallocn_checkoverflow(int nObjs, int objSize) GMEM_EXCEP;
++extern void *gmallocn3(int a, int b, int c) GMEM_EXCEP;
++extern void *gmallocn3_checkoverflow(int a, int b, int c) GMEM_EXCEP;
+ extern void *greallocn(void *p, int nObjs, int objSize) GMEM_EXCEP;
+ extern void *greallocn_checkoverflow(void *p, int nObjs, int objSize) GMEM_EXCEP;
+ 
+diff -pruN poppler-0.10.7.orig/poppler/ArthurOutputDev.cc poppler-0.10.7/poppler/ArthurOutputDev.cc
+--- poppler-0.10.7.orig/poppler/ArthurOutputDev.cc	2009-05-16 17:27:41.000000000 +0200
++++ poppler-0.10.7/poppler/ArthurOutputDev.cc	2009-10-24 20:01:57.000000000 +0200
+@@ -752,7 +752,7 @@ void ArthurOutputDev::drawImage(GfxState
+   QMatrix matrix;
+   int is_identity_transform;
+   
+-  buffer = (unsigned char *)gmalloc (width * height * 4);
++  buffer = (unsigned char *)gmallocn3(width, height, 4);
+ 
+   /* TODO: Do we want to cache these? */
+   imgStr = new ImageStream(str, width,
+diff -pruN poppler-0.10.7.orig/poppler/CairoOutputDev.cc poppler-0.10.7/poppler/CairoOutputDev.cc
+--- poppler-0.10.7.orig/poppler/CairoOutputDev.cc	2009-05-16 17:27:41.000000000 +0200
++++ poppler-0.10.7/poppler/CairoOutputDev.cc	2009-10-24 20:01:57.000000000 +0200
+@@ -550,7 +550,7 @@ void CairoOutputDev::beginString(GfxStat
+   if (!currentFont)
+     return;
+ 
+-  glyphs = (cairo_glyph_t *) gmalloc (len * sizeof (cairo_glyph_t));
++  glyphs = (cairo_glyph_t *) gmallocn (len, sizeof (cairo_glyph_t));
+   glyphCount = 0;
+ }
+ 
+@@ -1007,7 +1007,7 @@ void CairoOutputDev::drawImageMaskRegula
+   int row_stride;
+ 
+   row_stride = (width + 3) & ~3;
+-  buffer = (unsigned char *) malloc (height * row_stride);
++  buffer = (unsigned char *) gmallocn (height, row_stride);
+   if (buffer == NULL) {
+     error(-1, "Unable to allocate memory for image.");
+     return;
+@@ -1174,7 +1174,7 @@ void CairoOutputDev::drawImageMaskPresca
+   invert_bit = invert ? 1 : 0;
+ 
+   row_stride = (scaledWidth + 3) & ~3;
+-  buffer = (unsigned char *) malloc (scaledHeight * row_stride);
++  buffer = (unsigned char *) gmallocn (scaledHeight, row_stride);
+   if (buffer == NULL) {
+     error(-1, "Unable to allocate memory for image.");
+     return;
+@@ -1367,7 +1367,7 @@ void CairoOutputDev::drawMaskedImage(Gfx
+ 
+   int row_stride = (maskWidth + 3) & ~3;
+   unsigned char *maskBuffer;
+-  maskBuffer = (unsigned char *)gmalloc (row_stride * maskHeight);
++  maskBuffer = (unsigned char *)gmallocn (row_stride, maskHeight);
+   unsigned char *maskDest;
+   cairo_surface_t *maskImage;
+   cairo_pattern_t *maskPattern;
+@@ -1402,7 +1402,7 @@ void CairoOutputDev::drawMaskedImage(Gfx
+   cairo_matrix_t matrix;
+   int is_identity_transform;
+ 
+-  buffer = (unsigned char *)gmalloc (width * height * 4);
++  buffer = (unsigned char *)gmallocn3 (width, height, 4);
+ 
+   /* TODO: Do we want to cache these? */
+   imgStr = new ImageStream(str, width,
+@@ -1494,7 +1494,7 @@ void CairoOutputDev::drawSoftMaskedImage
+ 
+   int row_stride = (maskWidth + 3) & ~3;
+   unsigned char *maskBuffer;
+-  maskBuffer = (unsigned char *)gmalloc (row_stride * maskHeight);
++  maskBuffer = (unsigned char *)gmallocn (row_stride, maskHeight);
+   unsigned char *maskDest;
+   cairo_surface_t *maskImage;
+   cairo_pattern_t *maskPattern;
+@@ -1521,7 +1521,7 @@ void CairoOutputDev::drawSoftMaskedImage
+   cairo_matrix_t maskMatrix;
+   int is_identity_transform;
+ 
+-  buffer = (unsigned char *)gmalloc (width * height * 4);
++  buffer = (unsigned char *)gmallocn3 (width, height, 4);
+ 
+   /* TODO: Do we want to cache these? */
+   imgStr = new ImageStream(str, width,
+@@ -1616,7 +1616,7 @@ void CairoOutputDev::drawImage(GfxState 
+   cairo_matrix_t matrix;
+   int is_identity_transform;
+   
+-  buffer = (unsigned char *)gmallocn (width, height * 4);
++  buffer = (unsigned char *)gmallocn3 (width, height, 4);
+ 
+   /* TODO: Do we want to cache these? */
+   imgStr = new ImageStream(str, width,
+diff -pruN poppler-0.10.7.orig/poppler/GfxState.cc poppler-0.10.7/poppler/GfxState.cc
+--- poppler-0.10.7.orig/poppler/GfxState.cc	2009-05-02 14:14:57.000000000 +0200
++++ poppler-0.10.7/poppler/GfxState.cc	2009-10-24 20:01:57.000000000 +0200
+@@ -1201,7 +1201,7 @@ void GfxIndexedColorSpace::getRGBLine(Gu
+   int i, j, n;
+ 
+   n = base->getNComps();
+-  line = (Guchar *) gmalloc (length * n);
++  line = (Guchar *) gmallocn (length, n);
+   for (i = 0; i < length; i++)
+     for (j = 0; j < n; j++)
+       line[i * n + j] = lookup[in[i] * n + j];
+@@ -3424,7 +3424,7 @@ GfxImageColorMap::GfxImageColorMap(int b
+     nComps2 = colorSpace2->getNComps();
+     lookup2 = indexedCS->getLookup();
+     colorSpace2->getDefaultRanges(x, y, indexHigh);
+-    byte_lookup = (Guchar *)gmalloc ((maxPixel + 1) * nComps2);
++    byte_lookup = (Guchar *)gmallocn ((maxPixel + 1), nComps2);
+     for (k = 0; k < nComps2; ++k) {
+       lookup[k] = (GfxColorComp *)gmallocn(maxPixel + 1,
+ 					   sizeof(GfxColorComp));
+@@ -3572,7 +3572,7 @@ void GfxImageColorMap::getGrayLine(Gucha
+   switch (colorSpace->getMode()) {
+   case csIndexed:
+   case csSeparation:
+-    tmp_line = (Guchar *) gmalloc (length * nComps2);
++    tmp_line = (Guchar *) gmallocn (length, nComps2);
+     for (i = 0; i < length; i++) {
+       for (j = 0; j < nComps2; j++) {
+ 	tmp_line[i * nComps2 + j] = byte_lookup[in[i] * nComps2 + j];
+@@ -3602,7 +3602,7 @@ void GfxImageColorMap::getRGBLine(Guchar
+   switch (colorSpace->getMode()) {
+   case csIndexed:
+   case csSeparation:
+-    tmp_line = (Guchar *) gmalloc (length * nComps2);
++    tmp_line = (Guchar *) gmallocn (length, nComps2);
+     for (i = 0; i < length; i++) {
+       for (j = 0; j < nComps2; j++) {
+ 	tmp_line[i * nComps2 + j] = byte_lookup[in[i] * nComps2 + j];
+diff -pruN poppler-0.10.7.orig/poppler/PSOutputDev.cc poppler-0.10.7/poppler/PSOutputDev.cc
+--- poppler-0.10.7.orig/poppler/PSOutputDev.cc	2009-05-02 14:14:57.000000000 +0200
++++ poppler-0.10.7/poppler/PSOutputDev.cc	2009-10-24 20:01:57.000000000 +0200
+@@ -2323,7 +2323,7 @@ GooString *PSOutputDev::setupExternalCID
+   if ((ffTT = FoFiTrueType::load(fileName->getCString(), faceIndex))) {
+       int n = ((GfxCIDFont *)font)->getCIDToGIDLen();
+       if (n) {
+-	codeToGID = (Gushort *)gmalloc(n * sizeof(Gushort));
++	codeToGID = (Gushort *)gmallocn(n, sizeof(Gushort));
+ 	memcpy(codeToGID, ((GfxCIDFont *)font)->getCIDToGID(), n * sizeof(Gushort));
+       } else {
+ 	codeToGID = ((GfxCIDFont *)font)->getCodeToGIDMap(ffTT, &n);
+@@ -4502,7 +4502,7 @@ void PSOutputDev::doImageL1Sep(GfxImageC
+ 	     width, -height, height);
+ 
+   // allocate a line buffer
+-  lineBuf = (Guchar *)gmalloc(4 * width);
++  lineBuf = (Guchar *)gmallocn(width, 4);
+ 
+   // set up to process the data stream
+   imgStr = new ImageStream(str, width, colorMap->getNumPixelComps(),
+diff -pruN poppler-0.10.7.orig/poppler/SplashOutputDev.cc poppler-0.10.7/poppler/SplashOutputDev.cc
+--- poppler-0.10.7.orig/poppler/SplashOutputDev.cc	2009-05-02 14:14:57.000000000 +0200
++++ poppler-0.10.7/poppler/SplashOutputDev.cc	2009-10-24 20:01:57.000000000 +0200
+@@ -2013,7 +2013,7 @@ void SplashOutputDev::drawImage(GfxState
+       break;
+     case splashModeRGB8:
+     case splashModeBGR8:
+-      imgData.lookup = (SplashColorPtr)gmalloc(3 * n);
++      imgData.lookup = (SplashColorPtr)gmallocn(n, 3);
+       for (i = 0; i < n; ++i) {
+ 	pix = (Guchar)i;
+ 	colorMap->getRGB(&pix, &rgb);
+@@ -2023,7 +2023,7 @@ void SplashOutputDev::drawImage(GfxState
+       }
+       break;
+     case splashModeXBGR8:
+-      imgData.lookup = (SplashColorPtr)gmalloc(4 * n);
++      imgData.lookup = (SplashColorPtr)gmallocn(n, 4);
+       for (i = 0; i < n; ++i) {
+ 	pix = (Guchar)i;
+ 	colorMap->getRGB(&pix, &rgb);
+@@ -2035,7 +2035,7 @@ void SplashOutputDev::drawImage(GfxState
+       break;
+ #if SPLASH_CMYK
+     case splashModeCMYK8:
+-      imgData.lookup = (SplashColorPtr)gmalloc(4 * n);
++      imgData.lookup = (SplashColorPtr)gmallocn(n, 4);
+       for (i = 0; i < n; ++i) {
+ 	pix = (Guchar)i;
+ 	colorMap->getCMYK(&pix, &cmyk);
+@@ -2278,7 +2278,7 @@ void SplashOutputDev::drawMaskedImage(Gf
+ 	break;
+       case splashModeRGB8:
+       case splashModeBGR8:
+-	imgData.lookup = (SplashColorPtr)gmalloc(3 * n);
++	imgData.lookup = (SplashColorPtr)gmallocn(n, 3);
+ 	for (i = 0; i < n; ++i) {
+ 	  pix = (Guchar)i;
+ 	  colorMap->getRGB(&pix, &rgb);
+@@ -2288,7 +2288,7 @@ void SplashOutputDev::drawMaskedImage(Gf
+ 	}
+ 	break;
+       case splashModeXBGR8:
+-	imgData.lookup = (SplashColorPtr)gmalloc(4 * n);
++	imgData.lookup = (SplashColorPtr)gmallocn(n, 4);
+ 	for (i = 0; i < n; ++i) {
+ 	  pix = (Guchar)i;
+ 	  colorMap->getRGB(&pix, &rgb);
+@@ -2300,7 +2300,7 @@ void SplashOutputDev::drawMaskedImage(Gf
+ 	break;
+ #if SPLASH_CMYK
+       case splashModeCMYK8:
+-	imgData.lookup = (SplashColorPtr)gmalloc(4 * n);
++	imgData.lookup = (SplashColorPtr)gmallocn(n, 4);
+ 	for (i = 0; i < n; ++i) {
+ 	  pix = (Guchar)i;
+ 	  colorMap->getCMYK(&pix, &cmyk);
+@@ -2421,7 +2421,7 @@ void SplashOutputDev::drawSoftMaskedImag
+       break;
+     case splashModeRGB8:
+     case splashModeBGR8:
+-      imgData.lookup = (SplashColorPtr)gmalloc(3 * n);
++      imgData.lookup = (SplashColorPtr)gmallocn(n, 3);
+       for (i = 0; i < n; ++i) {
+ 	pix = (Guchar)i;
+ 	colorMap->getRGB(&pix, &rgb);
+@@ -2431,7 +2431,7 @@ void SplashOutputDev::drawSoftMaskedImag
+       }
+       break;
+     case splashModeXBGR8:
+-      imgData.lookup = (SplashColorPtr)gmalloc(4 * n);
++      imgData.lookup = (SplashColorPtr)gmallocn(n, 4);
+       for (i = 0; i < n; ++i) {
+ 	pix = (Guchar)i;
+ 	colorMap->getRGB(&pix, &rgb);
+@@ -2443,7 +2443,7 @@ void SplashOutputDev::drawSoftMaskedImag
+       break;
+ #if SPLASH_CMYK
+     case splashModeCMYK8:
+-      imgData.lookup = (SplashColorPtr)gmalloc(4 * n);
++      imgData.lookup = (SplashColorPtr)gmallocn(n, 4);
+       for (i = 0; i < n; ++i) {
+ 	pix = (Guchar)i;
+ 	colorMap->getCMYK(&pix, &cmyk);
+diff -pruN poppler-0.10.7.orig/splash/Splash.cc poppler-0.10.7/splash/Splash.cc
+--- poppler-0.10.7.orig/splash/Splash.cc	2009-05-02 14:14:57.000000000 +0200
++++ poppler-0.10.7/splash/Splash.cc	2009-10-24 20:01:57.000000000 +0200
+@@ -2001,7 +2001,7 @@ SplashError Splash::fillImageMask(Splash
+   xq = w % scaledWidth;
+ 
+   // allocate pixel buffer
+-  pixBuf = (SplashColorPtr)gmalloc((yp + 1) * w);
++  pixBuf = (SplashColorPtr)gmallocn((yp + 1), w);
+ 
+   // initialize the pixel pipe
+   pipeInit(&pipe, 0, 0, state->fillPattern, NULL, state->fillAlpha,
+@@ -2301,9 +2301,9 @@ SplashError Splash::drawImage(SplashImag
+   xq = w % scaledWidth;
+ 
+   // allocate pixel buffers
+-  colorBuf = (SplashColorPtr)gmalloc((yp + 1) * w * nComps);
++  colorBuf = (SplashColorPtr)gmallocn3((yp + 1), w, nComps);
+   if (srcAlpha) {
+-    alphaBuf = (Guchar *)gmalloc((yp + 1) * w);
++    alphaBuf = (Guchar *)gmallocn((yp + 1), w);
+   } else {
+     alphaBuf = NULL;
+   }
+diff -pruN poppler-0.10.7.orig/splash/SplashBitmap.cc poppler-0.10.7/splash/SplashBitmap.cc
+--- poppler-0.10.7.orig/splash/SplashBitmap.cc	2009-05-02 14:14:57.000000000 +0200
++++ poppler-0.10.7/splash/SplashBitmap.cc	2009-10-24 20:01:57.000000000 +0200
+@@ -68,7 +68,7 @@ SplashBitmap::SplashBitmap(int widthA, i
+     rowSize = -rowSize;
+   }
+   if (alphaA) {
+-    alpha = (Guchar *)gmalloc(width * height);
++    alpha = (Guchar *)gmallocn(width, height);
+   } else {
+     alpha = NULL;
+   }
+diff -pruN poppler-0.10.7.orig/splash/SplashFTFont.cc poppler-0.10.7/splash/SplashFTFont.cc
+--- poppler-0.10.7.orig/splash/SplashFTFont.cc	2009-05-02 14:14:57.000000000 +0200
++++ poppler-0.10.7/splash/SplashFTFont.cc	2009-10-24 20:01:57.000000000 +0200
+@@ -243,7 +243,7 @@ GBool SplashFTFont::makeGlyph(int c, int
+   } else {
+     rowSize = (bitmap->w + 7) >> 3;
+   }
+-  bitmap->data = (Guchar *)gmalloc(rowSize * bitmap->h);
++  bitmap->data = (Guchar *)gmallocn_checkoverflow(rowSize, bitmap->h);
+   bitmap->freeData = gTrue;
+   for (i = 0, p = bitmap->data, q = slot->bitmap.buffer;
+        i < bitmap->h;

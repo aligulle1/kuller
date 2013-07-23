@@ -1,0 +1,63 @@
+diff -Naur Python-2.5.4.orig/Lib/test/test_pyexpat.py Python-2.5.4/Lib/test/test_pyexpat.py
+--- Python-2.5.4.orig/Lib/test/test_pyexpat.py	2009-09-24 10:53:05.000000000 +0300
++++ Python-2.5.4/Lib/test/test_pyexpat.py	2009-09-24 11:10:12.000000000 +0300
+@@ -6,7 +6,9 @@
+ import pyexpat
+ from xml.parsers import expat
+ 
+-from test.test_support import sortdict, TestFailed
++import unittest
++
++from test.test_support import sortdict, TestFailed, run_unittest
+ 
+ class Outputter:
+     def StartElementHandler(self, name, attrs):
+@@ -366,7 +368,6 @@
+  </b>
+ </a>''', 1)
+ 
+-
+ def test_parse_only_xml_data():
+     # http://python.org/sf/1296433
+     #
+@@ -386,3 +387,28 @@
+         pass
+ 
+ test_parse_only_xml_data()
++
++class MalformedInputText(unittest.TestCase):
++    def test1(self):
++        xml = "\0\r\n"
++        parser = expat.ParserCreate()
++        try:
++            parser.Parse(xml, True)
++            self.fail()
++        except expat.ExpatError as e:
++            self.assertEquals(str(e), 'no element found: line 2, column 1')
++
++    def test2(self):
++        xml = "<?xml version\xc2\x85='1.0'?>\r\n"
++        parser = expat.ParserCreate()
++        try:
++            parser.Parse(xml, True)
++            self.fail()
++        except expat.ExpatError as e:
++            self.assertEquals(str(e), 'XML declaration not well-formed: line 1, column 14')
++
++def test_main():
++    run_unittest(MalformedInputText)
++
++if __name__ == '__main__':
++    test_main()
+diff -Naur Python-2.5.4.orig/Modules/expat/xmltok_impl.c Python-2.5.4/Modules/expat/xmltok_impl.c
+--- Python-2.5.4.orig/Modules/expat/xmltok_impl.c	2009-09-24 10:53:06.000000000 +0300
++++ Python-2.5.4/Modules/expat/xmltok_impl.c	2009-09-24 10:54:05.000000000 +0300
+@@ -1741,7 +1741,7 @@
+                        const char *end,
+                        POSITION *pos)
+ {
+-  while (ptr != end) {
++  while (ptr < end) {
+     switch (BYTE_TYPE(enc, ptr)) {
+ #define LEAD_CASE(n) \
+     case BT_LEAD ## n: \

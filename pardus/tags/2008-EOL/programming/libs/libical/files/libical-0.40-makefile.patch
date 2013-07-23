@@ -1,0 +1,43 @@
+Index: libical-0.42/src/libical/Makefile.in
+===================================================================
+--- libical-0.42.orig/src/libical/Makefile.in
++++ libical-0.42/src/libical/Makefile.in
+@@ -105,7 +105,7 @@ am_libical_la_OBJECTS = $(am__objects_2)
+ 	icalduration.lo icalperiod.lo icaltypes.lo icalvalue.lo pvl.lo \
+ 	sspm.lo vsnprintf.lo icallangbind.lo caldate.lo
+ libical_la_OBJECTS = $(am_libical_la_OBJECTS)
+-libical_cxx_la_LIBADD =
++libical_cxx_la_LIBADD = $(PTHREAD_LIBS)
+ am__libical_cxx_la_SOURCES_DIST = icalderivedparameter.h \
+ 	icalderivedproperty.h icalderivedvalue.h \
+ 	icalderivedparameter.c icalderivedproperty.c icalrestriction.c \
+Index: libical-0.42/src/libicalss/Makefile.in
+===================================================================
+--- libical-0.42.orig/src/libicalss/Makefile.in
++++ libical-0.42/src/libicalss/Makefile.in
+@@ -102,7 +102,6 @@ am_libicalss_la_OBJECTS = icalcalendar.l
+ 	icalset.lo icalspanlist.lo icalmessage.lo $(am__objects_1) \
+ 	$(am__objects_2)
+ libicalss_la_OBJECTS = $(am_libicalss_la_OBJECTS)
+-libicalss_cxx_la_LIBADD =
+ am__libicalss_cxx_la_SOURCES_DIST = icalspanlist_cxx.h \
+ 	icalspanlist_cxx.cpp
+ @WITH_CXX_BINDINGS_TRUE@am_libicalss_cxx_la_OBJECTS =  \
+@@ -308,7 +307,7 @@ INCLUDES = \
+ 	$(BDB_INCLUDE)
+ 
+ libicalss_la_LDFLAGS = -version-info 42:0:42
+-libicalss_la_LIBADD = $(BDB_LIBFILES) 
++libicalss_la_LIBADD = $(BDB_LIBFILES) ../libical/libical.la
+ @DEV_FALSE@libicalss_la_DEVSOURCES = icalsslexer.c icalssyacc.c
+ @DEV_TRUE@libicalss_la_DEVSOURCES = icalsslexer.l icalssyacc.y
+ libicalss_la_SOURCES = \
+@@ -351,6 +350,8 @@ COMBINEDHEADERS = \
+ 	$(srcdir)/icalspanlist.h	\
+ 	$(srcdir)/icalmessage.h
+ 
++libicalss_cxx_la_LIBADD = ./libicalss.la ../libical/libical_cxx.la
++libicalss_cxx_la_DEPENDENCIES = ./libicalss.la ../libical/libical_cxx.la
+ @WITH_CXX_BINDINGS_TRUE@libicalss_cxx_la_SOURCES = \
+ @WITH_CXX_BINDINGS_TRUE@	$(libicalss_evolution_la_SOURCES)	\
+ @WITH_CXX_BINDINGS_TRUE@	icalspanlist_cxx.h	\

@@ -1,0 +1,108 @@
+--- a/src/metadataextension/metadataextension.cpp
++++ b/src/metadataextension/metadataextension.cpp
+@@ -63,8 +63,6 @@
+ 
+ MetaDataExtension::MetaDataExtension()
+         : m_widget( 0 )
+-        , m_coverArtistLoader( new Http( this ) )
+-        , m_coverAlbumLoader( new Http( this ) )
+         , m_haveTrack( false )
+         , m_requestsReset( false )
+         , m_offline( false )
+@@ -77,11 +75,6 @@
+     // right language version.
+     m_urlBase = "http://" + The::settings().localizedHostName();
+ 
+-    connect( m_coverArtistLoader, SIGNAL( dataAvailable( QByteArray ) ),
+-             this,                SLOT( coverArtistLoaded( QByteArray ) ) );
+-    connect( m_coverAlbumLoader, SIGNAL( dataAvailable( QByteArray ) ),
+-             this,               SLOT( coverAlbumLoaded( QByteArray ) ) );
+-
+     m_tuning_in_timer = new QTimer( this );
+     m_tuning_in_timer->setInterval( 6000 );
+     m_tuning_in_timer->setSingleShot( true );
+@@ -492,8 +485,10 @@
+     if (m_trackMetaDataRequest)
+         m_trackMetaDataRequest->abort();
+ 
+-    m_coverArtistLoader->abort();
+-    m_coverAlbumLoader->abort();
++    if ( m_coverArtistLoader )
++        m_coverArtistLoader->abort();
++    if ( m_coverAlbumLoader )
++        m_coverAlbumLoader->abort();
+ 
+     m_requestsReset = true;
+ }
+@@ -1113,6 +1108,16 @@
+     QUrl url = m_metaData.artistPicUrl();
+     if ( !url.isEmpty() )
+     {
++        // no dataAvailable for lingering requests will be sent
++        if ( m_coverArtistLoader )
++        {
++            m_coverArtistLoader->abort();
++            m_coverArtistLoader->deleteLater();
++        }
++
++        m_coverArtistLoader = new Http( this );
++        connect( m_coverArtistLoader, SIGNAL( dataAvailable( QByteArray ) ),
++                 this,                SLOT( coverArtistLoaded( QByteArray ) ) );
+         downloadPic( m_coverArtistLoader, url );
+     }
+     else
+@@ -1243,6 +1248,16 @@
+     
+     if ( !url.isEmpty() )
+     {
++        // no dataAvailable for lingering requests will be sent
++        if ( m_coverAlbumLoader )
++        {
++            m_coverAlbumLoader->abort();
++            m_coverAlbumLoader->deleteLater();
++        }
++
++        m_coverAlbumLoader = new Http( this );
++        connect( m_coverAlbumLoader, SIGNAL( dataAvailable( QByteArray ) ),
++                 this,                SLOT( coverAlbumLoaded( QByteArray ) ) );
+         downloadPic( m_coverAlbumLoader, url );
+     }
+     else
+@@ -1291,8 +1306,6 @@
+ void
+ MetaDataExtension::downloadPic( Http* loader, const QUrl& url )
+ {
+-    loader->abort(); // no dataAvailable for lingering requests will be sent
+-    
+     loader->setHost( url.host() );
+     if ( !url.encodedQuery().isEmpty() )
+     {
+@@ -1310,6 +1323,7 @@
+ //    renderWithDropShadow( to, ui.artistPic );
+     render( to, ui.artistPic );
+     ui.artistPic->show();
++    m_coverArtistLoader->deleteLater();
+     checkMetaDataFetched( ArtistPicFetched );
+ }
+ 
+@@ -1319,6 +1333,7 @@
+ //    renderWithDropShadow( to, ui.albumPic );
+     render( to, ui.albumPic );
+     ui.albumPic->show();
++    m_coverAlbumLoader->deleteLater();
+     checkMetaDataFetched( AlbumPicFetched );
+ }
+ 
+--- a/src/metadataextension/metadataextension.h
++++ b/src/metadataextension/metadataextension.h
+@@ -145,8 +145,8 @@
+         QMutex m_metadataMutex;
+ 
+         MetaData m_metaData;
+-        Http* m_coverArtistLoader;
+-        Http* m_coverAlbumLoader;
++        QPointer<Http> m_coverArtistLoader;
++        QPointer<Http> m_coverAlbumLoader;
+         
+         // we guard them behind QPointers so we don't manipulate dead objects
+         QPointer<ArtistMetaDataRequest> m_artistMetaDataRequest;

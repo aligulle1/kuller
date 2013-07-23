@@ -1,0 +1,51 @@
+Index: pam_pkcs11-0.6.6/src/common/pkcs11_lib.c
+===================================================================
+--- pam_pkcs11-0.6.6.orig/src/common/pkcs11_lib.c
++++ pam_pkcs11-0.6.6/src/common/pkcs11_lib.c
+@@ -926,18 +926,6 @@ SECU_Strerror(PRErrorCode errNum)
+ 
+ #include "rsaref/pkcs11.h"
+ 
+-
+-struct cert_object_str {
+-  CK_KEY_TYPE key_type;
+-  CK_CERTIFICATE_TYPE type;
+-  CK_BYTE *id;
+-  CK_BYTE *label;
+-  CK_ULONG id_length;
+-  CK_ULONG label_length;
+-  CK_OBJECT_HANDLE private_key;
+-  X509 *x509;
+-};
+-
+ typedef struct {
+   CK_SLOT_ID id;
+   CK_BBOOL token_present;
+Index: pam_pkcs11-0.6.6/src/common/pkcs11_lib.h
+===================================================================
+--- pam_pkcs11-0.6.6.orig/src/common/pkcs11_lib.h
++++ pam_pkcs11-0.6.6/src/common/pkcs11_lib.h
+@@ -19,6 +19,23 @@
+ 
+ #include "cert_st.h"
+ 
++#ifndef HAVE_NSS
++#include "rsaref/pkcs11.h"
++
++
++struct cert_object_str {
++  CK_KEY_TYPE key_type;
++  CK_CERTIFICATE_TYPE type;
++  CK_BYTE *id;
++  CK_BYTE *label;
++  CK_ULONG id_length;
++  CK_ULONG label_length;
++  CK_OBJECT_HANDLE private_key;
++  X509 *x509;
++};
++
++#endif
++
+ typedef struct cert_object_str cert_object_t;
+ typedef struct pkcs11_handle_str pkcs11_handle_t;
+ 

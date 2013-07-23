@@ -1,0 +1,86 @@
+Index: libreport-2.0.6/src/plugins/Makefile.am
+===================================================================
+--- libreport-2.0.6.orig/src/plugins/Makefile.am
++++ libreport-2.0.6/src/plugins/Makefile.am
+@@ -4,7 +4,6 @@ pluginslibdir = $(PLUGINS_LIB_DIR)
+ 
+ bin_PROGRAMS = \
+     reporter-bugzilla \
+-    reporter-rhtsupport \
+     reporter-kerneloops \
+     reporter-upload \
+     reporter-mailx \
+@@ -16,8 +15,7 @@ pluginsconfdir = $(PLUGINS_CONF_DIR)
+ reportpluginsconfdir = $(REPORT_PLUGINS_CONF_DIR)
+ 
+ dist_reportpluginsconf_DATA = \
+-    bugzilla.conf \
+-    rhtsupport.conf
++    bugzilla.conf
+ 
+ eventsdir = $(EVENTS_DIR)
+ 
+@@ -27,7 +25,6 @@ dist_events_DATA = \
+     report_Logger.conf \
+     report_Logger.xml \
+     report_Mailx.xml \
+-    report_RHTSupport.xml \
+     report_Kerneloops.xml \
+     report_Uploader.xml
+ 
+@@ -39,14 +36,12 @@ dist_eventsconf_DATA = \
+     mailx_event.conf \
+     print_event.conf \
+     bugzilla_event.conf \
+-    rhtsupport_event.conf \
+     uploader_event.conf
+ 
+ MAN_TXT = \
+     reporter-print.txt \
+     reporter-mailx.txt \
+     reporter-bugzilla.txt \
+-    reporter-rhtsupport.txt \
+     reporter-kerneloops.txt \
+     reporter-upload.txt \
+     report.txt
+@@ -71,7 +66,6 @@ EXTRA_DIST = \
+     report_Logger.conf \
+     report_Logger.xml.in \
+     report_Mailx.xml.in \
+-    report_RHTSupport.xml.in \
+     report_Kerneloops.xml.in \
+     report_Uploader.xml.in
+ 
+@@ -100,32 +94,6 @@ reporter_bugzilla_LDADD = \
+     ../lib/libabrt_web.la \
+     ../lib/libreport.la
+ 
+-reporter_rhtsupport_SOURCES = \
+-    abrt_rh_support.h abrt_rh_support.c \
+-    reporter-rhtsupport.c
+-reporter_rhtsupport_CPPFLAGS = \
+-    -I$(srcdir)/../include \
+-    -I$(srcdir)/../lib \
+-    -DBIN_DIR=\"$(bindir)\" \
+-    -DVAR_RUN=\"$(VAR_RUN)\" \
+-    -DCONF_DIR=\"$(CONF_DIR)\" \
+-    -DLOCALSTATEDIR='"$(localstatedir)"' \
+-    -DDEBUG_DUMPS_DIR=\"$(DEBUG_DUMPS_DIR)\" \
+-    -DDEBUG_INFO_DIR=\"$(DEBUG_INFO_DIR)\" \
+-    -DPLUGINS_LIB_DIR=\"$(PLUGINS_LIB_DIR)\" \
+-    -DPLUGINS_CONF_DIR=\"$(REPORT_PLUGINS_CONF_DIR)\" \
+-    $(GLIB_CFLAGS) \
+-    $(LIBREPORT_CFLAGS) \
+-    $(XMLRPC_CFLAGS) $(XMLRPC_CLIENT_CFLAGS) \
+-    -D_GNU_SOURCE \
+-    -Wall -Wwrite-strings -Werror
+-reporter_rhtsupport_LDFLAGS = -ltar
+-reporter_rhtsupport_LDADD = \
+-    $(GLIB_LIBS) \
+-    $(XMLRPC_LIBS) $(XMLRPC_CLIENT_LIBS) \
+-    ../lib/libabrt_web.la \
+-    ../lib/libreport.la
+-
+ reporter_upload_SOURCES = \
+     reporter-upload.c
+ reporter_upload_CPPFLAGS = \

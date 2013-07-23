@@ -1,0 +1,57 @@
+diff -Nur memtest86+-1.70-old/Makefile memtest86+-1.70/Makefile
+--- memtest86+-1.70-old/Makefile	2007-05-19 04:07:54.303924319 +0300
++++ memtest86+-1.70/Makefile	2007-05-19 04:08:43.692416128 +0300
+@@ -8,13 +8,11 @@
+ #
+ FDISK=/dev/fd0
+ 
+-CC=gcc
+ #
+ # gcc compiler options, these settings should suffice
+ #
+ CCFLAGS=-Wall -m32 -march=i486 -Os -fomit-frame-pointer -fno-builtin -ffreestanding
+-
+-AS=as -32
++ASFLAGS=-32
+ 
+ OBJS= head.o reloc.o main.o test.o init.o lib.o patn.o screen_buffer.o config.o linuxbios.o memsize.o pci.o controller.o extra.o random.o dmi.o
+ 
+@@ -24,7 +22,7 @@
+ 	$(CC) -c -m32 -march=i486 -fPIC -Wall -g -O2 -fno-strict-aliasing reloc.c
+ 
+ test.o: test.c test.h defs.h config.h
+-	$(CC) -c $(CCFLAGS) test.c
++	$(CC) -c $(CCFLAGS) -fno-PIC test.c
+ 
+ main.o: main.c test.h defs.h
+ 	$(CC) -c $(CCFLAGS) -fPIC main.c
+@@ -69,9 +67,9 @@
+ 	$(CC) -E -m32 -traditional $< -o $@
+ 
+ head.o: head.s
+-	$(AS) -o $@ $<
++	$(AS) $(ASFLAGS) -o $@ $<
+ dmi.o:	dmi.c test.h
+-	 $(CC) -c $(CCFLAGS) -fPIC dmi.c
++	$(CC) -c $(CCFLAGS) -fPIC dmi.c
+ 
+ makedefs: makedefs.c defs.h
+ 	$(CC) $(CCFLAGS) makedefs.c -o $@
+@@ -94,7 +92,7 @@
+ 	$(CC) -E -traditional $< -o $@
+ 
+ bootsect.o: bootsect.s
+-	$(AS) -o $@ $<
++	$(AS) $(ASFLAGS) -o $@ $<
+ 
+ bootsect: bootsect.o
+ 	$(LD) -Ttext 0x00 -s --oformat binary -e _main --just-symbols=memtest_shared.o -o $@ $<
+@@ -103,7 +101,7 @@
+ 	$(CC) -E -traditional $< -o $@
+ 
+ setup.o: setup.s
+-	$(AS) -o $@ $<
++	$(AS) $(ASFLAGS) -o $@ $<
+ 
+ 
+ memtest.bin: memtest_shared.bin bootsect.o setup.o memtest.bin.lds

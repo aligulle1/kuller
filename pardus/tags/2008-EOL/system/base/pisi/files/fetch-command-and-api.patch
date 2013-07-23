@@ -1,0 +1,116 @@
+Index: pisi-2.1/pisi/api.py
+===================================================================
+--- pisi-2.1/pisi/api.py	(revision 25928)
++++ pisi-2.1/pisi/api.py	(revision 25929)
+@@ -14,6 +14,7 @@
+ import re
+ import logging
+ import logging.handlers
++import fetcher
+ 
+ import gettext
+ __trans = gettext.translation('pisi', fallback=True)
+@@ -687,6 +688,30 @@
+     else:
+         raise pisi.Error(_('No repository named %s found.') % repo)
+ 
++def fetch(packages=[], path=os.path.curdir):
++    """
++    Fetches the given packages from the repository without installing, just downloads the packages.
++    @param packages: list of package names -> list_of_strings
++    @param path: path to where the packages will be downloaded. If not given, packages will be downloaded
++    to the current working directory.
++    """
++    packagedb = pisi.db.packagedb.PackageDB()
++    repodb = pisi.db.repodb.RepoDB()
++    for name in packages:
++        package, repo = packagedb.get_package_repo(name)
++        ctx.ui.info(_("%s package found in %s repository") % (package.name, repo))
++        uri = pisi.uri.URI(package.packageURI)
++        output = os.path.join(path, uri.path())
++        if os.path.exists(output) and package.packageHash == pisi.util.sha1_file(output):
++            ctx.ui.warning(_("%s package already fetched") % uri.path())
++            continue
++        if uri.is_absolute_path():
++            url = str(pkg_uri)
++        else:
++            url = os.path.join(os.path.dirname(repodb.get_repo_url(repo)), str(uri.path()))
++
++        fetcher.fetch_url(url, path, ctx.ui.Progress)
++
+ @locked
+ def delete_cache():
+     pisi.util.clean_dir(ctx.config.cached_packages_dir())
+Index: pisi-2.1/pisi/cli/fetch.py
+===================================================================
+--- pisi-2.1/pisi/cli/fetch.py	(revision 0)
++++ pisi-2.1/pisi/cli/fetch.py	(revision 25929)
+@@ -0,0 +1,56 @@
++# -*- coding:utf-8 -*-
++#
++# Copyright (C) 2009, TUBITAK/UEKAE
++#
++# This program is free software; you can redistribute it and/or modify it under
++# the terms of the GNU General Public License as published by the Free
++# Software Foundation; either version 2 of the License, or (at your option)
++# any later version.
++#
++# Please read the COPYING file.
++#
++
++import os
++import optparse
++
++import gettext
++__trans = gettext.translation('pisi', fallback=True)
++_ = __trans.ugettext
++
++import pisi.cli.command as command
++import pisi.context as ctx
++import pisi.api
++
++class Fetch(command.Command):
++    __doc__ = _("""Fetch a package
++
++Usage: fetch [<package1> <package2> ... <packagen>]
++
++<packagei>: package name
++
++Downloads the given pisi packages to working directory
++""")
++    __metaclass__ = command.autocommand
++
++    def __init__(self,args):
++        super(Fetch, self).__init__(args)
++
++    name = ("fetch", "fc")
++
++    def options(self):
++        group = optparse.OptionGroup(self.parser, _("fetch options"))
++        self.add_options(group)
++        self.parser.add_option_group(group)
++
++    def add_options(self, group):
++        group.add_option("-o", "--output-dir", action="store", default=os.path.curdir,
++                               help=_("Output directory for the fetched packages"))
++
++    def run(self):
++        self.init(database = False, write = False)
++
++        if not self.args:
++            self.help()
++            return
++
++        pisi.api.fetch(self.args, ctx.config.options.output_dir)
+Index: pisi-2.1/pisi/cli/pisicli.py
+===================================================================
+--- pisi-2.1/pisi/cli/pisicli.py	(revision 25928)
++++ pisi-2.1/pisi/cli/pisicli.py	(revision 25929)
+@@ -28,6 +28,7 @@
+ import pisi.cli.deletecache
+ import pisi.cli.delta
+ import pisi.cli.emerge
++import pisi.cli.fetch
+ import pisi.cli.graph
+ import pisi.cli.index
+ import pisi.cli.info

@@ -1,0 +1,103 @@
+diff -Naur lpc10-1.5.orig/lpc55-C/lpc10/Makefile lpc10-1.5/lpc55-C/lpc10/Makefile
+--- lpc10-1.5.orig/lpc55-C/lpc10/Makefile	2010-03-26 08:53:59.716615520 +0200
++++ lpc10-1.5/lpc55-C/lpc10/Makefile	2010-03-26 08:54:37.823615768 +0200
+@@ -4,7 +4,7 @@
+ 
+ # default C compiler
+ CC= gcc
+-
++LIBTOOL=libtool
+ # 
+ # These definitions for CFLAGS and LIB_TARGET_DIR are used when one
+ # runs make in the lpc10 directory, without environment variables that
+@@ -25,7 +25,7 @@
+ CFLAGS += -I$(LIB_TARGET_DIR) $(WARNINGS)
+ 
+ LIB = $(LIB_TARGET_DIR)/liblpc10.la
+-LIBDIR = /usr/lib
++LIBDIR = $(ROOTDIR)/usr/lib
+ 
+ .PHONY: all clean
+ 
+@@ -34,7 +34,7 @@
+ $(LIB):		f2clib.lo	\
+ 		analys.lo	\
+ 		bsynz.lo		\
+-		chanwr.lo	\
++		chanwr.lo \
+ 		dcbias.lo	\
+ 		decode.lo	\
+ 		deemp.lo		\
+@@ -65,14 +65,14 @@
+ 		tbdm.lo		\
+ 		voicin.lo	\
+ 		vparms.lo
+-	libtool --mode=link $(CC) -o $(LIB) $^ -rpath $(LIBDIR) -lm
++	$(LIBTOOL) --tag=CC --mode=link $(CC) -o $(LIB) $^ -rpath $(LIBDIR) -lm
+ 
+ %.lo : %.c
+-	libtool --mode=compile $(CC) $(CFLAGS) -o $@ -c $<
++	$(LIBTOOL) --tag=CC --mode=compile $(CC) $(CFLAGS) -o $@ -c $<
+ 
+ install:
+ 	install -d $(DESTDIR)$(LIBDIR)
+-	libtool --mode=install install $(LIB) $(DESTDIR)$(LIBDIR)
++	$(LIBTOOL) --tag=CC --mode=install install $(LIB) $(DESTDIR)$(LIBDIR)
+ 
+ clean:
+ 	-rm -f *.o
+diff -Naur lpc10-1.5.orig/lpc55-C/Makefile lpc10-1.5/lpc55-C/Makefile
+--- lpc10-1.5.orig/lpc55-C/Makefile	2010-03-26 08:53:59.722616882 +0200
++++ lpc10-1.5/lpc55-C/Makefile	2010-03-26 08:54:20.766867535 +0200
+@@ -3,13 +3,14 @@
+ # 
+ 
+ WARNINGS = -Wall
++LIBTOOL=libtool
+ CFLAGS += $(WARNINGS)
+ 
+ # default C compiler
+ CC= gcc
+ 
+ BINDIR = /usr/bin
+-INCDIR = /usr/include
++INCDIR = $(ROOTDIR)/usr/include
+ 
+ .PHONY: all clean
+ 
+@@ -19,16 +20,16 @@
+ 	$(MAKE) -C lpc10
+ 
+ nuke:	nuke.o bitio.o sampleio.o
+-	libtool --mode=link $(CC) -o $@ nuke.o bitio.o sampleio.o liblpc10.la -lm
++	$(LIBTOOL) --mode=link $(CC) -o $@ nuke.o bitio.o sampleio.o liblpc10.la -lm
+ 
+ unnuke:	unnuke.o bitio.o sampleio.o
+-	libtool --mode=link $(CC) -o $@ unnuke.o bitio.o sampleio.o liblpc10.la -lm
++	$(LIBTOOL) --mode=link $(CC) -o $@ unnuke.o bitio.o sampleio.o liblpc10.la -lm
+ 
+ nuke2:	nuke2.o bitio.o sampleio.o
+-	libtool --mode=link $(CC) -o $@ nuke2.o bitio.o sampleio.o liblpc10.la -lm
++	$(LIBTOOL) --mode=link $(CC) -o $@ nuke2.o bitio.o sampleio.o liblpc10.la -lm
+ 
+ unnuke2:	unnuke2.o bitio.o sampleio.o
+-	libtool --mode=link $(CC) -o $@ unnuke2.o bitio.o sampleio.o liblpc10.la -lm
++	$(LIBTOOL) --mode=link $(CC) -o $@ unnuke2.o bitio.o sampleio.o liblpc10.la -lm
+ 
+ installlib:
+ 	$(MAKE) -C lpc10 install
+@@ -37,10 +38,10 @@
+ 
+ install: installlib
+ 	install -d $(DESTDIR)$(BINDIR)
+-	libtool --mode=install install nuke $(DESTDIR)$(BINDIR)
+-	libtool --mode=install install unnuke $(DESTDIR)$(BINDIR)
+-	libtool --mode=install install nuke2 $(DESTDIR)$(BINDIR)
+-	libtool --mode=install install unnuke2 $(DESTDIR)$(BINDIR)
++	$(LIBTOOL) --mode=install install nuke $(DESTDIR)$(BINDIR)
++	$(LIBTOOL) --mode=install install unnuke $(DESTDIR)$(BINDIR)
++	$(LIBTOOL) --mode=install install nuke2 $(DESTDIR)$(BINDIR)
++	$(LIBTOOL) --mode=install install unnuke2 $(DESTDIR)$(BINDIR)
+ 
+ clean:
+ 	-rm -f *.o

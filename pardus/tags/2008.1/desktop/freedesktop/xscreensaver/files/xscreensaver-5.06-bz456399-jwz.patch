@@ -1,0 +1,54 @@
+Index: driver/screens.c
+===================================================================
+RCS file: /cvsroot/xscreensaver/driver/screens.c,v
+retrieving revision 1.7
+diff -u -r1.7 screens.c
+--- driver/screens.c	8 Jul 2008 05:22:46 -0000	1.7
++++ driver/screens.c	24 Jul 2008 15:52:14 -0000
+@@ -342,7 +342,7 @@
+ 
+   for (i = 0, j = 0; i < ScreenCount (dpy); i++)
+     {
+-      Screen *screen = ScreenOfDisplay (dpy, j);
++      Screen *screen = ScreenOfDisplay (dpy, i);
+ 
+       if (! new_randr_p)  /* RANDR 1.0 */
+         {
+@@ -624,6 +624,7 @@
+       if (i != j &&
+           monitors[i]->sanity == S_SANE &&
+           monitors[j]->sanity == S_SANE &&
++          monitors[i]->screen == monitors[j]->screen &&
+           X2 >= X1 &&
+           Y2 >= Y1 &&
+           (X2+W2) <= (X1+W1) &&
+@@ -648,6 +649,7 @@
+       {
+         if (monitors[i]->sanity != S_SANE) continue; /* already marked */
+         if (monitors[j]->sanity != S_SANE) continue;
++        if (monitors[i]->screen != monitors[j]->screen) continue;
+ 
+         if (monitors_overlap_p (monitors[i], monitors[j]))
+           {
+@@ -656,17 +658,15 @@
+           }
+       }
+ 
+-  /* Finally, make sure all monitors are enclosed by their X screen.
++  /* Finally, make sure all monitors have sane positions and sizes.
+      Xinerama sometimes reports 1024x768 VPs at -1936862040, -1953705044.
+    */
+   for (i = 0; i < count; i++)
+     {
+-      int sw = WidthOfScreen (monitors[i]->screen)  * 2;
+-      int sh = HeightOfScreen (monitors[i]->screen) * 2;
+       if (monitors[i]->sanity != S_SANE) continue; /* already marked */
+-      if (X1    <  0 || Y1    <  0 || 
+-          W1    <= 0 || H1    <= 0 || 
+-          X1+W1 > sw || Y1+H1 > sh)
++      if (X1    <  0      || Y1    <  0 || 
++          W1    <= 0      || H1    <= 0 || 
++          X1+W1 >= 0x7FFF || Y1+H1 >= 0x7FFF)
+         {
+           monitors[i]->sanity = S_OFFSCREEN;
+           monitors[i]->enemy = 0;

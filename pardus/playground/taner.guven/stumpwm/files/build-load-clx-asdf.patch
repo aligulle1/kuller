@@ -1,0 +1,21 @@
+diff -Nuar stumpwm.orig/load_clx_asdf.lisp stumpwm/load_clx_asdf.lisp
+--- stumpwm.orig/load_clx_asdf.lisp	1970-01-01 02:00:00.000000000 +0200
++++ stumpwm/load_clx_asdf.lisp	2011-10-16 13:44:46.192000321 +0300
+@@ -0,0 +1,5 @@
++#+clisp
++(require "clx")
++
++#-asdf
++(require :asdf #+clisp '(#P"/usr/share/common-lisp/source/cl-asdf/asdf.lisp"))
+\ No newline at end of file
+diff -Nuar stumpwm.orig/Makefile.in stumpwm/Makefile.in
+--- stumpwm.orig/Makefile.in	2011-10-16 13:44:32.463000031 +0300
++++ stumpwm/Makefile.in	2011-10-16 13:45:00.379000108 +0300
+@@ -1,6 +1,6 @@
+ LISP=@LISP_PROGRAM@
+ 
+-clisp_BUILDOPTS=-on-error exit ./make-image.lisp
++clisp_BUILDOPTS=-on-error exit -i load_clx_asdf.lisp ./make-image.lisp
+ sbcl_BUILDOPTS=--load ./make-image.lisp
+ ccl_BUILDOPTS=--load ./make-image.lisp
+ ecl_BUILDOPTS=-norc -shell ./make-image.lisp

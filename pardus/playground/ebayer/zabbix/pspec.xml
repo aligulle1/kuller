@@ -1,0 +1,256 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>zabbix</Name>
+        <Homepage>http://www.zabbix.com/</Homepage>
+        <Packager>
+            <Name>Erdem Bayer</Name>
+            <Email>ebayer@bayer.gen.tr</Email>
+        </Packager>
+        <License>GPLv2</License>
+        <Summary>Open-source monitoring solution for your IT infrastructure</Summary>
+        <Description>ZABBIX is software that monitors numerous parameters of a network and the health and integrity of servers.</Description>
+        <Archive sha1sum="68f5d1f12897bc69c6ff5deea2bad82b0c1f5761" type="targz">mirrors://sourceforge/zabbix/zabbix-1.8.3.tar.gz</Archive>
+        <BuildDependencies>
+            <Dependency>apache</Dependency>
+            <Dependency>mod_php</Dependency>
+            <Dependency>postgresql-lib</Dependency>
+            <Dependency>mysql-lib</Dependency>
+            <Dependency>iksemel</Dependency>
+            <Dependency>net-snmp</Dependency>
+            <Dependency>openldap-client</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <Patch level="1">0001-Fix-linking-with-ldap-libs.patch</Patch>
+            <Patch level="1">0002-m4-ax_lib_postgresql.m4-move-pq-from-POSTGRESQL_LDFL.patch</Patch>
+            <Patch level="1">zabbix-1.8.3-config.patch</Patch>
+        </Patches>
+    </Source>
+    
+    <Package>
+        <Name>zabbix-common</Name>
+        <Files>
+            <Path fileType="data">/var/log/zabbix</Path>
+            <Path fileType="data">/var/run/zabbix</Path>
+            <Path fileType="doc">/usr/share/doc/zabbix</Path>
+        </Files>
+        <Provides>
+            <COMAR script="package.py">System.Package</COMAR>
+        </Provides>
+    </Package>
+
+    <Package>
+        <Name>zabbix-web</Name>
+        <RuntimeDependencies>
+            <Dependency release="current">zabbix-common</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="config">/etc/apache2/conf.d</Path>
+            <Path fileType="config">/etc/zabbix/web</Path>
+            <Path fileType="data">/usr/share/zabbix</Path>
+        </Files>
+        <AdditionalFiles>
+            <AdditionalFile target="/etc/apache2/conf.d/zabbix.conf" owner="root" group="root" permission="0644">zabbix-web.conf</AdditionalFile>
+        </AdditionalFiles>
+    </Package>
+
+    <Package>
+        <Name>zabbix-agent</Name>
+        <RuntimeDependencies>
+            <Dependency release="current">zabbix-common</Dependency>
+            <Dependency>openldap-client</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="config">/etc/zabbix/zabbix_agent.conf</Path>
+            <Path fileType="config">/etc/zabbix/zabbix_agentd.conf</Path>
+            <Path fileType="executable">/usr/sbin/zabbix_agent</Path>
+            <Path fileType="executable">/usr/sbin/zabbix_agentd</Path>
+            <Path fileType="executable">/usr/bin/zabbix_sender</Path>
+            <Path fileType="executable">/usr/bin/zabbix_get</Path>
+            <Path fileType="man">/usr/share/man/man1/zabbix_sender.1*</Path>
+            <Path fileType="man">/usr/share/man/man1/zabbix_get.1*</Path>
+            <Path fileType="man">/usr/share/man/man8/zabbix_agentd.8*</Path>
+        </Files>
+        <Provides>
+            <COMAR script="agent-service.py">System.Service</COMAR>
+        </Provides>
+    </Package>
+
+    <Package>
+        <Name>zabbix-server-common</Name>
+        <RuntimeDependencies>
+            <Dependency release="current">zabbix-common</Dependency>
+        </RuntimeDependencies>
+        <Conflicts>
+            <Package>zabbix-proxy-common</Package>
+        </Conflicts>
+        <Files>
+            <Path fileType="config">/etc/zabbix/zabbix_server.conf</Path>
+            <Path fileType="man">/usr/share/man/man8/zabbix_server.8*</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>zabbix-server-mysql</Name>
+        <RuntimeDependencies>
+            <Dependency release="current">zabbix-server-common</Dependency>
+            <Dependency>mysql-lib</Dependency>
+            <Dependency>iksemel</Dependency>
+            <Dependency>net-snmp</Dependency>
+            <Dependency>openldap-client</Dependency>
+        </RuntimeDependencies>
+        <Conflicts>
+            <Package>zabbix-server-pgsql</Package>
+            <Package>zabbix-server-sqlite</Package>
+            <Package>zabbix-proxy-mysql</Package>
+            <Package>zabbix-proxy-pgsql</Package>
+            <Package>zabbix-proxy-sqlite</Package>
+        </Conflicts>
+        <Files>
+            <Path fileType="executable">/usr/sbin/zabbix_server_mysql</Path>
+        </Files>
+        <Provides>
+            <COMAR script="server-mysql-service.py" name="zabbix_server">System.Service</COMAR>
+        </Provides>
+    </Package>
+
+    <Package>
+        <Name>zabbix-server-pgsql</Name>
+        <RuntimeDependencies>
+            <Dependency release="current">zabbix-server-common</Dependency>
+            <Dependency>postgresql-lib</Dependency>
+            <Dependency>iksemel</Dependency>
+            <Dependency>net-snmp</Dependency>
+            <Dependency>openldap-client</Dependency>
+        </RuntimeDependencies>
+        <Conflicts>
+            <Package>zabbix-server-mysql</Package>
+            <Package>zabbix-server-sqlite</Package>
+            <Package>zabbix-proxy-mysql</Package>
+            <Package>zabbix-proxy-pgsql</Package>
+            <Package>zabbix-proxy-sqlite</Package>
+        </Conflicts>
+        <Files>
+            <Path fileType="executable">/usr/sbin/zabbix_server_pgsql</Path>
+        </Files>
+        <Provides>
+            <COMAR script="server-pgsql-service.py" name="zabbix_server">System.Service</COMAR>
+        </Provides>
+    </Package>
+
+    <Package>
+        <Name>zabbix-server-sqlite</Name>
+        <RuntimeDependencies>
+            <Dependency release="current">zabbix-server-common</Dependency>
+            <Dependency>iksemel</Dependency>
+            <Dependency>net-snmp</Dependency>
+            <Dependency>openldap-client</Dependency>
+        </RuntimeDependencies>
+        <Conflicts>
+            <Package>zabbix-server-mysql</Package>
+            <Package>zabbix-server-pgsql</Package>
+            <Package>zabbix-proxy-mysql</Package>
+            <Package>zabbix-proxy-pgsql</Package>
+            <Package>zabbix-proxy-sqlite</Package>
+        </Conflicts>
+        <Files>
+            <Path fileType="executable">/usr/sbin/zabbix_server_sqlite</Path>
+        </Files>
+        <Provides>
+            <COMAR script="server-sqlite-service.py" name="zabbix_server">System.Service</COMAR>
+        </Provides>
+    </Package>
+
+    <Package>
+        <Name>zabbix-proxy-common</Name>
+        <RuntimeDependencies>
+            <Dependency release="current">zabbix-common</Dependency>
+        </RuntimeDependencies>
+        <Conflicts>
+            <Package>zabbix-server-common</Package>
+        </Conflicts>
+        <Files>
+            <Path fileType="config">/etc/zabbix/zabbix_proxy.conf</Path>
+            <Path fileType="man">/usr/share/man/man8/zabbix_proxy.8*</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>zabbix-proxy-mysql</Name>
+        <RuntimeDependencies>
+            <Dependency release="current">zabbix-proxy-common</Dependency>
+            <Dependency>mysql-lib</Dependency>
+            <Dependency>net-snmp</Dependency>
+            <Dependency>openldap-client</Dependency>
+        </RuntimeDependencies>
+        <Conflicts>
+            <Package>zabbix-proxy-pgsql</Package>
+            <Package>zabbix-proxy-sqlite</Package>
+            <Package>zabbix-server-mysql</Package>
+            <Package>zabbix-server-pgsql</Package>
+            <Package>zabbix-server-sqlite</Package>
+        </Conflicts>
+        <Files>
+            <Path fileType="executable">/usr/sbin/zabbix_proxy_mysql</Path>
+        </Files>
+        <Provides>
+            <COMAR script="proxy-mysql-service.py" name="zabbix_proxy">System.Service</COMAR>
+        </Provides>
+    </Package>
+
+    <Package>
+        <Name>zabbix-proxy-pgsql</Name>
+        <RuntimeDependencies>
+            <Dependency release="current">zabbix-proxy-common</Dependency>
+            <Dependency>postgresql-lib</Dependency>
+            <Dependency>net-snmp</Dependency>
+            <Dependency>openldap-client</Dependency>
+        </RuntimeDependencies>
+        <Conflicts>
+            <Package>zabbix-proxy-mysql</Package>
+            <Package>zabbix-proxy-sqlite</Package>
+            <Package>zabbix-server-mysql</Package>
+            <Package>zabbix-server-pgsql</Package>
+            <Package>zabbix-server-sqlite</Package>
+        </Conflicts>
+        <Files>
+            <Path fileType="executable">/usr/sbin/zabbix_proxy_pgsql</Path>
+        </Files>
+        <Provides>
+            <COMAR script="proxy-pgsql-service.py" name="zabbix_proxy">System.Service</COMAR>
+        </Provides>
+    </Package>
+
+    <Package>
+        <Name>zabbix-proxy-sqlite</Name>
+        <RuntimeDependencies>
+            <Dependency release="current">zabbix-proxy-common</Dependency>
+            <Dependency>net-snmp</Dependency>
+            <Dependency>openldap-client</Dependency>
+        </RuntimeDependencies>
+        <Conflicts>
+            <Package>zabbix-proxy-mysql</Package>
+            <Package>zabbix-proxy-pgsql</Package>
+            <Package>zabbix-server-mysql</Package>
+            <Package>zabbix-server-pgsql</Package>
+            <Package>zabbix-server-sqlite</Package>
+        </Conflicts>
+        <Files>
+            <Path fileType="executable">/usr/sbin/zabbix_proxy_sqlite</Path>
+        </Files>
+        <Provides>
+            <COMAR script="proxy-sqlite-service.py" name="zabbix_proxy">System.Service</COMAR>
+        </Provides>
+    </Package>
+    
+    <History>
+        <Update release="1">
+            <Date>2010-11-18</Date>
+            <Version>1.8.3</Version>
+            <Comment>First Release</Comment>
+            <Name>Erdem Bayer</Name>
+            <Email>ebayer@bayer.gen.tr</Email>
+        </Update>
+    </History>
+</PISI>

@@ -1,0 +1,182 @@
+diff -urN last.fm-1.3.0.58-08/src/container.cpp last.fm-1.3.0.58-09/src/container.cpp
+--- last.fm-1.3.0.58-08/src/container.cpp	2007-06-24 19:19:04.000000000 -0700
++++ last.fm-1.3.0.58-09/src/container.cpp	2007-06-24 19:50:59.000000000 -0700
+@@ -30,6 +30,7 @@
+ #include "container.h"
+ #include "containerutils.h"
+ #include "controlinterface.h"
++#include "dbusinterface.h"
+ #include "deleteuserdialog.h"
+ #include "interfaces/ExtensionInterface.h"
+ #include "iconshack.h"
+@@ -149,6 +150,10 @@
+     installHelperApp();
+   #endif
+ 
++  #ifdef LINUX
++    m_dbusInterface = new DBusInterface();
++  #endif
++
+ //////
+     // don't use CTRL as that varies by platform, it is easier to have a single
+     // shortcut to tell all users
+@@ -473,6 +478,10 @@
+ 
+     connect( this,           SIGNAL( newSong( MetaData ) ),
+              ui.songTimeBar, SLOT( setNewTrack( const MetaData& ) ) );
++  #ifdef LINUX 
++    connect( this,            SIGNAL( newSong( MetaData ) ),
++             m_dbusInterface, SLOT( setNewSong( const MetaData& ) ) );
++  #endif
+ 
+     ui.stationTimeBar->setProgressEnabled( false );
+     ui.stationTimeBar->setVisible( false );
+diff -urN last.fm-1.3.0.58-08/src/container.h last.fm-1.3.0.58-09/src/container.h
+--- last.fm-1.3.0.58-08/src/container.h	2007-06-24 19:19:06.000000000 -0700
++++ last.fm-1.3.0.58-09/src/container.h	2007-06-24 19:31:09.000000000 -0700
+@@ -146,6 +146,9 @@
+       #endif
+         class ScrobblerManager *m_scrobbler;
+         class ControlInterface* m_iControl;
++      #ifdef LINUX
++        class DBusInterface* m_dbusInterface;
++      #endif
+     
+         /** having a persistent copy means whatever the user entered last time
+           * into the input widgets and that, stays, and load time is quicker too
+diff -urN last.fm-1.3.0.58-08/src/dbusinterface.cpp last.fm-1.3.0.58-09/src/dbusinterface.cpp
+--- last.fm-1.3.0.58-08/src/dbusinterface.cpp	1969-12-31 16:00:00.000000000 -0800
++++ last.fm-1.3.0.58-09/src/dbusinterface.cpp	2007-06-24 19:52:23.000000000 -0700
+@@ -0,0 +1,51 @@
++/***************************************************************************
++ *   Copyright (C) 2007 by                                                 *
++ *      İsmail Dönmez <ismail@pardus.org.tr>                               *
++ *                                                                         *
++ *   This program is free software; you can redistribute it and/or modify  *
++ *   it under the terms of the GNU General Public License as published by  *
++ *   the Free Software Foundation; either version 2 of the License, or     *
++ *   (at your option) any later version.                                   *
++ *                                                                         *
++ *   This program is distributed in the hope that it will be useful,       *
++ *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
++ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
++ *   GNU General Public License for more details.                          *
++ *                                                                         *
++ *   You should have received a copy of the GNU General Public License     *
++ *   along with this program; if not, write to the                         *
++ *   Free Software Foundation, Inc.,                                       *
++ *   51 Franklin Steet, Fifth Floor, Boston, MA  02111-1307, USA.          *
++ ***************************************************************************/
++
++#include <QtDBus/QtDBus>
++
++#include "dbusinterface.h"
++
++DBusInterface::DBusInterface()
++{
++  QDBusConnection::sessionBus().registerService("com.lastfm.DBusInterface");
++  QDBusConnection::sessionBus().registerObject("/", this, QDBusConnection::ExportAllSlots);
++}
++
++void DBusInterface::setNewSong(const MetaData& metaData )
++{
++  m_artist = metaData.artist();
++  m_album  = metaData.album();
++  m_track  = metaData.track();
++}
++
++QString DBusInterface::currentArtist()
++{
++  return m_artist;
++}
++
++QString DBusInterface::currentAlbum()
++{
++  return m_album;
++}
++
++QString DBusInterface::currentTrack()
++{
++  return m_track;
++}
+diff -urN last.fm-1.3.0.58-08/src/dbusinterface.h last.fm-1.3.0.58-09/src/dbusinterface.h
+--- last.fm-1.3.0.58-08/src/dbusinterface.h	1969-12-31 16:00:00.000000000 -0800
++++ last.fm-1.3.0.58-09/src/dbusinterface.h	2007-06-24 19:30:06.000000000 -0700
+@@ -0,0 +1,49 @@
++/***************************************************************************
++ *   Copyright (C) 2007 by                                                 *
++ *      İsmail Dönmez <ismail@pardus.org.tr>                               *
++ *                                                                         *
++ *   This program is free software; you can redistribute it and/or modify  *
++ *   it under the terms of the GNU General Public License as published by  *
++ *   the Free Software Foundation; either version 2 of the License, or     *
++ *   (at your option) any later version.                                   *
++ *                                                                         *
++ *   This program is distributed in the hope that it will be useful,       *
++ *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
++ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
++ *   GNU General Public License for more details.                          *
++ *                                                                         *
++ *   You should have received a copy of the GNU General Public License     *
++ *   along with this program; if not, write to the                         *
++ *   Free Software Foundation, Inc.,                                       *
++ *   51 Franklin Steet, Fifth Floor, Boston, MA  02111-1307, USA.          *
++ ***************************************************************************/
++
++#ifndef DBUSINTERFACE_H
++#define DBUSINTERFACE_H
++
++#ifdef LINUX
++
++#include <QtCore/QObject>
++#include "metadata.h"
++
++class DBusInterface: public QObject
++{
++ Q_OBJECT
++
++ public:
++  DBusInterface();
++
++ public slots:
++  void setNewSong(const MetaData& );
++  Q_SCRIPTABLE QString currentArtist();
++  Q_SCRIPTABLE QString currentAlbum();
++  Q_SCRIPTABLE QString currentTrack();
++
++ private:
++  QString m_artist, m_album, m_track;
++
++};
++
++#endif // LINUX
++
++#endif // DBUSINTERFACE_H
+diff -urN last.fm-1.3.0.58-08/src/src.pro last.fm-1.3.0.58-09/src/src.pro
+--- last.fm-1.3.0.58-08/src/src.pro	2007-06-24 19:19:06.000000000 -0700
++++ last.fm-1.3.0.58-09/src/src.pro	2007-06-24 19:26:42.000000000 -0700
+@@ -6,6 +6,7 @@
+ 
+ PRECOMPILED_HEADER = precompiled.h
+ CONFIG += precompile_header
++CONFIG += qdbus
+ 
+ unix {
+     # precompiled headers breaks icecream builds for some reason :(
+@@ -215,12 +216,14 @@
+              searchextension/search_win.ui
+     
+     SOURCES += trayicon/trayicon_x11.cpp \
+-                simplewizard_mac.cpp
++                simplewizard_mac.cpp \
++                dbusinterface.cpp
+                 
+     #--warning
+     HEADERS -= itunesscript.h
+                 
+-    HEADERS += simplewizard_mac.h
++    HEADERS += simplewizard_mac.h \
++               dbusinterface.h
+     
+     INCLUDEPATH += breakpad
+ }

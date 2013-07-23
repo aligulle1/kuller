@@ -1,0 +1,259 @@
+Index: ksysguard/gui/Workspace.cc
+===================================================================
+--- ksysguard/gui/Workspace.cc	(revision 608083)
++++ ksysguard/gui/Workspace.cc	(revision 608084)
+@@ -35,6 +35,7 @@
+ 
+ #include "WorkSheet.h"
+ #include "WorkSheetSettings.h"
++#include "ProcessController.h"
+ 
+ #include "Workspace.h"
+ 
+@@ -341,7 +342,7 @@
+     }
+ }
+ 
+-bool Workspace::restoreWorkSheet( const QString &fileName, const QString &newName )
++WorkSheet *Workspace::restoreWorkSheet( const QString &fileName, const QString &newName )
+ {
+   /* We might want to save the worksheet under a different name later. This
+    * name can be specified by newName. If newName is empty we use the
+@@ -365,7 +366,7 @@
+ 
+   if ( !sheet->load( fileName ) ) {
+     delete sheet;
+-    return false;
++    return NULL;
+   }
+   
+   mSheetList.append( sheet );
+@@ -377,7 +378,7 @@
+   if ( !newName.isEmpty() )
+     sheet->setFileName( newName );
+ 
+-  return true;
++  return sheet;
+ }
+ 
+ void Workspace::cut()
+@@ -443,10 +444,20 @@
+   kstd->addResourceType( "data", "share/apps/ksysguard" );
+ 
+   QString file = kstd->findResource( "data", "ProcessTable.sgrd" );
+-  if ( !file.isEmpty() )
+-    restoreWorkSheet( file );
+-  else
++  if ( file.isEmpty() ) {
+     KMessageBox::error( this, i18n( "Cannot find file ProcessTable.sgrd." ) );
++    return;
++  }
++  WorkSheet *processSheet = restoreWorkSheet( file );
++  if(!processSheet) return;
++
++  //Set the focus of the search line.  This is nasty I know, but I don't know how better to do this :(
++  KSGRD::SensorDisplay *processSensor = processSheet->display( 0,0 );
++  if(!processSensor || !processSensor->isA("ProcessController")) return;
++  ProcessController *controller = dynamic_cast<ProcessController *>(processSensor);
++  if(!controller) return;
++  controller->setSearchFocus();
++
+ }
+ 
+ #include "Workspace.moc"
+Index: ksysguard/gui/Workspace.h
+===================================================================
+--- ksysguard/gui/Workspace.h	(revision 608083)
++++ ksysguard/gui/Workspace.h	(revision 608084)
+@@ -47,7 +47,7 @@
+ 
+     void showProcesses();
+ 
+-    bool restoreWorkSheet( const QString &fileName,
++    WorkSheet *restoreWorkSheet( const QString &fileName,
+                            const QString &newName = QString::null );
+     void deleteWorkSheet( const QString &fileName );
+ 
+Index: ksysguard/gui/SensorDisplayLib/ProcessController.h
+===================================================================
+--- ksysguard/gui/SensorDisplayLib/ProcessController.h	(revision 608083)
++++ ksysguard/gui/SensorDisplayLib/ProcessController.h	(revision 608084)
+@@ -87,6 +87,8 @@
+ 	}
+ 
+ public slots:
++	void setSearchFocus();
++	void fixTabOrder();
+ 	void filterModeChanged(int filter)
+ 	{
+ 		pList->setFilterMode(filter);
+Index: ksysguard/gui/SensorDisplayLib/SensorDisplay.cc
+===================================================================
+--- ksysguard/gui/SensorDisplayLib/SensorDisplay.cc	(revision 608083)
++++ ksysguard/gui/SensorDisplayLib/SensorDisplay.cc	(revision 608084)
+@@ -83,7 +83,6 @@
+   /* Let's call updateWhatsThis() in case the derived class does not do
+    * this. */
+   updateWhatsThis();
+-  setFocusPolicy( QWidget::StrongFocus );
+ }
+ 
+ SensorDisplay::~SensorDisplay()
+@@ -431,18 +430,6 @@
+   }
+ }
+ 
+-void SensorDisplay::focusInEvent( QFocusEvent* )
+-{
+-  if(mFrame)
+-    mFrame->setLineWidth( 2 );
+-}
+-
+-void SensorDisplay::focusOutEvent( QFocusEvent* )
+-{
+-  if(mFrame)
+-    mFrame->setLineWidth( 1 );
+-}
+-
+ void SensorDisplay::setSensorOk( bool ok )
+ {
+   if ( ok ) {
+@@ -516,6 +503,7 @@
+ void SensorDisplay::setPlotterWidget( QWidget *wdg )
+ {
+   mPlotterWdg = wdg;
++
+ }
+ 
+ QWidget *SensorDisplay::frame()
+Index: ksysguard/gui/SensorDisplayLib/SensorDisplay.h
+===================================================================
+--- ksysguard/gui/SensorDisplayLib/SensorDisplay.h	(revision 608083)
++++ ksysguard/gui/SensorDisplayLib/SensorDisplay.h	(revision 608084)
+@@ -238,8 +238,6 @@
+ 
+   protected:
+     virtual bool eventFilter( QObject*, QEvent* );
+-    virtual void focusInEvent( QFocusEvent* );
+-    virtual void focusOutEvent( QFocusEvent* );
+     virtual void resizeEvent( QResizeEvent* );
+     virtual void timerEvent( QTimerEvent* );
+ 
+Index: ksysguard/gui/SensorDisplayLib/ProcessController.cc
+===================================================================
+--- ksysguard/gui/SensorDisplayLib/ProcessController.cc	(revision 608083)
++++ ksysguard/gui/SensorDisplayLib/ProcessController.cc	(revision 608084)
+@@ -65,11 +65,21 @@
+ 	dict.insert("Login", new QString(i18n("Login")));
+ 	dict.insert("Command", new QString(i18n("Command")));
+ 
++	// Setup the geometry management.
++	gm = new QVBoxLayout(this, 10);
++	Q_CHECK_PTR(gm);
++	gm->addSpacing(15);
++
++	gmSearch = new QHBoxLayout();
++	Q_CHECK_PTR(gmSearch);
++	gm->addLayout(gmSearch, 0);
++
+ 	// Create the table that lists the processes.
+ 	pList = new ProcessList(this, "pList");
+ 	Q_CHECK_PTR(pList);
+ 	pList->setShowSortIndicator(true);
+ 	pListSearchLine = new KListViewSearchLineWidget(pList, this, "process_list_search_line");
++	gmSearch->addWidget(pListSearchLine, 1);
+ 
+ 	connect(pList, SIGNAL(killProcess(int, int)),
+ 			this, SLOT(killProcess(int, int)));
+@@ -83,6 +93,7 @@
+ 	 * pList constructor sets cbFilter to its start value. */
+ 	cbFilter = new QComboBox(this, "pList_cbFilter");
+ 	Q_CHECK_PTR(cbFilter);
++	gmSearch->addWidget(cbFilter,0);
+ 	cbFilter->insertItem(i18n("All Processes"), 0);
+ 	cbFilter->insertItem(i18n("System Processes"), 1);
+ 	cbFilter->insertItem(i18n("User Processes"), 2);
+@@ -118,18 +129,6 @@
+ 	bKill->setEnabled(false);
+ 	killSupported = false;
+ 
+-	
+-	// Setup the geometry management.
+-	gm = new QVBoxLayout(this, 10);
+-	Q_CHECK_PTR(gm);
+-	gm->addSpacing(15);
+-
+-	gmSearch = new QHBoxLayout();
+-	Q_CHECK_PTR(gmSearch);
+-	gm->addLayout(gmSearch, 0);
+-	gmSearch->addWidget(pListSearchLine, 1);
+-	gmSearch->addWidget(cbFilter,0);
+-
+ 	gm->addWidget(pList, 1);
+ 
+ 	gm1 = new QHBoxLayout();
+@@ -149,8 +148,35 @@
+ 	setPlotterWidget(pList);
+ 
+ 	setMinimumSize(sizeHint());
++	fixTabOrder(); 
+ }
+ 
++void ProcessController::setSearchFocus() {
++	//stupid search line widget.  See rant in fixTabOrder
++	if(!pListSearchLine->searchLine())
++		QTimer::singleShot(100, this, SLOT(setSearchFocus()));
++	else {
++		pListSearchLine->searchLine()->setFocus();
++	}
++}
++void ProcessController::fixTabOrder() {
++
++	//Wow, I hate this search line widget so much.
++	//It creates the searchline in a singleshot timer.  This makes it totally unpredictable when searchLine is actually valid.
++	//So we set up singleshot timer and call ourselves over and over until it's ready.
++	//
++	//Did i mention I hate this?
++	if(!pListSearchLine->searchLine())
++		QTimer::singleShot(100, this, SLOT(fixTabOrder()));
++	else {
++		setTabOrder(pListSearchLine->searchLine(), cbFilter);
++		setTabOrder(cbFilter, pList);
++		setTabOrder(pList, xbTreeView);
++		setTabOrder(xbTreeView, bRefresh);
++		setTabOrder(bRefresh, bKill);
++	}
++}
++
+ void
+ ProcessController::resizeEvent(QResizeEvent* ev)
+ {
+Index: ksysguard/gui/WorkSheet.cc
+===================================================================
+--- ksysguard/gui/WorkSheet.cc	(revision 608083)
++++ ksysguard/gui/WorkSheet.cc	(revision 608084)
+@@ -634,6 +634,10 @@
+   mGridLayout->activate();
+ }
+ 
++KSGRD::SensorDisplay *WorkSheet::display( uint row, uint column ) {
++  if(row >= mRows || column >= mColumns) return 0;
++  return mDisplayList[row][column];
++}
+ KSGRD::SensorDisplay *WorkSheet::currentDisplay( uint *row, uint *column )
+ {
+   for ( uint r = 0 ; r < mRows; ++r )
+Index: ksysguard/gui/WorkSheet.h
+===================================================================
+--- ksysguard/gui/WorkSheet.h	(revision 608083)
++++ ksysguard/gui/WorkSheet.h	(revision 608084)
+@@ -72,6 +72,9 @@
+                                       const QString &sensorType,
+                                       const QString &sensorDescr,
+                                       uint rows, uint columns );
++    //Returns the sensor at position row,column.
++    //Return NULL if invalid row or column
++    KSGRD::SensorDisplay *display( uint row, uint column );
+ 
+     void settings();
+ 

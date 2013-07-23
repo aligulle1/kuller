@@ -1,0 +1,104 @@
+--- konversation/scripts/media.orig	2008-06-10 14:00:01.000000000 +0300
++++ konversation/scripts/media	2008-06-10 14:01:30.000000000 +0300
+@@ -48,9 +48,13 @@
+ ## If you add a new player, you must add it here or it won't get checked when in audio-only or video-only modes.
+ playerRankings= {
+     'video' :['kaffeine', 'noatun', 'kdetv'],
+-    'audio' :['Amarok', 'JuK', 'Noatun', 'Kaffeine', 'kscd', 'XMMS', 'Yammi', 'LastFM', 'Audacious']
++    'audio' :['Amarok', 'JuK', 'Noatun', 'Kaffeine', 'kscd', 'XMMS', 'Yammi', 'LastFM', 'Audacious', 'MPD']
+ }
+ 
++MPD_HOST = "localhost"
++
++MPD_PORT = 6600
++
+ ## Title, album and artist fields to be quoted depending on contents
+ # List the possible trigger characters here.
+ # If you want a '-', it must be first. if you want a '^', it must be last.
+@@ -300,6 +304,77 @@
+             else:
+                 return (self.reEncodeString(data),'','')
+ 
++import socket
++
++class MPD(Player):
++    def __init__(self, display_name):
++        Player.__init__(self, display_name)
++
++        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
++        self.data = ""
++
++        try:
++            self.sock.connect((MPD_HOST, MPD_PORT))
++            # just welcome message, we don't need it
++            self.sock.recv(1024)
++            self.sock.send("status\n")
++            status = self.sock.recv(1024)
++
++            print status
++
++            # If state is "stop", we should understand that mpd doesn't play anything
++            if status.find("state: stop") >= 0 or status.find("state: pause") >= 0:
++                self.running = False
++            else:
++                # it is running and append self.data veriable
++                self.running = True
++                self.sock.send("currentsong\n")
++                self.data = self.sock.recv(1024)
++        except socket.error:
++            self.running = False
++
++    def getData(self):
++        if not self.running:
++            return ''
++
++        data = self.data
++
++        # if there is Artist, Title and Album, get it
++        if (data.find("Artist") and data.find("Title") and data.find("Album")) > 0:
++            output = []
++            # MPD return is like this; "Title: Foo\nAlbum: Bar\nGenre: Baz"
++            for meta in data.split("\n"):
++                if meta.startswith("Artist"):
++                    output.insert(1, self.reEncodeString(meta.split(":")[1].lstrip()))
++                if meta.startswith("Title"):
++                    output.insert(0, self.reEncodeString(meta.split(":")[1].lstrip()))
++                if meta.startswith("Album"):
++                    output.insert(2, self.reEncodeString(meta.split(":")[1].lstrip()))
++            return output
++        elif (data.find("Artist") and data.find("Title")) > 0:
++            output = []
++            for meta in data.split("\n"):
++                if meta.startswith("Title"):
++                    output.insert(0, self.reEncodeString(meta.split(":")[1].lstrip()))
++                if meta.startswith("Artist"):
++                    output.insert(1, self.reEncodeString(meta.split(":")[1].lstrip()))
++            return output
++        elif data.find("Title") > 0:
++            output = []
++            for meta in data.split("\n"):
++                if meta.startswith("Title"):
++                    output.insert(0, self.reEncodeString(meta.split(":")[1].lstrip()))
++            return output
++        else:
++            # else, show File name as being played ;) MPD ROCKS :P
++            output = []
++            for meta in data.split("\n"):
++                if meta.startswith("file"):
++                    filename = meta.split(":")[1].split("/")[-1].lstrip()
++                    output.insert(0, self.reEncodeString(filename))
++            return output
++
++
+ def playing(playerList, mode=None):
+     for i in playerList:
+         s=i.get(mode)
+@@ -359,7 +434,7 @@
+ DCOPPlayer("Noatun",'noatun',"Noatun title",playerType='audio, video'),
+ DCOPPlayer("Kaffeine","kaffeine","KaffeineIface title","KaffeineIface artist","KaffeineIface album",playerType='video, audio'),
+ DCOPPlayer("KsCD","kscd","CDPlayer currentTrackTitle","CDPlayer currentArtist","CDPlayer currentAlbum"),
+-XmmsPlayer('XMMS'),
++XmmsPlayer('XMMS'), MPD('MPD'),
+ DCOPPlayer("Yammi","yammi","YammiPlayer songTitle","YammiPlayer songArtist","YammiPlayer songAlbum"),
+ DCOPPlayer("kdetv","kdetv","KdetvIface channelName",playerType='video'),
+ LastFMPlayer(),

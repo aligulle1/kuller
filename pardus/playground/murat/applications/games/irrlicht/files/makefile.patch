@@ -1,0 +1,67 @@
+--- source/Irrlicht/Makefile.orig	2007-11-29 18:16:36.000000000 +0200
++++ source/Irrlicht/Makefile	2007-12-08 17:21:48.000000000 +0200
+@@ -43,33 +43,33 @@
+ EXTRAOBJ =
+ LINKOBJ := $(IRRMESHOBJ) $(IRROBJ) $(IRRPARTICLEOBJ) $(IRRANIMOBJ) \
+ 	$(IRRVIDEOOBJ) $(IRRSWRENDEROBJ) $(IRRIOOBJ) $(IRROTHEROBJ) \
+-	$(IRRGUIOBJ) $(ZLIBOBJ) $(JPEGLIBOBJ) $(LIBPNGOBJ) $(EXTRAOBJ)
++	$(IRRGUIOBJ) $(EXTRAOBJ)
+ 
+ ###############
+ #Compiler flags
+-CXXINCS = -I../../include -Izlib -Ijpeglib -Ilibpng
+-CPPFLAGS = $(CXXINCS) -DIRRLICHT_EXPORTS=1
+-CXXFLAGS = -Wall
++CXXINCS += -I../../include
++CPPFLAGS += $(CXXINCS) -DIRRLICHT_EXPORTS=1
++CXXFLAGS += -Wall
+ ifndef NDEBUG
+-CXXFLAGS += -g -D_DEBUG
++CXXFLAGS +=
+ else
+-CXXFLAGS += -fexpensive-optimizations -O3
++CXXFLAGS += -fexpensive-optimizations
+ endif
+ ifdef PROFILE
+ CXXFLAGS += -pg
+ endif
+-CFLAGS := -fexpensive-optimizations -O3 -DPNG_NO_MMX_CODE -DPNG_NO_MNG_FEATURES
++CFLAGS += -fexpensive-optimizations -DPNG_NO_MMX_CODE -DPNG_NO_MNG_FEATURES
+ 
+ #Linux specific options
+ STATIC_LIB = libIrrlicht.a
+ SHARED_LIB = libIrrlicht.so
+ IRRLICHT_DLL := ../../bin/Win32-gcc/Irrlicht.dll
+ LIB_PATH = ../../lib/$(SYSTEM)
+-INSTALL_DIR = /usr/local/lib
++INSTALL_DIR = /usr/lib
+ staticlib sharedlib install: SYSTEM = Linux
+ staticlib sharedlib : LDFLAGS = --no-export-all-symbols --add-stdcall-alias
+-sharedlib : LDFLAGS += -L/usr/X11R6/lib -lGL -lXxf86vm
+-staticlib sharedlib : CXXINCS += -I/usr/X11R6/include
++sharedlib : LDFLAGS += -L/usr/lib -lGLU -lGL -lXxf86vm -lXext -lX11 -lpng -ljpeg
++staticlib sharedlib : CXXINCS += -I/usr/include
+ 
+ #Windows specific options
+ sharedlib_win32 staticlib_win32: SYSTEM = Win32-gcc
+@@ -85,6 +85,7 @@
+ sharedlib: $(LINKOBJ)
+ 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -shared -Wl,-soname,$(SHARED_LIB).1 -fPIC -o $(SHARED_LIB).$(VERSION) $^ $(LDFLAGS)
+ 	cp $(SHARED_LIB).$(VERSION) $(LIB_PATH)
++	ln -s $(SHARED_LIB).$(VERSION) $(LIB_PATH)/$(SHARED_LIB)
+ 
+ # Builds Irrlicht as static lib (libIrrlicht.a)
+ $(STATIC_LIB): $(LINKOBJ)
+@@ -105,9 +106,9 @@
+ 
+ # Installs Irrlicht if it was created as shared lib
+ install:
+-	cp $(LIB_PATH)/$(SHARED_LIB).$(VERSION) $(INSTALL_DIR)
+-	cd $(INSTALL_DIR) && ln -s libIrrlicht.so.$(VERSION) $(SHARED_LIB)
+-	ldconfig -n $(INSTALL_DIR)
++	mkdir -p $(DESTDIR)/$(INSTALL_DIR)
++	cp $(LIB_PATH)/$(SHARED_LIB).$(VERSION) $(DESTDIR)/$(INSTALL_DIR)
++	cd $(DESTDIR)/$(INSTALL_DIR) && ln -s libIrrlicht.so.$(VERSION) $(SHARED_LIB).1 && ln -s libIrrlicht.so.$(VERSION) $(SHARED_LIB)
+ 
+ # Create dependency files for automatic recompilation
+ %.d:%.cpp

@@ -1,0 +1,14 @@
+diff -uNBwp Lib/ctypes/util.py.orig Lib/ctypes/util.py
+--- Lib/ctypes/util.py.orig	2010-09-15 15:06:09.000000000 +0200
++++ Lib/ctypes/util.py	2011-02-17 20:00:06.163171630 +0100
+@@ -135,7 +135,9 @@ elif os.name == "posix":
+             dump = f.read()
+             rv = f.close()
+             if rv == 10:
+-                raise OSError('objdump command not found')
++                return os.path.basename(f) # This is good for Glibc, I think,
++                                           # and a dep on binutils is big (for
++                                           # live CDs).
+             with contextlib.closing(os.popen(cmd)) as f:
+                 data = f.read()
+             res = re.search(r'\sSONAME\s+([^\s]+)', data)

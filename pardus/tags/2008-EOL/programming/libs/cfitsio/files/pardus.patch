@@ -1,0 +1,34 @@
+--- configure.orig	2006-11-13 19:14:20.000000000 +0200
++++ configure	2007-04-30 21:22:14.000000000 +0300
+@@ -3379,8 +3379,8 @@
+ 
+ # Shared library section
+ #-------------------------------------------------------------------------------
+-SHLIB_LD=:
+-SHLIB_SUFFIX=".so"
++SHLIB_LD="cc -shared -Wl,-soname,libcfitsio.so"
++SHLIB_SUFFIX=".so"
+ lhea_shlib_cflags=
+ case $EXT in
+   cygwin)
+@@ -3418,7 +3418,7 @@
+ # Darwin uses gcc (=cc), but needs different flags (see above)
+ # if test "x$GCC" = xyes; then
+ if test "x$GCC" = xyes && test "x$EXT" != xdarwin && test "x$EXT" != xcygwin; then
+-  SHLIB_LD="$CC -shared"
++  SHLIB_LD="cc -shared -Wl,-soname,libcfitsio.so"
+   lhea_shlib_cflags='-fPIC'
+ fi
+ if test "x$lhea_shlib_cflags" != x; then
+--- Makefile.in	2006-11-07 19:30:44.000000000 +0200
++++ Makefile.in	2008-01-07 19:57:57.000000000 +0200
+@@ -90,9 +90,6 @@
+ 		${SHLIB_LD} -o $@ ${OBJECTS}
+ 
+ install:	libcfitsio.a $(INSTALL_DIRS)
+-		@if [ -f libcfitsio.a ]; then \
+-			/bin/mv libcfitsio.a ${CFITSIO_LIB}; \
+-		fi; \
+ 		if [ -f libcfitsio${SHLIB_SUFFIX} ]; then \
+ 			/bin/mv libcfitsio${SHLIB_SUFFIX} ${CFITSIO_LIB}; \
+ 		fi; \

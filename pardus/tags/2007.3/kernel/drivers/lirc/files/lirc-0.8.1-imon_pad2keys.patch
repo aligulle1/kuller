@@ -1,0 +1,130 @@
+--- lirc-0.8.1-old/drivers/lirc_imon/lirc_imon.c	2006-12-29 11:00:07.000000000 +0100
++++ lirc-0.8.1/drivers/lirc_imon/lirc_imon.c	2007-04-23 14:50:31.000000000 +0200
+@@ -65,9 +65,9 @@
+ 
+ 
+ #define MOD_AUTHOR	"Venky Raju <dev@venky.ws>"
+-#define MOD_DESC	"Driver for Soundgraph iMON MultiMedian IR/VFD"
+-#define MOD_NAME	"lirc_imon"
+-#define MOD_VERSION	"0.3"
++#define MOD_DESC	"Driver for Soundgraph iMON MultiMedian IR/VFD w/imon pad2keys patch"
++#define MOD_NAME	"lirc_imon2"
++#define MOD_VERSION	"0.3p2k"
+ 
+ #define VFD_MINOR_BASE	144	/* Same as LCD */
+ #define DEVFS_MODE	S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH
+@@ -81,6 +81,7 @@
+ #define SUCCESS		0
+ #define	TRUE		1
+ #define FALSE		0
++#define CURSOR_LIMIT    16
+ 
+ 
+ /* ------------------------------------------------------------
+@@ -160,6 +161,9 @@
+ 		atomic_t busy;		     /* write in progress         */
+ 		int status;		     /* status of tx completion   */
+ 	} tx;
++	int key_x;
++	int key_y;
++	int last_count;                      /* number of times pressed   */
+ };
+ 
+ #define LOCK_CONTEXT	down (&context ->sem)
+@@ -250,6 +254,7 @@
+ 
+ MODULE_AUTHOR (MOD_AUTHOR);
+ MODULE_DESCRIPTION (MOD_DESC);
++MODULE_VERSION(MOD_VERSION);    /* MBr: was missing */
+ MODULE_LICENSE ("GPL");
+ module_param (debug, int, 0);
+ MODULE_PARM_DESC (debug, "Debug messages: 0=no, 1=yes (default: no)");
+@@ -574,6 +579,11 @@
+ 	context ->rx.initial_space = 1;
+ 	context ->rx.prev_bit = 0;
+ 
++        /* init pad context */
++        context ->key_x = 0;
++        context ->key_y = 0;
++        context ->last_count = 0;
++
+ 	usb_fill_int_urb (context ->rx_urb, context ->dev,
+ 		usb_rcvintpipe (context ->dev,
+ 				context ->rx_endpoint-> bEndpointAddress),
+@@ -704,6 +714,76 @@
+ 
+ 		/* The signals have been decoded onboard the iMON controller */
+ 
++               /* encode mouse pad as key events */
++               /* we like pad events, not mouse button events*/
++               if((buf[0] & 0x40) &&
++                   !(buf[1] & 0x01 || buf[1] >> 2 & 0x01))
++                {
++                    int rel_x = (buf[1] & 0x08) | (buf[1] & 0x10) >> 2 | (buf[1] & 0x20) >> 4 | (buf[1] & 0x40) >> 6;
++                    int rel_y = (buf[2] & 0x08) | (buf[2] & 0x10) >> 2 | (buf[2] & 0x20) >> 4 | (buf[2] & 0x40) >> 6;
++
++                    if(buf[0] & 0x02)
++                        rel_x |= ~0x10+1;
++                    if(buf[0] & 0x01)
++                        rel_y |= ~0x10+1;
++
++                    /* keyboard direction key emulation */
++                    if( context->last_count > 32 )
++                    {  /* Hopefully eliminate drift*/
++                        context->last_count=0;
++                        context->key_y=0;
++                        context->key_x=0;
++                    }
++                    context->last_count++;
++
++                    /* limit decoded events */
++                    if(abs(context->key_x) > CURSOR_LIMIT || abs(context->key_y) > CURSOR_LIMIT )
++                    {
++                        if(abs(context->key_y ) > abs(context->key_x))
++                        { /* mouse s/n */
++                            if(context->key_y > 0 && rel_y > 0)
++                            { /* mouse s */
++                                buf[0] = 0x68;
++                                buf[1] = 0x82;
++                                buf[2] = 0x91;
++                            }
++                            else if(context->key_y < 0 && rel_y < 0)
++                            { /* mouse n */
++                                buf[0] = 0x69;
++                                buf[1] = 0x02;
++                                buf[2] = 0x81;
++                            }
++                        }
++                        else
++                        { /* mouse e/w*/
++                            if(context->key_x > 0 && rel_x > 0 )
++                            { /* mouse e */
++                                buf[0] = 0x68;
++                                buf[1] = 0x8A;
++                                buf[2] = 0x81;
++                            }
++                            else if(context->key_x < 0 && rel_x < 0  )
++                            { /* mouse w */
++                                buf[0] = 0x6A;
++                                buf[1] = 0x82;
++                                buf[2] = 0x81;
++                            }
++                        }
++                    }
++                    else
++                    {
++                        context->key_x += rel_x;
++                        context->key_y += rel_y;
++
++                        return; /* discard those key codes */
++                    }
++                }
++
++                /* a key was pressed, reset count */
++                context->key_x = 0;
++                context->key_y = 0;
++                context->last_count = 0;
++
+ 		lirc_buffer_write_1 (context ->plugin ->rbuf, buf);
+ 		wake_up (&context ->plugin ->rbuf ->wait_poll);
+ 		return;

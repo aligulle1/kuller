@@ -1,0 +1,120 @@
+Index: NVIDIA-Linux-x86-177.76/usr/src/nv/nv.c
+===================================================================
+--- NVIDIA-Linux-x86-177.76.orig/usr/src/nv/nv.c
++++ NVIDIA-Linux-x86-177.76/usr/src/nv/nv.c
+@@ -907,6 +907,10 @@ static int __determine_pat_mode()
+ 
+ static unsigned long orig_pat1, orig_pat2;
+ 
++#ifdef CONFIG_PREEMPT_RT
++static raw_spinlock_t __nv_pat_entries_lock = __RAW_SPIN_LOCK_UNLOCKED;
++#endif
++
+ static void __nv_setup_pat_entries(void *info)
+ {
+     unsigned long pat1, pat2, cr4;
+@@ -918,8 +922,12 @@ static void __nv_setup_pat_entries(void 
+         return;
+ #endif
+ 
++#ifndef CONFIG_PREEMPT_RT
+     NV_SAVE_FLAGS(eflags);
+     NV_CLI();
++#else
++    spin_lock_irqsave(&__nv_pat_entries_lock, eflags);
++#endif
+     __nv_disable_caches(&cr4);
+ 
+     NV_READ_PAT_ENTRIES(pat1, pat2);
+@@ -930,7 +938,11 @@ static void __nv_setup_pat_entries(void 
+     NV_WRITE_PAT_ENTRIES(pat1, pat2);
+ 
+     __nv_enable_caches(cr4);
++#ifndef CONFIG_PREEMPT_RT
+     NV_RESTORE_FLAGS(eflags);
++#else
++    spin_unlock_irqrestore(&__nv_pat_entries_lock, eflags);
++#endif
+ }
+ 
+ static void __nv_restore_pat_entries(void *info)
+@@ -944,14 +956,22 @@ static void __nv_restore_pat_entries(voi
+         return;
+ #endif
+ 
++#ifndef CONFIG_PREEMPT_RT
+     NV_SAVE_FLAGS(eflags);
+     NV_CLI();
++#else
++    spin_lock_irqsave(&__nv_pat_entries_lock, eflags);
++#endif
+     __nv_disable_caches(&cr4);
+ 
+     NV_WRITE_PAT_ENTRIES(orig_pat1, orig_pat2);
+ 
+     __nv_enable_caches(cr4);
++#ifndef CONFIG_PREEMPT_RT
+     NV_RESTORE_FLAGS(eflags);
++#else
++    spin_unlock_irqrestore(&__nv_pat_entries_lock, eflags);
++#endif
+ }
+ #endif
+ 
+Index: NVIDIA-Linux-x86-177.76/usr/src/nv/nv-linux.h
+===================================================================
+--- NVIDIA-Linux-x86-177.76.orig/usr/src/nv/nv-linux.h
++++ NVIDIA-Linux-x86-177.76/usr/src/nv/nv-linux.h
+@@ -773,10 +773,14 @@ static inline int nv_execute_on_all_cpus
+ #  define NV_IS_SUSER()                 capable(CAP_SYS_ADMIN)
+ #  define NV_PCI_DEVICE_NAME(dev)       ((dev)->pretty_name)
+ #  define NV_NUM_CPUS()                 num_online_cpus()
++#ifndef CONFIG_PREEMPT_RT
+ #  define NV_CLI()                      local_irq_disable()
+ #  define NV_SAVE_FLAGS(eflags)         local_save_flags(eflags)
+ #  define NV_RESTORE_FLAGS(eflags)      local_irq_restore(eflags)
+ #  define NV_MAY_SLEEP()                (!in_interrupt() && !in_atomic())
++#else
++#  define NV_MAY_SLEEP() (!in_irq() && !in_softirq() && !in_atomic())
++#endif
+ #  define NV_MODULE_PARAMETER(x)        module_param(x, int, 0)
+ #  define NV_MODULE_STRING_PARAMETER(x) module_param(x, charp, 0)
+ 
+@@ -1068,6 +1072,7 @@ typedef void irqreturn_t;
+ /* this isn't defined in some older kernel header files */
+ #define NV_CPU_INTERRUPT_FLAGS_BIT (1<<9)
+ 
++#ifndef CONFIG_PREEMPT_RT
+ static inline int NV_IRQL_IS_RAISED(void)
+     {
+         unsigned long int eflags;
+@@ -1075,6 +1080,7 @@ static inline int NV_IRQL_IS_RAISED(void
+         return !(eflags & NV_CPU_INTERRUPT_FLAGS_BIT);
+     }
+ #endif
++#endif
+ 
+ static inline int nv_calc_order(unsigned int size)
+     {
+Index: NVIDIA-Linux-x86-177.76/usr/src/nv/os-interface.c
+===================================================================
+--- NVIDIA-Linux-x86-177.76.orig/usr/src/nv/os-interface.c
++++ NVIDIA-Linux-x86-177.76/usr/src/nv/os-interface.c
+@@ -613,7 +613,7 @@ RM_STATUS NV_API_CALL os_delay(U032 Mill
+     if (jiffies) 
+     {
+         // if we have at least 1 full jiffy to wait, give up the cpu
+-#if !defined(NV_XEN_SUPPORT_OLD_STYLE_KERNEL)
++#if !(defined(NV_XEN_SUPPORT_OLD_STYLE_KERNEL) || defined(CONFIG_PREEMPT_RT))
+         // but first, make sure we haven't raised the irql level on
+         // this cpu (most likely holding a lock). I'm seeing cases
+         // where we give up the cpu with raised irql, and never get
+@@ -627,7 +627,7 @@ RM_STATUS NV_API_CALL os_delay(U032 Mill
+ #endif
+             /* give up the cpu */
+             current->state = TASK_INTERRUPTIBLE;
+-#if !defined(NV_XEN_SUPPORT_OLD_STYLE_KERNEL)
++#if !(defined(NV_XEN_SUPPORT_OLD_STYLE_KERNEL) || defined(CONFIG_PREEMPT_RT))
+         }
+         else
+         {

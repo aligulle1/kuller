@@ -1,0 +1,35 @@
+
+commit 7e5b685255b2dbc9d96f954c86fcc86a56fee0c6
+Author: aliguori <aliguori@c046a42c-6fe2-441c-8c8c-71466251a162>
+Date:   Wed Dec 10 15:12:57 2008 +0000
+
+    Fix off-by-one bug limiting VNC passwords to 7 chars (Chris Webb)
+    
+    monitor_readline expects buf_size to include the terminating \0, but
+    do_change_vnc in monitor.c calls it as though it doesn't. The other site
+    where monitor_readline reads a password (in vl.c) passes the buffer
+    length
+    correctly.
+    
+    Signed-off-by: Chris Webb <chris@arachsys.com>
+    Signed-off-by: Anthony Liguori <aliguori@us.ibm.com>
+    
+    
+    
+    git-svn-id: svn+ssh://svn.savannah.nongnu.org/qemu/trunk@5966 c046a42c-6fe2-441c-8c8c-71466251a162
+
+diff --git a/monitor.c b/monitor.c
+index f142a87..bec9211 100644
+--- a/monitor.c
++++ b/monitor.c
+@@ -434,8 +434,7 @@ static void do_change_vnc(const char *target)
+     if (strcmp(target, "passwd") == 0 ||
+ 	strcmp(target, "password") == 0) {
+ 	char password[9];
+-	monitor_readline("Password: ", 1, password, sizeof(password)-1);
+-	password[sizeof(password)-1] = '\0';
++	monitor_readline("Password: ", 1, password, sizeof(password));
+ 	if (vnc_display_password(NULL, password) < 0)
+ 	    term_printf("could not set VNC server password\n");
+     } else {
+

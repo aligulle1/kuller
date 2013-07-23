@@ -1,0 +1,43 @@
+From 14a1971fd0ab7ce14bfb95408b4be54897c1450c Mon Sep 17 00:00:00 2001
+From: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+Date: Sat, 8 Aug 2009 00:26:25 -0700
+Subject: [PATCH 301/304] ACPI: video - fix potential crash when unloading
+
+thermal_cooling_device_register() returns error encoded in a pointer
+when it fails in which case we need to explictly set device->cdev
+to NULL so we don't try to unregister it when unloading.
+
+Signed-off-by: Dmitry Torokhov <dtor@mail.ru>
+Acked-by: Zhang Rui <rui.zhang@intel.com>
+Signed-off-by: Len Brown <len.brown@intel.com>
+---
+ drivers/acpi/video.c |   12 +++++++++++-
+ 1 files changed, 11 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/acpi/video.c b/drivers/acpi/video.c
+index bfdb624..39b3271 100644
+--- a/drivers/acpi/video.c
++++ b/drivers/acpi/video.c
+@@ -1000,8 +1000,18 @@ static void acpi_video_device_find_cap(struct acpi_video_device *device)
+ 
+ 		device->cdev = thermal_cooling_device_register("LCD",
+ 					device->dev, &video_cooling_ops);
+-		if (IS_ERR(device->cdev))
++		if (IS_ERR(device->cdev)) {
++			/*
++			 * Set cdev to NULL so we don't crash trying to
++			 * free it.
++			 * Also, why the hell we are returning early and
++			 * not attempt to register video output if cooling
++			 * device registration failed?
++			 * -- dtor
++			 */
++			device->cdev = NULL;
+ 			return;
++		}
+ 
+ 		dev_info(&device->dev->dev, "registered as cooling_device%d\n",
+ 			 device->cdev->id);
+-- 
+1.7.0.4
+

@@ -1,0 +1,57 @@
+for gdb-6.3/gdb/ChangeLog
+from  Alexandre Oliva  <aoliva@redhat.com>
+
+	* i386-linux-nat.c (i386_debug_register_for_thread): New struct.
+	(i386_linux_set_dr_for_thread): Rename from...
+	(i386_linux_set_debug_regs_for_thread): ... this, and
+	add new function to catch exceptions in the old one.
+
+Index: gdb-6.5/gdb/i386-linux-nat.c
+===================================================================
+--- gdb-6.5.orig/gdb/i386-linux-nat.c	2006-07-11 05:21:58.000000000 -0300
++++ gdb-6.5/gdb/i386-linux-nat.c	2006-07-11 05:24:29.000000000 -0300
+@@ -27,6 +27,7 @@
+ #include "observer.h"
+ #include "target.h"
+ #include "linux-nat.h"
++#include "exceptions.h"
+ 
+ #include "gdb_assert.h"
+ #include "gdb_string.h"
+@@ -695,14 +696,33 @@ struct i386_debug_register_state
+   unsigned long control;
+ };
+ 
+-static void
+-i386_linux_set_debug_regs_for_thread (ptid_t ptid,
+-				      struct i386_debug_register_state *dbs)
++struct i386_debug_register_for_thread
++{
++  ptid_t ptid;
++  struct i386_debug_register_state *dbs;
++};
++
++static int
++i386_linux_set_dr_for_thread (void *drp)
+ {
++  ptid_t ptid = ((struct i386_debug_register_for_thread *)drp)->ptid;
++  struct i386_debug_register_state *dbs
++    = ((struct i386_debug_register_for_thread *)drp)->dbs;
+   int i;
+   for (i = 0; i < (DR_LASTADDR - DR_FIRSTADDR) + 1; ++i)
+     i386_linux_dr_set_addr (ptid, i, dbs->addr[i]);
+   i386_linux_dr_set_control (ptid, dbs->control);
++  return 1;
++}
++
++static int
++i386_linux_set_debug_regs_for_thread (ptid_t ptid,
++				      struct i386_debug_register_state *dbs)
++{
++  struct i386_debug_register_for_thread dr;
++  dr.ptid = ptid;
++  dr.dbs = dbs;
++  return catch_errors (i386_linux_set_dr_for_thread, &dr, "", RETURN_MASK_ALL);
+ }
+ 
+ /* Iterator function to support syncing debug registers across all threads.  */

@@ -1,0 +1,18 @@
+diff -Naur hamlib-1.2.10/dummy/dummy.c hamlib-1.2.10-mod/dummy/dummy.c
+--- hamlib-1.2.10/dummy/dummy.c	2009-11-03 00:17:47.000000000 +0200
++++ hamlib-1.2.10-mod/dummy/dummy.c	2010-05-09 10:42:29.000000000 +0300
+@@ -206,8 +206,12 @@
+   for (i=0; i<NB_CHAN; i++) {
+ 	free(priv->mem[i].ext_levels);
+   }
+-  free(priv->vfo_a.ext_levels);
+-  free(priv->vfo_b.ext_levels);
++  if (priv->vfo_a.ext_levels != priv->vfo_b.ext_levels) {
++  	free(priv->vfo_a.ext_levels);
++  	free(priv->vfo_b.ext_levels);
++  } else {
++  	free(priv->vfo_a.ext_levels);
++  }
+   free(priv->ext_parms);
+ 
+   if (rig->state.priv)

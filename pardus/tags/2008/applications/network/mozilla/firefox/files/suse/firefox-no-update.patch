@@ -1,0 +1,144 @@
+Index: browser/components/preferences/advanced.js
+===================================================================
+RCS file: /cvsroot/mozilla/browser/components/preferences/advanced.js,v
+retrieving revision 1.27
+diff -u -p -6 -r1.27 advanced.js
+--- browser/components/preferences/advanced.js	9 Oct 2007 17:24:35 -0000	1.27
++++ browser/components/preferences/advanced.js	28 Nov 2007 15:30:36 -0000
+@@ -241,12 +241,14 @@ var gAdvancedPane = {
+         getService(Components.interfaces.nsIApplicationUpdateService);
+ 
+     var enabledPref = document.getElementById("app.update.enabled");
+     var enableAppUpdate = document.getElementById("enableAppUpdate");
+ 
+     enableAppUpdate.disabled = !aus.canUpdate || enabledPref.locked;
++    enableAppUpdate.disabled = true;
++    enableAppUpdate.hidden = true;
+   },
+ 
+   /**
+    * Enables/disables UI for "when updates are found" based on the values,
+    * and "locked" states of associated preferences.
+    */
+Index: browser/base/content/baseMenuOverlay.xul
+===================================================================
+RCS file: /cvsroot/mozilla/browser/base/content/baseMenuOverlay.xul,v
+retrieving revision 1.16
+diff -u -p -6 -r1.16 baseMenuOverlay.xul
+--- browser/base/content/baseMenuOverlay.xul	1 Apr 2007 05:22:56 -0000	1.16
++++ browser/base/content/baseMenuOverlay.xul	29 Nov 2007 13:11:29 -0000
+@@ -94,17 +94,17 @@
+ #endif
+         <menuitem id="releaseNotes"
+                   accesskey="&helpReleaseNotes.accesskey;"
+                   label="&helpReleaseNotes.label;"
+                   oncommand="openReleaseNotes(event)"
+                   onclick="checkForMiddleClick(this, event);"/>
+-        <menuseparator id="updateSeparator"/>
+         <menuitem id="checkForUpdates"
+                   accesskey="&updateCmd.accesskey;"
+                   label="&updateCmd.label;"
+                   class="menuitem-iconic"
++                  hidden="true"
+                   oncommand="checkForUpdates();"/>
+         <menuseparator id="aboutSeparator"/>
+         <menuitem id="aboutName"
+                   accesskey="&aboutCmd.accesskey;"
+                   label="&aboutCmd.label;"
+                   oncommand="openAboutDialog();"/>
+Index: browser/app/profile/firefox.js
+===================================================================
+RCS file: /cvsroot/mozilla/browser/app/profile/firefox.js,v
+retrieving revision 1.252
+diff -u -p -r1.252 firefox.js
+--- browser/app/profile/firefox.js	12 Jan 2008 22:22:03 -0000	1.252
++++ browser/app/profile/firefox.js	18 Jan 2008 21:26:09 -0000
+@@ -77,66 +77,6 @@ pref("extensions.blocklist.detailsURL", 
+ // Dictionary download preference
+ pref("browser.dictionaries.download.url", "https://%LOCALE%.add-ons.mozilla.com/%LOCALE%/firefox/%VERSION%/dictionaries/");
+ 
+-// App-specific update preferences
+-
+-// Whether or not app updates are enabled
+-pref("app.update.enabled", true);
+-
+-// This preference turns on app.update.mode and allows automatic download and
+-// install to take place. We use a separate boolean toggle for this to make
+-// the UI easier to construct.
+-pref("app.update.auto", true);
+-
+-// Defines how the Application Update Service notifies the user about updates:
+-//
+-// AUM Set to:        Minor Releases:     Major Releases:
+-// 0                  download no prompt  download no prompt
+-// 1                  download no prompt  download no prompt if no incompatibilities
+-// 2                  download no prompt  prompt
+-//
+-// See chart in nsUpdateService.js.in for more details
+-//
+-pref("app.update.mode", 1);
+-
+-// If set to true, the Update Service will present no UI for any event.
+-pref("app.update.silent", false);
+-
+-// Update service URL:
+-pref("app.update.url", "https://aus2.mozilla.org/update/3/%PRODUCT%/%VERSION%/%BUILD_ID%/%BUILD_TARGET%/%LOCALE%/%CHANNEL%/%OS_VERSION%/%DISTRIBUTION%/%DISTRIBUTION_VERSION%/update.xml");
+-// app.update.url.manual is in branding section
+-// app.update.url.details is in branding section
+-
+-// User-settable override to app.update.url for testing purposes.
+-//pref("app.update.url.override", "");
+-
+-// Interval: Time between checks for a new version (in seconds)
+-//           default=1 day
+-pref("app.update.interval", 86400);
+-// Interval: Time before prompting the user again to restart to install the
+-//           latest download (in seconds) default=1 day
+-pref("app.update.nagTimer.restart", 86400);
+-// Interval: When all registered timers should be checked (in milliseconds)
+-//           default=10 minutes
+-pref("app.update.timer", 600000);
+-// Give the user x seconds to react before showing the big UI. default=12 hrs
+-pref("app.update.promptWaitTime", 43200);
+-// Show the Update Checking/Ready UI when the user was idle for x seconds
+-pref("app.update.idletime", 60);
+-
+-// Whether or not we show a dialog box informing the user that the update was
+-// successfully applied. This is off in Firefox by default since we show a 
+-// upgrade start page instead! Other apps may wish to show this UI, and supply
+-// a whatsNewURL field in their brand.properties that contains a link to a page
+-// which tells users what's new in this new update.
+-pref("app.update.showInstalledUI", false);
+-
+-// 0 = suppress prompting for incompatibilities if there are updates available
+-//     to newer versions of installed addons that resolve them.
+-// 1 = suppress prompting for incompatibilities only if there are VersionInfo
+-//     updates available to installed addons that resolve them, not newer
+-//     versions.
+-pref("app.update.incompatible.mode", 0);
+-
+ // Symmetric (can be overridden by individual extensions) update preferences.
+ // e.g.
+ //  extensions.{GUID}.update.enabled
+Index: browser/components/safebrowsing/content/report-phishing-overlay.xul
+===================================================================
+RCS file: /cvsroot/mozilla/browser/components/safebrowsing/content/report-phishing-overlay.xul,v
+retrieving revision 1.12
+diff -u -p -6 -r1.12 report-phishing-overlay.xul
+--- browser/components/safebrowsing/content/report-phishing-overlay.xul	4 Mar 2008 16:05:13 -0000	1.12
++++ browser/components/safebrowsing/content/report-phishing-overlay.xul	27 Mar 2008 21:52:53 -0000
+@@ -47,13 +47,13 @@
+     <!--<broadcaster id="reportPhishingErrorBroadcaster" disabled="true"/>-->
+   </broadcasterset>
+   <menupopup id="menu_HelpPopup">
+     <menuitem id="menu_HelpPopup_reportPhishingtoolmenu"
+               label="&reportPhishSiteMenu.title2;"
+               accesskey="&reportPhishSiteMenu.accesskey;"
+-              insertbefore="updateSeparator"
++              insertbefore="aboutSeparator"
+               observes="reportPhishingBroadcaster"
+               oncommand="openUILink(safebrowsing.getReportURL('Phish'), event);"
+               onclick="checkForMiddleClick(this, event);"/>
+     <!-- XXX Bug 415846
+     <menuitem id="menu_HelpPopup_reportPhishingErrortoolmenu"
+               label="&safeb.palm.notforgery.label2;"

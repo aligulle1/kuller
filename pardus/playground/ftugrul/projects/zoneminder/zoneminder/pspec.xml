@@ -1,0 +1,85 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>zoneminder</Name>
+        <Homepage>http://www.zoneminder.com</Homepage>
+        <Packager>
+            <Name>Fahri Tuğrul Gürkaynak</Name>
+            <Email>ftugrul@gmail.com</Email>
+        </Packager>
+        <License>GPLv2</License>
+        <IsA>app:console</IsA>
+        <Summary>A set of applications which together provides a complete surveillance solution allowing capture, analysis, recording and monitoring of any cctv cameras attached to a Linux based machine</Summary>
+        <Description>ZoneMinder is designed to run on distributions which support the Video For Linux (V4L) interface and has been tested with video cameras attached to BTTV cards, various USB cameras and IP network cameras. A partial list is given in the Support section, please give feedback in the Forums if it works with yours.</Description>
+        <Archive sha1sum="ea854c941b83374a352d7d794a4462e279fea487" type="targz">http://www2.zoneminder.com/downloads/ZoneMinder-1.24.2.tar.gz</Archive>
+        <BuildDependencies>
+            <Dependency>mod_perl</Dependency>
+            <Dependency>perl-libwww</Dependency>
+            <Dependency>perl-Archive-Zip</Dependency>
+            <Dependency>perl-Archive-Tar</Dependency>
+            <Dependency>perl-DBI</Dependency>
+            <Dependency>perl-DBD-mysql</Dependency>
+            <Dependency>perl-Date-Manip</Dependency>
+            <Dependency>perl-libnet</Dependency>
+            <Dependency>perl-MIME-tools</Dependency>
+            <Dependency>perl-MIME-Lite</Dependency>
+            <Dependency>perl-Time-HiRes</Dependency>
+            <Dependency>perl-Date-Manip</Dependency>
+            <Dependency>perl-X10</Dependency>
+            <Dependency>perl-Device-SerialPort</Dependency>
+            <Dependency>perl-Getopt-Long</Dependency>
+            <Dependency>perl-PHP-Serialization</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <Patch>Makefile.am.patch</Patch>
+            <Patch>zm_create.sql.in.patch</Patch>
+            <Patch>zm_remote_camera_http.patch</Patch>
+            <Patch>db_upgrade_script_location.patch</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>zoneminder</Name>
+        <RuntimeDependencies>
+            <Dependency>netpbm</Dependency>
+            <Dependency>perl-DBI</Dependency>
+            <Dependency>perl-DBD-mysql</Dependency>
+            <Dependency>ffmpeg</Dependency>
+            <Dependency>mysql-server</Dependency>
+            <Dependency>apache</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="executable">/usr/bin</Path>
+            <Path fileType="library">/usr/lib</Path>
+            <Path fileType="config">/etc</Path>
+            <Path fileType="data">/var/www</Path>
+            <Path fileType="data">/var/lib/mysql/zm</Path>
+            <Path fileType="data">/usr/share/zoneminder</Path>
+            <Path fileType="data">/var/log</Path>
+            <Path fileType="data">/var/run</Path>
+            <Path fileType="man">/usr/share/man</Path>
+            <Path fileType="doc">/usr/share/doc</Path>
+        </Files>
+        <AdditionalFiles>
+            <AdditionalFile owner="root" permission="0755" target="/usr/bin/zmdb.py">zmdb.py</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/var/lib/mysql/zm/db.opt">db</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/usr/share/zoneminder/db/zmuser.sql">zmuser.sql</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/etc/apache2/vhosts.d/10_zoneminder.conf">10_zoneminder.conf</AdditionalFile>
+        </AdditionalFiles>
+        <Provides>
+            <COMAR script="package.py">System.Package</COMAR>
+            <COMAR script="service.py">System.Service</COMAR>
+        </Provides>
+    </Package>
+
+    <History>
+        <Update release="1">
+            <Date>2009-12-30</Date>
+            <Version>1.24.2</Version>
+            <Comment>First release</Comment>
+            <Name>Fahri Tuğrul Gürkaynak</Name>
+            <Email>ftugrul@gmail.com</Email>
+        </Update>
+    </History>
+</PISI>

@@ -1,0 +1,16 @@
+diff -ur apparmor-parser-2.0.1.orig/parser_include.c apparmor-parser-2.0.1/parser_include.c
+--- apparmor-parser-2.0.1.orig/parser_include.c	2006-10-11 01:36:10.000000000 +0300
++++ apparmor-parser-2.0.1/parser_include.c	2006-11-18 01:09:34.000000000 +0200
+@@ -393,8 +393,11 @@
+ 	}
+ 
+ 	if (S_ISDIR(my_stat.st_mode)) {
+-		DIR *dir = fdopendir(fileno(newf));
++		DIR *dir = NULL;
+ 		struct dirent *dirent;
++
++		fclose(newf);
++		dir = opendir(buf);
+ 		if (!dir) {
+ 			retval = 1;
+ 			goto out;

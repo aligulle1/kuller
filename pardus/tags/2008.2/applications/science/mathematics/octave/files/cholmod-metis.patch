@@ -1,0 +1,22 @@
+--- configure.in	2007-12-18 02:56:17.000000000 +0200
++++ configure.in	2007-12-18 02:57:32.000000000 +0200
+@@ -849,7 +849,7 @@
+       AC_CHECK_LIB(cholmod, cholmod_start, [CHOLMOD_LIBS="-lcholmod -cblas"; 
+ 	with_cholmod=yes], [],
+ 	$CAMD_LIBS $AMD_LIBS $COLAMD_LIBS $CCOLAMD_LIBS $BLAS_LIBS $FLIBS)],
+-      $CAMD_LIBS $AMD_LIBS $COLAMD_LIBS $CCOLAMD_LIBS $BLAS_LIBS $FLIBS)
++      $CAMD_LIBS $AMD_LIBS $COLAMD_LIBS $CCOLAMD_LIBS $BLAS_LIBS $FLIBS -lmetis)
+ 
+     if test "$with_cholmod" = yes; then
+       AC_DEFINE(HAVE_CHOLMOD, 1, [Define if the CHOLMOD library is used.])
+--- src/Makefile.in	2007-12-18 02:58:03.000000000 +0200
++++ src/Makefile.in	2007-12-18 03:35:48.000000000 +0200
+@@ -340,7 +340,7 @@
+ 	$(OCTAVE_LIBS) \
+ 	$(LEXLIB) $(UMFPACK_LIBS) $(AMD_LIBS) $(CAMD_LIBS) $(COLAMD_LIBS) \
+ 	$(CHOLMOD_LIBS) $(CCOLAMD_LIBS) $(CXSPARSE_LIBS) $(BLAS_LIBS) \
+-	$(FFTW_LIBS) $(LIBS) $(FLIBS) -lmpi -lmpi_cxx
++	$(FFTW_LIBS) $(LIBS) $(FLIBS) -lmpi -lmpi_cxx -lmetis
+ 
+ stmp-pic: pic
+ 	@if [ -f stmp-pic ]; then \

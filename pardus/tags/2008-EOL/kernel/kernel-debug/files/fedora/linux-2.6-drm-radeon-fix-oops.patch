@@ -1,0 +1,14 @@
+Index: 2008-devel/drivers/char/drm/radeon_state.c
+===================================================================
+--- 2008-devel.orig/drivers/char/drm/radeon_state.c
++++ 2008-devel/drivers/char/drm/radeon_state.c
+@@ -3090,7 +3090,8 @@ static int radeon_cp_setparam(struct drm
+ 			dev_priv->gart_info.table_size = RADEON_PCIGART_TABLE_SIZE;
+ 		break;
+ 	case RADEON_SETPARAM_VBLANK_CRTC:
+-		return radeon_vblank_crtc_set(dev, sp->value);
++		if (dev_priv)
++			return radeon_vblank_crtc_set(dev, sp->value);
+ 		break;
+ 	default:
+ 		DRM_DEBUG("Invalid parameter %d\n", sp->param);

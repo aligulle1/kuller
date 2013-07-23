@@ -1,0 +1,580 @@
+diff --exclude='*~' -Naur links-2.1pre20.orig/charsets.c links-2.1pre20/charsets.c
+--- links-2.1pre20.orig/charsets.c	2005-12-09 23:52:02.000000000 -0200
++++ links-2.1pre20/charsets.c	2005-12-09 23:57:07.000000000 -0200
+@@ -92,7 +92,7 @@
+ #define U_EQUAL(a, b) (a).x == (b)
+ #define U_ABOVE(a, b) (a).x > (b)
+ 
+-static inline unsigned char *u2cp(int u, int to)
++unsigned char *u2cp(int u, int to)
+ {
+ 	int j, s;
+ 	if (u < 128) return strings[u];
+@@ -152,6 +152,22 @@
+ 	return utf_buffer;
+ }
+ 
++/* this slow and ugly code is used by the terminal utf_8_io */
++unsigned char *cp2utf_8(int from, int c)
++{
++	int j;
++
++	if (codepages[from].table == table_utf_8) return strings[c];
++	for (j = 0; codepages[from].table[j].c; j++) {
++		if (codepages[from].table[j].c == c)
++		{
++			return encode_utf_8(codepages[from].table[j].u);
++		}
++	}
++	if (c < 128) return strings[c];
++	return encode_utf_8(UCS_NO_CHAR);
++}
++
+ void add_utf_8(struct conv_table *ct, int u, unsigned char *str)
+ {
+ 	unsigned char *p = encode_utf_8(u);
+diff --exclude='*~' -Naur links-2.1pre20.orig/default.c links-2.1pre20/default.c
+--- links-2.1pre20.orig/default.c	2005-12-09 23:52:02.000000000 -0200
++++ links-2.1pre20/default.c	2005-12-10 00:06:45.000000000 -0200
+@@ -722,6 +722,7 @@
+ 	}
+ }
+ 
++/* terminal NAME(str) MODE(0-3) M11_HACK(0-1) BLOCK_CURSOR.RESTRICT_852.COL(0-7) CHARSET(str) [ UTF_8_IO("utf-8") ]*/
+ unsigned char *term_rd(struct option *o, unsigned char *c)
+ {
+ 	struct term_spec *ts;
+@@ -732,6 +733,7 @@
+ 		mem_free(w);
+ 		goto end;
+ 	}
++        ts->utf_8_io = 0;
+ 	mem_free(w);
+ 	if (!(w = get_token(&c))) goto err;
+ 	if (strlen(w) != 1 || w[0] < '0' || w[0] > '4') goto err_f;
+@@ -752,6 +754,9 @@
+ 	if ((i = get_cp_index(w)) == -1 || is_cp_special(i)) goto err_f;
+ 	ts->charset = i;
+ 	mem_free(w);
++	if (!(w = get_token(&c))) goto end;
++	if (!(strcasecmp(w, "utf-8"))) ts->utf_8_io = 1;
++	mem_free(w);
+ 	end:
+ 	return NULL;
+ 	err_f:
+@@ -760,6 +765,7 @@
+ 	return "Error reading terminal specification";
+ }
+ 
++/* terminal2 NAME(str) MODE(0-3) M11_HACK(0-1) RESTRICT_852(0-1) COL(0-1) CHARSET(str) [ UTF_8_IO("utf-8") ]*/
+ unsigned char *term2_rd(struct option *o, unsigned char *c)
+ {
+ 	struct term_spec *ts;
+@@ -770,6 +776,7 @@
+ 		mem_free(w);
+ 		goto end;
+ 	}
++        ts->utf_8_io = 0;
+ 	mem_free(w);
+ 	if (!(w = get_token(&c))) goto err;
+ 	if (strlen(w) != 1 || w[0] < '0' || w[0] > '3') goto err_f;
+@@ -791,6 +798,9 @@
+ 	if ((i = get_cp_index(w)) == -1 || is_cp_special(i)) goto err_f;
+ 	ts->charset = i;
+ 	mem_free(w);
++	if (!(w = get_token(&c))) goto end;
++	if (!(strcasecmp(w, "utf-8"))) ts->utf_8_io = 1;
++	mem_free(w);
+ 	end:
+ 	return NULL;
+ 	err_f:
+@@ -813,6 +823,10 @@
+ 		add_num_to_str(s, l, !!ts->col + !!ts->restrict_852 * 2 + !!ts->block_cursor * 4);
+ 		add_to_str(s, l, " ");
+ 		add_to_str(s, l, get_cp_mime_name(ts->charset));
++                if (ts->utf_8_io)
++                {
++                    add_to_str(s, l, " utf-8");
++                }
+ 	}
+ }
+ 
+diff --exclude='*~' -Naur links-2.1pre20.orig/intl/bahasa_indonesian.lng links-2.1pre20/intl/bahasa_indonesian.lng
+--- links-2.1pre20.orig/intl/bahasa_indonesian.lng	2005-12-09 23:52:02.000000000 -0200
++++ links-2.1pre20/intl/bahasa_indonesian.lng	2005-12-10 00:13:56.000000000 -0200
+@@ -512,3 +512,4 @@
+ T_HK_COPY_URL_LOCATION, "C",
+ T_HK_BLOCK_URL, "B",
+ T_HK_BLOCK_LIST, "B",
++T_UTF_8_IO, "UTF-8 I/O",
+diff --exclude='*~' -Naur links-2.1pre20.orig/intl/belarusian.lng links-2.1pre20/intl/belarusian.lng
+--- links-2.1pre20.orig/intl/belarusian.lng	2005-12-09 23:52:02.000000000 -0200
++++ links-2.1pre20/intl/belarusian.lng	2005-12-10 00:13:56.000000000 -0200
+@@ -512,3 +512,4 @@
+ T_HK_COPY_URL_LOCATION, NULL,
+ T_HK_BLOCK_URL, NULL,
+ T_HK_BLOCK_LIST, NULL,
++T_UTF_8_IO, "UTF-8 I/O",
+diff --exclude='*~' -Naur links-2.1pre20.orig/intl/brazilian_portuguese.lng links-2.1pre20/intl/brazilian_portuguese.lng
+--- links-2.1pre20.orig/intl/brazilian_portuguese.lng	2005-12-09 23:52:02.000000000 -0200
++++ links-2.1pre20/intl/brazilian_portuguese.lng	2005-12-10 00:13:56.000000000 -0200
+@@ -512,3 +512,4 @@
+ T_HK_COPY_URL_LOCATION, NULL,
+ T_HK_BLOCK_URL, NULL,
+ T_HK_BLOCK_LIST, NULL,
++T_UTF_8_IO, "UTF-8 I/O",
+diff --exclude='*~' -Naur links-2.1pre20.orig/intl/bulgarian.lng links-2.1pre20/intl/bulgarian.lng
+--- links-2.1pre20.orig/intl/bulgarian.lng	2005-12-09 23:52:02.000000000 -0200
++++ links-2.1pre20/intl/bulgarian.lng	2005-12-10 00:13:56.000000000 -0200
+@@ -512,3 +512,4 @@
+ T_HK_COPY_URL_LOCATION, NULL,
+ T_HK_BLOCK_URL, NULL,
+ T_HK_BLOCK_LIST, NULL,
++T_UTF_8_IO, "UTF-8 I/O",
+diff --exclude='*~' -Naur links-2.1pre20.orig/intl/catalan.lng links-2.1pre20/intl/catalan.lng
+--- links-2.1pre20.orig/intl/catalan.lng	2005-12-09 23:52:02.000000000 -0200
++++ links-2.1pre20/intl/catalan.lng	2005-12-10 00:13:56.000000000 -0200
+@@ -512,3 +512,4 @@
+ T_HK_COPY_URL_LOCATION, NULL,
+ T_HK_BLOCK_URL, NULL,
+ T_HK_BLOCK_LIST, NULL,
++T_UTF_8_IO, "UTF-8 I/O",
+diff --exclude='*~' -Naur links-2.1pre20.orig/intl/croatian.lng links-2.1pre20/intl/croatian.lng
+--- links-2.1pre20.orig/intl/croatian.lng	2005-12-09 23:52:02.000000000 -0200
++++ links-2.1pre20/intl/croatian.lng	2005-12-10 00:13:56.000000000 -0200
+@@ -512,3 +512,4 @@
+ T_HK_COPY_URL_LOCATION, NULL,
+ T_HK_BLOCK_URL, NULL,
+ T_HK_BLOCK_LIST, NULL,
++T_UTF_8_IO, "UTF-8 I/O",
+diff --exclude='*~' -Naur links-2.1pre20.orig/intl/czech.lng links-2.1pre20/intl/czech.lng
+--- links-2.1pre20.orig/intl/czech.lng	2005-12-09 23:52:02.000000000 -0200
++++ links-2.1pre20/intl/czech.lng	2005-12-10 00:13:56.000000000 -0200
+@@ -512,3 +512,4 @@
+ T_HK_COPY_URL_LOCATION, "C",
+ T_HK_BLOCK_URL, "B",
+ T_HK_BLOCK_LIST, "B",
++T_UTF_8_IO, "UTF-8 I/O",
+diff --exclude='*~' -Naur links-2.1pre20.orig/intl/danish.lng links-2.1pre20/intl/danish.lng
+--- links-2.1pre20.orig/intl/danish.lng	2005-12-09 23:52:02.000000000 -0200
++++ links-2.1pre20/intl/danish.lng	2005-12-10 00:13:56.000000000 -0200
+@@ -512,3 +512,4 @@
+ T_HK_COPY_URL_LOCATION, NULL,
+ T_HK_BLOCK_URL, NULL,
+ T_HK_BLOCK_LIST, NULL,
++T_UTF_8_IO, "UTF-8 I/O",
+diff --exclude='*~' -Naur links-2.1pre20.orig/intl/dutch.lng links-2.1pre20/intl/dutch.lng
+--- links-2.1pre20.orig/intl/dutch.lng	2005-12-09 23:52:02.000000000 -0200
++++ links-2.1pre20/intl/dutch.lng	2005-12-10 00:13:56.000000000 -0200
+@@ -512,3 +512,4 @@
+ T_HK_COPY_URL_LOCATION, NULL,
+ T_HK_BLOCK_URL, NULL,
+ T_HK_BLOCK_LIST, NULL,
++T_UTF_8_IO, "UTF-8 I/O",
+diff --exclude='*~' -Naur links-2.1pre20.orig/intl/english.lng links-2.1pre20/intl/english.lng
+--- links-2.1pre20.orig/intl/english.lng	2005-12-09 23:52:02.000000000 -0200
++++ links-2.1pre20/intl/english.lng	2005-12-10 00:13:56.000000000 -0200
+@@ -512,3 +512,4 @@
+ T_HK_COPY_URL_LOCATION, "C",
+ T_HK_BLOCK_URL, "B",
+ T_HK_BLOCK_LIST, "B",
++T_UTF_8_IO, "UTF-8 I/O",
+diff --exclude='*~' -Naur links-2.1pre20.orig/intl/estonian.lng links-2.1pre20/intl/estonian.lng
+--- links-2.1pre20.orig/intl/estonian.lng	2005-12-09 23:52:02.000000000 -0200
++++ links-2.1pre20/intl/estonian.lng	2005-12-10 00:13:56.000000000 -0200
+@@ -512,3 +512,4 @@
+ T_HK_COPY_URL_LOCATION, NULL,
+ T_HK_BLOCK_URL, NULL,
+ T_HK_BLOCK_LIST, NULL,
++T_UTF_8_IO, "UTF-8 I/O",
+diff --exclude='*~' -Naur links-2.1pre20.orig/intl/finnish.lng links-2.1pre20/intl/finnish.lng
+--- links-2.1pre20.orig/intl/finnish.lng	2005-12-09 23:52:02.000000000 -0200
++++ links-2.1pre20/intl/finnish.lng	2005-12-10 00:13:56.000000000 -0200
+@@ -512,3 +512,4 @@
+ T_HK_COPY_URL_LOCATION, "U",
+ T_HK_BLOCK_URL, NULL,
+ T_HK_BLOCK_LIST, NULL,
++T_UTF_8_IO, "UTF-8 I/O",
+diff --exclude='*~' -Naur links-2.1pre20.orig/intl/french.lng links-2.1pre20/intl/french.lng
+--- links-2.1pre20.orig/intl/french.lng	2005-12-09 23:52:02.000000000 -0200
++++ links-2.1pre20/intl/french.lng	2005-12-10 00:13:56.000000000 -0200
+@@ -512,3 +512,4 @@
+ T_HK_COPY_URL_LOCATION, NULL,
+ T_HK_BLOCK_URL, NULL,
+ T_HK_BLOCK_LIST, NULL,
++T_UTF_8_IO, "UTF-8 I/O",
+diff --exclude='*~' -Naur links-2.1pre20.orig/intl/galician.lng links-2.1pre20/intl/galician.lng
+--- links-2.1pre20.orig/intl/galician.lng	2005-12-09 23:52:02.000000000 -0200
++++ links-2.1pre20/intl/galician.lng	2005-12-10 00:13:56.000000000 -0200
+@@ -512,3 +512,4 @@
+ T_HK_COPY_URL_LOCATION, NULL,
+ T_HK_BLOCK_URL, NULL,
+ T_HK_BLOCK_LIST, NULL,
++T_UTF_8_IO, "UTF-8 I/O",
+diff --exclude='*~' -Naur links-2.1pre20.orig/intl/german.lng links-2.1pre20/intl/german.lng
+--- links-2.1pre20.orig/intl/german.lng	2005-12-09 23:52:02.000000000 -0200
++++ links-2.1pre20/intl/german.lng	2005-12-10 00:13:56.000000000 -0200
+@@ -512,3 +512,4 @@
+ T_HK_COPY_URL_LOCATION, "U",
+ T_HK_BLOCK_URL, NULL,
+ T_HK_BLOCK_LIST, NULL,
++T_UTF_8_IO, "UTF-8 I/O",
+diff --exclude='*~' -Naur links-2.1pre20.orig/intl/greek.lng links-2.1pre20/intl/greek.lng
+--- links-2.1pre20.orig/intl/greek.lng	2005-12-09 23:52:02.000000000 -0200
++++ links-2.1pre20/intl/greek.lng	2005-12-10 00:13:56.000000000 -0200
+@@ -512,3 +512,4 @@
+ T_HK_COPY_URL_LOCATION, NULL,
+ T_HK_BLOCK_URL, NULL,
+ T_HK_BLOCK_LIST, NULL,
++T_UTF_8_IO, "UTF-8 I/O",
+diff --exclude='*~' -Naur links-2.1pre20.orig/intl/hungarian.lng links-2.1pre20/intl/hungarian.lng
+--- links-2.1pre20.orig/intl/hungarian.lng	2005-12-09 23:52:02.000000000 -0200
++++ links-2.1pre20/intl/hungarian.lng	2005-12-10 00:13:56.000000000 -0200
+@@ -512,3 +512,4 @@
+ T_HK_COPY_URL_LOCATION, NULL,
+ T_HK_BLOCK_URL, NULL,
+ T_HK_BLOCK_LIST, NULL,
++T_UTF_8_IO, "UTF-8 I/O",
+diff --exclude='*~' -Naur links-2.1pre20.orig/intl/icelandic.lng links-2.1pre20/intl/icelandic.lng
+--- links-2.1pre20.orig/intl/icelandic.lng	2005-12-09 23:52:02.000000000 -0200
++++ links-2.1pre20/intl/icelandic.lng	2005-12-10 00:13:56.000000000 -0200
+@@ -512,3 +512,4 @@
+ T_HK_COPY_URL_LOCATION, NULL,
+ T_HK_BLOCK_URL, NULL,
+ T_HK_BLOCK_LIST, NULL,
++T_UTF_8_IO, "UTF-8 I/O",
+diff --exclude='*~' -Naur links-2.1pre20.orig/intl/italian.lng links-2.1pre20/intl/italian.lng
+--- links-2.1pre20.orig/intl/italian.lng	2005-12-09 23:52:02.000000000 -0200
++++ links-2.1pre20/intl/italian.lng	2005-12-10 00:13:56.000000000 -0200
+@@ -512,3 +512,4 @@
+ T_HK_COPY_URL_LOCATION, NULL,
+ T_HK_BLOCK_URL, NULL,
+ T_HK_BLOCK_LIST, NULL,
++T_UTF_8_IO, "UTF-8 I/O",
+diff --exclude='*~' -Naur links-2.1pre20.orig/intl/lithuanian.lng links-2.1pre20/intl/lithuanian.lng
+--- links-2.1pre20.orig/intl/lithuanian.lng	2005-12-09 23:52:02.000000000 -0200
++++ links-2.1pre20/intl/lithuanian.lng	2005-12-10 00:13:56.000000000 -0200
+@@ -512,3 +512,4 @@
+ T_HK_COPY_URL_LOCATION, NULL,
+ T_HK_BLOCK_URL, NULL,
+ T_HK_BLOCK_LIST, NULL,
++T_UTF_8_IO, "UTF-8 I/O",
+diff --exclude='*~' -Naur links-2.1pre20.orig/intl/norwegian.lng links-2.1pre20/intl/norwegian.lng
+--- links-2.1pre20.orig/intl/norwegian.lng	2005-12-09 23:52:02.000000000 -0200
++++ links-2.1pre20/intl/norwegian.lng	2005-12-10 00:13:56.000000000 -0200
+@@ -512,3 +512,4 @@
+ T_HK_COPY_URL_LOCATION, "C",
+ T_HK_BLOCK_URL, "B",
+ T_HK_BLOCK_LIST, "B",
++T_UTF_8_IO, "UTF-8 I/O",
+diff --exclude='*~' -Naur links-2.1pre20.orig/intl/polish.lng links-2.1pre20/intl/polish.lng
+--- links-2.1pre20.orig/intl/polish.lng	2005-12-09 23:52:02.000000000 -0200
++++ links-2.1pre20/intl/polish.lng	2005-12-10 00:13:56.000000000 -0200
+@@ -512,3 +512,4 @@
+ T_HK_COPY_URL_LOCATION, NULL,
+ T_HK_BLOCK_URL, NULL,
+ T_HK_BLOCK_LIST, NULL,
++T_UTF_8_IO, "UTF-8 I/O",
+diff --exclude='*~' -Naur links-2.1pre20.orig/intl/portuguese.lng links-2.1pre20/intl/portuguese.lng
+--- links-2.1pre20.orig/intl/portuguese.lng	2005-12-09 23:52:02.000000000 -0200
++++ links-2.1pre20/intl/portuguese.lng	2005-12-10 00:13:56.000000000 -0200
+@@ -512,3 +512,4 @@
+ T_HK_COPY_URL_LOCATION, NULL,
+ T_HK_BLOCK_URL, NULL,
+ T_HK_BLOCK_LIST, NULL,
++T_UTF_8_IO, "UTF-8 I/O",
+diff --exclude='*~' -Naur links-2.1pre20.orig/intl/romanian.lng links-2.1pre20/intl/romanian.lng
+--- links-2.1pre20.orig/intl/romanian.lng	2005-12-09 23:52:02.000000000 -0200
++++ links-2.1pre20/intl/romanian.lng	2005-12-10 00:13:56.000000000 -0200
+@@ -512,3 +512,4 @@
+ T_HK_COPY_URL_LOCATION, NULL,
+ T_HK_BLOCK_URL, NULL,
+ T_HK_BLOCK_LIST, NULL,
++T_UTF_8_IO, "UTF-8 I/O",
+diff --exclude='*~' -Naur links-2.1pre20.orig/intl/russian.lng links-2.1pre20/intl/russian.lng
+--- links-2.1pre20.orig/intl/russian.lng	2005-12-09 23:52:02.000000000 -0200
++++ links-2.1pre20/intl/russian.lng	2005-12-10 00:13:56.000000000 -0200
+@@ -512,3 +512,4 @@
+ T_HK_COPY_URL_LOCATION, NULL,
+ T_HK_BLOCK_URL, NULL,
+ T_HK_BLOCK_LIST, NULL,
++T_UTF_8_IO, "UTF-8 I/O",
+diff --exclude='*~' -Naur links-2.1pre20.orig/intl/serbian.lng links-2.1pre20/intl/serbian.lng
+--- links-2.1pre20.orig/intl/serbian.lng	2005-12-09 23:52:02.000000000 -0200
++++ links-2.1pre20/intl/serbian.lng	2005-12-10 00:13:56.000000000 -0200
+@@ -512,3 +512,4 @@
+ T_HK_COPY_URL_LOCATION, "â",
+ T_HK_BLOCK_URL, NULL,
+ T_HK_BLOCK_LIST, NULL,
++T_UTF_8_IO, "UTF-8 I/O",
+diff --exclude='*~' -Naur links-2.1pre20.orig/intl/slovak.lng links-2.1pre20/intl/slovak.lng
+--- links-2.1pre20.orig/intl/slovak.lng	2005-12-09 23:52:02.000000000 -0200
++++ links-2.1pre20/intl/slovak.lng	2005-12-10 00:13:56.000000000 -0200
+@@ -512,3 +512,4 @@
+ T_HK_COPY_URL_LOCATION, NULL,
+ T_HK_BLOCK_URL, NULL,
+ T_HK_BLOCK_LIST, NULL,
++T_UTF_8_IO, "UTF-8 I/O",
+diff --exclude='*~' -Naur links-2.1pre20.orig/intl/spanish.lng links-2.1pre20/intl/spanish.lng
+--- links-2.1pre20.orig/intl/spanish.lng	2005-12-09 23:52:02.000000000 -0200
++++ links-2.1pre20/intl/spanish.lng	2005-12-10 00:13:56.000000000 -0200
+@@ -512,3 +512,4 @@
+ T_HK_COPY_URL_LOCATION, NULL,
+ T_HK_BLOCK_URL, NULL,
+ T_HK_BLOCK_LIST, NULL,
++T_UTF_8_IO, "UTF-8 I/O",
+diff --exclude='*~' -Naur links-2.1pre20.orig/intl/swedish.lng links-2.1pre20/intl/swedish.lng
+--- links-2.1pre20.orig/intl/swedish.lng	2005-12-09 23:52:02.000000000 -0200
++++ links-2.1pre20/intl/swedish.lng	2005-12-10 00:13:56.000000000 -0200
+@@ -512,3 +512,4 @@
+ T_HK_COPY_URL_LOCATION, NULL,
+ T_HK_BLOCK_URL, NULL,
+ T_HK_BLOCK_LIST, NULL,
++T_UTF_8_IO, "UTF-8 I/O",
+diff --exclude='*~' -Naur links-2.1pre20.orig/intl/turkish.lng links-2.1pre20/intl/turkish.lng
+--- links-2.1pre20.orig/intl/turkish.lng	2005-12-09 23:52:02.000000000 -0200
++++ links-2.1pre20/intl/turkish.lng	2005-12-10 00:13:56.000000000 -0200
+@@ -512,3 +512,4 @@
+ T_HK_COPY_URL_LOCATION, NULL,
+ T_HK_BLOCK_URL, NULL,
+ T_HK_BLOCK_LIST, NULL,
++T_UTF_8_IO, "UTF-8 I/O",
+diff --exclude='*~' -Naur links-2.1pre20.orig/intl/ukrainian.lng links-2.1pre20/intl/ukrainian.lng
+--- links-2.1pre20.orig/intl/ukrainian.lng	2005-12-09 23:52:02.000000000 -0200
++++ links-2.1pre20/intl/ukrainian.lng	2005-12-10 00:13:56.000000000 -0200
+@@ -512,3 +512,4 @@
+ T_HK_COPY_URL_LOCATION, NULL,
+ T_HK_BLOCK_URL, NULL,
+ T_HK_BLOCK_LIST, NULL,
++T_UTF_8_IO, "UTF-8 I/O",
+diff --exclude='*~' -Naur links-2.1pre20.orig/intl/upper_sorbian.lng links-2.1pre20/intl/upper_sorbian.lng
+--- links-2.1pre20.orig/intl/upper_sorbian.lng	2005-12-09 23:52:02.000000000 -0200
++++ links-2.1pre20/intl/upper_sorbian.lng	2005-12-10 00:13:56.000000000 -0200
+@@ -512,3 +512,4 @@
+ T_HK_COPY_URL_LOCATION, NULL,
+ T_HK_BLOCK_URL, NULL,
+ T_HK_BLOCK_LIST, NULL,
++T_UTF_8_IO, "UTF-8 I/O",
+diff --exclude='*~' -Naur links-2.1pre20.orig/links.h links-2.1pre20/links.h
+--- links-2.1pre20.orig/links.h	2005-12-09 23:52:02.000000000 -0200
++++ links-2.1pre20/links.h	2005-12-10 00:15:49.000000000 -0200
+@@ -1865,6 +1865,11 @@
+ #ifdef G
+ 	struct graphics_device *dev;
+ #endif
++	struct {
++		int ucs;
++		int len;
++		int min;
++	} utf_8;
+ };
+ 
+ struct term_spec {
+@@ -1873,6 +1878,7 @@
+ 	unsigned char term[MAX_TERM_LEN];
+ 	int mode;
+ 	int m11_hack;
++	int utf_8_io;
+ 	int restrict_852;
+ 	int block_cursor;
+ 	int col;
+@@ -3387,6 +3393,9 @@
+ 
+ /* charsets.c */
+ 
++/* UCS/Unicode replacement character */
++#define UCS_NO_CHAR 0xFFFD
++
+ #include "codepage.h"
+ 
+ extern int utf8_table;
+@@ -3409,6 +3418,8 @@
+ void free_conv_table(void);
+ unsigned char *encode_utf_8(int);
+ int cp2u(unsigned char, int);
++unsigned char *cp2utf_8(int, int);
++unsigned char *u2cp(int, int);
+ 
+ #ifdef G
+ int get_utf_8(unsigned char **p);
+diff --exclude='*~' -Naur links-2.1pre20.orig/menu.c links-2.1pre20/menu.c
+--- links-2.1pre20.orig/menu.c	2005-12-09 23:52:02.000000000 -0200
++++ links-2.1pre20/menu.c	2005-12-10 00:26:55.000000000 -0200
+@@ -537,14 +537,14 @@
+ 	cls_redraw_all_terminals();
+ }
+ 
+-unsigned char *td_labels[] = { TEXT(T_NO_FRAMES), TEXT(T_VT_100_FRAMES), TEXT(T_LINUX_OR_OS2_FRAMES), TEXT(T_KOI8R_FRAMES), TEXT(T_FREEBSD_FRAMES), TEXT(T_USE_11M), TEXT(T_RESTRICT_FRAMES_IN_CP850_852), TEXT(T_BLOCK_CURSOR), TEXT(T_COLOR), TEXT(T_BRAILLE_TERMINAL), NULL };
++unsigned char *td_labels[] = { TEXT(T_NO_FRAMES), TEXT(T_VT_100_FRAMES), TEXT(T_LINUX_OR_OS2_FRAMES), TEXT(T_KOI8R_FRAMES), TEXT(T_FREEBSD_FRAMES), TEXT(T_USE_11M), TEXT(T_RESTRICT_FRAMES_IN_CP850_852), TEXT(T_BLOCK_CURSOR), TEXT(T_COLOR), TEXT(T_BRAILLE_TERMINAL), TEXT(T_UTF_8_IO), NULL };
+ 
+ void terminal_options(struct terminal *term, void *xxx, struct session *ses)
+ {
+ 	struct dialog *d;
+ 	struct term_spec *ts = new_term_spec(term->term);
+ 	if (!ts) return;
+-	d = mem_calloc(sizeof(struct dialog) + 12 * sizeof(struct dialog_item));
++	d = mem_calloc(sizeof(struct dialog) + 14 * sizeof(struct dialog_item));
+ 	d->title = TEXT(T_TERMINAL_OPTIONS);
+ 	d->fn = checkbox_list_fn;
+ 	d->udata = td_labels;
+@@ -594,15 +594,19 @@
+ 	d->items[9].gid = 0;
+ 	d->items[9].dlen = sizeof(int);
+ 	d->items[9].data = (void *)&ts->braille;
+-	d->items[10].type = D_BUTTON;
+-	d->items[10].gid = B_ENTER;
+-	d->items[10].fn = ok_dialog;
+-	d->items[10].text = TEXT(T_OK);
++	d->items[10].type = D_CHECKBOX;
++	d->items[10].gid = 0;
++	d->items[10].dlen = sizeof(int);
++	d->items[10].data = (void *)&ts->utf_8_io;	d->items[11].type = D_BUTTON;
+ 	d->items[11].type = D_BUTTON;
+-	d->items[11].gid = B_ESC;
+-	d->items[11].fn = cancel_dialog;
+-	d->items[11].text = TEXT(T_CANCEL);
+-	d->items[12].type = D_END;
++	d->items[11].gid = B_ENTER;
++	d->items[11].fn = ok_dialog;
++	d->items[11].text = TEXT(T_OK);
++	d->items[12].type = D_BUTTON;
++	d->items[12].gid = B_ESC;
++	d->items[12].fn = cancel_dialog;
++	d->items[12].text = TEXT(T_CANCEL);
++	d->items[13].type = D_END;
+ 	do_dialog(term, d, getml(d, NULL));
+ }
+ 
+diff --exclude='*~' -Naur links-2.1pre20.orig/terminal.c links-2.1pre20/terminal.c
+--- links-2.1pre20.orig/terminal.c	2005-12-09 23:52:02.000000000 -0200
++++ links-2.1pre20/terminal.c	2005-12-10 00:40:02.000000000 -0200
+@@ -681,6 +681,25 @@
+ 
+ #endif
+ 
++static inline void term_send_event(struct terminal *term, struct event *ev)
++{
++	((struct window *)&term->windows)->next->handler(term->windows.next, ev, 0);
++}
++
++static inline void term_send_ucs(struct terminal *term, struct event *ev, int u)
++{
++	unsigned char *recoded;
++
++	if (u == 0xA0) u = ' ';
++	recoded = u2cp(u, term->spec->charset);
++	if (! recoded) recoded = "*";
++	while (*recoded) {
++		ev->x = *recoded;
++		term_send_event(term, ev);
++		recoded ++;
++	}
++}
++
+ void in_term(struct terminal *term)
+ {
+ 	struct event *ev;
+@@ -740,7 +759,40 @@
+ 			goto send_redraw;
+ 		}
+ 		else if (ev->ev == EV_KBD && ev->x == KBD_CTRL_C) ((struct window *)&term->windows)->prev->handler(term->windows.prev, ev, 0);
+-		else ((struct window *)&term->windows)->next->handler(term->windows.next, ev, 0);
++		else if (ev->ev == EV_KBD) {
++			if (term->utf_8.len) {
++				if ((ev->x & 0xC0) == 0x80 && term->spec->utf_8_io) {
++					term->utf_8.ucs <<= 6;
++					term->utf_8.ucs |= ev->x & 0x3F;
++					if (! --term->utf_8.len) {
++						int u = term->utf_8.ucs;
++
++						if (u < term->utf_8.min) u = UCS_NO_CHAR;
++						term_send_ucs(term, ev, u);
++					}
++					goto mm;
++				} else {
++					term->utf_8.len = 0;
++					term_send_ucs(term, ev, UCS_NO_CHAR);
++				}
++			}
++			if (ev->x < 0x80 || ev->x > 0xFF || ! term->spec->utf_8_io) {
++				term_send_event(term, ev);
++				goto mm;
++			} else if ((ev->x & 0xC0) == 0xC0 && (ev->x & 0xFE) != 0xFE) {
++				int mask, len = 0, cov = 0x80;
++
++				for (mask = 0x80; ev->x & mask; mask >>= 1) {
++					len++;
++					term->utf_8.min = cov;
++					cov = 1 << (1 + 5 * len);
++				}
++				term->utf_8.len = len - 1;
++				term->utf_8.ucs = ev->x & (mask - 1);
++				goto mm;
++			}
++			term_send_ucs(term, ev, UCS_NO_CHAR);
++		} else term_send_event(term, ev);
+ 	}
+ 	if (ev->ev == EV_ABORT) {
+ 		destroy_terminal(term);
+@@ -760,6 +812,14 @@
+ 
+ unsigned char frame_dumb[48] =	"   ||||++||++++++--|-+||++--|-+----++++++++     ";
+ unsigned char frame_vt100[48] =	"aaaxuuukkuxkjjjkmvwtqnttmlvwtqnvvwwmmllnnjla    ";
++unsigned char frame_vt100_u[48] = {
++	177,177,177,179,180,180,180,191,
++	191,180,179,191,217,217,217,191,
++	192,193,194,195,196,197,195,195,
++	192,218,193,194,195,196,197,193,
++	193,194,194,192,192,218,218,197,
++	197,217,218,177, 32, 32, 32, 32
++};
+ unsigned char frame_koi[48] = {
+ 	144,145,146,129,135,178,180,167,
+ 	166,181,161,168,174,173,172,131,
+@@ -791,7 +851,7 @@
+ 	unsigned char c = ch & 0xff;							\
+ 	unsigned char A = ch >> 8 & 0x7f;						\
+ 	if (s->mode == TERM_LINUX) {							\
+-		if (s->m11_hack) {							\
++		if (s->m11_hack && !s->utf_8_io) {							\
+ 			if ((int)(ch >> 15) != mode) {					\
+ 				if (!(mode = ch >> 15)) add_to_str(&a, &l, "\033[10m");	\
+ 				else add_to_str(&a, &l, "\033[11m");			\
+@@ -800,12 +860,14 @@
+ 		if (s->restrict_852 && (ch >> 15) && c >= 176 && c < 224) {		\
+ 			if (frame_restrict[c - 176]) c = frame_restrict[c - 176];	\
+ 		}									\
+-	} else if (s->mode == TERM_VT100) {						\
++	} else if (s->mode == TERM_VT100 && !s->utf_8_io) {						\
+ 		if ((int)(ch >> 15) != mode) {						\
+ 			if (!(mode = ch >> 15)) add_to_str(&a, &l, "\x0f");		\
+ 			else add_to_str(&a, &l, "\x0e");				\
+ 		}									\
+ 		if (mode && c >= 176 && c < 224) c = frame_vt100[c - 176];		\
++	} else if (s->mode == TERM_VT100 && (ch >> 15) && c >= 176 && c < 224) {	\
++		c = frame_vt100_u[c - 176];						\
+ 	} else if (s->mode == TERM_KOI8 && (ch >> 15) && c >= 176 && c < 224) { c = frame_koi[c - 176];\
+ 	} else if (s->mode == TERM_FREEBSD && (ch >> 15) && c >= 176 && c < 224) { c = frame_freebsd[c - 176];\
+ 	} else if (s->mode == TERM_DUMB && (ch >> 15) && c >= 176 && c < 224) c = frame_dumb[c - 176];\
+@@ -826,7 +888,20 @@
+ 		if (attrib & 0100) add_to_str(&a, &l, ";1");				\
+ 		add_to_str(&a, &l, "m");						\
+ 	}										\
+-	if (c >= ' ' && c != 127/* && c != 155*/) add_chr_to_str(&a, &l, c);		\
++	if (c >= ' ' && c != 127/* && c != 155*/) {					\
++		int charset = s->charset;						\
++											\
++		if (ch >> 15) {								\
++			int frames_charset = (s->mode == TERM_LINUX || s->mode == TERM_VT100) \
++						? get_cp_index("cp437")			\
++						: s->mode == TERM_KOI8			\
++						? get_cp_index("koi8-r")		\
++						: -1;					\
++			if (frames_charset != -1) charset = frames_charset;		\
++		}									\
++		if (s->utf_8_io) add_to_str(&a, &l, cp2utf_8(charset, c));		\
++		else add_chr_to_str(&a, &l, c);						\
++	}										\
+ 	else if (!c || c == 1) add_chr_to_str(&a, &l, ' ');				\
+ 	else add_chr_to_str(&a, &l, '.');						\
+ 	cx++;										\

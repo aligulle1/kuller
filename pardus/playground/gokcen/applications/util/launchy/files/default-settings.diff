@@ -1,0 +1,48 @@
+Index: launchy-2.1.2/src/options.cpp
+===================================================================
+--- launchy-2.1.2.orig/src/options.cpp
++++ launchy-2.1.2/src/options.cpp
+@@ -40,10 +40,10 @@ OptionsDlg::OptionsDlg(QWidget * parent)
+     genAlwaysShow->setChecked(gSettings->value("GenOps/alwaysshow", false).toBool());
+     genAlwaysTop->setChecked(gSettings->value("GenOps/alwaystop", false).toBool());
+     genPortable->setChecked(gSettings->value("GenOps/isportable", false).toBool());
+-    genHideFocus->setChecked(gSettings->value("GenOps/hideiflostfocus", false).toBool());
+-    genCenter->setChecked(gSettings->value("GenOps/alwayscenter", false).toBool());
++    genHideFocus->setChecked(gSettings->value("GenOps/hideiflostfocus", true).toBool());
++    genCenter->setChecked(gSettings->value("GenOps/alwayscenter", true).toBool());
+     genFastIndex->setChecked(gSettings->value("GenOps/fastindexer",false).toBool());
+-    genUpdateCheck->setChecked(gSettings->value("GenOps/updatecheck", true).toBool());
++    genUpdateCheck->setChecked(gSettings->value("GenOps/updatecheck", false).toBool());
+     genShowHidden->setChecked(gSettings->value("GenOps/showHiddenFiles", false).toBool());
+     genCondensed->setChecked(gSettings->value("GenOps/condensedView",false).toBool());
+     genUpMinutes->setText(gSettings->value("GenOps/updatetimer", "10").toString());
+diff --exclude=.svn --exclude=.svnignore --exclude=CVS -Naur launchy-2.1.2-orig/src/main.cpp launchy-2.1.2/src/main.cpp
+--- launchy-2.1.2-orig/src/main.cpp	2009-04-14 05:07:20.000000000 +0300
++++ launchy-2.1.2/src/main.cpp	2009-04-14 05:09:48.000000000 +0300
+@@ -168,7 +168,7 @@
+ 
+ 
+ 	// Check for udpates?
+-	if (gSettings->value("GenOps/updatecheck", true).toBool()) {
++	if (gSettings->value("GenOps/updatecheck", false).toBool()) {
+ 		checkForUpdate();
+ 	}
+ 
+@@ -328,7 +328,7 @@
+ 
+ void MyWidget::focusOutEvent ( QFocusEvent * evt) {
+ 	if (evt->reason() == Qt::ActiveWindowFocusReason) {
+-		if (gSettings->value("GenOps/hideiflostfocus", false).toBool())
++		if (gSettings->value("GenOps/hideiflostfocus", true).toBool())
+ 			if (!this->isActiveWindow() && !alternatives->isActiveWindow() && !optionsOpen) {
+ 				hideLaunchy();
+ 			}
+@@ -808,7 +808,7 @@
+ 	QRect r = geometry();
+ 	int primary = qApp->desktop()->primaryScreen();
+ 	QRect scr = qApp->desktop()->availableGeometry(primary);
+-	if (gSettings->value("GenOps/alwayscenter", false).toBool()) {
++	if (gSettings->value("GenOps/alwayscenter", true).toBool()) {
+ 		QPoint p;
+ 		p.setX(scr.width()/2.0 - r.width() / 2.0);
+ 		p.setY(scr.height()/2.0 - r.height() / 2.0);

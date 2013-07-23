@@ -1,0 +1,77 @@
+diff -uNBwp configure.in.orig configure.in
+--- configure.in.orig	2011-02-05 21:26:52.000000000 +0100
++++ configure.in	2011-02-17 20:38:32.740713993 +0100
+@@ -1215,7 +1215,7 @@ then
+ AC_MSG_CHECKING(whether $CC accepts -pthread)
+ AC_CACHE_VAL(ac_cv_thread,
+ [ac_save_cc="$CC"
+-CC="$CC -pthread"
++LIBS="$LIBS -lpthread"
+ AC_RUN_IFELSE([AC_LANG_SOURCE([[
+ #include <pthread.h>
+ 
+@@ -1251,7 +1251,7 @@ then
+   ac_cv_cxx_thread=yes
+ elif test "$ac_cv_pthread" = "yes"
+ then 
+-  CXX="$CXX -pthread"
++  LIBS="$LIBS -lpthread"
+   ac_cv_cxx_thread=yes
+ fi
+ 
+@@ -1498,7 +1498,7 @@ then CC="$CC -Kpthread"
+ elif test "$ac_cv_kthread" = "yes"
+ then CC="$CC -Kthread"
+ elif test "$ac_cv_pthread" = "yes"
+-then CC="$CC -pthread"
++then LIBS="$LIBS -lpthread"
+ fi
+ 
+ AC_MSG_CHECKING(for pthread_t)
+@@ -2083,10 +2083,7 @@ then
+     THREADOBJ="Python/thread.o"
+ elif test "$ac_cv_pthread" = "yes"
+ then
+-    CC="$CC -pthread"
+-    if test "$ac_cv_cxx_thread" = "yes"; then
+-        CXX="$CXX -pthread"
+-    fi
++    LIBS="$LIBS -lpthread"
+     AC_DEFINE(WITH_THREAD)
+     posix_threads=yes
+     THREADOBJ="Python/thread.o"
+diff -uNBwp setup.py.orig setup.py
+--- setup.py.orig	2010-12-28 10:51:43.000000000 +0100
++++ setup.py	2011-02-17 20:45:03.099725984 +0100
+@@ -555,7 +555,7 @@ class PyBuildExt(build_ext):
+         # Operations on audio samples
+         # According to #993173, this one should actually work fine on
+         # 64-bit platforms.
+-        exts.append( Extension('audioop', ['audioop.c']) )
++        exts.append( Extension('audioop', ['audioop.c'], library_dirs=lib_dirs, libraries=['m']) )
+ 
+         # readline
+         do_readline = self.compiler.find_library_file(lib_dirs, 'readline')
+@@ -1346,6 +1346,7 @@ class PyBuildExt(build_ext):
+         if sysconfig.get_config_var('WITH_THREAD'):
+             exts.append ( Extension('_multiprocessing', multiprocessing_srcs,
+                                     define_macros=list(macros.items()),
++                                    libraries=['pthread'],
+                                     include_dirs=["Modules/_multiprocessing"]))
+         else:
+             missing.append('_multiprocessing')
+@@ -1708,10 +1709,13 @@ class PyBuildExt(build_ext):
+                         include_dirs=include_dirs,
+                         extra_compile_args=extra_compile_args,
+                         extra_link_args=extra_link_args,
+-                        libraries=[],
++            library_dirs=lib_dirs,
++                        libraries=['dl'],
+                         sources=sources,
+                         depends=depends)
+         ext_test = Extension('_ctypes_test',
++                libraries=['m'],
++                library_dirs=lib_dirs,
+                              sources=['_ctypes/_ctypes_test.c'])
+         self.extensions.extend([ext, ext_test])
+ 

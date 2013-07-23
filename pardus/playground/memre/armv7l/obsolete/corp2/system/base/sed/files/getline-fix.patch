@@ -1,0 +1,26 @@
+Index: sed-4.1.5/lib/getline.c
+===================================================================
+--- sed-4.1.5.orig/lib/getline.c
++++ sed-4.1.5/lib/getline.c
+@@ -31,7 +31,7 @@
+    null terminator), or -1 on error or EOF.  */
+ 
+ size_t
+-getline (lineptr, n, stream)
++getline_ (lineptr, n, stream)
+      char **lineptr;
+      size_t *n;
+      FILE *stream;
+Index: sed-4.1.5/lib/utils.c
+===================================================================
+--- sed-4.1.5.orig/lib/utils.c
++++ sed-4.1.5/lib/utils.c
+@@ -245,7 +245,7 @@ ck_getline(text, buflen, stream)
+ {
+   int result;
+   if (!ferror (stream))
+-    result = getline (text, buflen, stream);
++    result = getline_ (text, buflen, stream);
+ 
+   if (ferror (stream))
+     panic (_("read error on %s: %s"), utils_fp_name(stream), strerror(errno));

@@ -1,0 +1,14 @@
+--- src/beagk.cpp	2006/07/11 10:30:39	1.1
++++ src/beagk.cpp	2006/07/11 13:08:14
+@@ -142,6 +142,11 @@
+ // from kio_locate
+ void kio_beagkProtocol::stat(const KURL & url)
+ {
++    if (url.path()=="?beagled-status" && !beagle_util_daemon_is_running ()) {
++      error(KIO::ERR_SERVICE_NOT_AVAILABLE, QString::null);
++      return;
++    }
++
+     UDSEntry entry;
+     /// \todo Is UDS_NAME used for anything? If so we should
+     /// at least strip of the protocol part.

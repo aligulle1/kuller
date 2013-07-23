@@ -1,0 +1,53 @@
+diff -Naur -x '*~' -x '*.orig' -x '*.rej' heimdal-1.4/cf/check-compile-et.m4 heimdal-1.4-shared-libcom_err//cf/check-compile-et.m4
+--- heimdal-1.4/cf/check-compile-et.m4	2010-09-13 09:23:34.000000000 +0200
++++ heimdal-1.4-shared-libcom_err//cf/check-compile-et.m4	2010-09-15 21:00:35.000000000 +0200
+@@ -67,7 +67,6 @@
+     const char *p;
+     p = error_message(0);
+     initialize_error_table_r(0,0,0,0);
+-    com_right_r(0, 0, 0, 0);
+   ]])],[krb_cv_com_err="yes"],[krb_cv_com_err="no"; CPPFLAGS="${save_CPPFLAGS}"])
+   AC_MSG_RESULT(${krb_cv_com_err})
+   LIBS="${krb_cv_save_LIBS}"
+diff -Naur -x '*~' -x '*.orig' -x '*.rej' heimdal-1.4/lib/krb5/error_string.c heimdal-1.4-shared-libcom_err//lib/krb5/error_string.c
+--- heimdal-1.4/lib/krb5/error_string.c	2010-09-13 09:23:34.000000000 +0200
++++ heimdal-1.4-shared-libcom_err//lib/krb5/error_string.c	2010-09-15 21:02:26.000000000 +0200
+@@ -226,30 +226,17 @@
+ KRB5_LIB_FUNCTION const char * KRB5_LIB_CALL
+ krb5_get_error_message(krb5_context context, krb5_error_code code)
+ {
++    const char *cstr;
+     char *str;
+ 
+-    HEIMDAL_MUTEX_lock(context->mutex);
+-    if (context->error_string &&
+-	(code == context->error_code || context->error_code == 0))
+-    {
+-	str = strdup(context->error_string);
+-	if (str) {
+-	    HEIMDAL_MUTEX_unlock(context->mutex);
+-	    return str;
+-	}
+-    }
+-    HEIMDAL_MUTEX_unlock(context->mutex);
+-
+-    if (code == 0)
+-	return strdup("Success");
+-    {
+-	const char *msg;
+-	char buf[128];
+-	msg = com_right_r(context->et_list, code, buf, sizeof(buf));
+-	if (msg)
+-	    return strdup(msg);
+-    }
++    str = krb5_get_error_string(context);
++    if (str)
++      return str;
+ 
++    cstr = krb5_get_err_text(context, code);
++    if (cstr)
++      return strdup(cstr);
++    
+     if (asprintf(&str, "<unknown error: %d>", (int)code) == -1 || str == NULL)
+ 	return NULL;
+ 

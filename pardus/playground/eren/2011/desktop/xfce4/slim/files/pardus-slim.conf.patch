@@ -1,0 +1,52 @@
+diff -Nur slim-1.3.0.orig/slim.conf slim-1.3.0/slim.conf
+--- slim-1.3.0.orig/slim.conf	2008-01-28 08:42:27.000000000 +0200
++++ slim-1.3.0/slim.conf	2008-01-28 09:25:06.000000000 +0200
+@@ -1,17 +1,17 @@
+ # Path, X server and arguments (if needed)
+ # Note: -xauth $authfile is automatically appended
+-default_path        ./:/bin:/usr/bin:/usr/local/bin:/usr/X11R6/bin
+-default_xserver     /usr/X11R6/bin/X
++default_path        /usr/kde/3.5/bin:/usr/local/bin:/usr/bin:/bin:/opt/bin:/usr/i686-pc-linux-gnu/gcc-bin/3.4.6:/opt/sun-jre/bin:/usr/qt/3/bin:/usr/kde/3.5/bin
++default_xserver     /usr/bin/X
+ #xserver_arguments   -dpi 75
+ 
+ # Commands for halt, login, etc.
+ halt_cmd            /sbin/shutdown -h now
+ reboot_cmd          /sbin/shutdown -r now
+-console_cmd         /usr/X11R6/bin/xterm -C -fg white -bg black +sb -T "Console login" -e /bin/sh -c "/bin/cat /etc/issue; exec /bin/login"
++console_cmd         /usr/bin/xterm -C -fg white -bg black +sb -T "Console login" -e /bin/sh -c "/bin/cat /etc/issue; exec /bin/login"
+ #suspend_cmd        /usr/sbin/suspend
+ 
+ # Full path to the xauth binary
+-xauth_path         /usr/X11R6/bin/xauth 
++xauth_path         /usr/bin/xauth
+ 
+ # Xauth file for server
+ authfile           /var/run/slim.auth
+@@ -33,7 +33,11 @@
+ # to adjust the command according to your preferred shell,
+ # i.e. for freebsd use:
+ # login_cmd           exec /bin/sh - ~/.xinitrc %session
+-login_cmd           exec /bin/bash -login ~/.xinitrc %session
++
++# slim-start-session is Pardus's script. It's like glogal xinitrc file.
++# when new window manager is packaged, slim can be used for it after adding new session
++
++login_cmd           exec /usr/bin/slim-start-session %session
+ 
+ # Commands executed when starting and exiting a session.
+ # They can be used for registering a X11 session with
+@@ -51,7 +55,7 @@
+ # The current chosen session name is replaced in the login_cmd
+ # above, so your login command can handle different sessions.
+ # see the xinitrc.sample file shipped with slim sources
+-sessions            xfce4,icewm,wmaker,blackbox
++sessions            xfce4
+ 
+ # Executed when pressing F11 (requires imagemagick)
+ screenshot_cmd      import -window root /slim.png
+@@ -76,4 +80,3 @@
+ 
+ # Log file
+ logfile             /var/log/slim.log
+-

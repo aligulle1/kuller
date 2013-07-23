@@ -1,0 +1,248 @@
+diff -ur w3m-0.5.2.orig/file.c w3m-0.5.2/file.c
+--- w3m-0.5.2.orig/file.c	2007-05-24 00:06:05.000000000 +0900
++++ w3m-0.5.2/file.c	2008-01-22 03:56:22.000000000 +0900
+@@ -4370,25 +4370,56 @@
+ 	flushline(h_env, obuf, envs[h_env->envc].indent, 1, h_env->limit);
+ 	h_env->blank_lines = 0;
+ 	return 1;
+-    case HTML_H:
+-	if (!(obuf->flag & (RB_PREMODE | RB_IGNORE_P))) {
+-	    flushline(h_env, obuf, envs[h_env->envc].indent, 0, h_env->limit);
+-	    do_blankline(h_env, obuf, envs[h_env->envc].indent, 0,
+-			 h_env->limit);
+-	}
+-	HTMLlineproc1("<b>", h_env);
+-	set_alignment(obuf, tag);
+-	return 1;
+-    case HTML_N_H:
+-	HTMLlineproc1("</b>", h_env);
+-	if (!(obuf->flag & RB_PREMODE)) {
+-	    flushline(h_env, obuf, envs[h_env->envc].indent, 0, h_env->limit);
+-	}
+-	do_blankline(h_env, obuf, envs[h_env->envc].indent, 0, h_env->limit);
+-	RB_RESTORE_FLAG(obuf);
+-	close_anchor(h_env, obuf);
+-	obuf->flag |= RB_IGNORE_P;
+-	return 1;
++    case HTML_H1:
++    case HTML_H2:
++    case HTML_H3:
++    case HTML_H4:
++    case HTML_H5:
++    case HTML_H6:
++        if (!(obuf->flag & (RB_PREMODE | RB_IGNORE_P))) {
++            flushline(h_env, obuf, envs[h_env->envc].indent, 0, h_env->limit);
++            do_blankline(h_env, obuf, envs[h_env->envc].indent, 0,
++                         h_env->limit);
++        }
++        if (w3m_halfdump_backend) {
++            obuf->in_bold++;
++            return 0;
++        }
++        else {
++            HTMLlineproc1("<b>", h_env);
++            set_alignment(obuf, tag);
++            return 1;
++        }
++    case HTML_N_H1:
++    case HTML_N_H2:
++    case HTML_N_H3:
++    case HTML_N_H4:
++    case HTML_N_H5:
++    case HTML_N_H6:
++        if (w3m_halfdump_backend) {
++            if (obuf->in_bold > 0) {
++                obuf->in_bold = 0;
++                switch (cmd) {
++                case HTML_N_H1: HTMLlineproc1("</h1>", h_env); break;
++                case HTML_N_H2: HTMLlineproc1("</h2>", h_env); break;
++                case HTML_N_H3: HTMLlineproc1("</h3>", h_env); break;
++                case HTML_N_H4: HTMLlineproc1("</h4>", h_env); break;
++                case HTML_N_H5: HTMLlineproc1("</h5>", h_env); break;
++                case HTML_N_H6: HTMLlineproc1("</H6>", h_env); break;
++                }
++            } else
++                return 0;
++        }
++        else
++            HTMLlineproc1("</b>", h_env);
++        if (!(obuf->flag & RB_PREMODE)) {
++            flushline(h_env, obuf, envs[h_env->envc].indent, 0, h_env->limit);
++        }
++        do_blankline(h_env, obuf, envs[h_env->envc].indent, 0, h_env->limit);
++        RB_RESTORE_FLAG(obuf);
++        close_anchor(h_env, obuf);
++        obuf->flag |= RB_IGNORE_P;
++        return 1;
+     case HTML_UL:
+     case HTML_OL:
+     case HTML_BLQ:
+diff -ur w3m-0.5.2.orig/fm.h w3m-0.5.2/fm.h
+--- w3m-0.5.2.orig/fm.h	2007-05-30 13:47:24.000000000 +0900
++++ w3m-0.5.2/fm.h	2008-01-18 03:01:14.000000000 +0900
+@@ -893,15 +893,17 @@
+ global char *w3m_reqlog;
+ extern char *w3m_version;
+ 
+-#define DUMP_BUFFER   0x01
+-#define DUMP_HEAD     0x02
+-#define DUMP_SOURCE   0x04
+-#define DUMP_EXTRA    0x08
+-#define DUMP_HALFDUMP 0x10
+-#define DUMP_FRAME    0x20
++#define DUMP_BUFFER           0x01
++#define DUMP_HEAD             0x02
++#define DUMP_SOURCE           0x04
++#define DUMP_EXTRA            0x08
++#define DUMP_HALFDUMP         0x10
++#define DUMP_HALFDUMP_BACKEND 0x20
++#define DUMP_FRAME            0x40
+ global int w3m_debug;
+ global int w3m_dump init(0);
+ #define w3m_halfdump (w3m_dump & DUMP_HALFDUMP)
++#define w3m_halfdump_backend (w3m_dump & DUMP_HALFDUMP_BACKEND)
+ global int w3m_halfload init(FALSE);
+ global Str header_string init(NULL);
+ global int override_content_type init(FALSE);
+diff -ur w3m-0.5.2.orig/html.c w3m-0.5.2/html.c
+--- w3m-0.5.2.orig/html.c	2007-04-19 21:00:38.000000000 +0900
++++ w3m-0.5.2/html.c	2008-01-18 02:57:31.000000000 +0900
+@@ -124,8 +124,8 @@
+     {NULL, NULL, 0, 0},		/*   0 HTML_UNKNOWN    */
+     {"a", ALST_A, MAXA_A, 0},	/*   1 HTML_A          */
+     {"/a", NULL, 0, TFLG_END},	/*   2 HTML_N_A        */
+-    {"h", ALST_P, MAXA_P, 0},	/*   3 HTML_H          */
+-    {"/h", NULL, 0, TFLG_END},	/*   4 HTML_N_H        */
++    {"h1", ALST_P, MAXA_P, 0},	/*   3 HTML_H1         */
++    {"/h1", NULL, 0, TFLG_END},	/*   4 HTML_N_H1       */
+     {"p", ALST_P, MAXA_P, 0},	/*   5 HTML_P          */
+     {"br", NULL, 0, 0},		/*   6 HTML_BR         */
+     {"b", NULL, 0, 0},		/*   7 HTML_B          */
+@@ -269,6 +269,23 @@
+     {"/internal", NULL, 0, TFLG_INT | TFLG_END},	/* 142 HTML_N_INTERNAL   */
+     {"div_int", ALST_P, MAXA_P, TFLG_INT},	/*  143 HTML_DIV_INT    */
+     {"/div_int", NULL, 0, TFLG_INT | TFLG_END},	/*  144 HTML_N_DIV_INT  */
++
++    {NULL, NULL, 0, 0},		/* 145 Undefined       */
++    {NULL, NULL, 0, 0},		/* 146 Undefined       */
++    {NULL, NULL, 0, 0},		/* 147 Undefined       */
++    {NULL, NULL, 0, 0},		/* 148 Undefined       */
++    {NULL, NULL, 0, 0},		/* 149 Undefined       */
++
++    {"h2", ALST_P, MAXA_P, 0},	/* 150 HTML_H2         */
++    {"/h2", NULL, 0, TFLG_END},	/* 151 HTML_N_H2       */
++    {"h3", ALST_P, MAXA_P, 0},	/* 152 HTML_H3         */
++    {"/h3", NULL, 0, TFLG_END},	/* 153 HTML_N_H3       */
++    {"h4", ALST_P, MAXA_P, 0},	/* 154 HTML_H4         */
++    {"/h4", NULL, 0, TFLG_END},	/* 155 HTML_N_H4       */
++    {"h5", ALST_P, MAXA_P, 0},	/* 156 HTML_H5         */
++    {"/h5", NULL, 0, TFLG_END},	/* 157 HTML_N_H5       */
++    {"h6", ALST_P, MAXA_P, 0},	/* 158 HTML_H6         */
++    {"/h6", NULL, 0, TFLG_END},	/* 159 HTML_N_H6       */
+ };
+ 
+ TagAttrInfo AttrMAP[MAX_TAGATTR] = {
+diff -ur w3m-0.5.2.orig/html.h w3m-0.5.2/html.h
+--- w3m-0.5.2.orig/html.h	2007-05-23 21:01:43.000000000 +0900
++++ w3m-0.5.2/html.h	2008-01-18 02:56:34.000000000 +0900
+@@ -92,8 +92,8 @@
+ #define HTML_UNKNOWN	0
+ #define HTML_A		1
+ #define HTML_N_A	2
+-#define HTML_H		3
+-#define HTML_N_H	4
++#define HTML_H1		3
++#define HTML_N_H1	4
+ #define HTML_P		5
+ #define HTML_BR		6
+ #define HTML_B		7
+@@ -230,7 +230,18 @@
+ #define HTML_DIV_INT        143
+ #define HTML_N_DIV_INT      144
+ 
+-#define MAX_HTMLTAG	    145
++#define HTML_H2		150
++#define HTML_N_H2	151
++#define HTML_H3		152
++#define HTML_N_H3	153
++#define HTML_H4		154
++#define HTML_N_H4	155
++#define HTML_H5		156
++#define HTML_N_H5	157
++#define HTML_H6		158
++#define HTML_N_H6	159
++
++#define MAX_HTMLTAG	    160
+ 
+ /* Tag attribute */
+ 
+diff -ur w3m-0.5.2.orig/main.c w3m-0.5.2/main.c
+--- w3m-0.5.2.orig/main.c	2007-05-31 10:19:50.000000000 +0900
++++ w3m-0.5.2/main.c	2008-01-18 03:05:39.000000000 +0900
+@@ -614,6 +614,8 @@
+ 		w3m_halfload = TRUE;
+ 		DefaultType = default_type = "text/html";
+ 	    }
++            else if (!strcmp("-halfdump_backend", argv[i]))
++                w3m_dump = DUMP_HALFDUMP | DUMP_HALFDUMP_BACKEND;
+ 	    else if (!strcmp("-backend", argv[i])) {
+ 		w3m_backend = TRUE;
+ 	    }
+diff -ur w3m-0.5.2.orig/table.c w3m-0.5.2/table.c
+--- w3m-0.5.2.orig/table.c	2007-05-23 22:07:44.000000000 +0900
++++ w3m-0.5.2/table.c	2008-01-18 02:44:38.000000000 +0900
+@@ -2753,8 +2753,18 @@
+ 	    break;
+     case HTML_DT:
+     case HTML_DD:
+-    case HTML_H:
+-    case HTML_N_H:
++    case HTML_H1:
++    case HTML_H2:
++    case HTML_H3:
++    case HTML_H4:
++    case HTML_H5:
++    case HTML_H6:
++    case HTML_N_H1:
++    case HTML_N_H2:
++    case HTML_N_H3:
++    case HTML_N_H4:
++    case HTML_N_H5:
++    case HTML_N_H6:
+     case HTML_LI:
+     case HTML_PRE:
+     case HTML_N_PRE:
+diff -ur w3m-0.5.2.orig/tagtable.tab w3m-0.5.2/tagtable.tab
+--- w3m-0.5.2.orig/tagtable.tab	2006-12-10 20:06:12.000000000 +0900
++++ w3m-0.5.2/tagtable.tab	2008-01-18 02:43:58.000000000 +0900
+@@ -5,18 +5,18 @@
+ /a		HTML_N_A
+ _id		HTML_NOP
+ hr		HTML_HR
+-h1		HTML_H
+-h2		HTML_H
+-h3		HTML_H
+-h4		HTML_H
+-h5		HTML_H
+-h6		HTML_H
+-/h1		HTML_N_H
+-/h2		HTML_N_H
+-/h3		HTML_N_H
+-/h4		HTML_N_H
+-/h5		HTML_N_H
+-/h6		HTML_N_H
++h1		HTML_H1
++h2		HTML_H2
++h3		HTML_H3
++h4		HTML_H4
++h5		HTML_H5
++h6		HTML_H6
++/h1		HTML_N_H1
++/h2		HTML_N_H2
++/h3		HTML_N_H3
++/h4		HTML_N_H4
++/h5		HTML_N_H5
++/h6		HTML_N_H6
+ p		HTML_P
+ br		HTML_BR
+ b		HTML_B

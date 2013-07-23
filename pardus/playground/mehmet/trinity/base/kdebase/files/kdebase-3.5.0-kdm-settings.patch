@@ -1,0 +1,174 @@
+Index: kdebase/kdm/config.def
+===================================================================
+--- kdebase.orig/kdm/config.def
++++ kdebase/kdm/config.def
+@@ -937,7 +937,7 @@ Description:
+ 
+ Key: ExportList
+ Type: list
+-Default: ""
++Default: "LC_ALL,XCURSOR_THEME"
+ User: core
+ Instance: #"LD_LIBRARY_PATH,ANOTHER_IMPORTANT_VAR"
+ Merge: xdm(P_List)
+@@ -1251,7 +1251,7 @@ Type: enum
+  None/BO_NONE: no boot manager
+  Grub/BO_GRUB: Grub boot manager
+  Lilo/BO_LILO: Lilo boot manager (Linux on i386 &amp; x86-64 only)
+-Default: None
++Default: Grub
+ User: core
+ User: greeter
+ Instance: #Grub
+@@ -1455,7 +1455,7 @@ Description:
+ 
+ Key: TerminateServer
+ Type: bool
+-Default: false
++Default: true
+ User: core
+ Instance: #:*/!
+ Merge: xdm
+@@ -1556,7 +1556,7 @@ Description:
+ Key: Resources
+ # XXX strictly speaking this is supposed to be a string list, i think.
+ Type: string
+-Default: ""
++Default: "/etc/X11/xdm/Xresources"
+ User: core
+ Instance: #*/""
+ Update: cp_resources
+@@ -1588,7 +1588,7 @@ Description:
+ 
+ Key: Setup
+ Type: string
+-Default: ""
++Default: *KDMCONF "/Xsetup"
+ User: core
+ # will be overwritten
+ Instance: #*/""
+@@ -1609,7 +1609,7 @@ Description:
+ 
+ Key: Startup
+ Type: string
+-Default: ""
++Default: *KDMCONF "/Xstartup"
+ User: core
+ # will be overwritten
+ Instance: #*/""
+@@ -1627,7 +1627,7 @@ Description:
+ 
+ Key: Reset
+ Type: string
+-Default: ""
++Default: *KDMCONF "/Xreset"
+ User: core
+ # will be overwritten
+ Instance: #*/""
+@@ -1645,7 +1645,7 @@ Description:
+ 
+ Key: Session
+ Type: string
+-Default: XBINDIR "/xterm -ls -T"
++Default: "/usr/lib/X11/xinit/Xsession"
+ #Merge: xdm - incompatible!
+ User: core
+ # will be overwritten
+@@ -1928,7 +1928,7 @@ Description:
+ 
+ Key: SessionsDirs
+ Type: list
+-Default: "/usr/share/xsessions,/var/lib/menu-xdg/xsessions,/usr/share/apps/kdm/sessions"
++Default: "/usr/share/xsessions"
+ User: core
+ User: greeter-c
+ Instance: #*/"/usr/share/xsessions,/var/lib/menu-xdg/xsessions,/usr/share/apps/kdm/sessions"
+@@ -2123,30 +2123,30 @@ Description:
+ 
+ Key: GreetFont
+ Type: string
+-Default: "Sans Serif,22,5,0,50,0"
+-CDefault: "Serif,20,bold"
++Default: "DejaVu Sans,22,5,0,50,0"
++CDefault: "DejaVu Sans,20,bold"
+ User: greeter:font
+-Instance: #*/"Sans Serif,22,5,0,50,0"
++Instance: #*/"DejaVu Sans,22,5,0,50,0"
+ Comment: &
+ Description:
+  The font for the greeter headline.
+ 
+ Key: StdFont
+ Type: string
+-Default: "Sans Serif,10,5,0,50,0"
+-CDefault: "Sans Serif,10"
++Default: "DejaVu Sans,10,5,0,50,0"
++CDefault: "DejaVu Sans,10"
+ User: greeter(normalFont):font
+-Instance: #*/"Sans Serif,10,5,0,50,0"
++Instance: #*/"DejaVu Sans,10,5,0,50,0"
+ Comment: &
+ Description:
+  The normal font used in the greeter.
+ 
+ Key: FailFont
+ Type: string
+-Default: "Sans Serif,10,5,0,75,0"
+-CDefault: "Sans Serif,10,bold"
++Default: "DejaVu Sans,10,5,0,75,0"
++CDefault: "DejaVu Sans,10,bold"
+ User: greeter:font
+-Instance: #*/"Sans Serif,10,5,0,75,0"
++Instance: #*/"DejaVu Sans,10,5,0,75,0"
+ Comment: &
+ Description:
+  The font used for the <quote>Login Failed</quote> message.
+@@ -2165,9 +2165,9 @@ Description:
+ 
+ Key: Language
+ Type: string
+-Default: "en_US"
++Default: ""
+ User: greeter-c
+-Instance: #*/"de_DE"
++Instance: #*/"tr"
+ Update: upd_language
+ Comment: &
+ Description:
+@@ -2286,9 +2286,9 @@ Type: enum
+  PreferAdmin/FACE_PREFER_ADMIN: prefer &lt;<option>FaceDir</option>&gt;, fallback on $<envar>HOME</envar>
+  PreferUser/FACE_PREFER_USER: ... and the other way round
+  UserOnly/FACE_USER_ONLY: from the user's <filename>$<envar>HOME</envar>/.face[.icon]</filename>
+-Default: AdminOnly
++Default: PreferUser
+ User: greeter
+-Instance: #*/PreferUser
++Instance: */PreferUser
+ Comment:
+  Specify, where the users' pictures should be taken from.
+ Description:
+@@ -2623,9 +2623,9 @@ Description:
+ 
+ Key: Theme
+ Type: string
+-Default: KDMDATA "/themes/o2_enterprise"
++Default: "pardus"
+ User: greeter
+-Instance: */KDMDATA "/themes/o2_enterprise"
++Instance: Instance: */KDMDATA "/themes/pardus"
+ Comment: &
+ Description:
+  The theme to use for the greeter. Can point to either a directory or an XML
+Index: kdebase/kdm/kfrontend/genkdmconf.c
+===================================================================
+--- kdebase.orig/kdm/kfrontend/genkdmconf.c
++++ kdebase/kdm/kfrontend/genkdmconf.c
+@@ -694,7 +694,7 @@ static const char def_background[] =
+ "Program=\n"
+ "ReverseBlending=false\n"
+ "UseSHM=false\n"
+-"Wallpaper=isadora.png\n"
++"Wallpaper=/usr/kde/3.5/share/apps/kdm/themes/pardus/background.jpg\n"
+ "WallpaperList=\n"
+ "WallpaperMode=Scaled\n";
+ 

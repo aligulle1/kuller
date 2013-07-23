@@ -1,0 +1,86 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>ocsinventory-server</Name>
+        <Homepage>http://www.ocsinventory-ng.org/</Homepage>
+        <Packager>
+            <Name>Erdem Bayer</Name>
+            <Email>ebayer@bayer.gen.tr</Email>
+        </Packager>
+        <License>GPLv2</License>
+        <Summary>Powerful inventory and package deployment system for Windows and Unix like computers</Summary>
+        <Description>OCS Inventory NG (Open Computer and Software Inventory Next Generation) is an application designed to help a network or system administrator keep track of the computers configuration and software that are installed on the network. OCS Inventory is also able to detect all active devices on your network, such as switch, router, network printer and unattended devices.It also allows deploying softwares, commands or files on client computers.</Description>
+        <Archive sha1sum="ac62694998f100f3b68b8e5174a4b46baf06db35" type="targz">http://launchpad.net/ocsinventory-server/stable-1.3/1.3.2/+download/OCSNG_UNIX_SERVER-1.3.2.tar.gz</Archive>
+        <BuildDependencies>
+            <Dependency>perl</Dependency>
+            <Dependency>perl-Apache-DBI</Dependency>
+            <Dependency>perl-DBD-mysql</Dependency>
+            <Dependency>perl-Net-IP</Dependency>
+            <Dependency>perl-XML-Simple</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <!-- <Patch level="1">ocsinventory-reports.conf.patch</Patch> -->
+            <!-- Patches copmes from http://pkgs.fedoraproject.org/gitweb/?p=ocsinventory.git;a=tree -->
+            <Patch level="1">ocsinventory-shorttag.patch</Patch>
+            <Patch level="1">ocsinventory-upstream.patch</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>ocsinventory-server</Name>
+        <Summary>Powerful inventory and package deployment system for Windows and Unix like computers (Communication Server)</Summary>
+        <Description>OCS Inventory NG (Open Computer and Software Inventory Next Generation) is an application designed to help a network or system administrator keep track of the computers configuration and software that are installed on the network. OCS Inventory is also able to detect all active devices on your network, such as switch, router, network printer and unattended devices.It also allows deploying softwares, commands or files on client computers. This package provides the Communication server, which will handle HTTP communications between database server and agents.</Description>
+        <RuntimeDependencies>
+            <Dependency>perl</Dependency>
+            <Dependency>perl-Apache-DBI</Dependency>
+            <Dependency>perl-DBD-mysql</Dependency>
+            <Dependency>perl-Net-IP</Dependency>
+            <Dependency>perl-XML-Simple</Dependency>
+            <Dependency>mod_perl</Dependency>
+            <Dependency>perl-SOAP-Lite</Dependency>
+            <Dependency>perl-Compress-Zlib</Dependency>
+            <Dependency>mysql-server</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="executable">/usr/share/ocsinventory-server</Path>
+            <Path fileType="library">/usr/lib/perl5</Path>
+            <Path fileType="config">/etc/logrotate.d</Path>
+            <Path fileType="config">/etc/apache2/conf.d</Path>
+            <Path fileType="data">/var/log</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>ocsinventory-reports</Name>
+        <Summary>Powerful inventory and package deployment system for Windows and Unix like computers (Communication Server)</Summary>
+        <Description>OCS Inventory NG (Open Computer and Software Inventory Next Generation) is an application designed to help a network or system administrator keep track of the computers configuration and software that are installed on the network. OCS Inventory is also able to detect all active devices on your network, such as switch, router, network printer and unattended devices.It also allows deploying softwares, commands or files on client computers. This package provides the Administration console, which will allow administrators to query the database server through their favorite browser.</Description>
+       <RuntimeDependencies>
+            <Dependency>perl-DBD-mysql</Dependency>
+            <Dependency>mod_php</Dependency>
+            <Dependency>php-common</Dependency>
+            <Dependency>nmap</Dependency>
+            <Dependency>samba</Dependency>
+            <Dependency>perl-Compress-Zlib</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="data">/usr/share/ocsinventory-reports</Path>
+            <Path fileType="data">/var/lib/ocsinventory-reports</Path>
+            <Path fileType="config">/etc/ocsinventory/ocsinventory-reports</Path>
+            <Path fileType="config">/etc/apache2/vhosts.d</Path>
+        </Files>
+        <AdditionalFiles>
+            <AdditionalFile target="/etc/apache2/vhosts.d/ocsinventory-reports.conf.default" owner="root" group="root" permission="0644">ocsinventory-reports.conf.default</AdditionalFile>
+        </AdditionalFiles>
+    </Package>
+
+    <History>
+        <Update release="1">
+            <Date>2010-09-30</Date>
+            <Version>1.3.2</Version>
+            <Comment>First release.</Comment>
+            <Name>Erdem Bayer</Name>
+            <Email>ebayer@bayer.gen.tr</Email>
+        </Update>
+    </History>
+</PISI>

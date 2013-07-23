@@ -1,0 +1,361 @@
+--- eciadsl-config-tk.bak	2004-11-03 10:10:24.000000000 +0200
++++ eciadsl-config-tk	    2006-01-06 05:40:23.000000000 +0200
+@@ -26,14 +26,14 @@
+ exec wish "$0" "$@" & exit 0
+ 
+ # <CONFIG>
+-set BIN_DIR "/usr/local/bin"
++set BIN_DIR "/usr/sbin"
+ set ETC_DIR "/etc"
+ set CONF_DIR "/etc/eciadsl"
+ set PPPD_DIR "/etc/ppp"
+ set VERSION ""
+ # </CONFIG>
+ 
+-set titre_fenetre "ECI Linux driver configuration v$VERSION"
++set titre_fenetre "ECI Linux sürücü konfigürasyonu v$VERSION"
+ 
+ wm title . $titre_fenetre
+ 
+@@ -45,7 +45,7 @@
+ catch {exec id -u} current_user
+ if {$current_user != 0} {
+     frame .baduser
+-    message .baduser.texte -text "You must be root in order to run the ECI Linux driver configuration." -aspect 900 -padx 15 -pady 15
++    message .baduser.texte -text "ECI Linux sürücü konfigürasyonu'nu çalıştırabilmek için root yetkisi ile giriş yapmanız gereklidir." -aspect 900 -padx 15 -pady 15
+     button .baduser.ok -text { O K } -command {exit}
+     pack .baduser.texte .baduser.ok -side top
+     pack configure .baduser.ok -pady 15
+@@ -57,7 +57,7 @@
+ 
+ # default values
+ 
+-set username "username@domain"
++set username "kullanıcı_adı@ttnet"
+ set password ""
+ set vpi "8"
+ set vci "35"
+@@ -67,8 +67,8 @@
+ set pid1 ""
+ set vid2 ""
+ set pid2 ""
+-set use_dhcp "no"
+-set use_staticip "no"
++set use_dhcp "hayır"
++set use_staticip "hayır"
+ set staticip ""
+ set gateway ""
+ set mode ""
+@@ -145,16 +145,16 @@
+ frame .bloc0.ident
+ 
+ frame .bloc0.ident.user
+-label .bloc0.ident.user.label -text {User:} -width 15 -anchor e
++label .bloc0.ident.user.label -text {Kullanıcı adı:} -width 15 -anchor e
+ entry .bloc0.ident.user.edit -textvariable username -background lightblue -width 17
+-bind .bloc0.ident.user.edit <Enter> {pushstate "Enter your username and domain (given by your provider)"}
++bind .bloc0.ident.user.edit <Enter> {pushstate "Kullanıcı adınızı ve alanadınızı giriniz (kullanıcı_adı@ttnet)"}
+ bind .bloc0.ident.user.edit <Leave> {popstate}
+ pack .bloc0.ident.user.label .bloc0.ident.user.edit -side left
+ 
+ frame .bloc0.ident.password
+-label .bloc0.ident.password.label -text {Password:} -width 15 -anchor e
++label .bloc0.ident.password.label -text {Parola:} -width 15 -anchor e
+ entry .bloc0.ident.password.edit -show * -textvariable password -background lightblue -width 17
+-bind .bloc0.ident.password.edit <Enter> {pushstate "Enter your password (given by your provider)"}
++bind .bloc0.ident.password.edit <Enter> {pushstate "Parolanızı giriniz"}
+ bind .bloc0.ident.password.edit <Leave> {popstate}
+ pack .bloc0.ident.password.label .bloc0.ident.password.edit -side left
+ 
+@@ -169,14 +169,14 @@
+ frame .bloc0.call.vpi
+ label .bloc0.call.vpi.label -text {VPI:} -width 10 -anchor e
+ entry .bloc0.call.vpi.edit -textvariable vpi -background lightblue -width 4
+-bind .bloc0.call.vpi.edit <Enter> {pushstate "Virtual Path Identifier of your provider (8 for France)"}
++bind .bloc0.call.vpi.edit <Enter> {pushstate "VPI değerini giriniz (Türkiye için 8)"}
+ bind .bloc0.call.vpi.edit <Leave> {popstate}
+ pack .bloc0.call.vpi.label .bloc0.call.vpi.edit -side left
+ 
+ frame .bloc0.call.vci
+ label .bloc0.call.vci.label -text {VCI:} -width 10 -anchor e
+ entry .bloc0.call.vci.edit -textvariable vci -background lightblue -width 4
+-bind .bloc0.call.vci.edit <Enter> {pushstate "Virtual Channel Identifier of your provider (35 for France)"}
++bind .bloc0.call.vci.edit <Enter> {pushstate "VCI değerini giriniz (Türkiye için 35)"}
+ bind .bloc0.call.vci.edit <Leave> {popstate}
+ pack .bloc0.call.vci.label .bloc0.call.vci.edit -side left
+ 
+@@ -197,8 +197,8 @@
+ frame .bloc1.fai
+ 
+ frame .bloc1.fai.majdns
+-checkbutton .bloc1.fai.majdns.checkbox -text { Update provider DNS:} -command {invert_fai} -relief groove -background "#ffcc99" -width 28 -variable majfai -offvalue "non" -onvalue "oui" -selectcolor blue
+-bind .bloc1.fai.majdns.checkbox <Enter> {pushstate "Check this box if you want to update your DNS ($ETC_DIR/resolv.conf)"}
++checkbutton .bloc1.fai.majdns.checkbox -text { Sağlayıcı DNS'i güncelle:} -command {invert_fai} -relief groove -background "#ffcc99" -width 28 -variable majfai -offvalue "non" -onvalue "oui" -selectcolor blue
++bind .bloc1.fai.majdns.checkbox <Enter> {pushstate "Eğer DNS bilgilerinizi güncellemek istiyorsanız bu kutuyu işaretleyin ($ETC_DIR/resolv.conf)"}
+ bind .bloc1.fai.majdns.checkbox <Leave> {popstate}
+ pack .bloc1.fai.majdns.checkbox -side left
+ pack .bloc1.fai.majdns  -side top -anchor w
+@@ -227,7 +227,7 @@
+ 	}
+ }
+ close $file
+-lappend providers "Other" "" ""
++lappend providers "Diğerleri" "" ""
+ 
+ # fill the widget with the list of providers
+ frame .bloc1.fai.liste
+@@ -297,11 +297,11 @@
+ set fai_choisi ""
+ 
+ bind .bloc1.fai.liste.contenu <ButtonRelease> {select_provider}
+-bind .bloc1.fai.liste.contenu <Enter> {pushstate "Select a provider"}
++bind .bloc1.fai.liste.contenu <Enter> {pushstate "Bir servis sağlayıcı seçin"}
+ bind .bloc1.fai.liste.contenu <Leave> {popstate}
+-bind .bloc1.fai.dns1 <Enter> {pushstate "\[OPTIONAL\] Enter your own primary DNS (given by your provider)"}
++bind .bloc1.fai.dns1 <Enter> {pushstate "\[Opsiyonel\] Birincil DNS bilgisini giriniz"}
+ bind .bloc1.fai.dns1 <Leave> {popstate}
+-bind .bloc1.fai.dns2 <Enter> {pushstate "\[OPTIONAL\] Enter your own secondary DNS (given by your provider)"}
++bind .bloc1.fai.dns2 <Enter> {pushstate "\[Opsiyonel\] İkincil DNS bilgisini giriniz"}
+ bind .bloc1.fai.dns2 <Leave> {popstate}
+ 
+ 
+@@ -313,7 +313,7 @@
+ 
+ frame .bloc1.modem
+ 
+-label .bloc1.modem.libelle -text "Select your modem:" -relief groove -background "#ffcc99" -width 46
++label .bloc1.modem.libelle -text "Modeminizi seçiniz:" -relief groove -background "#ffcc99" -width 46
+ pack .bloc1.modem.libelle
+ 
+ # build the list of modems
+@@ -344,7 +344,7 @@
+ 	}
+ }
+ close $file
+-lappend modems "Other" "" "" "" ""
++lappend modems "Diğer" "" "" "" ""
+ 
+ # fill the widget with the list of modems
+ frame .bloc1.modem.liste
+@@ -426,11 +426,11 @@
+ .bloc1.modem.vidpid2.labelpid configure -foreground darkgray
+ 
+ bind .bloc1.modem.liste.contenu <ButtonRelease> {select_modem}
+-bind .bloc1.modem.liste.contenu <Enter> {pushstate "Select a modem"}
++bind .bloc1.modem.liste.contenu <Enter> {pushstate "Bir modem seçiniz"}
+ bind .bloc1.modem.liste.contenu <Leave> {popstate}
+-bind .bloc1.modem.vidpid1 <Enter> {pushstate "These are the Vendor ID and Product ID of your modem (4-digit hexa)"}
++bind .bloc1.modem.vidpid1 <Enter> {pushstate "Bunlar modeminizin üretici ve ürün kimlik bilgileridir (4-basamak hexa)"}
+ bind .bloc1.modem.vidpid1 <Leave> {popstate}
+-bind .bloc1.modem.vidpid2 <Enter> {pushstate "These are the Vendor ID and Product ID of your modem once initialized (4-digit hexa)"}
++bind .bloc1.modem.vidpid2 <Enter> {pushstate "Bunlar modeminiz çalıştığındaki üretici ve ürün kimlik bilgileridir (4-basamak hexa)"}
+ bind .bloc1.modem.vidpid2 <Leave> {popstate}
+ 
+ frame .bloc1.espace3 -width 15
+@@ -450,12 +450,12 @@
+ 
+ frame .bloc2.listebin
+ 
+-checkbutton .bloc2.listebin.checkbox -text { Change synch .bin file (only if driver hangs up):} -command {invert_bin} -relief groove -background "#ffcc99" -width 45 -variable majbin -offvalue "non" -onvalue "oui" -selectcolor blue
+-bind .bloc2.listebin.checkbox <Enter> {pushstate "Check this box if you want to change your synch .bin file"}
++checkbutton .bloc2.listebin.checkbox -text { .bin dosyasını değiştir (sadece sürücü takılırsa):} -command {invert_bin} -relief groove -background "#ffcc99" -width 45 -variable majbin -offvalue "non" -onvalue "oui" -selectcolor blue
++bind .bloc2.listebin.checkbox <Enter> {pushstate "Sync.bin dosyasını değiştirmek istiyorusanız bu kutuyu işaretleyin"}
+ bind .bloc2.listebin.checkbox <Leave> {popstate}
+ set majbin "non"
+ 
+-label .bloc2.listebin.actuel -text "Current .bin: $synch" -relief sunken -width 48 -anchor w
++label .bloc2.listebin.actuel -text "Mevcut .bin: $synch" -relief sunken -width 48 -anchor w
+ 
+ frame .bloc2.listebin.liste
+ listbox .bloc2.listebin.liste.contenu -yscrollcommand ".bloc2.listebin.liste.scroll set" -width 45 -height 4 -foreground darkgray -selectbackground lightgray -selectforeground darkgray
+@@ -480,16 +480,16 @@
+ 
+ set bin_choisi [.bloc2.listebin.liste.contenu curselection]
+ set bin_initial $bin_choisi
+-bind .bloc2.listebin.liste.contenu <Enter> {pushstate "Choose another .bin (ONLY if driver hangs up into eciadsl-synch or LCP timeouts !)"}
++bind .bloc2.listebin.liste.contenu <Enter> {pushstate "Başka bir .bin seçin (SADECE eğer eciadsl-synch işleminde takılır ya da LCP zaman aşımına uğrarsa!)"}
+ bind .bloc2.listebin.liste.contenu <Leave> {popstate}
+ scrollbar .bloc2.listebin.liste.scroll -command ".bloc2.listebin.liste.contenu yview"
+ pack .bloc2.listebin.liste.contenu .bloc2.listebin.liste.scroll -side left -fill y
+ 
+ frame .bloc2.listebin.recherche
+-label .bloc2.listebin.recherche.texte -text {Search .bin here:} -width 15
++label .bloc2.listebin.recherche.texte -text {.bin dosyasını burada ara:} -width 15
+ set chemin_bin $CONF_DIR
+ entry .bloc2.listebin.recherche.chemin -textvariable chemin_bin -background "#CCEEEE" -width 27
+-bind .bloc2.listebin.recherche.chemin <Enter> {pushstate "Enter path for searching .bin files"}
++bind .bloc2.listebin.recherche.chemin <Enter> {pushstate ".bin dosyalarının aranması için yer belirtin"}
+ bind .bloc2.listebin.recherche.chemin <Leave> {popstate}
+ image create bitmap bitmaptest -data "\
+ #define loupe_width 25 \
+@@ -501,7 +501,7 @@
+    0x00, 0xee, 0x01, 0x00, 0x00, 0x07, 0x00, 0x00, 0x80, 0x03, 0x00, 0x00, \
+    0xc0, 0x01, 0x00, 0x00, 0xe0, 0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00 };"
+ button .bloc2.listebin.recherche.search -image bitmaptest -background "#99CCCC" -command {add_bins $chemin_bin}
+-bind .bloc2.listebin.recherche.search <Enter> {pushstate "Click to search .bin files (warning: can take a moment!)"}
++bind .bloc2.listebin.recherche.search <Enter> {pushstate ".bin dosyalarının aranması için tıklatın (uyarı: biraz zaman alabilir!)"}
+ bind .bloc2.listebin.recherche.search <Leave> {popstate}
+ pack .bloc2.listebin.recherche.texte .bloc2.listebin.recherche.chemin .bloc2.listebin.recherche.search -side left
+ 
+@@ -519,7 +519,7 @@
+ 
+ frame .bloc2.modes
+ 
+-label .bloc2.modes.libelle -text "Select a PPP mode:" -relief groove -background "#ffcc99" -width 43
++label .bloc2.modes.libelle -text "Bir PPP modu seçin:" -relief groove -background "#ffcc99" -width 43
+ pack .bloc2.modes.libelle
+ 
+ list modes
+@@ -569,8 +569,8 @@
+ pack .bloc2.modes.espacevertic
+ 
+ frame .bloc2.modes.advanced
+-checkbutton .bloc2.modes.advanced.use_dhcp -text {Use DHCP} -command {onclick_use_dhcp} -variable use_dhcp -offvalue "no" -onvalue "yes"
+-checkbutton .bloc2.modes.advanced.use_staticip -text {Use static IP} -command {onclick_use_staticip} -variable use_staticip -offvalue "no" -onvalue "yes"
++checkbutton .bloc2.modes.advanced.use_dhcp -text {DHCP kullan} -command {onclick_use_dhcp} -variable use_dhcp -offvalue "no" -onvalue "yes"
++checkbutton .bloc2.modes.advanced.use_staticip -text {Statik IP kullan} -command {onclick_use_staticip} -variable use_staticip -offvalue "no" -onvalue "yes"
+ pack .bloc2.modes.advanced.use_dhcp .bloc2.modes.advanced.use_staticip -side left
+ 
+ frame .bloc2.modes.staticip
+@@ -616,15 +616,15 @@
+ onclick_use_staticip
+ 
+ bind .bloc2.modes.liste.contenu <ButtonRelease> {select_mode}
+-bind .bloc2.modes.liste.contenu <Enter> {pushstate "Select a PPP mode/encapsulation (leave the first one selected if you don't know what it means)"}
++bind .bloc2.modes.liste.contenu <Enter> {pushstate "Bir PPP mode/encapsulation seçin (eğer ne anlama geldiğini bilmiyorsanız ilk şıkkı seçiniz)"}
+ bind .bloc2.modes.liste.contenu <Leave> {popstate}
+-bind .bloc2.modes.advanced.use_dhcp <Enter> {pushstate "Click here if you use DHCP to get an IP from your provider (MOST users should DISABLE this)"}
++bind .bloc2.modes.advanced.use_dhcp <Enter> {pushstate "Servis sağlayıcınızdan IP almak için DHCP kullanıyorsanız tıklayın (Bir çok kullanıcı bu servisi kullanmaz)"}
+ bind .bloc2.modes.advanced.use_dhcp <Leave> {popstate}
+-bind .bloc2.modes.advanced.use_staticip <Enter> {pushstate "Click here if you get a static IP from your provider (MOST users should DISABLE this)"}
++bind .bloc2.modes.advanced.use_staticip <Enter> {pushstate "Servis sağlayıcınızdan statik IP aldıysanız buraya tıklayın (Bir çok kullanıcı servisi kullanmaz)"}
+ bind .bloc2.modes.advanced.use_staticip <Leave> {popstate}
+-bind .bloc2.modes.staticip.edit <Enter> {pushstate "Your static IP (ONLY IF given by your provider)"}
++bind .bloc2.modes.staticip.edit <Enter> {pushstate "Statik IP'niz (Eğer servis sağlayıcısından aldıysanız)"}
+ bind .bloc2.modes.staticip.edit <Leave> {popstate}
+-bind .bloc2.modes.gateway.edit <Enter> {pushstate "Your provider's gateway IP (ONLY IF given by your provider)"}
++bind .bloc2.modes.gateway.edit <Enter> {pushstate "Sağlayıcınızın ağ geçit IP'si (Sadece servis sağlayıcısından verildiyse)"}
+ bind .bloc2.modes.gateway.edit <Leave> {popstate}
+ 
+ pack .bloc2.modes.liste
+@@ -644,15 +644,15 @@
+ #
+ 
+ frame .boutons
+-button .boutons.create -text {Create config !} -width 15 -height 1 -command {run_makeconfig} -state disabled -background lightgray
+-bind .boutons.create <Enter> {pushstate "Save modifications then quit: select a modem first"}
++button .boutons.create -text {Ayar oluştur!} -width 15 -height 1 -command {run_makeconfig} -state disabled -background lightgray
++bind .boutons.create <Enter> {pushstate "Değişikleri kaydedip çıkın: önce bir modem seçin"}
+ bind .boutons.create <Leave> {popstate}
+ 
+ proc enable_create_button {} {
+ 	global .boutons.create
+ 
+ 	.boutons.create configure -state normal -background lightgreen
+-	bind .boutons.create <Enter> {pushstate "Save settings: write configuration files and set synch .bin if enabled, then quit"}
++	bind .boutons.create <Enter> {pushstate "Ayarları kaydet: konfigürasyon dosyasını kaydedip ve eğer  aktifse .bin dosyanızı senkron edip çıkın"}
+ 	bind .boutons.create <Leave> {popstate}
+ }
+ 
+@@ -680,18 +680,18 @@
+ 
+ 
+ frame .boutons.espace -width 20
+-button .boutons.dabusb -text {Remove Dabusb} -background "#ffccff" -command {run_dabusb} -padx 10
+-bind .boutons.dabusb <Enter> {pushstate "Unplug your modem first and then click on this button to remove dabusb"}
++button .boutons.dabusb -text {Dabusb çıkar} -background "#ffccff" -command {run_dabusb} -padx 10
++bind .boutons.dabusb <Enter> {pushstate "Önce modemizi çıkartın ve (dabusb'yi çıkar) düğmesine basın"}
+ bind .boutons.dabusb <Leave> {popstate}
+ 
+ frame .boutons.espace1 -width 20
+-button .boutons.set_bin -text {Change synch .bin} -width 15 -height 1 -command {run_makeconfig_synch} -state disabled -background lightgray
+-bind .boutons.set_bin <Enter> {pushstate "Only change current synch .bin: enable it above and select a .bin"}
++button .boutons.set_bin -text { .bin değiştir} -width 15 -height 1 -command {run_makeconfig_synch} -state disabled -background lightgray
++bind .boutons.set_bin <Enter> {pushstate "Sadece mevcut .bin'i senkron edin: aşağıdan aktive edin ve bir .bin seçin"}
+ bind .boutons.set_bin <Leave> {popstate}
+ 
+ frame .boutons.espace2 -width 20
+-button .boutons.cancel -text {Cancel} -background "#ffbbbb" -width 15 -height 1 -command {exit}
+-bind .boutons.cancel <Enter> {pushstate "Quit without saving"}
++button .boutons.cancel -text {İptal} -background "#ffbbbb" -width 15 -height 1 -command {exit}
++bind .boutons.cancel <Enter> {pushstate "Kaydetmeden çık"}
+ bind .boutons.cancel <Leave> {popstate}
+ 
+ pack .boutons.create .boutons.espace .boutons.dabusb .boutons.espace1 .boutons.set_bin .boutons.espace2 .boutons.cancel -side left
+@@ -702,7 +702,7 @@
+ 
+ label .state -textvariable statetext -borderwidth 2 -relief sunken -anchor w
+ pack .state -fill x
+-set statetext "Ready."
++set statetext "Hazır."
+ 
+ 
+ proc conf_report {exit msg color sortie} {
+@@ -745,9 +745,9 @@
+         set synch [.bloc2.listebin.liste.contenu get $numero_bin_choix]
+ 	    set returncode [catch {exec $BIN_DIR/eciadsl-makeconfig --synch "$synch"} sortie]
+     	if {$returncode != 0} {
+-	        conf_report "non" "Synch .bin has NOT been set.\n\nThis is the error from makeconfig:" "#ffbbbb" $sortie
++	        conf_report "non" "Senkron için .bin set edilmedi.\n\nBu hata makeconfig'den geliyor:" "#ffbbbb" $sortie
+     	} else {
+-	        conf_report "non" "Synch .bin has been changed and will\nbe used the next time you run eciadsl-start." lightgreen ""
++	        conf_report "non" ".bin senkron edildi ve bir dahaki sefer\n eciadsl-start başlatılınca kullanılacak." lightgreen ""
+     	}
+ 	}
+ }
+@@ -763,9 +763,9 @@
+ 
+     set returncode [catch {exec $BIN_DIR/eciadsl-makeconfig "$mode" "$username" "$password" "$BIN_DIR/eciadsl-pppoeci" "$dns1" "$dns2" $vpi $vci "$vid1$pid1" "$vid2$pid2" "$synch" "$firm" "$staticip" "$gateway" "$use_staticip" "$use_dhcp" "$modem" "$provider"} sortie]
+     if {$returncode != 0} {
+-        conf_report "non" "eciadsl-makeconfig did not update your files.\n\nThis is the error:" "#ffbbbb" $sortie
++        conf_report "non" "eciadsl-makeconfig dosyalarınızı güncelleyemedi.\n\nHata:" "#ffbbbb" $sortie
+     } else {
+-        conf_report "oui" "Configuration files updated with success!\n\nThis is eciadsl-makeconfig output:" lightgreen $sortie
++        conf_report "oui" "Konfigürasyon dosyaları başarı ile güncellendi!\n\neciadsl-makeconfig çıktısı:" lightgreen $sortie
+     }
+ }
+ 
+@@ -780,12 +780,12 @@
+     toplevel .dab
+     wm title .dab "dabusb"
+     if {$returncode != 0} {
+-        set msg "Dabusb couldn't be removed...\n\nThe error is:"
+-        set vmtitle "Error"
++        set msg "Dabusb ayrılamadı...\n\nHata:"
++        set vmtitle "Hata"
+         set color "#ffbbbb"
+     } else {
+-        set msg "Dabusb succesfully removed.\n\nThis is eciadsl-remove-dabusb output:"
+-        set vmtitle "OK"
++        set msg "Dabusb başarı ile ayrıldı.\n\neciadsl-remove-dabusb çıktısı:"
++        set vmtitle "TAMAM"
+         set color lightgreen
+     }
+     message .dab.texte -text "$msg" -aspect 600 -padx 15 -pady 15
+@@ -822,7 +822,7 @@
+             set statetext $statepile($topstatepile)
+         } else {
+             set topstatepile 0
+-            set statetext "Ready."
++            set statetext "Hazır."
+         }
+     }
+ }
+@@ -878,7 +878,7 @@
+             .bloc2.listebin.liste.contenu selection set $bin_choisi
+             .bloc2.listebin.liste.contenu see $bin_choisi
+ 			.boutons.set_bin configure -state normal -background lightblue
+-			bind .boutons.set_bin <Enter> {pushstate "Only change current synch .bin with the selected one"}
++			bind .boutons.set_bin <Enter> {pushstate "Sadece seçilmiş olanı mevcut .bin ile senkron et"}
+ 			bind .boutons.set_bin <Leave> {popstate}
+         } else {
+             set majbin "non"
+@@ -890,7 +890,7 @@
+             set bin_choisi $bin_initial
+         }
+ 		.boutons.set_bin configure -state disabled -background lightgray
+-		bind .boutons.set_bin <Enter> {pushstate "Only change current synch .bin: enable it above and select a .bin"}
++		bind .boutons.set_bin <Enter> {pushstate "Sadece mevcut .bin'i senkron et: eğer aşağıdaki seçenek aktifse"}
+ 		bind .boutons.set_bin <Leave> {popstate}
+     }
+ }

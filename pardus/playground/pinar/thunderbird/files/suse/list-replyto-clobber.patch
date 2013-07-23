@@ -1,0 +1,130 @@
+Index: mailnews/mailnews.js
+===================================================================
+RCS file: /cvsroot/mozilla/mailnews/mailnews.js,v
+retrieving revision 3.249
+diff -u -r3.249 mailnews.js
+--- mailnews/mailnews.js	9 Aug 2005 00:36:31 -0000	3.249
++++ mailnews/mailnews.js	15 Aug 2005 01:12:06 -0000
+@@ -196,6 +196,7 @@
+ pref("mailnews.reply_header_locale",        "");
+ pref("mailnews.reply_header_authorwrote",   "chrome://messenger/locale/messengercompose/composeMsgs.properties");
+ pref("mailnews.reply_header_ondate",        "chrome://messenger/locale/messengercompose/composeMsgs.properties");
++pref("mailnews.clobber_list_reply",         false);
+ 
+ // separator to separate between date and author
+ pref("mailnews.reply_header_separator",     ", ");
+--- mailnews/compose/src/nsMsgCompose.cpp.old	2007-01-10 10:03:52.000000000 +0100
++++ mailnews/compose/src/nsMsgCompose.cpp	2007-01-10 10:09:45.000000000 +0100
+@@ -2221,6 +2221,7 @@ NS_IMETHODIMP QuotingOutputStreamListene
+         nsAutoString listPost;
+         nsXPIDLCString outCString;
+         PRBool needToRemoveDup = PR_FALSE;
++        PRBool clobberListReply = PR_FALSE;
+         if (!mMimeConverter)
+         {
+           mMimeConverter = do_GetService(NS_MIME_CONVERTER_CONTRACTID, &rv);
+@@ -2229,6 +2230,70 @@ NS_IMETHODIMP QuotingOutputStreamListene
+         nsXPIDLCString charset;
+         compFields->GetCharacterSet(getter_Copies(charset));
+ 
++       nsCOMPtr<nsIPrefBranch> prefBranch (do_GetService(NS_PREFSERVICE_CONTRACTID));
++       if (prefBranch)
++          prefBranch->GetBoolPref("mailnews.clobber_list_reply", &clobberListReply);
++
++       mHeaders->ExtractHeader(HEADER_REPLY_TO, PR_FALSE, getter_Copies(outCString));
++       if (outCString)
++         mMimeConverter->DecodeMimeHeader(outCString, replyTo, charset);
++
++       mHeaders->ExtractHeader(HEADER_MAIL_REPLY_TO, PR_TRUE, getter_Copies(outCString));
++       if (outCString)
++         mMimeConverter->DecodeMimeHeader(outCString, mailReplyTo, charset);
++
++       if (clobberListReply) {
++         /* the 'Al fix'.  Try to fake up Mail-Reply-To: and
++          * Mail-Followup-To: headers if we don't have any, and if it looks
++          * like it came via a mailing list.
++          *
++          * Currently only supports List-Post header.
++          */
++
++         mHeaders->ExtractHeader(HEADER_MAIL_FOLLOWUP_TO, PR_TRUE, getter_Copies(outCString));
++         if (outCString)
++           mMimeConverter->DecodeMimeHeader(outCString, mailFollowupTo, charset);
++
++         if (mailFollowupTo.IsEmpty()) {
++           nsAutoString mailingList;
++
++           mHeaders->ExtractHeader(HEADER_LIST_POST, PR_TRUE, getter_Copies(outCString));
++           if (outCString)
++            {
++              mMimeConverter->DecodeMimeHeader(outCString, mailingList, charset);
++             /* s/<mailto:(.*)>/$1/; */
++             if (StringBeginsWith(mailingList, NS_LITERAL_STRING("<mailto:")) &&
++                 StringEndsWith(mailingList, NS_LITERAL_STRING(">"))) {
++
++               mailingList = Substring(mailingList, 8, mailingList.Length() - 9);
++             }
++           }
++
++           mailFollowupTo = mailingList;
++         }
++
++         if (mailReplyTo.IsEmpty()) {
++           nsAutoString from;
++           nsAutoString xReplyTo;
++
++           mHeaders->ExtractHeader(HEADER_FROM, PR_FALSE, getter_Copies(outCString));
++           if (outCString)
++              mMimeConverter->DecodeMimeHeader(outCString, from, charset);
++
++           mHeaders->ExtractHeader(HEADER_X_REPLY_TO, PR_FALSE, getter_Copies(outCString));
++           if (outCString)
++              mMimeConverter->DecodeMimeHeader(outCString, xReplyTo, charset);
++
++           if (replyTo == mailFollowupTo) {
++             if (!xReplyTo.IsEmpty())
++               mailReplyTo = xReplyTo;
++             else 
++               mailReplyTo = from;
++           }
++         }
++       }
++
++
+         if (type == nsIMsgCompType::ReplyAll)
+         {
+           mHeaders->ExtractHeader(HEADER_TO, PR_TRUE, getter_Copies(outCString));
+@@ -2252,10 +2317,10 @@ NS_IMETHODIMP QuotingOutputStreamListene
+               compFields->SetBcc(bcc);
+           }
+ 
+-          mHeaders->ExtractHeader(HEADER_MAIL_FOLLOWUP_TO, PR_TRUE, getter_Copies(outCString));
+-          if (outCString)
+-          {
+-            mMimeConverter->DecodeMimeHeader(outCString, mailFollowupTo, charset);
++          if (!clobberListReply) { // else we've already looked this up earlier 
++            mHeaders->ExtractHeader(HEADER_MAIL_FOLLOWUP_TO, PR_TRUE, getter_Copies(outCString));
++            if (outCString)
++              mMimeConverter->DecodeMimeHeader(outCString, mailFollowupTo, charset);    
+           }
+ 
+           if (! mailFollowupTo.IsEmpty())
+@@ -2296,18 +2361,6 @@ NS_IMETHODIMP QuotingOutputStreamListene
+           }
+         }
+ 
+-        mHeaders->ExtractHeader(HEADER_REPLY_TO, PR_FALSE, getter_Copies(outCString));
+-        if (outCString)
+-        {
+-          mMimeConverter->DecodeMimeHeader(outCString, replyTo, charset);
+-        }
+-
+-        mHeaders->ExtractHeader(HEADER_MAIL_REPLY_TO, PR_TRUE, getter_Copies(outCString));
+-        if (outCString)
+-        {
+-          mMimeConverter->DecodeMimeHeader(outCString, mailReplyTo, charset);
+-        }
+-
+         mHeaders->ExtractHeader(HEADER_NEWSGROUPS, PR_FALSE, getter_Copies(outCString));
+         if (outCString)
+         {

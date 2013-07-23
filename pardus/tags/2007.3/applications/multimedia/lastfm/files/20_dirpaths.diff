@@ -1,0 +1,53 @@
+--- a/src/container.cpp
++++ b/src/container.cpp
+@@ -971,7 +971,7 @@
+     // Hack to get it working with VS2005
+     dirPath = qApp->applicationDirPath();
+   #else
+-    dirPath = qApp->applicationDirPath() + "/extensions";
++    dirPath = "/usr/lib/lastfm/extensions";
+   #endif
+ 
+   #ifndef QT_NO_DEBUG
+--- a/src/lastfmapplication.cpp
++++ b/src/lastfmapplication.cpp
+@@ -60,7 +60,7 @@
+ 
+     // This is needed so that relative paths will work on Windows regardless
+     // of where the app is launched from.
+-    QDir::setCurrent( applicationDirPath() );
++    //QDir::setCurrent( applicationDirPath() );
+ 
+     // run init() as soon as event loop starts
+     QTimer::singleShot( 0, this, SLOT(init()) );
+@@ -200,8 +200,8 @@
+     m_lang = langCode;
+ 
+     // Discards previously loaded translations
+-    m_translatorApp.load( dataPath( "i18n/lastfm_%1" ).arg( langCode ) );
+-    m_translatorQt.load( dataPath( "i18n/qt_%1" ).arg( langCode ) );
++    m_translatorApp.load( QString( "/usr/share/lastfm/i18n/lastfm_%1" ).arg( langCode ) );
++    m_translatorQt.load( QString( "/usr/share/lastfm/i18n/qt_%1" ).arg( langCode ) );
+ }
+ 
+ 
+--- a/src/libLastFmTools/containerutils.cpp
++++ b/src/libLastFmTools/containerutils.cpp
+@@ -67,7 +67,7 @@
+ 
+ QString dataPath( QString file )
+ {
+-    return QApplication::applicationDirPath() + "/data/" + file;
++    return QString( "/usr/share/lastfm/%1" ).arg( file );
+ }
+ 
+ 
+@@ -118,7 +118,7 @@
+         // Hack to get it working with VS2005
+         dirPath = qApp->applicationDirPath();
+     #else
+-        dirPath = qApp->applicationDirPath() + "/services";
++        dirPath = "/usr/lib/lastfm/services";
+     #endif
+ 
+     #ifndef QT_NO_DEBUG

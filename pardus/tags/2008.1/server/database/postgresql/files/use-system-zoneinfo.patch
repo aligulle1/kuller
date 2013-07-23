@@ -1,0 +1,64 @@
+--- src/timezone/Makefile	2007-03-14 19:38:22.000000000 +0200
++++ src/timezone/Makefile	2008-01-12 05:13:27.000000000 +0200
+@@ -38,7 +38,6 @@
+ 	$(CC) $(CFLAGS) $(ZICOBJS) $(LDFLAGS) $(LIBS) -o $@$(X)
+ 
+ install: all installdirs
+-	./zic -d $(DESTDIR)$(datadir)/timezone -p $(POSIXRULES) $(TZDATAFILES)
+ 
+ installdirs:
+ 	$(mkinstalldirs) $(DESTDIR)$(datadir)
+--- src/timezone/pgtz.c	2005-11-22 20:23:31.000000000 +0200
++++ src/timezone/pgtz.c	2008-01-12 05:14:52.000000000 +0200
+@@ -32,9 +32,6 @@
+ pg_tz	   *global_timezone = NULL;
+ 
+ 
+-static char tzdir[MAXPGPATH];
+-static int	done_tzdir = 0;
+-
+ static const char *identify_system_timezone(void);
+ static const char *select_default_timezone(void);
+ static bool set_global_timezone(const char *tzname);
+@@ -43,17 +40,10 @@
+ /*
+  * Return full pathname of timezone data directory
+  */
+-char *
++const char *
+ pg_TZDIR(void)
+ {
+-	if (done_tzdir)
+-		return tzdir;
+-
+-	get_share_path(my_exec_path, tzdir);
+-	strcat(tzdir, "/timezone");
+-
+-	done_tzdir = 1;
+-	return tzdir;
++	return "/usr/share/zoneinfo";
+ }
+ 
+ 
+--- src/timezone/pgtz.h	2005-10-15 05:49:51.000000000 +0300
++++ src/timezone/pgtz.h	2008-01-12 05:17:19.000000000 +0200
+@@ -18,7 +18,7 @@
+ 
+ #include "tzfile.h"
+ 
+-extern char *pg_TZDIR(void);
++extern const char *pg_TZDIR(void);
+ 
+ #define BIGGEST(a, b)	(((a) > (b)) ? (a) : (b))
+ 
+--- src/timezone/zic.c	2005-10-15 05:49:51.000000000 +0300
++++ src/timezone/zic.c	2008-01-12 05:18:54.000000000 +0200
+@@ -2390,7 +2390,7 @@
+  *	This allows zic to compile by just assigning a dummy value.
+  *	localtime.c references it, but no one uses it from zic.
+  */
+-char *
++const char *
+ pg_TZDIR(void)
+ {
+ 	return NULL;

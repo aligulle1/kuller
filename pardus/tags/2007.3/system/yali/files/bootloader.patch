@@ -1,0 +1,38 @@
+Index: yali/gui/ScrBootloader.py
+===================================================================
+--- yali/gui/ScrBootloader.py	(revision 16036)
++++ yali/gui/ScrBootloader.py	(working copy)
+@@ -204,14 +204,13 @@
+ 
+         info_window.close()
+ 
+-        if self.noInstall.isChecked():
+-            ctx.installData.bootLoaderDev = None
+-
+         root_part_req = ctx.partrequests.searchPartTypeAndReqType(parttype.root,
+                                                                   request.mountRequestType)
+ 
+         # install_dev
+-        if self.installPart.isChecked():
++        if self.noInstall.isChecked():
++            ctx.installData.bootLoaderDev = None
++        elif self.installPart.isChecked():
+             ctx.installData.bootLoaderDev = basename(root_part_req.partition().getPath())
+         elif self.installMBR.isChecked():
+             ctx.installData.bootLoaderDev = basename(self.device.getPath())
+Index: yali/storage.py
+===================================================================
+--- yali/storage.py	(revision 16036)
++++ yali/storage.py	(working copy)
+@@ -459,10 +459,7 @@
+         for dev_type in ["hd*", "sd*"]:
+             sysfs_devs = glob.glob("/sys/block/" + dev_type)
+             for sysfs_dev in sysfs_devs:
+-                if not int(open(sysfs_dev + "/removable").read().strip()):
+-                    devlink = os.readlink(sysfs_dev + "/device")
+-                    if not "/usb" in devlink:
+-                        devices.append("/dev/" + os.path.basename(sysfs_dev))
++                devices.append("/dev/" + os.path.basename(sysfs_dev))
+         devices.sort()
+         return devices
+ 

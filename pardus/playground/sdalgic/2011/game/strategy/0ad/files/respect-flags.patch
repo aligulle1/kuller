@@ -1,0 +1,39 @@
+Index: 0ad-r09786-alpha/build/workspaces/update-workspaces.sh
+===================================================================
+--- 0ad-r09786-alpha.orig/build/workspaces/update-workspaces.sh
++++ 0ad-r09786-alpha/build/workspaces/update-workspaces.sh
+@@ -47,9 +47,9 @@ echo "Updating bundled third-party depen
+ echo
+ 
+ # Build/update bundled external libraries
+-(cd ../../libraries/fcollada/src && make ${JOBS}) || die "FCollada build failed"
++(cd ../../libraries/fcollada/src && make ${JOBS} CXX=${pardusCXX} CPPFLAGS="${pardusCPPFLAGS}" )  || die "FCollada build failed"
+ echo
+-(cd ../../libraries/spidermonkey-tip && JOBS=${JOBS} ./build.sh) || die "SpiderMonkey build failed"
++(cd ../../libraries/spidermonkey-tip && JOBS=${JOBS} CXX=${pardusCXX} CPPFLAGS="${pardusCPPFLAGS}" ./build.sh) || die "SpiderMonkey build failed"
+ echo
+ if [ "$with_system_nvtt" = "false" ]; then
+   (cd ../../libraries/nvtt && JOBS=${JOBS} ./build.sh) || die "NVTT build failed"
+Index: 0ad-r09786-alpha/libraries/spidermonkey-tip/build.sh
+===================================================================
+--- 0ad-r09786-alpha.orig/libraries/spidermonkey-tip/build.sh
++++ 0ad-r09786-alpha/libraries/spidermonkey-tip/build.sh
+@@ -21,17 +21,10 @@ JOBS=${JOBS:="-j2"}
+ 
+ MAKE_OPTS="${JOBS}"
+ 
+-CONF_OPTS="--disable-tests"
++CONF_OPTS="--disable-tests --disable-valgrind --disable-static"
+ # (We don't use --enable-threadsafe because we don't use a single runtime in
+ # multiple threads, so it is unnecessary complexity and performance overhead)
+ 
+-# If Valgrind looks like it's installed, then set up SM to support it
+-# (else the JITs will interact poorly with it)
+-if [ -e /usr/include/valgrind/valgrind.h ]
+-then
+-  CONF_OPTS="${CONF_OPTS} --enable-valgrind"
+-fi
+-
+ # We need to be able to override CHOST in case it is 32bit userland on 64bit kernel
+ CONF_OPTS="${CONF_OPTS} \
+   ${CBUILD:+--build=${CBUILD}} \

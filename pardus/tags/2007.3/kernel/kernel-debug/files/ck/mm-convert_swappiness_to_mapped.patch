@@ -1,0 +1,209 @@
+Turn the "swappiness" knob into one with well defined semantics. Rename it
+"mapped" to correspond directly with the percentage of mapped ram or
+"applications" as users think of it. Currently the swappiness algorithm can
+easily lead to swapping situations on simple file copies due to the distress
+algorithm which too easily overrides the swappiness value. Add a
+"hardmaplimit" tunable, on by default, which only allows the vm to override
+the "mapped" tunable when distress is at its greatest to prevent false
+out-of-memory situations.
+
+Signed-off-by: Con Kolivas <kernel@kolivas.org>
+
+Index: linux-2.6.18/Documentation/sysctl/vm.txt
+===================================================================
+--- linux-2.6.18.orig/Documentation/sysctl/vm.txt
++++ linux-2.6.18/Documentation/sysctl/vm.txt
+@@ -22,6 +22,8 @@ Currently, these files are in /proc/sys/
+ - dirty_background_ratio
+ - dirty_expire_centisecs
+ - dirty_writeback_centisecs
++- hardmaplimit
++- mapped
+ - max_map_count
+ - min_free_kbytes
+ - laptop_mode
+@@ -86,6 +88,27 @@ for swap because we only cluster swap da
+ 
+ ==============================================================
+ 
++hardmaplimit:
++
++This flag makes the vm adhere to the mapped value as closely as possible
++except in the most extreme vm stress where doing so would provoke an out
++of memory condition (see mapped below).
++
++Enabled by default.
++
++==============================================================
++
++mapped:
++
++This is the percentage ram that is filled with mapped pages (applications)
++before the vm will start reclaiming mapped pages by moving them to swap.
++It is altered by the relative stress of the vm at the time so is not
++strictly adhered to to prevent provoking out of memory kills.
++
++Set to 66 by default.
++
++==============================================================
++
+ max_map_count:
+ 
+ This file contains the maximum number of memory map areas a process
+Index: linux-2.6.18/include/linux/swap.h
+===================================================================
+--- linux-2.6.18.orig/include/linux/swap.h
++++ linux-2.6.18/include/linux/swap.h
+@@ -183,7 +183,8 @@ extern void swap_setup(void);
+ /* linux/mm/vmscan.c */
+ extern unsigned long try_to_free_pages(struct zone **, gfp_t);
+ extern unsigned long shrink_all_memory(unsigned long nr_pages);
+-extern int vm_swappiness;
++extern int vm_mapped;
++extern int vm_hardmaplimit;
+ extern int remove_mapping(struct address_space *mapping, struct page *page);
+ extern long vm_total_pages;
+ 
+Index: linux-2.6.18/include/linux/sysctl.h
+===================================================================
+--- linux-2.6.18.orig/include/linux/sysctl.h
++++ linux-2.6.18/include/linux/sysctl.h
+@@ -176,7 +176,7 @@ enum
+ 	VM_OVERCOMMIT_RATIO=16, /* percent of RAM to allow overcommit in */
+ 	VM_PAGEBUF=17,		/* struct: Control pagebuf parameters */
+ 	VM_HUGETLB_PAGES=18,	/* int: Number of available Huge Pages */
+-	VM_SWAPPINESS=19,	/* Tendency to steal mapped memory */
++	VM_MAPPED=19,		/* percent mapped min while evicting cache */
+ 	VM_LOWMEM_RESERVE_RATIO=20,/* reservation ratio for lower memory zones */
+ 	VM_MIN_FREE_KBYTES=21,	/* Minimum free kilobytes to maintain */
+ 	VM_MAX_MAP_COUNT=22,	/* int: Maximum number of mmaps/address-space */
+@@ -193,6 +193,7 @@ enum
+ 	VM_PANIC_ON_OOM=33,	/* panic at out-of-memory */
+ 	VM_VDSO_ENABLED=34,	/* map VDSO into new processes? */
+ 	VM_MIN_SLAB=35,		 /* Percent pages ignored by zone reclaim */
++	VM_HARDMAPLIMIT=35,	/* Make mapped a hard limit */
+ };
+ 
+ 
+Index: linux-2.6.18/kernel/sysctl.c
+===================================================================
+--- linux-2.6.18.orig/kernel/sysctl.c
++++ linux-2.6.18/kernel/sysctl.c
+@@ -815,16 +815,24 @@ static ctl_table vm_table[] = {
+ 		.proc_handler	= &proc_dointvec,
+ 	},
+ 	{
+-		.ctl_name	= VM_SWAPPINESS,
+-		.procname	= "swappiness",
+-		.data		= &vm_swappiness,
+-		.maxlen		= sizeof(vm_swappiness),
++		.ctl_name	= VM_MAPPED,
++		.procname	= "mapped",
++		.data		= &vm_mapped,
++		.maxlen		= sizeof(vm_mapped),
+ 		.mode		= 0644,
+ 		.proc_handler	= &proc_dointvec_minmax,
+ 		.strategy	= &sysctl_intvec,
+ 		.extra1		= &zero,
+ 		.extra2		= &one_hundred,
+ 	},
++	{
++		.ctl_name	= VM_HARDMAPLIMIT,
++		.procname	= "hardmaplimit",
++		.data		= &vm_hardmaplimit,
++		.maxlen		= sizeof(int),
++		.mode		= 0644,
++		.proc_handler	= &proc_dointvec,
++	},
+ #ifdef CONFIG_HUGETLB_PAGE
+ 	 {
+ 		.ctl_name	= VM_HUGETLB_PAGES,
+Index: linux-2.6.18/mm/vmscan.c
+===================================================================
+--- linux-2.6.18.orig/mm/vmscan.c
++++ linux-2.6.18/mm/vmscan.c
+@@ -62,7 +62,7 @@ struct scan_control {
+ 	 * whole list at once. */
+ 	int swap_cluster_max;
+ 
+-	int swappiness;
++	int mapped;
+ };
+ 
+ /*
+@@ -107,9 +107,10 @@ struct shrinker {
+ #endif
+ 
+ /*
+- * From 0 .. 100.  Higher means more swappy.
++ * From 0 .. 100.  Lower means more swappy.
+  */
+-int vm_swappiness = 60;
++int vm_mapped __read_mostly = 66;
++int vm_hardmaplimit __read_mostly = 1;
+ long vm_total_pages;	/* The total number of pages which the VM controls */
+ 
+ static LIST_HEAD(shrinker_list);
+@@ -770,10 +771,14 @@ static void shrink_active_list(unsigned 
+ 		 * The distress ratio is important - we don't want to start
+ 		 * going oom.
+ 		 *
+-		 * A 100% value of vm_swappiness overrides this algorithm
+-		 * altogether.
++		 * This distress value is ignored if we apply a hardmaplimit except
++		 * in extreme distress.
++		 *
++		 * A 0% value of vm_mapped overrides this algorithm altogether.
+ 		 */
+-		swap_tendency = mapped_ratio / 2 + distress + sc->swappiness;
++		swap_tendency = mapped_ratio * 100 / (sc->mapped + 1);
++		if (!vm_hardmaplimit || distress == 100)
++			swap_tendency += distress;
+ 
+ 		/*
+ 		 * Now use this metric to decide whether to start moving mapped
+@@ -986,7 +991,7 @@ unsigned long try_to_free_pages(struct z
+ 		.may_writepage = !laptop_mode,
+ 		.swap_cluster_max = SWAP_CLUSTER_MAX,
+ 		.may_swap = 1,
+-		.swappiness = vm_swappiness,
++		.mapped = vm_mapped,
+ 	};
+ 
+ 	count_vm_event(ALLOCSTALL);
+@@ -1087,7 +1092,7 @@ static unsigned long balance_pgdat(pg_da
+ 		.gfp_mask = GFP_KERNEL,
+ 		.may_swap = 1,
+ 		.swap_cluster_max = SWAP_CLUSTER_MAX,
+-		.swappiness = vm_swappiness,
++		.mapped = vm_mapped,
+ 	};
+ 	/*
+ 	 * temp_priority is used to remember the scanning priority at which
+@@ -1383,7 +1388,7 @@ unsigned long shrink_all_memory(unsigned
+ 		.may_swap = 0,
+ 		.swap_cluster_max = nr_pages,
+ 		.may_writepage = 1,
+-		.swappiness = vm_swappiness,
++		.mapped = vm_mapped,
+ 	};
+ 
+ 	current->reclaim_state = &reclaim_state;
+@@ -1428,7 +1433,7 @@ unsigned long shrink_all_memory(unsigned
+ 		/* Force reclaiming mapped pages in the passes #3 and #4 */
+ 		if (pass > 2) {
+ 			sc.may_swap = 1;
+-			sc.swappiness = 100;
++			sc.mapped = 0;
+ 		}
+ 
+ 		for (prio = DEF_PRIORITY; prio >= 0; prio--) {
+@@ -1615,7 +1620,7 @@ static int __zone_reclaim(struct zone *z
+ 		.swap_cluster_max = max_t(unsigned long, nr_pages,
+ 					SWAP_CLUSTER_MAX),
+ 		.gfp_mask = gfp_mask,
+-		.swappiness = vm_swappiness,
++		.mapped = vm_mapped,
+ 	};
+ 
+ 	disable_swap_token();

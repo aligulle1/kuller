@@ -1,0 +1,23 @@
+#!/sbin/runscript
+# Copyright © 2006  TUBITAK/UEKAE
+# Licensed under the GNU General Public License, version 2.
+# See the file http://www.gnu.org/copyleft/gpl.txt.
+#
+# Original work belongs Gentoo Linux
+
+depend() {
+	need net
+	after lm_sensors
+}
+
+start() {
+	ebegin "Starting GNU Krell Monitor daemon"
+	start-stop-daemon --start --quiet --background --pidfile /var/run/gkrellmd.pid --make-pidfile --exec /usr/bin/gkrellmd
+	eend $?
+}
+
+stop() {
+	ebegin "Stopping GNU Krell Monitor daemon"
+	start-stop-daemon --stop --quiet --pidfile /var/run/gkrellmd.pid --name gkrellmd
+	eend $?
+}

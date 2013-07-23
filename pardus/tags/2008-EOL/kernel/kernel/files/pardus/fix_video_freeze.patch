@@ -1,0 +1,40 @@
+diff -ur linux-2.6.25.orig/drivers/usb/host/ehci-sched.c linux-2.6.25/drivers/usb/host/ehci-sched.c
+--- linux-2.6.25.orig/drivers/usb/host/ehci-sched.c	2008-04-16 22:49:44.000000000 -0400
++++ linux-2.6.25/drivers/usb/host/ehci-sched.c	2010-03-17 19:40:22.000000000 -0400
+@@ -1354,20 +1354,27 @@
+ 	/* when's the last uframe this urb could start? */
+ 	max = now + mod;
+ 
+-	/* typical case: reuse current schedule. stream is still active,
+-	 * and no gaps from host falling behind (irq delays etc)
+-	 */
++	/* Typical case: reuse current schedule, stream is still active.
++	* Hopefully there are no gaps from the host falling behind
++	* (irq delays etc), but if there are we'll take the next
++	* slot in the schedule, implicitly assuming URB_ISO_ASAP.
++	*/
+ 	if (likely (!list_empty (&stream->td_list))) {
+ 		start = stream->next_uframe;
+ 		if (start < now)
+ 			start += mod;
+-		if (likely ((start + sched->span) < max))
+-			goto ready;
+-		/* else fell behind; someday, try to reschedule */
+-		status = -EL2NSYNC;
+-		goto fail;
++		/* Fell behind (by up to twice the slop amount)? */
++		if (start >= max - 2 * 8 * SCHEDULE_SLOP)
++			start += stream->interval * DIV_ROUND_UP(
++				max - start, stream->interval) - mod;
++
++		/* Tried to schedule too far into the future? */
++		if (unlikely((start + sched->span) >= max)) {
++			status = -EFBIG;
++			goto fail;
++		}
++		goto ready;
+ 	}
+-
+ 	/* need to schedule; when's the next (u)frame we could start?
+ 	 * this is bigger than ehci->i_thresh allows; scheduling itself
+ 	 * isn't free, the slop should handle reasonably slow cpus.  it

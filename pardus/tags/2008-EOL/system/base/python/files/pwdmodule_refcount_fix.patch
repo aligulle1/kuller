@@ -1,0 +1,31 @@
+Fix refcounting problem which causes a segfault for following test code;
+
+--------------------------------------------------------
+#include <python2.5/Python.h>
+
+int main(void)
+{
+    int i;
+    for (i = 0; i < 1000; ++i)
+    {
+        Py_Initialize();
+        PyRun_SimpleString("import pwd\n");
+        Py_Finalize();
+    }
+    return 0;
+}
+--------------------------------------------------------
+
+Reported-by: Onur Küçük <onur@pardus.org.tr>
+Signed-off-by: S.Çağlar Onur <caglar@pardus.org.tr>
+
+--- Modules/pwdmodule.c	2006-04-16 21:55:50.000000000 +0300
++++ Modules/pwdmodule.c	2009-09-08 21:44:53.000000000 +0300
+@@ -193,6 +193,7 @@
+ 	Py_INCREF((PyObject *) &StructPwdType);
+ 	PyModule_AddObject(m, "struct_passwd", (PyObject *) &StructPwdType);
+ 	/* And for b/w compatibility (this was defined by mistake): */
++	Py_INCREF((PyObject *) &StructPwdType);
+ 	PyModule_AddObject(m, "struct_pwent", (PyObject *) &StructPwdType);
+ 	initialized = 1;
+ }

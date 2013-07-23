@@ -1,0 +1,35 @@
+--- Makefile	2007-06-12 19:26:12.000000000 +0300
++++ Makefile	2007-06-13 01:17:46.000000000 +0300
+@@ -19,7 +19,7 @@
+ # HEADERS to install
+ HEADERS = miniupnpc.h miniwget.h upnpcommands.h igd_desc_parse.h \
+           upnpreplyparse.h
+-LIBRARY = libminiupnpc.a
++LIBRARY = libminiupnpc.so
+ EXECUTABLES = upnpc testminixml minixmlvalid testupnpreplyparse
+ 
+ INSTALLPREFIX = /usr
+@@ -53,10 +53,10 @@
+ depend:
+ 	makedepend -Y -- $(CFLAGS) -- $(SRCS) 2>/dev/null
+ 
+-libminiupnpc.a:	miniwget.o minixml.o igd_desc_parse.o minisoap.o miniupnpc.o upnpreplyparse.o upnpcommands.o
+-	$(AR) crs $@ $?
++libminiupnpc.so:	miniwget.o minixml.o igd_desc_parse.o minisoap.o miniupnpc.o upnpreplyparse.o upnpcommands.o
++	gcc -shared -o libminiupnpc.so $?
+ 
+-upnpc:	upnpc.o libminiupnpc.a
++upnpc:	upnpc.o libminiupnpc.so
+ 
+ testminixml:	minixml.o igd_desc_parse.o testminixml.o
+ 
+--- setup.py	2007-06-11 23:51:54.000000000 +0300
++++ setup.py	2007-06-13 01:19:26.000000000 +0300
+@@ -9,6 +9,6 @@
+ setup(name="miniupnpc", version="1.0-RC6",
+       ext_modules=[
+ 	         Extension(name="miniupnpc", sources=["miniupnpcmodule.c"],
+-			           extra_objects=["libminiupnpc.a"])
++			           extra_objects=["libminiupnpc.so"])
+ 			 ])
+ 

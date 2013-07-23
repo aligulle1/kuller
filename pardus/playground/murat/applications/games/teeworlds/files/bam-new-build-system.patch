@@ -1,0 +1,92 @@
+diff -Naur bam.orig/configure.ac bam/configure.ac
+--- bam.orig/configure.ac	1970-01-01 02:00:00.000000000 +0200
++++ bam/configure.ac	2008-01-22 20:53:48.000000000 +0200
+@@ -0,0 +1,12 @@
++AC_PREREQ(2.59)
++
++AC_INIT(bam, 0.0, magnus.auvinen+bam@gmail.com)
++
++AM_INIT_AUTOMAKE
++
++AC_PROG_CC
++AC_PROG_MAKE_SET
++
++AC_CONFIG_FILES([Makefile src/tools/Makefile src/Makefile])
++
++AC_OUTPUT
+diff -Naur bam.orig/Makefile.am bam/Makefile.am
+--- bam.orig/Makefile.am	1970-01-01 02:00:00.000000000 +0200
++++ bam/Makefile.am	2008-01-22 21:13:11.000000000 +0200
+@@ -0,0 +1 @@
++SUBDIRS=src/tools src
+diff -Naur bam.orig/src/Makefile.am bam/src/Makefile.am
+--- bam.orig/src/Makefile.am	1970-01-01 02:00:00.000000000 +0200
++++ bam/src/Makefile.am	2008-01-22 20:37:19.000000000 +0200
+@@ -0,0 +1,48 @@
++LIBTOOL = /usr/bin/libtool --tag=CXX
++
++AM_CPPFLAGS = \
++	-I. -Ilua/include -Ilua/include/src -Ilua/include/src/lib
++
++AM_CFLAGS = \
++         $(CFLAGS)
++
++AM_LDFLAGS = -lm -lpthread
++
++bin_PROGRAMS = bam
++ 
++bam_SOURCES = \
++	lua/src/lapi.c \
++	lua/src/lcode.c \
++	lua/src/ldebug.c \
++	lua/src/ldo.c \
++	lua/src/ldump.c \
++	lua/src/lfunc.c \
++	lua/src/lgc.c \
++	lua/src/llex.c \
++	lua/src/lmem.c \
++	lua/src/lobject.c \
++	lua/src/lopcodes.c \
++	lua/src/lparser.c \
++	lua/src/lstate.c \
++	lua/src/lstring.c \
++	lua/src/ltable.c \
++	lua/src/ltests.c \
++	lua/src/ltm.c \
++	lua/src/lundump.c \
++	lua/src/lvm.c \
++	lua/src/lzio.c \
++	lua/src/lib/lauxlib.c \
++	lua/src/lib/lbaselib.c \
++	lua/src/lib/ldblib.c \
++	lua/src/lib/liolib.c \
++	lua/src/lib/lmathlib.c \
++	lua/src/lib/loadlib.c \
++	lua/src/lib/lstrlib.c \
++	lua/src/lib/ltablib.c \
++	context.c \
++	dep_cpp_2.c \
++	main.c \
++	mem.c \
++	node.c \
++	path.c \
++	support.c
+diff -Naur bam.orig/src/tools/Makefile.am bam/src/tools/Makefile.am
+--- bam.orig/src/tools/Makefile.am	1970-01-01 02:00:00.000000000 +0200
++++ bam/src/tools/Makefile.am	2008-01-22 21:13:32.000000000 +0200
+@@ -0,0 +1,15 @@
++LIBTOOL = /usr/bin/libtool --tag=CXX
++
++AM_CPPFLAGS = -Wall -ansi -pedantic
++
++AM_CFLAGS = \
++         $(CFLAGS)
++
++AM_LDFLAGS =
++
++bin_PROGRAMS = txt2c
++
++txt2c_SOURCES = txt2c.c
++
++all:
++	./$(bin_PROGRAMS) < ../base.bam > ../internal_base.h

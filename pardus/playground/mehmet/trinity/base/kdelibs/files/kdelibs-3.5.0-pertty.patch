@@ -1,0 +1,31 @@
+Index: kdelibs/kdefx/kstyle.cpp
+===================================================================
+--- kdelibs.orig/kdefx/kstyle.cpp
++++ kdelibs/kdefx/kstyle.cpp
+@@ -194,7 +194,7 @@ KStyle::KStyle( KStyleFlags flags, KStyl
+ 	d->menuAltKeyNavigation = settings.readBoolEntry("/KStyle/Settings/MenuAltKeyNavigation", true);
+ 	d->scrollablePopupmenus = settings.readBoolEntry("/KStyle/Settings/ScrollablePopupMenus", false);
+ 	d->menuDropShadow       = settings.readBoolEntry("/KStyle/Settings/MenuDropShadow", false);
+-	d->semiTransparentRubberband = settings.readBoolEntry("/KStyle/Settings/SemiTransparentRubberband", false);
++	d->semiTransparentRubberband = settings.readBoolEntry("/KStyle/Settings/SemiTransparentRubberband", true);
+ 	d->menuHandler = NULL;
+ 
+ 	if (useMenuTransparency) {
+Index: kdelibs/kdeui/kiconview.cpp
+===================================================================
+--- kdelibs.orig/kdeui/kiconview.cpp
++++ kdelibs/kdeui/kiconview.cpp
+@@ -545,11 +545,11 @@ void KIconViewItem::calcRect( const TQSt
+     }
+     
+     // Calculate the word-wrap
+-    TQRect outerRect( 0, 0, tw - 6, height );
++    TQRect outerRect( 0, 0, tw - 10, height );
+     m_wordWrap = KWordWrap::formatText( *fm, outerRect, 0, t );
+     r = m_wordWrap->boundingRect();
+ 
+-    int realWidth = QMAX( QMIN( r.width() + 4, tw ), fm->width( "X" ) );
++    int realWidth = QMAX( QMIN( r.width() + 8, tw ), fm->width( "X" ) );
+     if (drawRoundedRect == true)
+       itemTextRect.setWidth( realWidth + 2);
+     else

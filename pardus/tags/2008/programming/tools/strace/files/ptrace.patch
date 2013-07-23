@@ -1,0 +1,47 @@
+--- process.c
++++ process.c
+@@ -2242,6 +2242,18 @@
+ #ifdef PTRACE_SETVRREGS
+ 	{ PTRACE_SETVRREGS,	"PTRACE_SETVRREGS",	},
+ #endif
++#ifdef PTRACE_SETOPTIONS
++	{ PTRACE_SETOPTIONS,	"PTRACE_SETOPTIONS",	},
++#endif
++#ifdef PTRACE_GETEVENTMSG
++	{ PTRACE_GETEVENTMSG,	"PTRACE_GETEVENTMSG",	},
++#endif
++#ifdef PTRACE_GETSIGINFO
++	{ PTRACE_GETSIGINFO,	"PTRACE_GETSIGINFO",	},
++#endif
++#ifdef PTRACE_SETSIGINFO
++	{ PTRACE_SETSIGINFO,	"PTRACE_SETSIGINFO",	},
++#endif
+ #ifdef SUNOS4
+ 	{ PTRACE_READDATA,	"PTRACE_READDATA"	},
+ 	{ PTRACE_WRITEDATA,	"PTRACE_WRITEDATA"	},
+@@ -3016,10 +3028,12 @@
+ 			tprintf("%#lx, ", tcp->u_arg[2]);
+ #ifdef LINUX
+ 		switch (tcp->u_arg[0]) {
++#ifndef IA64
+ 		case PTRACE_PEEKDATA:
+ 		case PTRACE_PEEKTEXT:
+ 		case PTRACE_PEEKUSER:
+ 			break;
++#endif
+ 		case PTRACE_CONT:
+ 		case PTRACE_SINGLESTEP:
+ 		case PTRACE_SYSCALL:
+@@ -3035,8 +3049,12 @@
+ 		case PTRACE_PEEKDATA:
+ 		case PTRACE_PEEKTEXT:
+ 		case PTRACE_PEEKUSER:
++#ifdef IA64
++			return RVAL_HEX;
++#else
+ 			printnum(tcp, tcp->u_arg[3], "%#lx");
+ 			break;
++#endif
+ 		}
+ 	}
+ #endif /* LINUX */

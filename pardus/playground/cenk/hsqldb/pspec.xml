@@ -1,0 +1,88 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>hsqldb</Name>
+        <Homepage>http://hsqldb.org/</Homepage>
+        <Packager>
+            <Name>Cenk Güre</Name>
+            <Email>gure.cenk@gmail.com</Email>
+        </Packager>
+        <License>as-is</License>
+        <IsA>service</IsA>
+        <Summary>A relational database engine written in Java, with a JDBC driver</Summary>
+        <Archive sha1sum="fab82a70adedaeb427f8115736bd2c8bb6358556" type="zip">mirrors://sourceforge/hsqldb/hsqldb_1_8_0_9.zip</Archive>
+        <BuildDependencies>
+            <Dependency>sun-jdk</Dependency>
+            <Dependency>ant</Dependency>
+            <Dependency>tomcat-servlet-api</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <Patch>jar-paths.patch</Patch>
+            <Patch>server-paths.patch</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>hsqldb-lib</Name>
+        <RuntimeDependencies>
+            <Dependency>sun-jre</Dependency>
+            <Dependency>tomcat-servlet-api</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="data">/usr/share/java</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>hsqldb-server</Name>
+        <RuntimeDependencies>
+            <Dependency>hsqldb-lib</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="executable">/usr/sbin</Path>
+            <Path fileType="executable">/usr/bin</Path>
+            <Path fileType="config">/etc/hsqldb</Path>
+            <Path fileType="data">/var/lib/hsqldb</Path>
+            <Path fileType="data">/var/log/hsqldb</Path>
+            <Path fileType="data">/var/run/hsqldb</Path>
+            <Path fileType="data">/usr/share/applications</Path>
+            <Path fileType="data">/usr/share/pixmaps</Path>
+            <Path fileType="doc">/usr/share/doc</Path>
+        </Files>
+        <AdditionalFiles>
+            <!-- Configuration files -->
+            <AdditionalFile owner="root" permission="0644" target="/etc/hsqldb/hsqldb.conf">hsqldb.conf</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/var/lib/hsqldb/server.properties">server.properties</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/var/lib/hsqldb/sqltool.rc">sqltool.rc</AdditionalFile>
+
+            <!-- Additional executables -->
+            <AdditionalFile owner="root" permission="0755" target="/usr/bin/hsqldb-databasemanager">hsqldb-databasemanager</AdditionalFile>
+            <AdditionalFile owner="root" permission="0755" target="/usr/bin/hsqldb-databasemanagerswing">hsqldb-databasemanagerswing</AdditionalFile>
+            <AdditionalFile owner="root" permission="0755" target="/usr/bin/hsqldb-querytool">hsqldb-querytool</AdditionalFile>
+            <AdditionalFile owner="root" permission="0755" target="/usr/bin/hsqldb-sqltool">hsqldb-sqltool</AdditionalFile>
+            <AdditionalFile owner="root" permission="0755" target="/usr/bin/hsqldb-transfer">hsqldb-transfer</AdditionalFile>
+
+            <!-- Icon and desktop files -->
+            <AdditionalFile owner="root" permission="0644" target="/usr/share/pixmaps/hsqldb.xpm">hsqldb.xpm</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/usr/share/applications/hsqldb-databasemanager.desktop">hsqldb-databasemanager.desktop</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/usr/share/applications/hsqldb-databasemanagerswing.desktop">hsqldb-databasemanagerswing.desktop</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/usr/share/applications/hsqldb-querytool.desktop">hsqldb-querytool.desktop</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/usr/share/applications/hsqldb-transfer.desktop">hsqldb-transfer.desktop</AdditionalFile>
+        </AdditionalFiles>
+        <Provides>
+            <COMAR script="package.py">System.Package</COMAR>
+            <COMAR script="service.py">System.Service</COMAR>
+        </Provides>
+    </Package>
+
+    <History>
+        <Update release="1">
+            <Date>2008-01-11</Date>
+            <Version>1.8.0.9</Version>
+            <Comment>First release</Comment>
+            <Name>Cenk Güre</Name>
+            <Email>gure.cenk@gmail.com</Email>
+        </Update>
+    </History>
+</PISI>

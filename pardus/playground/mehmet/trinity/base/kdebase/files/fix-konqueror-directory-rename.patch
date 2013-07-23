@@ -1,0 +1,23 @@
+Index: kdebase/konqueror/listview/konq_listview.cc
+===================================================================
+--- kdebase.orig/konqueror/listview/konq_listview.cc
++++ kdebase/konqueror/listview/konq_listview.cc
+@@ -167,6 +167,18 @@ void ListViewBrowserExtension::rename()
+   KLineEdit* le = m_listView->listViewWidget()->renameLineEdit();
+   if ( le ) {
+      const TQString txt = le->text();
++
++     // Construct full path
++
++     KURL url = m_listView->url();
++     KURL *kpath = new KURL(url.path() + "/" + txt);
++     KFileItem *kfile = new KFileItem(KFileItem::Unknown, KFileItem::Unknown, *kpath);
++
++     if (kfile->isDir()) {
++         le->setSelection(0, txt.length());
++         return;
++     }
++
+      TQString pattern;
+      KMimeType::diagnoseFileName( txt, pattern );
+      if (!pattern.isEmpty() && pattern.at(0)=='*' && pattern.find('*',1)==-1)

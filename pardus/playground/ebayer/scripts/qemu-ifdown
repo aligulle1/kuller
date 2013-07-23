@@ -1,0 +1,16 @@
+#!/bin/sh
+#set -x
+
+switch=br0
+
+if [ -n "$1" ];then
+        /usr/sbin/brctl delif $switch $1
+        /sbin/ip link set $1 down
+        sleep 0.5s
+        /usr/sbin/tunctl -d $1
+        exit 0
+else
+        echo "Error: no interface specified"
+        exit 1
+fi
+

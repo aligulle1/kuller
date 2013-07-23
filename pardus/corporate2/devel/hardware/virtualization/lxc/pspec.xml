@@ -1,0 +1,113 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>lxc</Name>
+        <Homepage>http://lxc.sourceforge.net/</Homepage>
+        <Packager>
+            <Name>Pardus</Name>
+            <Email>admins@pardus.org.tr</Email>
+        </Packager>
+        <License>LGPLv2+</License>
+        <Summary>Linux Resource Containers</Summary>
+        <Description>Linux Resource Containers provide process and resource isolation without the overhead of full virtualization.</Description>
+        <Archive sha1sum="876cf9a4788eb082e58e4a7853ca81b0a9676037" type="targz">http://lxc.sourceforge.net/download/lxc/lxc-0.7.4.2.tar.gz</Archive>
+        <Archive sha1sum="12c9a92e5558d30db12a7e2b0da3dce593a172ff" type="tarbz2" target="lxc-0.7.4.2">http://cekirdek.pardus.org.tr/~ozan/dist/sources/lxc-management-tools-0.0_20101021.tar.bz2</Archive>
+        <BuildDependencies>
+            <Dependency>libcap</Dependency>
+            <Dependency>kernel-module-headers</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <Patch level="1">management-tools-pardus.patch</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>lxc</Name>
+        <RuntimeDependencies>
+            <Dependency>libcap</Dependency>
+            <Dependency>bridge-utils</Dependency>
+            <!-- For management tools -->
+            <Dependency>inotify-tools</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="executable">/usr/bin</Path>
+            <Path fileType="doc">/usr/share/doc</Path>
+            <Path fileType="man">/usr/share/man</Path>
+            <Path fileType="library">/usr/lib</Path>
+            <Path fileType="data">/var/lib/lxc</Path>
+            <Path fileType="config">/etc/conf.d/lxc</Path>
+        </Files>
+        <AdditionalFiles>
+            <AdditionalFile target="/usr/share/doc/lxc/templates/lxc-pardus" owner="root" group="root" permission="0755">lxc-pardus</AdditionalFile>
+            <AdditionalFile target="/etc/conf.d/lxc" owner="root" group="root" permission="0644">lxc.conf</AdditionalFile>
+        </AdditionalFiles>
+        <Provides>
+            <COMAR script="service.py">System.Service</COMAR>
+        </Provides>
+    </Package>
+
+    <Package>
+        <Name>lxc-devel</Name>
+        <Summary>The linux containers development files</Summary>
+        <RuntimeDependencies>
+            <Dependency release="current">lxc</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="data">/usr/share/pkgconfig</Path>
+            <Path fileType="library">/usr/include</Path>
+        </Files>
+    </Package>
+
+    <History>
+        <Update release="6">
+            <Date>2011-05-25</Date>
+            <Version>0.7.4.2</Version>
+            <Comment>
+                * Version Bump
+                * Add config file to autostart selected containers
+                * Add uludag/trunk/scripts/lxc-pardus
+                * Add service script to autostart/stop selected containers
+                * Add bridge-utils as dependency
+                * Delete unnecessary patches
+            </Comment>
+            <Name>Erdem Bayer</Name>
+            <Email>ebayer@bayer.gen.tr</Email>
+        </Update>
+        <Update release="5">
+            <Date>2010-10-27</Date>
+            <Version>0.7.3</Version>
+            <Comment>Mass rebuild for Pardus Corporate 2 Alpha 3</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="4">
+            <Date>2010-10-27</Date>
+            <Version>0.7.3</Version>
+            <Comment>Version Bump</Comment>
+            <Name>Erdem Bayer</Name>
+            <Email>ebayer@bayer.gen.tr</Email>
+        </Update>
+        <Update release="3">
+            <Date>2010-10-21</Date>
+            <Version>0.7.2</Version>
+            <Comment>Add management tools</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="2">
+            <Date>2010-09-28</Date>
+            <Version>0.7.2</Version>
+            <Comment>Fix unused direct dependencies</Comment>
+            <Name>Mete Alpaslan Katırcıoğlu</Name>
+            <Email>mete@pardus.org.tr</Email>
+        </Update>
+        <Update release="1">
+            <Date>2010-09-27</Date>
+            <Version>0.7.2</Version>
+            <Comment>First release.</Comment>
+            <Name>Erdem Bayer</Name>
+            <Email>ebayer@bayer.gen.tr</Email>
+        </Update>
+    </History>
+</PISI>

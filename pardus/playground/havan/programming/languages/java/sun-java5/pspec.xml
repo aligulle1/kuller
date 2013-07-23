@@ -1,0 +1,81 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>sun-java5</Name>
+        <Homepage>https://jdk-distros.dev.java.net</Homepage>
+        <Packager>
+            <Name>Ekrem SEREN</Name>
+            <Email>ekrem.seren@uygunteknoloji.com.tr</Email>
+        </Packager>
+        <License>dlj-1.1</License>
+        <IsA>app:console</IsA>
+        <IsA>library</IsA>
+        <Summary>Sun's Java5 J2SE Development Kit</Summary>
+        <Description>Java Platform, Standard Edition (also known as Java 2 Platform) lets you develop and deploy Java applications on desktops and servers, as well as today's demanding Embedded and Real-Time environments.</Description>
+        <Archive sha1sum="56e29e2d96fca31f6b0e34c208c13c82c523098d" type="binary">http://download.java.net/dlj/binaries/jdk-5.0u16-dlj-linux-i586.bin</Archive>
+        <Patches>
+            <Patch>construct.patch</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>sun-java5-jre</Name>
+        <RuntimeDependencies>
+            <Dependency>xorg-server</Dependency>
+            <Dependency>alsa-lib</Dependency>
+            <Dependency>unixODBC</Dependency>
+        </RuntimeDependencies>
+        <Conflicts>
+            <Package>blackdown-jre</Package>
+        </Conflicts>
+        <Files>
+            <Path fileType="config">/etc/env.d/18java_jre</Path>
+            <Path fileType="data">/opt/sun-java5-jdk/jre</Path>
+            <Path fileType="executable">/opt/sun-java5-jre</Path>
+            <!--<Path fileType="data">/usr/lib/nsbrowser/plugins</Path>-->
+            <Path fileType="doc">/usr/share/doc</Path>
+            <Path fileType="data">/usr/share/applications</Path>
+        </Files>
+        <AdditionalFiles>
+            <AdditionalFile owner="root" permission="0644" target="/etc/env.d/18java_jre">18java_jre</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/usr/share/applications/javaws5.desktop">javaws5.desktop</AdditionalFile>
+        </AdditionalFiles>
+        <Provides>
+            <COMAR script="package.py">System.Package</COMAR>
+        </Provides>
+    </Package>
+
+    <Package>
+        <Name>sun-java5-jdk</Name>
+        <RuntimeDependencies>
+            <Dependency version="1.5.0.16">sun-java5-jre</Dependency>
+        </RuntimeDependencies>
+        <Conflicts>
+            <Package>blackdown-jdk</Package>
+        </Conflicts>
+        <Files>
+            <Path fileType="executable">/opt/sun-java5-jdk/bin</Path>
+            <Path fileType="executable">/opt/sun-java5-jdk/demo</Path>
+            <Path fileType="header">/opt/sun-java5-jdk/include</Path>
+            <Path fileType="library">/opt/sun-java5-jdk/lib</Path>
+            <Path fileType="data">/opt/sun-java5-jdk/sample</Path>
+            <Path fileType="data">/opt/sun-java5-jdk/src.zip</Path>
+            <Path fileType="man">/opt/sun-java5-jdk/man</Path>
+            <Path fileType="config">/etc/env.d/19java_jdk</Path>
+        </Files>
+        <AdditionalFiles>
+            <AdditionalFile owner="root" permission="0644" target="/etc/env.d/19java_jdk">19java_jdk</AdditionalFile>
+        </AdditionalFiles>
+    </Package>
+
+    <History>
+        <Update release="1">
+            <Date>2008-07-14</Date>
+            <Version>1.5.0.16</Version>
+            <Comment>First release</Comment>
+            <Name>Ekrem SEREN</Name>
+            <Email>ekrem.seren@uygunteknoloji.com.tr</Email>
+        </Update>
+    </History>
+</PISI>

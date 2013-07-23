@@ -1,0 +1,48 @@
+qt-bugs@ issue: none
+Trolltech task ID: none
+applied: yes
+author: Thiago Macieira
+
+qdbuscpp2xml invokes moc in order to do the C++ parsing. But it used
+to assume moc was in $PATH, which is not always the case. This patch
+makes it use the moc that is in the same bindir as argv[0], falling
+back to $PATH if qdbuscpp2xml was also invoked with it.
+
+Note: this does NOT solve the problem of having Qt3's moc ahead in
+$PATH if qdbuscpp2xml is also invoked using $PATH.
+
+=== tools/qdbus/tools/qdbuscpp2xml/qdbuscpp2xml.cpp
+==================================================================
+--- tools/qdbus/tools/qdbuscpp2xml/qdbuscpp2xml.cpp	(revision 167)
++++ tools/qdbus/tools/qdbuscpp2xml/qdbuscpp2xml.cpp	(local)
+@@ -351,10 +351,20 @@
+     QCoreApplication app(argc, argv);
+     QStringList args = app.arguments();
+ 
++    QString mocExecutable = QFile::encodeName(argv[0]);
++    int i = mocExecutable.lastIndexOf(QLatin1Char('/'));
++    if (i == -1) {
++        // we were called with a relative path
++        mocExecutable = QLatin1String("moc");
++    } else {
++        mocExecutable.truncate(i + 1);
++        mocExecutable.append(QLatin1String("moc"));
++    }
++
+     MocParser parser;
+     parseCmdLine(args);
+ 
+-    for (int i = 1; i < args.count(); ++i) {
++    for (i = 1; i < args.count(); ++i) {
+         const QString arg = args.at(i);
+         if (arg.startsWith(QLatin1Char('-')))
+             continue;
+@@ -375,7 +385,7 @@
+         else {
+             // run moc on this file
+             QProcess proc;
+-            proc.start(QLatin1String("moc"), QStringList() << QFile::decodeName(argv[i]));
++            proc.start(mocExecutable, QStringList() << QFile::decodeName(argv[i]));
+ 
+             if (!proc.waitForStarted()) {
+                 fprintf(stderr, PROGRAMNAME ": could not execute moc! Aborting.\n");

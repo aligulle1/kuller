@@ -1,0 +1,39 @@
+From: Mark McLoughlin <markmc@redhat.com>
+Subject: [PATCH] Handle kernels with no ipv6 support
+
+If the ipv6 kernel module is not loaded, then we get this when starting
+a virtual network:
+
+  libvir: Network Config error :
+  cannot enable /proc/sys/net/ipv6/conf/virbr0/disable_ipv6:
+  No such file or directory
+
+If disable_ipv6 is not present, we should just merrily continue on our
+way.
+
+* src/network_driver.c: make networkDisableIPV6() not fail if the kernel
+  has no ipv6 support
+---
+ src/network_driver.c |    6 ++++++
+ 1 files changed, 6 insertions(+), 0 deletions(-)
+
+diff --git a/src/network_driver.c b/src/network_driver.c
+index eaea454..84910ab 100644
+--- a/src/network_driver.c
++++ b/src/network_driver.c
+@@ -801,6 +801,12 @@ static int networkDisableIPV6(virConnectPtr conn,
+         goto cleanup;
+     }
+ 
++    if (access(field, W_OK) < 0 && errno == ENOENT) {
++        VIR_DEBUG("ipv6 appears to already be disabled on %s", network->def->bridge);
++        ret = 0;
++        goto cleanup;
++    }
++
+     if (virFileWriteStr(field, "1") < 0) {
+         virReportSystemError(conn, errno,
+                              _("cannot enable %s"), field);
+-- 
+1.6.2.5
+

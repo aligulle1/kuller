@@ -1,0 +1,33 @@
+--- src/qemu_conf.c.orig	2009-04-02 11:50:10.000000000 +0200
++++ src/qemu_conf.c	2009-04-03 17:46:59.000000000 +0200
+@@ -779,6 +779,20 @@ int qemudBuildCommandLine(virConnectPtr 
+     char domid[50];
+     char *pidfile;
+     const char *cpu = NULL;
++    int skipSound = 0;
++
++    if (driver->securityDriver &&
++        driver->securityDriver->name &&
++        STREQ(driver->securityDriver->name, "selinux") &&
++        getuid() == 0) {
++        static int soundWarned = 0; 
++        skipSound = 1;
++        if (def->nsounds &&
++            !soundWarned) {
++            soundWarned = 1;
++            VIR_WARN0("Sound cards for VMs are disabled while SELinux security model is active");
++        }
++    }
+ 
+     uname_normalize(&ut);
+ 
+@@ -1425,7 +1439,8 @@ int qemudBuildCommandLine(virConnectPtr 
+     }
+ 
+     /* Add sound hardware */
+-    if (def->nsounds) {
++    if (def->nsounds &&
++        !skipSound) {
+         int size = 100;
+         char *modstr;
+         if (VIR_ALLOC_N(modstr, size+1) < 0)

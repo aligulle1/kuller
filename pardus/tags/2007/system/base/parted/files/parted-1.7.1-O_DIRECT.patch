@@ -1,0 +1,150 @@
+--- parted-1.7.1/libparted/arch/linux.c.o_direct	2006-06-22 14:31:38.000000000 -0400
++++ parted-1.7.1/libparted/arch/linux.c	2006-06-22 14:32:59.000000000 -0400
+@@ -30,6 +30,7 @@
+ #include <libgen.h>
+ #include <stdint.h>
+ #include <stdio.h>
++#include <stdlib.h>
+ #include <string.h>
+ #include <syscall.h>
+ #include <unistd.h>
+@@ -1212,7 +1213,7 @@
+                 if (!name)
+                         break;
+                 if (!_partition_is_mounted_by_path (name)) {
+-                        fd = open (name, O_WRONLY, 0);
++                        fd = open (name, O_WRONLY | O_DIRECT, 0);
+                         if (fd > 0) {
+                                 ioctl (fd, BLKFLSBUF);
+                                 close (fd);
+@@ -1228,11 +1229,11 @@
+         LinuxSpecific*  arch_specific = LINUX_SPECIFIC (dev);
+ 
+ retry:
+-        arch_specific->fd = open (dev->path, O_RDWR);
++        arch_specific->fd = open (dev->path, O_RDWR | O_DIRECT);
+         if (arch_specific->fd == -1) {
+                 char*   rw_error_msg = strerror (errno);
+ 
+-                arch_specific->fd = open (dev->path, O_RDONLY);
++                arch_specific->fd = open (dev->path, O_RDONLY | O_DIRECT);
+                 if (arch_specific->fd == -1) {
+                         if (ped_exception_throw (
+                                 PED_EXCEPTION_ERROR,
+@@ -1375,6 +1376,7 @@
+         int                     status;
+         PedExceptionOption      ex_status;
+         size_t                  read_length = count * dev->sector_size;
++        void*                   diobuf;
+ 
+         PED_ASSERT (dev->sector_size % 512 == 0, return 0);
+ 
+@@ -1412,8 +1414,12 @@
+                 }
+         }
+ 
++        if (posix_memalign(&diobuf, PED_SECTOR_SIZE_DEFAULT, count * PED_SECTOR_SIZE_DEFAULT) != 0)
++                return 0;
+         while (1) {
+-                status = read (arch_specific->fd, buffer, read_length);
++                status = read (arch_specific->fd, diobuf, read_length);
++                if (status > 0)
++                        memcpy(buffer, diobuf, status);
+                 if (status == count * dev->sector_size) break;
+                 if (status > 0) {
+                         read_length -= status;
+@@ -1430,6 +1436,7 @@
+ 
+                 switch (ex_status) {
+                         case PED_EXCEPTION_IGNORE:
++                                free(diobuf);
+                                 return 1;
+ 
+                         case PED_EXCEPTION_RETRY:
+@@ -1438,9 +1445,11 @@
+                         case PED_EXCEPTION_UNHANDLED:
+                                 ped_exception_catch ();
+                         case PED_EXCEPTION_CANCEL:
++                                free(diobuf);
+                                 return 0;
+                 }
+         }
++        free(diobuf);
+ 
+         return 1;
+ }
+@@ -1486,6 +1495,8 @@
+         int                     status;
+         PedExceptionOption      ex_status;
+         size_t                  write_length = count * dev->sector_size;
++        void*                   diobuf;
++        void*                   diobuf_start;
+ 
+         PED_ASSERT(dev->sector_size % 512 == 0, return 0);
+ 
+@@ -1539,12 +1550,16 @@
+                 dev->path, buffer, (int) start, (int) count);
+ #else
+         dev->dirty = 1;
++        if (posix_memalign(&diobuf, PED_SECTOR_SIZE_DEFAULT, count * PED_SECTOR_SIZE_DEFAULT) != 0)
++                return 0;
++        memcpy(diobuf, buffer, count * PED_SECTOR_SIZE_DEFAULT);
++        diobuf_start = diobuf;
+         while (1) {
+-                status = write (arch_specific->fd, buffer, write_length);
++                status = write (arch_specific->fd, diobuf, write_length);
+                 if (status == count * dev->sector_size) break;
+                 if (status > 0) {
+                         write_length -= status;
+-                        buffer += status;
++                        diobuf += status;
+                         continue;
+                 }
+ 
+@@ -1556,6 +1571,7 @@
+ 
+                 switch (ex_status) {
+                         case PED_EXCEPTION_IGNORE:
++                                free(diobuf_start);
+                                 return 1;
+ 
+                         case PED_EXCEPTION_RETRY:
+@@ -1564,9 +1580,11 @@
+                         case PED_EXCEPTION_UNHANDLED:
+                                 ped_exception_catch ();
+                         case PED_EXCEPTION_CANCEL:
++                                free(diobuf_start);
+                                 return 0;
+                 }
+         }
++        free(diobuf_start);
+ #endif /* !READ_ONLY */
+         return 1;
+ }
+@@ -1579,18 +1597,25 @@
+         LinuxSpecific*  arch_specific = LINUX_SPECIFIC (dev);
+         PedSector       done = 0;
+         int             status;
++        void*           diobuf;
+ 
+         PED_ASSERT(dev != NULL, return 0);
+         
+         if (!_device_seek (dev, start))
+                 return 0;
+ 
++        if (posix_memalign(&diobuf, PED_SECTOR_SIZE_DEFAULT, count * PED_SECTOR_SIZE_DEFAULT) != 0)
++                return 0;
++
+         for (done = 0; done < count; done += status / dev->sector_size) {
+-                status = read (arch_specific->fd, buffer,
++                status = read (arch_specific->fd, diobuf,
+                                (size_t) ((count-done) * dev->sector_size));
++                if (status > 0)
++                        memcpy(buffer, diobuf, status);
+                 if (status < 0)
+                         break;
+         }
++        free(diobuf);
+ 
+         return done;
+ }

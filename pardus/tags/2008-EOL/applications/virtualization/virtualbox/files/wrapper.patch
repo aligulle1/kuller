@@ -1,0 +1,30 @@
+Index: VirtualBox-2.1.2_OSE/src/VBox/Installer/linux/VBox.sh
+===================================================================
+--- VirtualBox-2.1.2_OSE.orig/src/VBox/Installer/linux/VBox.sh
++++ VirtualBox-2.1.2_OSE/src/VBox/Installer/linux/VBox.sh
+@@ -33,15 +33,21 @@ fi
+ if [ "$1" = "shutdown" ]; then
+     SHUTDOWN="true"
+ elif ! lsmod|grep -q vboxdrv; then
+-    cat << EOF
++    # Load the vboxdrv module
++    $INSTALL_DIR/vbox-python.py
++
++    if [ $? = 0 ]; then
++        echo "vboxdrv kernel module successfully loaded."
++    else
++        cat << EOF
+ WARNING: The vboxdrv kernel module is not loaded. Either there is no module
+          available for the current kernel (`uname -r`) or it failed to
+-         load. Please recompile the kernel module and install it by
+-
+-           sudo /etc/init.d/vboxdrv setup
++         load.
+ 
+          You will not be able to start VMs until this problem is fixed.
+ EOF
++    fi
++
+ elif [ ! -c /dev/vboxdrv ]; then
+     cat << EOF
+ WARNING: The character device /dev/vboxdrv does not exist. Try

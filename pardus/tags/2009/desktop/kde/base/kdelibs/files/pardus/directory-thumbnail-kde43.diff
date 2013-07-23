@@ -1,0 +1,1080 @@
+Index: kio/kio/kdirmodel.h
+===================================================================
+--- kio/kio/kdirmodel.h.orig
++++ kio/kio/kdirmodel.h
+@@ -192,6 +192,19 @@ public:
+      */
+     static KUrl::List simplifiedUrlList( const KUrl::List & urls );
+ 
++    /**
++     * This emits the needSequenceIcon signal, requesting another sequence icon
++     * 
++     * If there is a KFilePreviewGenerator attached to this model, that generator will care
++     * about creating another preview.
++     * 
++     * @param index Index of the item that should get another icon
++     * @param sequenceIndex Index in the sequence. If it is zero, the standard icon will be assigned.
++     *                                        For higher indices, arbitrary different meaningful icons will be generated.
++     * @since 4.3
++     */
++    void requestSequenceIcon(const QModelIndex& index, int sequenceIndex);
++    
+ Q_SIGNALS:
+     /**
+      * Emitted for each subdirectory that is a parent of a url passed to expandToUrl
+@@ -200,6 +213,16 @@ Q_SIGNALS:
+      * (for instance so that it can be selected).
+      */
+     void expand(const QModelIndex& index);
++    /**
++     * Emitted when another icon sequence index is requested
++     * @param index Index of the item that should get another icon
++     * @param sequenceIndex Index in the sequence. If it is zero, the standard icon should be assigned.
++     *                                        For higher indices, arbitrary different meaningful icons should be generated.
++     *                                        This is usually slowly counted up while the user hovers the icon.
++     *                                        If no meaningful alternative icons can be generated, this should be ignored.
++     * @since 4.3
++     */
++    void needSequenceIcon(const QModelIndex& index, int sequenceIndex);
+ 
+ private:
+     // Make those private, they shouldn't be called by applications
+Index: kio/kio/previewjob.cpp
+===================================================================
+--- kio/kio/previewjob.cpp.orig
++++ kio/kio/previewjob.cpp
+@@ -100,6 +100,7 @@ public:
+     // Whether we should save the thumbnail
+     bool bSave;
+     bool ignoreMaximumSize;
++    int sequenceIndex;
+     bool succeeded;
+     // If the file to create a thumb for was a temp file, this is its name
+     QString tempName;
+@@ -151,6 +152,7 @@ PreviewJob::PreviewJob( const KFileItemL
+     d->succeeded = false;
+     d->thumbRoot = QDir::homePath() + "/.thumbnails/";
+     d->ignoreMaximumSize = false;
++    d->sequenceIndex = 0;
+ 
+     // Return to event loop first, determineNextFile() might delete this;
+     QTimer::singleShot(0, this, SLOT(startPreview()));
+@@ -286,6 +288,10 @@ void PreviewJob::removeItem( const KUrl&
+     }
+ }
+ 
++void KIO::PreviewJob::setSequenceIndex(int index) {
++    d_func()->sequenceIndex = index;
++}
++
+ void PreviewJob::setIgnoreMaximumSize(bool ignoreSize)
+ {
+     d_func()->ignoreMaximumSize = ignoreSize;
+@@ -344,7 +350,7 @@ void PreviewJob::slotResult( KJob *job )
+                 return;
+             }
+ 
+-            if ( !d->currentItem.plugin->property( "CacheThumbnail" ).toBool() )
++            if ( !d->currentItem.plugin->property( "CacheThumbnail" ).toBool()  || d->sequenceIndex )
+             {
+                 // This preview will not be cached, no need to look for a saved thumbnail
+                 // Just create it, and be done
+@@ -442,13 +448,16 @@ void PreviewJobPrivate::createThumbnail(
+     KIO::TransferJob *job = KIO::get(thumbURL, NoReload, HideProgressInfo);
+     q->addSubjob(job);
+     q->connect(job, SIGNAL(data(KIO::Job *, const QByteArray &)), SLOT(slotThumbData(KIO::Job *, const QByteArray &)));
+-    bool save = bSave && currentItem.plugin->property("CacheThumbnail").toBool();
++    bool save = bSave && currentItem.plugin->property("CacheThumbnail").toBool() && !sequenceIndex;
+     job->addMetaData("mimeType", currentItem.item.mimetype());
+     job->addMetaData("width", QString().setNum(save ? cacheWidth : width));
+     job->addMetaData("height", QString().setNum(save ? cacheHeight : height));
+     job->addMetaData("iconSize", QString().setNum(save ? 64 : iconSize));
+     job->addMetaData("iconAlpha", QString().setNum(iconAlpha));
+     job->addMetaData("plugin", currentItem.plugin->library());
++    if(sequenceIndex)
++        job->addMetaData("sequence-index", QString().setNum(sequenceIndex));
++
+ #ifdef Q_OS_UNIX
+     if (shmid == -1)
+     {
+@@ -480,7 +489,7 @@ void PreviewJobPrivate::slotThumbData(KI
+     bool save = bSave &&
+                 currentItem.plugin->property("CacheThumbnail").toBool() &&
+                 (currentItem.item.url().protocol() != "file" ||
+-                 !currentItem.item.url().directory( KUrl::AppendTrailingSlash ).startsWith(thumbRoot));
++                 !currentItem.item.url().directory( KUrl::AppendTrailingSlash ).startsWith(thumbRoot)) && !sequenceIndex;
+     QImage thumb;
+ #ifdef Q_OS_UNIX
+     if (shmaddr)
+Index: kio/kio/thumbsequencecreator.h
+===================================================================
+--- /dev/null
++++ kio/kio/thumbsequencecreator.h
+@@ -0,0 +1,77 @@
++/*  This file is part of the KDE libraries
++    Copyright (C) 2009 David Nolden <david.nolden.kdevelop@art-master.de>
++
++    This library is free software; you can redistribute it and/or
++    modify it under the terms of the GNU Library General Public
++    License as published by the Free Software Foundation; either
++    version 2 of the License, or (at your option) any later version.
++
++    This library is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++    Library General Public License for more details.
++
++    You should have received a copy of the GNU Library General Public License
++    along with this library; see the file COPYING.LIB.  If not, write to
++    the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
++    Boston, MA 02110-1301, USA.
++*/
++
++#ifndef _THUMBSEQUENCECREATOR_H_
++#define _THUMBSEQUENCECREATOR_H_
++
++#include "thumbcreator.h"
++
++/**
++ * @see ThumbCreator
++ *
++ * This is an extension of ThumbCreator that allows creating a thumbnail sequence for
++ * a file. If your thumbnail plugin can create a thumbnail sequence, you should base it
++ * on ThumbSequenceCreator instead of ThumbCreator, and should use sequenceIndex()
++ * to decide what thumbnail you generate.
++ *
++ * @since 4.3
++ */
++class KIO_EXPORT ThumbSequenceCreator : public ThumbCreator
++{
++public:
++  /**
++   * The flags of this plugin.
++   * @see flags()
++   */
++    Q_DISABLE_COPY(ThumbSequenceCreator)
++    ThumbSequenceCreator();
++    virtual ~ThumbSequenceCreator();
++
++    /**
++     * If this thumb-creator can create a sequence of thumbnails,
++     * it should use this to decide what sequence item to use.
++     * 
++     * If the value is zero, the standard thumbnail should be created.
++     *
++     * This can be used for example to create thumbnails for different
++     * timeframes in videos(For example 0m, 10m, 20m, ...).
++     *
++     * If your thumb-creator supports a high granularity, like a video,
++     * you can respect the sub-integer precision coming from the float.
++     * Else, just round the index to an integer.
++     *
++     * If the end of your sequence is reached, the sequence should start
++     * from the beginning, or continue in some other way.
++     */
++    float sequenceIndex() const;
++
++    /**
++     * Sets the sequence-index for this thumb creator.
++     * @see sequenceIndex
++     */
++    void setSequenceIndex(float index);
++
++private:
++    class Private;
++    Private* d;
++};
++
++typedef ThumbCreator *(*newCreator)();
++
++#endif
+Index: kio/kio/delegateanimationhandler.cpp
+===================================================================
+--- kio/kio/delegateanimationhandler.cpp.orig
++++ kio/kio/delegateanimationhandler.cpp
+@@ -28,6 +28,10 @@
+ #include <QDebug>
+ 
+ #include <cmath>
++#include "kdirmodel.h"
++#include <kglobalsettings.h>
++#include <kdebug.h>
++#include <qabstractproxymodel.h>
+ 
+ #include "delegateanimationhandler_p.moc"
+ 
+@@ -47,14 +51,29 @@ public:
+ 
+ 
+ 
+-CachedRendering::CachedRendering(QStyle::State state, const QSize &size)
+-    : state(state), regular(QPixmap(size)), hover(QPixmap(size))
++CachedRendering::CachedRendering(QStyle::State state, const QSize &size, QModelIndex index)
++    : state(state), regular(QPixmap(size)), hover(QPixmap(size)), valid(true), validityIndex(index)
+ {
+     regular.fill(Qt::transparent);
+     hover.fill(Qt::transparent);
++
++    if(index.model()) {
++      connect(index.model(), SIGNAL(dataChanged(const QModelIndex &, const QModelIndex &)), SLOT(dataChanged(const QModelIndex &, const QModelIndex &)));
++      connect(index.model(), SIGNAL(modelReset()), SLOT(modelReset()));
++    }
+ }
+ 
++void CachedRendering::dataChanged(const QModelIndex & topLeft, const QModelIndex & bottomRight)
++{
++  if(validityIndex.row() >= topLeft.row() && validityIndex.column() >= topLeft.column() && 
++     validityIndex.row() <= bottomRight.row() && validityIndex.column() <= bottomRight.column())
++    valid = false;
++}
+ 
++void CachedRendering::modelReset()
++{
++  valid = false;
++}
+ 
+ // ---------------------------------------------------------------------------
+ 
+@@ -62,7 +81,7 @@ CachedRendering::CachedRendering(QStyle:
+ 
+ AnimationState::AnimationState(const QModelIndex &index)
+         : index(index), direction(QTimeLine::Forward),
+-          animating(false), progress(0.0), renderCache(NULL)
++          animating(false), progress(0.0), m_fadeProgress(1.0), renderCache(NULL), fadeFromRenderCache(NULL)
+ {
+     creationTime.start();
+ }
+@@ -71,6 +90,7 @@ AnimationState::AnimationState(const QMo
+ AnimationState::~AnimationState()
+ {
+     delete renderCache;
++    delete fadeFromRenderCache;
+ }
+ 
+ 
+@@ -91,6 +111,15 @@ bool AnimationState::update()
+         animating = (progress > 0.0);
+     }
+ 
++    
++    if(fadeFromRenderCache) {
++      //Icon fading goes always forwards
++      m_fadeProgress = qMin(qreal(1.0), m_fadeProgress + delta);
++      animating |= (m_fadeProgress < 1.0);
++      if(m_fadeProgress == 1)
++        setCachedRenderingFadeFrom(0);
++    }
++
+     return !animating;
+ }
+ 
+@@ -103,7 +132,10 @@ qreal AnimationState::hoverProgress() co
+     return qRound(255.0 * std::sin(progress * M_PI_2)) / 255.0;
+ }
+ 
+-
++qreal AnimationState::fadeProgress() const
++{
++    return qRound(255.0 * std::sin(m_fadeProgress * M_PI_2)) / 255.0;
++}
+ 
+ // ---------------------------------------------------------------------------
+ 
+@@ -112,6 +144,9 @@ qreal AnimationState::hoverProgress() co
+ DelegateAnimationHandler::DelegateAnimationHandler(QObject *parent)
+     : QObject(parent)
+ {
++  iconSequenceTimer.setSingleShot(true);
++  iconSequenceTimer.setInterval(1000); ///@todo Eventually configurable interval?
++  connect(&iconSequenceTimer, SIGNAL(timeout()), SLOT(sequenceTimerTimeout()));;
+ }
+ 
+ DelegateAnimationHandler::~DelegateAnimationHandler()
+@@ -127,6 +162,42 @@ DelegateAnimationHandler::~DelegateAnima
+     animationLists.clear();
+ }
+ 
++void DelegateAnimationHandler::sequenceTimerTimeout() {
++  QAbstractItemModel* model = const_cast<QAbstractItemModel*>(sequenceModelIndex.model());
++  QAbstractProxyModel* proxy = qobject_cast<QAbstractProxyModel*>(model);
++  
++  QModelIndex index = sequenceModelIndex;
++  
++  if(proxy) {
++    index = proxy->mapToSource(index);
++    model = proxy->sourceModel();
++  }
++  
++  KDirModel* dirModel = dynamic_cast<KDirModel*>(model);
++  if(dirModel) {
++    dirModel->requestSequenceIcon(index, currentSequenceIndex);
++    iconSequenceTimer.start();
++  }
++
++  ++currentSequenceIndex;
++}
++
++void DelegateAnimationHandler::setSequenceIndex(int sequenceIndex) {
++  kDebug() << sequenceIndex;
++  if(currentSequenceIndex == sequenceIndex)
++    return;
++  
++  if(sequenceIndex) {
++    currentSequenceIndex = sequenceIndex;
++    sequenceTimerTimeout();
++  }else{
++    currentSequenceIndex = 0;
++    sequenceTimerTimeout(); //Set the icon back to the standard one
++    currentSequenceIndex = 0; //currentSequenceIndex was incremented, set it back to 0
++    iconSequenceTimer.stop();
++  }
++}
++
+ AnimationState *DelegateAnimationHandler::animationState(const QStyleOption &option,
+                                                          const QModelIndex &index,
+                                                          const QAbstractItemView *view)
+@@ -159,6 +230,13 @@ AnimationState *DelegateAnimationHandler
+         }
+ 
+         fadeInAddTime.restart();
++        
++//         if(KGlobalSettings::graphicEffectsLevel() & KGlobalSettings::SimpleAnimationEffects) {
++            ///Think about it.
++            //Start sequence iteration
++            sequenceModelIndex = index;
++            setSequenceIndex(1);
++//      }
+     }
+     else if (state)
+     {
+@@ -171,6 +249,10 @@ AnimationState *DelegateAnimationHandler
+                 state->progress = 0.0;
+ 
+             startAnimation(state);
++            
++            //Stop sequence iteration
++            setSequenceIndex(0);
++            sequenceModelIndex = QPersistentModelIndex();
+         }
+         else if (hover && state->direction == QTimeLine::Backward)
+         {
+@@ -222,6 +304,10 @@ void DelegateAnimationHandler::addAnimat
+     list->append(state);
+ }
+ 
++void DelegateAnimationHandler::restartAnimation(AnimationState *state)
++{
++    startAnimation(state);
++}
+ 
+ void DelegateAnimationHandler::startAnimation(AnimationState *state)
+ {
+@@ -232,7 +318,6 @@ void DelegateAnimationHandler::startAnim
+         timer.start(1000 / 30, this); // 30 fps
+ }
+ 
+-
+ int DelegateAnimationHandler::runAnimations(AnimationList *list, const QAbstractItemView *view)
+ {
+     int activeAnimations = 0;
+Index: kio/kio/kfileitemdelegate.cpp
+===================================================================
+--- kio/kio/kfileitemdelegate.cpp.orig
++++ kio/kio/kfileitemdelegate.cpp
+@@ -105,6 +105,7 @@ class KFileItemDelegate::Private
+                            const QRect &textBoundingRect) const;
+         KIO::AnimationState *animationState(const QStyleOptionViewItemV4 &option, const QModelIndex &index,
+                                             const QAbstractItemView *view) const;
++        void restartAnimation(KIO::AnimationState* state);
+         QPixmap applyHoverEffect(const QPixmap &icon) const;
+         QPixmap transition(const QPixmap &from, const QPixmap &to, qreal amount) const;
+         void initStyleOption(QStyleOptionViewItemV4 *option, const QModelIndex &index) const;
+@@ -538,6 +539,9 @@ QPixmap KFileItemDelegate::Private::appl
+     return icon;
+ }
+ 
++void KFileItemDelegate::Private::restartAnimation(KIO::AnimationState* state) {
++    animationHandler->restartAnimation(state);
++}
+ 
+ KIO::AnimationState *KFileItemDelegate::Private::animationState(const QStyleOptionViewItemV4 &option,
+                                                                 const QModelIndex &index,
+@@ -1156,15 +1160,30 @@ void KFileItemDelegate::paint(QPainter *
+         {
+             if (cache->checkValidity(opt.state) && cache->regular.size() == opt.rect.size())
+             {
+-                const QPixmap pixmap = d->transition(cache->regular, cache->hover, progress);
++                QPixmap pixmap = d->transition(cache->regular, cache->hover, progress);
++
++                if (state->cachedRenderingFadeFrom() && state->fadeProgress() != 1.0)
++                {
++                    // Apply icon fading animation
++                    KIO::CachedRendering* fadeFromCache = state->cachedRenderingFadeFrom();
++                    const QPixmap fadeFromPixmap = d->transition(fadeFromCache->regular, fadeFromCache->hover, progress);
++
++                    pixmap = d->transition(fadeFromPixmap, pixmap, state->fadeProgress());
++                }
+                 painter->drawPixmap(option.rect.topLeft(), pixmap);
+                 return;
+             }
+ 
++            if(!cache->checkValidity(opt.state) && (KGlobalSettings::graphicEffectsLevel() & KGlobalSettings::SimpleAnimationEffects)) {
++                // Fade over from the old icon to the new one
++                // Only start a new fade if the previous one is ready
++                // Else we may start racing when checkValidity() always returns false
++                if(state->fadeProgress() == 1) {
++                    state->setCachedRenderingFadeFrom(state->takeCachedRendering());
++                }
++            }
+             // If it wasn't valid, delete it
+             state->setCachedRendering(0);
+-            delete cache;
+-            cache = 0;
+         }
+     }
+ 
+@@ -1198,9 +1217,9 @@ void KFileItemDelegate::paint(QPainter *
+     // We don't create a new cache for a fully hovered item, since we don't
+     // know yet if a hover out animation will be run.
+     // ========================================================================
+-    if (state && progress < 1)
++    if (state && (state->hoverProgress() < 1 || state->fadeProgress() < 1))
+     {
+-        cache = new KIO::CachedRendering(opt.state, option.rect.size());
++        cache = new KIO::CachedRendering(opt.state, option.rect.size(), index);
+ 
+         QPainter p;
+         p.begin(&cache->regular);
+@@ -1228,7 +1247,19 @@ void KFileItemDelegate::paint(QPainter *
+ 
+         state->setCachedRendering(cache);
+ 
+-        const QPixmap pixmap = d->transition(cache->regular, cache->hover, progress);
++        QPixmap pixmap = d->transition(cache->regular, cache->hover, progress);
++
++        if (state->cachedRenderingFadeFrom() && state->fadeProgress() == 0)
++        {
++            // Apply icon fading animation
++            KIO::CachedRendering* fadeFromCache = state->cachedRenderingFadeFrom();
++            const QPixmap fadeFromPixmap = d->transition(fadeFromCache->regular, fadeFromCache->hover, progress);
++
++            pixmap = d->transition(fadeFromPixmap, pixmap, state->fadeProgress());
++
++            d->restartAnimation(state);
++        }
++
+         painter->drawPixmap(option.rect.topLeft(), pixmap);
+         return;
+     }
+Index: kio/kio/thumbsequencecreator.cpp
+===================================================================
+--- /dev/null
++++ kio/kio/thumbsequencecreator.cpp
+@@ -0,0 +1,45 @@
++/*  This file is part of the KDE libraries
++    Copyright (C) 2009 David Nolden <david.nolden.kdevelop@art-master.de>
++
++    This library is free software; you can redistribute it and/or
++    modify it under the terms of the GNU Library General Public
++    License as published by the Free Software Foundation; either
++    version 2 of the License, or (at your option) any later version.
++
++    This library is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++    Library General Public License for more details.
++
++    You should have received a copy of the GNU Library General Public License
++    along with this library; see the file COPYING.LIB.  If not, write to
++    the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
++    Boston, MA 02110-1301, USA.
++*/
++
++#include "thumbsequencecreator.h"
++
++struct ThumbSequenceCreator::Private {
++    Private() : sequenceIndex(0) {
++    }
++  
++    float sequenceIndex;
++    bool randomSequence;
++};
++
++float ThumbSequenceCreator::sequenceIndex() const {
++    return d->sequenceIndex;
++}
++
++void ThumbSequenceCreator::setSequenceIndex(float index) {
++    d->sequenceIndex = index;
++}
++
++ThumbSequenceCreator::ThumbSequenceCreator() : d(new Private) {
++  
++}
++
++ThumbSequenceCreator::~ThumbSequenceCreator()
++{
++    delete d;
++}
+Index: kio/kio/delegateanimationhandler_p.h
+===================================================================
+--- kio/kio/delegateanimationhandler_p.h.orig
++++ kio/kio/delegateanimationhandler_p.h
+@@ -29,6 +29,7 @@
+ #include <QStyle>
+ #include <QTimeLine>
+ #include <QTime>
++#include <QTimer>
+ 
+ 
+ class QAbstractItemView;
+@@ -36,14 +37,23 @@ class QAbstractItemView;
+ namespace KIO
+ {
+ 
+-struct CachedRendering
++class CachedRendering : public QObject
+ {
+-    CachedRendering(QStyle::State state, const QSize &size);
+-    bool checkValidity(QStyle::State current) const { return state == current; }
++    Q_OBJECT
++public:
++    
++    CachedRendering(QStyle::State state, const QSize &size, QModelIndex validityIndex);
++    bool checkValidity(QStyle::State current) const { return state == current && valid; }
+ 
+     QStyle::State state;
+     QPixmap regular;
+     QPixmap hover;
++    
++    bool valid;
++    QPersistentModelIndex validityIndex;
++private Q_SLOTS:
++    void dataChanged(const QModelIndex & topLeft, const QModelIndex & bottomRight);
++    void modelReset();
+ };
+ 
+ 
+@@ -51,9 +61,21 @@ class AnimationState
+ {
+ public:
+     ~AnimationState();
++    //Progress of the mouse hovering animation
+     qreal hoverProgress() const;
++    //Progress of the icon fading animation
++    qreal fadeProgress() const;
+     CachedRendering *cachedRendering() const { return renderCache; }
+-    void setCachedRendering(CachedRendering *rendering) { renderCache = rendering; }
++    //The previous render-cache is deleted, if there was one
++    void setCachedRendering(CachedRendering *rendering) { delete renderCache; renderCache = rendering; }
++
++    //Returns current cached rendering, and removes it from this state.
++    //The caller has the ownership.
++    CachedRendering *takeCachedRendering() { CachedRendering* ret = renderCache; renderCache = 0; return ret; }
++
++    CachedRendering* cachedRenderingFadeFrom() const { return fadeFromRenderCache; }
++    //The previous render-cache is deleted, if there was one
++    void setCachedRenderingFadeFrom(CachedRendering* rendering) { delete fadeFromRenderCache; fadeFromRenderCache = rendering; if(rendering) m_fadeProgress = 0; else m_fadeProgress = 1; }
+ 
+ private:
+     AnimationState(const QModelIndex &index);
+@@ -63,9 +85,11 @@ private:
+     QTimeLine::Direction direction;
+     bool animating;
+     qreal progress;
++    qreal m_fadeProgress;
+     QTime time;
+     QTime creationTime;
+     CachedRendering *renderCache;
++    CachedRendering *fadeFromRenderCache;
+ 
+     friend class DelegateAnimationHandler;
+ };
+@@ -85,8 +109,11 @@ public:
+ 
+     AnimationState *animationState(const QStyleOption &option, const QModelIndex &index, const QAbstractItemView *view);
+ 
++    void restartAnimation(AnimationState* state);
++
+ private slots:
+     void viewDeleted(QObject *view);
++    void sequenceTimerTimeout();
+ 
+ private:
+     AnimationState *findAnimationState(const QAbstractItemView *view, const QModelIndex &index) const;
+@@ -94,11 +121,16 @@ private:
+     void startAnimation(AnimationState *state);
+     int runAnimations(AnimationList *list, const QAbstractItemView *view);
+     void timerEvent(QTimerEvent *event);
++    void setSequenceIndex(int arg1);
+ 
+ private:
+     QMap<const QAbstractItemView*, AnimationList*> animationLists;
+     QTime fadeInAddTime;
+     QBasicTimer timer;
++    //Icon sequence handling:
++    QPersistentModelIndex sequenceModelIndex;
++    QTimer iconSequenceTimer;
++    int currentSequenceIndex;
+ };
+ 
+ }
+Index: kio/kio/previewjob.h
+===================================================================
+--- kio/kio/previewjob.h.orig
++++ kio/kio/previewjob.h
+@@ -74,6 +74,16 @@ namespace KIO {
+         void setIgnoreMaximumSize(bool ignoreSize = true);
+ 
+         /**
++         * Sets the sequence index given to the thumb creators.
++         * Use the sequence index, it is possible to create alternative
++         * icons for the same item. For example it may allow iterating through
++         * the items of a directory, or the frames of a video.
++         *
++         * @since KDE 4.3
++         **/
++        void setSequenceIndex(int index);
++        
++        /**
+          * Returns a list of all available preview plugins. The list
+          * contains the basenames of the plugins' .desktop files (no path,
+          * no .desktop).
+Index: kio/kio/kdirmodel.cpp
+===================================================================
+--- kio/kio/kdirmodel.cpp.orig
++++ kio/kio/kdirmodel.cpp
+@@ -65,7 +65,7 @@ public:
+     // linear search
+     int rowNumber() const; // O(n)
+     QIcon preview() const { return m_preview; }
+-    void addPreview( const QPixmap& pix ) { m_preview.addPixmap(pix); }
++    void setPreview( const QPixmap& pix ) {  m_preview = QIcon(); m_preview.addPixmap(pix); }
+     void setPreview( const QIcon& icn ) { m_preview = icn; }
+ 
+ private:
+@@ -756,7 +756,7 @@ bool KDirModel::setData( const QModelInd
+                 const QIcon icon(qvariant_cast<QIcon>(value));
+                 node->setPreview(icon);
+             } else if (value.type() == QVariant::Pixmap) {
+-                node->addPreview(qvariant_cast<QPixmap>(value));
++                node->setPreview(qvariant_cast<QPixmap>(value));
+             }
+             emit dataChanged(index, index);
+             return true;
+@@ -804,6 +804,10 @@ static bool lessThan(const KUrl &left, c
+     return left.url().compare(right.url()) < 0;
+ }
+ 
++void KDirModel::requestSequenceIcon(const QModelIndex& index, int sequenceIndex) {
++    emit needSequenceIcon(index, sequenceIndex);
++}
++
+ KUrl::List KDirModel::simplifiedUrlList(const KUrl::List &urls)
+ {
+     if (!urls.count()) {
+Index: kio/kfile/kfiledialog.h
+===================================================================
+--- kio/kfile/kfiledialog.h.orig
++++ kio/kfile/kfiledialog.h
+@@ -86,17 +86,11 @@ public:
+     /**
+       * Constructs a file dialog.
+       *
+-      * @param startDir This can either be
+-      *         @li The URL of the directory to start in.
+-      *         @li A KUrl() to start in the current working
+-      *             directory, or the last directory where a file has been
+-      *             selected.
+-      *         @li An URL starting with 'kfiledialog:///&lt;keyword&gt;' to start in the
+-      *             directory last used by a filedialog in the same application that specified
+-      *             the same keyword.
+-      *         @li An URL starting with 'kfiledialog:///&lt;keyword&gt;?global' to start
+-      *             in the directory last used by a filedialog in any application that specified the
+-      *             same keyword.
++      * @param startDir Specifies the starting directory and/or initially selected
++      *                 file name, or a last used directory and optional file name
++      *                 using the @c kfiledialog:/// syntax.
++      *                 Refer to the KFileWidget documentation for more information
++      *                 on this parameter.
+       *
+       * @param filter A shell glob or a mime-type-filter that specifies
+       *               which files to display.
+@@ -109,6 +103,8 @@ public:
+       *               display a check box with the caption "Open as read-only".
+       *               When creating this widget, you don't need to specify a parent,
+       *               since the widget's parent will be set automatically by KFileDialog.
++      *
++      * @see KFileWidget::KFileWidget()
+       */
+     KFileDialog( const KUrl& startDir, const QString& filter,
+                  QWidget *parent, QWidget* widget = 0 );
+@@ -334,23 +330,17 @@ public:
+      * Note that with
+      * this method the user must select an existing filename.
+      *
+-     * @param startDir This can either be
+-     *         @li The URL of the directory to start in.
+-     *         @li A KUrl() to start in the current working
+-     *             directory, or the last directory where a file has been
+-     *             selected.
+-     *         @li An URL starting with 'kfiledialog:///&lt;keyword&gt;' to start in the
+-     *             directory last used by a filedialog in the same application that specified
+-     *             the same keyword.
+-     *         @li An URL starting with 'kfiledialog:///&lt;keyword&gt;?global' to start
+-     *             in the directory last used by a filedialog in any application that specified the
+-     *             same keyword.
++     * @param startDir Starting directory or @c kfiledialog:/// URL.
++     *                 Refer to the KFileWidget documentation for more information
++     *                 on this parameter.
+      * @param filter A shell glob or a mime-type-filter that specifies which files to display.
+      *    The preferred option is to set a list of mimetype names, see setMimeFilter() for details.
+      *    Otherwise you can set the text to be displayed for the each glob, and
+      *    provide multiple globs, see setFilter() for details.
+      * @param parent The widget the dialog will be centered on initially.
+      * @param caption The name of the dialog widget.
++     *
++     * @see KFileWidget::KFileWidget()
+      */
+     static QString getOpenFileName( const KUrl& startDir= KUrl(),
+                                     const QString& filter= QString(),
+@@ -375,23 +365,17 @@ public:
+      * Note that with
+      * this method the user must select an existing filename.
+      *
+-     * @param startDir This can either be
+-     *         @li The URL of the directory to start in.
+-     *         @li A KUrl() to start in the current working
+-     *             directory, or the last directory where a file has been
+-     *             selected.
+-     *         @li An URL starting with 'kfiledialog:///&lt;keyword&gt;' to start in the
+-     *             directory last used by a filedialog in the same application that specified
+-     *             the same keyword.
+-     *         @li An URL starting with 'kfiledialog:///&lt;keyword&gt;?global' to start
+-     *             in the directory last used by a filedialog in any application that specified the
+-     *             same keyword.
++     * @param startDir Starting directory or @c kfiledialog:/// URL.
++     *                 Refer to the KFileWidget documentation for more information
++     *                 on this parameter.
+      * @param filter A shell glob or a mime-type-filter that specifies which files to display.
+      *    The preferred option is to set a list of mimetype names, see setMimeFilter() for details.
+      *    Otherwise you can set the text to be displayed for the each glob, and
+      *    provide multiple globs, see setFilter() for details.
+      * @param parent The widget the dialog will be centered on initially.
+      * @param caption The name of the dialog widget.
++     *
++     * @see KFileWidget::KFileWidget()
+      */
+     static QStringList getOpenFileNames( const KUrl& startDir= KUrl(),
+                                          const QString& filter = QString(),
+@@ -407,23 +391,17 @@ public:
+      * Note that with
+      * this method the user must select an existing URL.
+      *
+-     * @param startDir This can either be
+-     *         @li The URL of the directory to start in.
+-     *         @li A KUrl() to start in the current working
+-     *             directory, or the last directory where a file has been
+-     *             selected.
+-     *         @li An URL starting with 'kfiledialog:///&lt;keyword&gt;' to start in the
+-     *             directory last used by a filedialog in the same application that specified
+-     *             the same keyword.
+-     *         @li An URL starting with 'kfiledialog:///&lt;keyword&gt;?global' to start
+-     *             in the directory last used by a filedialog in any application that specified the
+-     *             same keyword.
++     * @param startDir Starting directory or @c kfiledialog:/// URL.
++     *                 Refer to the KFileWidget documentation for more information
++     *                 on this parameter.
+      * @param filter A shell glob or a mime-type-filter that specifies which files to display.
+      *    The preferred option is to set a list of mimetype names, see setMimeFilter() for details.
+      *    Otherwise you can set the text to be displayed for the each glob, and
+      *    provide multiple globs, see setFilter() for details.
+      * @param parent The widget the dialog will be centered on initially.
+      * @param caption The name of the dialog widget.
++     *
++     * @see KFileWidget::KFileWidget()
+      */
+     static KUrl getOpenUrl( const KUrl& startDir = KUrl(),
+                             const QString& filter = QString(),
+@@ -439,23 +417,17 @@ public:
+      * Note that with
+      * this method the user must select an existing filename.
+      *
+-     * @param startDir This can either be
+-     *         @li The URL of the directory to start in.
+-     *         @li A KUrl() to start in the current working
+-     *             directory, or the last directory where a file has been
+-     *             selected.
+-     *         @li An URL starting with 'kfiledialog:///&lt;keyword&gt;' to start in the
+-     *             directory last used by a filedialog in the same application that specified
+-     *             the same keyword.
+-     *         @li An URL starting with 'kfiledialog:///&lt;keyword&gt;?global' to start
+-     *             in the directory last used by a filedialog in any application that specified the
+-     *             same keyword.
++     * @param startDir Starting directory or @c kfiledialog:/// URL.
++     *                 Refer to the KFileWidget documentation for more information
++     *                 on this parameter.
+      * @param filter A shell glob or a mime-type-filter that specifies which files to display.
+      *    The preferred option is to set a list of mimetype names, see setMimeFilter() for details.
+      *    Otherwise you can set the text to be displayed for the each glob, and
+      *    provide multiple globs, see setFilter() for details.
+      * @param parent The widget the dialog will be centered on initially.
+      * @param caption The name of the dialog widget.
++     *
++     * @see KFileWidget::KFileWidget()
+      */
+     static KUrl::List getOpenUrls( const KUrl& startDir = KUrl(),
+                                    const QString& filter = QString(),
+@@ -471,23 +443,17 @@ public:
+      * Note that with this
+      * method the user need not select an existing filename.
+      *
+-     * @param startDir This can either be
+-     *         @li The URL of the directory to start in.
+-     *         @li A KUrl() to start in the current working
+-     *             directory, or the last directory where a file has been
+-     *             selected.
+-     *         @li An URL starting with 'kfiledialog:///&lt;keyword&gt;' to start in the
+-     *             directory last used by a filedialog in the same application that specified
+-     *             the same keyword.
+-     *         @li An URL starting with 'kfiledialog:///&lt;keyword&gt;?global' to start
+-     *             in the directory last used by a filedialog in any application that specified the
+-     *             same keyword.
++     * @param startDir Starting directory or @c kfiledialog:/// URL.
++     *                 Refer to the KFileWidget documentation for more information
++     *                 on this parameter.
+      * @param filter A shell glob or a mime-type-filter that specifies which files to display.
+      *    The preferred option is to set a list of mimetype names, see setMimeFilter() for details.
+      *    Otherwise you can set the text to be displayed for the each glob, and
+      *    provide multiple globs, see setFilter() for details.
+      * @param parent The widget the dialog will be centered on initially.
+      * @param caption The name of the dialog widget.
++     *
++     * @see KFileWidget::KFileWidget()
+      */
+     static QString getSaveFileName( const KUrl& startDir = KUrl(),
+                                     const QString& filter = QString(),
+@@ -510,23 +476,17 @@ public:
+      * Note that with this
+      * method the user need not select an existing filename.
+      *
+-     * @param startDir This can either be
+-     *         @li The URL of the directory to start in.
+-     *         @li A KUrl() to start in the current working
+-     *             directory, or the last directory where a file has been
+-     *             selected.
+-     *         @li An URL starting with 'kfiledialog:///&lt;keyword&gt;' to start in the
+-     *             directory last used by a filedialog in the same application that specified
+-     *             the same keyword.
+-     *         @li An URL starting with 'kfiledialog:///&lt;keyword&gt;?global' to start
+-     *             in the directory last used by a filedialog in any application that specified the
+-     *             same keyword.
++     * @param startDir Starting directory or @c kfiledialog:/// URL.
++     *                 Refer to the KFileWidget documentation for more information
++     *                 on this parameter.
+      * @param filter A shell glob or a mime-type-filter that specifies which files to display.
+      *    The preferred option is to set a list of mimetype names, see setMimeFilter() for details.
+      *    Otherwise you can set the text to be displayed for the each glob, and
+      *    provide multiple globs, see setFilter() for details.
+      * @param parent The widget the dialog will be centered on initially.
+      * @param caption The name of the dialog widget.
++     *
++     * @see KFileWidget::KFileWidget()
+      */
+     static KUrl getSaveUrl( const KUrl& startDir = KUrl(),
+                             const QString& filter = QString(),
+@@ -538,20 +498,14 @@ public:
+      * Creates a modal directory-selection dialog and returns the selected
+      * directory (local only) or an empty string if none was chosen.
+      *
+-     * @param startDir This can either be
+-     *         @li The URL of the directory to start in.
+-     *         @li A KUrl() to start in the current working
+-     *             directory, or the last directory where a file has been
+-     *             selected.
+-     *         @li An URL starting with 'kfiledialog:///&lt;keyword&gt;' to start in the
+-     *             directory last used by a filedialog in the same application that specified
+-     *             the same keyword.
+-     *         @li An URL starting with 'kfiledialog:///&lt;keyword&gt;?global' to start
+-     *             in the directory last used by a filedialog in any application that specified the
+-     *             same keyword.
++     * @param startDir Starting directory or @c kfiledialog:/// URL.
++     *                 Refer to the KFileWidget documentation for more information
++     *                 on this parameter.
+      * @param parent The widget the dialog will be centered on initially.
+      * @param caption The name of the dialog widget.
+      * @return the path to an existing local directory.
++     *
++     * @see KFileWidget::KFileWidget()
+      */
+     static QString getExistingDirectory( const KUrl& startDir = KUrl(),
+                                          QWidget * parent = 0,
+@@ -562,20 +516,14 @@ public:
+      * directory or an empty string if none was chosen.
+      * This version supports remote urls.
+      *
+-     * @param startDir This can either be
+-     *         @li The URL of the directory to start in.
+-     *         @li A KUrl() to start in the current working
+-     *             directory, or the last directory where a file has been
+-     *             selected.
+-     *         @li An URL starting with 'kfiledialog:///&lt;keyword&gt;' to start in the
+-     *             directory last used by a filedialog in the same application that specified
+-     *             the same keyword.
+-     *         @li An URL starting with 'kfiledialog:///&lt;keyword&gt;?global' to start
+-     *             in the directory last used by a filedialog in any application that specified the
+-     *             same keyword.
++     * @param startDir Starting directory or @c kfiledialog:/// URL.
++     *                 Refer to the KFileWidget documentation for more information
++     *                 on this parameter.
+      * @param parent The widget the dialog will be centered on initially.
+      * @param caption The name of the dialog widget.
+      * @return the url to an existing directory (local or remote).
++     *
++     * @see KFileWidget::KFileWidget()
+      */
+     static KUrl getExistingDirectoryUrl( const KUrl& startDir = KUrl(),
+                                          QWidget * parent = 0,
+@@ -585,19 +533,13 @@ public:
+      * Creates a modal file dialog with an image previewer and returns the
+      * selected url or an empty string if none was chosen.
+      *
+-     * @param startDir This can either be
+-     *         @li The URL of the directory to start in.
+-     *         @li A KUrl() to start in the current working
+-     *             directory, or the last directory where a file has been
+-     *             selected.
+-     *         @li An URL starting with 'kfiledialog:///&lt;keyword&gt;' to start in the
+-     *             directory last used by a filedialog in the same application that specified
+-     *             the same keyword.
+-     *         @li An URL starting with 'kfiledialog:///&lt;keyword&gt;?global' to start
+-     *             in the directory last used by a filedialog in any application that specified the
+-     *             same keyword.
++     * @param startDir Starting directory or @c kfiledialog:/// URL.
++     *                 Refer to the KFileWidget documentation for more information
++     *                 on this parameter.
+      * @param parent The widget the dialog will be centered on initially.
+      * @param caption The name of the dialog widget.
++     *
++     * @see KFileWidget::KFileWidget()
+      */
+     static KUrl getImageOpenUrl( const KUrl& startDir = KUrl(),
+                                  QWidget *parent = 0,
+@@ -694,13 +636,18 @@ public:
+      * This method implements the logic to determine the user's default directory
+      * to be listed. E.g. the documents directory, home directory or a recently
+      * used directory.
+-     * @param startDir A url, to be used. May use the 'kfiledialog:///keyword' and
+-     *                 'kfiledialog:///keyword?global' syntax
+-     *                 as documented in the KFileDialog() constructor.
+-     * @param recentDirClass If the 'kfiledialog:///' syntax is used, recentDirClass
+-     *        will contain the string to be used later for KRecentDir::dir()
++     *
++     * @param startDir Starting directory or @c kfiledialog:/// URL.
++     *                 Refer to the KFileWidget documentation for more information
++     *                 on this parameter.
++     * @param recentDirClass If the @c kfiledialog:/// syntax is used, this
++     *        will return the string to be passed to KRecentDirs::dir() and
++     *        KRecentDirs::add().
+      * @return The URL that should be listed by default (e.g. by KFileDialog or
+      *         KDirSelectDialog).
++     *
++     * @see KFileWidget::KFileWidget()
++     * @see KFileWidget::getStartUrl( const KUrl& startDir, QString& recentDirClass );
+      */
+     static KUrl getStartUrl( const KUrl& startDir, QString& recentDirClass );
+ 
+Index: kio/kfile/tests/kfiledialogtest.cpp
+===================================================================
+--- kio/kfile/tests/kfiledialogtest.cpp.orig
++++ kio/kfile/tests/kfiledialogtest.cpp
+@@ -39,10 +39,20 @@ int main (int argc, char **argv)
+     KCmdLineArgs::init( argc, argv, &aboutData );
+     KApplication app;
+ 
+-    KFileDialog keywordDlg(KUrl("kfiledialog://testKeyword"), QString("*.*|"), 0);
++    // Test for: saved location keyword.
++    //     - Should return to the starting directory last used for this test.
++    //     - Should have no entered file name.
++    KFileDialog keywordDlg(KUrl("kfiledialog:///testKeyword"), QString("*.*|"), 0);
+     keywordDlg.setMode(KFile::Files);
+     keywordDlg.exec();
+ 
++    // Test for: saved location keyword with file name.
++    //     - Should return to the starting directory last used for this test.
++    //     - Should enter the file name 'new.file'.
++    KFileDialog keywordDlg2(KUrl("kfiledialog:///testKeyword/new.file"), QString("*.*|"), 0);
++    keywordDlg2.setMode(KFile::Files);
++    keywordDlg2.exec();
++
+     // bug 173137
+     KFileDialog dlg(KUrl(QString()), QString("*.*|"), 0);
+     dlg.setMode(KFile::Files | KFile::Directory);
+Index: kio/kfile/kfiledialog.cpp
+===================================================================
+--- kio/kfile/kfiledialog.cpp.orig
++++ kio/kfile/kfiledialog.cpp
+@@ -722,7 +722,7 @@ KUrl KFileDialog::getSaveUrl(const KUrl&
+     bool defaultDir = dir.isEmpty();
+     bool specialDir = !defaultDir && dir.protocol() == "kfiledialog";
+     KFileDialog dlg(specialDir ? dir : KUrl(), filter, parent);
+-    if ( !specialDir )
++    if ( !specialDir && !defaultDir )
+         dlg.setSelection( dir.url() ); // may also be a filename
+ 
+     dlg.setCaption(caption.isEmpty() ? i18n("Save As") : caption);
+Index: kio/tests/karchivetest.cpp
+===================================================================
+--- kio/tests/karchivetest.cpp.orig
++++ kio/tests/karchivetest.cpp
+@@ -98,10 +98,8 @@ static QStringList recursiveListEntries(
+   QStringList ret;
+   QStringList l = dir->entries();
+   l.sort();
+-  QStringList::ConstIterator it = l.begin();
+-  for( ; it != l.end(); ++it )
+-  {
+-    const KArchiveEntry* entry = dir->entry( (*it) );
++  Q_FOREACH(const QString& it, l) {
++    const KArchiveEntry* entry = dir->entry(it);
+ 
+     QString descr;
+     descr += QString("mode=") + QString::number( entry->permissions(), 8 ) + ' ';
+@@ -110,7 +108,7 @@ static QStringList recursiveListEntries(
+         descr += QString("user=") + entry->user() + ' ';
+         descr += QString("group=") + entry->group() + ' ';
+     }
+-    descr += QString("path=") + path+(*it) + ' ';
++    descr += QString("path=") + path+(it) + ' ';
+     descr += QString("type=") + ( entry->isDirectory() ? "dir" : "file" );
+     if ( entry->isFile() )
+         descr += QString(" size=") + QString::number( static_cast<const KArchiveFile *>(entry)->size() );
+@@ -123,7 +121,7 @@ static QStringList recursiveListEntries(
+     ret.append( descr );
+ 
+     if (entry->isDirectory())
+-      ret += recursiveListEntries( (KArchiveDirectory *)entry, path+(*it)+'/', listingFlags );
++      ret += recursiveListEntries( (KArchiveDirectory *)entry, path+it+'/', listingFlags );
+   }
+   return ret;
+ }
+Index: kio/CMakeLists.txt
+===================================================================
+--- kio/CMakeLists.txt.orig
++++ kio/CMakeLists.txt
+@@ -117,6 +117,7 @@ set(kiocore_STAT_SRCS
+   kio/slaveconfig.cpp
+   kio/slaveinterface.cpp
+   kio/thumbcreator.cpp
++  kio/thumbsequencecreator.cpp
+   kio/tcpslavebase.cpp
+   kio/udsentry.cpp
+   kio/hostinfo.cpp
+@@ -328,6 +329,7 @@ install(  FILES
+   kio/http_slave_defaults.h
+   kio/previewjob.h
+   kio/thumbcreator.h
++  kio/thumbsequencecreator.h
+   kio/metainfojob.h
+   kio/davjob.h
+   kio/directorysizejob.h

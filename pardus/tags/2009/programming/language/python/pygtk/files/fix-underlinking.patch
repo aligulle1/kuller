@@ -1,0 +1,86 @@
+diff -Nuar pygtk-2.14.1.orig/gtk/Makefile.am pygtk-2.14.1/gtk/Makefile.am
+--- pygtk-2.14.1.orig/gtk/Makefile.am	2009-03-06 00:06:49.000000000 +0200
++++ pygtk-2.14.1/gtk/Makefile.am	2009-05-25 17:41:13.000000000 +0300
+@@ -150,7 +150,7 @@
+ gdk.c: gdk-types.defs gdk.defs $(GDK_OVERRIDES)
+ gtk.c: gdk-types.defs gtk-types.defs gtk.defs gdk-types.defs $(GTK_OVERRIDES)
+ _gtk_la_CFLAGS = $(PYCAIRO_CFLAGS) $(GTK_CFLAGS)
+-_gtk_la_LDFLAGS = $(common_ldflags) -export-symbols-regex init_gtk
++_gtk_la_LDFLAGS = $(common_ldflags) -export-symbols-regex init_gtk `python-config --libs`
+ _gtk_la_LIBADD = $(GTK_LIBS)
+ _gtk_la_SOURCES = 		\
+ 	gtk-types.c 		\
+@@ -176,7 +176,7 @@
+ libglade.c: $(LIBGLADE_DEFS) libglade.override gdk-types.defs gtk-types.defs
+ glade_la_CFLAGS = $(LIBGLADE_CFLAGS)
+ glade_la_LIBADD = $(LIBGLADE_LIBS)
+-glade_la_LDFLAGS = $(common_ldflags) -export-symbols-regex initglade
++glade_la_LDFLAGS = $(common_ldflags) -export-symbols-regex initglade `python-config --libs`
+ glade_la_SOURCES = libglademodule.c
+ nodist_glade_la_SOURCES = libglade.c
+ if BUILD_LIBGLADE
+@@ -203,7 +203,7 @@
+ 
+ gtkunixprint_la_CFLAGS = $(PYCAIRO_CFLAGS) $(GTKUNIXPRINT_CFLAGS)
+ gtkunixprint_la_LIBADD = $(GTKUNIXPRINT_LIBS)
+-gtkunixprint_la_LDFLAGS = $(common_ldflags) -export-symbols-regex initgtkunixprint
++gtkunixprint_la_LDFLAGS = $(common_ldflags) -export-symbols-regex initgtkunixprint `python-config --libs`
+ gtkunixprint_la_SOURCES = gtkunixprintmodule.c
+ nodist_gtkunixprint_la_SOURCES = gtkunixprint.c
+ if BUILD_GTKUNIXPRINT
+diff -Nuar pygtk-2.14.1.orig/gtk/Makefile.in pygtk-2.14.1/gtk/Makefile.in
+--- pygtk-2.14.1.orig/gtk/Makefile.in	2009-03-06 01:09:16.000000000 +0200
++++ pygtk-2.14.1/gtk/Makefile.in	2009-05-25 17:41:01.000000000 +0300
+@@ -394,7 +394,7 @@
+ 	gtkwindow.override
+ 
+ _gtk_la_CFLAGS = $(PYCAIRO_CFLAGS) $(GTK_CFLAGS) $(am__append_18)
+-_gtk_la_LDFLAGS = $(common_ldflags) -export-symbols-regex init_gtk
++_gtk_la_LDFLAGS = $(common_ldflags) -export-symbols-regex init_gtk `python-config --libs`
+ _gtk_la_LIBADD = $(GTK_LIBS)
+ _gtk_la_SOURCES = \
+ 	gtk-types.c 		\
+@@ -413,12 +413,12 @@
+ LIBGLADE_DEFS = libglade.defs
+ glade_la_CFLAGS = $(LIBGLADE_CFLAGS)
+ glade_la_LIBADD = $(LIBGLADE_LIBS)
+-glade_la_LDFLAGS = $(common_ldflags) -export-symbols-regex initglade
++glade_la_LDFLAGS = $(common_ldflags) -export-symbols-regex initglade `python-config --libs`
+ glade_la_SOURCES = libglademodule.c
+ nodist_glade_la_SOURCES = libglade.c
+ gtkunixprint_la_CFLAGS = $(PYCAIRO_CFLAGS) $(GTKUNIXPRINT_CFLAGS)
+ gtkunixprint_la_LIBADD = $(GTKUNIXPRINT_LIBS)
+-gtkunixprint_la_LDFLAGS = $(common_ldflags) -export-symbols-regex initgtkunixprint
++gtkunixprint_la_LDFLAGS = $(common_ldflags) -export-symbols-regex initgtkunixprint `python-config --libs`
+ gtkunixprint_la_SOURCES = gtkunixprintmodule.c
+ nodist_gtkunixprint_la_SOURCES = gtkunixprint.c
+ @BUILD_GTKUNIXPRINT_TRUE@pkgpyexec_LTLIBRARIES = gtkunixprint.la
+diff -Nuar pygtk-2.14.1.orig/Makefile.in pygtk-2.14.1/Makefile.in
+--- pygtk-2.14.1.orig/Makefile.in	2009-03-06 01:09:16.000000000 +0200
++++ pygtk-2.14.1/Makefile.in	2009-05-25 17:21:29.000000000 +0300
+@@ -364,7 +364,7 @@
+ ATK_OVERRIDES = atk.override atkrectangle.override
+ atk_la_CFLAGS = $(ATK_CFLAGS)
+ atk_la_LIBADD = $(ATK_LIBS)
+-atk_la_LDFLAGS = $(common_ldflags) -export-symbols-regex initatk
++atk_la_LDFLAGS = $(common_ldflags) -export-symbols-regex initatk `python-config --libs`
+ atk_la_SOURCES = atkmodule.c
+ nodist_atk_la_SOURCES = atk.c
+ 
+@@ -372,14 +372,14 @@
+ PANGO_DEFS = pango.defs pango-types.defs
+ pango_la_CFLAGS = $(PANGO_CFLAGS)
+ pango_la_LIBADD = $(PANGO_LIBS)
+-pango_la_LDFLAGS = $(common_ldflags) -export-symbols-regex initpango
++pango_la_LDFLAGS = $(common_ldflags) -export-symbols-regex initpango `python-config --libs`
+ pango_la_SOURCES = pangomodule.c
+ nodist_pango_la_SOURCES = pango.c
+ 
+ # pangocairo module
+ PANGOCAIRO_DEFS = pangocairo.defs pangocairo.override
+ pangocairo_la_CFLAGS = $(PYCAIRO_CFLAGS) $(PANGOCAIRO_CFLAGS)
+-pangocairo_la_LDFLAGS = $(common_ldflags) -export-symbols-regex initpangocairo
++pangocairo_la_LDFLAGS = $(common_ldflags) -export-symbols-regex initpangocairo `python-config --libs`
+ pangocairo_la_LIBADD = $(PANGOCAIRO_LIBS)
+ pangocairo_la_SOURCES = pangocairomodule.c
+ nodist_pangocairo_la_SOURCES = pangocairo.c

@@ -1,0 +1,160 @@
+#!/usr/bin/python
+import os
+import sys
+
+
+def dir_lists(head_dir):
+    dirList = ""
+    """Return a list of the full paths of the subdirectories
+    under directory 'head_dir' """
+    dir_list = os.listdir(head_dir)
+
+
+    for fn in dir_list:
+        if fn == ".svn":
+            continue
+        if fn == "pspec.xml" or fn == "actions.py" or fn == "translations.xml" \
+        or fn == "files" or fn == "comar":
+            #dirList += head_dir
+            os.path.join(os.getcwd(), "..")
+            return head_dir[head_dir.rfind('/')+1:] + " & " + head_dir + "\n"
+
+        dirfile = os.path.join(head_dir, fn)
+        #if fn == "actions.py" or fn == "pspec.xml" or \
+        #fn == "translations.xml":
+            #return dirfile
+
+        if os.path.isdir(dirfile) :
+            dirList += dir_lists(dirfile)
+            #dirList += fn + " & " + dirfile + "\n"
+
+    return dirList
+
+
+def replace_new_packager(package, packagerName, packagerEmail):
+    try:
+        file = open(package, "r")
+        orig_pspec = file.readlines()
+        file.close()
+    except:
+        print "Error when reading %s file" % package
+        raise SystemExit
+
+    entered = 0
+    entered_other_one = 0
+    new_pspec = ""
+    
+    for _line in orig_pspec:
+        line = _line.split("\n")[0]
+
+        if not entered:
+            if line.find("<Packager>") != -1:
+                entered=1
+                new_pspec += _line
+                continue
+        if entered:
+            _line = "            <Name>%s</Name>\n" % packagerName
+            entered_other_one = 1
+            entered = 0
+            new_pspec += _line
+            continue
+
+        if entered_other_one:
+            _line = "            <Email>%s</Email>\n" % packagerEmail
+            entered_other_one = 0
+            new_pspec += _line
+            continue
+
+        new_pspec += _line
+
+    file = open(package, "w")
+    file.writelines(new_pspec)
+    file.close()
+
+def main(args):
+    try:
+        file_name = args[1]
+    except:
+        print """
+        usage: takePisiPackages file_name new_packager's_name new_packager's_email
+
+        file_name is a file which including package names.
+
+        new_packager's_name is a real name. New packager's name.
+
+        new_packager's_email is a real email address. New packager's email address.
+        """
+        raise SystemExit
+
+    try:
+        packages = open(file_name, "r")
+        package_lines = packages.readlines()
+        packages.close()
+
+    except:
+        print "Unable to open %s" % file_name
+        raise SystemExit
+
+    try:
+        packager_name = args[2]
+
+    except:
+        packager_name = raw_input("New packager's name: ")
+        if packager_name == None:
+            raise SystemExit
+
+    try:
+        packager_email = args[3]
+
+    except:
+        packager_email = raw_input("New packager's (%s) email: " % packager_name)
+        if packager_email == None:
+            raise SystemExit
+
+    pack_list = dir_lists(os.getcwd())
+
+    pack_dict = {}
+    inp = raw_input("Do you want to edit files?[Y/N]: ")
+    if inp == 'Y' or inp == 'y' :
+        inp = True
+        editor = raw_input("Which command do you want to use to edit: ")
+        files = raw_input("Which files do you want to edit: ")
+    else:
+        inp = False
+
+    for line in pack_list.split("\n"):
+        try:
+            pack_dict[line.split(" & ")[0]] = line.split(" & ")[1]
+
+        except:
+            pass
+
+    for _package in package_lines:
+        package = _package.split("\n")[0]
+
+        try:
+            if os.path.exists(package) and package.find("pspec.xml") == -1:
+                pack_addr = package+"/pspec.xml"
+                replace_new_packager(pack_addr, packager_name, packager_email)
+
+            elif os.path.exists(package) and package.find("pspec.xml") != -1:
+                pack_addr = package
+                replace_new_packager(pack_addr, packager_name, packager_email)
+
+            else:
+                _pack_addr = pack_dict[package]
+                if os.path.exists(_pack_addr):
+                    pack_addr = _pack_addr + "/pspec.xml"
+                    replace_new_packager(pack_addr, packager_name, packager_email)
+
+            if inp:
+                try:
+                    for file in files.split(" "):
+                        os.system("%s %s%s" % (editor, pack_addr.split("pspec.xml")[0], file))
+                except:
+                    print "No file(s) exist such as %s" % i
+        except:
+            print "%s package does not exist" % package
+
+if __name__ == "__main__":
+    main(sys.argv)

@@ -1,0 +1,18 @@
+Do not add -I/usr/include to gccxml options.  Doing so breaks #include_next,
+which is heavily used in GCC 4.3.
+
+This is GCCXML bug 7134; see http://www.gccxml.org/Bug/view.php?id=7134.
+
+--- insighttoolkit-3.6.0.orig/Wrapping/CSwig/CMakeLists.txt
++++ insighttoolkit-3.6.0/Wrapping/CSwig/CMakeLists.txt
+@@ -749,7 +749,9 @@
+   SET(SWIG_INC_FILE ${WrapITK_BINARY_DIR}/${DIRECTORY}/SwigInc.txt)
+   SET(SWIG_INC_CONTENTS)
+   FOREACH(dir ${SWIG_INC})
+-    SET(SWIG_INC_CONTENTS "${SWIG_INC_CONTENTS}-I${dir}\n")
++    IF(NOT ${dir} STREQUAL "/usr/include")
++      SET(SWIG_INC_CONTENTS "${SWIG_INC_CONTENTS}-I${dir}\n")
++    ENDIF(NOT ${dir} STREQUAL "/usr/include")
+   ENDFOREACH(dir)
+   CONFIGURE_FILE(${WrapITK_SOURCE_DIR}/SwigInc.txt.in ${SWIG_INC_FILE}
+     @ONLY IMMEDIATE)

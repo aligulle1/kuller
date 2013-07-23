@@ -1,0 +1,68 @@
+From: Thomas Moschny <thomas.moschny@gmx.de>
+Subject: [PATCH] t/libexecdir
+
+Move the vst and zynaddsubfx plugins to libexecdir.
+
+Signed-off-by: Thomas Moschny <thomas.moschny@gmx.de>
+
+---
+ CMakeLists.txt                     |    2 +-
+ plugins/vst_base/CMakeLists.txt    |    2 +-
+ plugins/zynaddsubfx/CMakeLists.txt |    2 +-
+ src/core/RemotePlugin.cpp          |    2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index ca38621..86dab89 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -421,7 +421,7 @@ IF(LMMS_BUILD_WIN32)
+ 	SET(EXTRA_LIBRARIES "-lwinmm")
+ ENDIF()
+ 
+-ADD_DEFINITIONS(-D'LIB_DIR="${CMAKE_INSTALL_PREFIX}/${LIB_DIR}/"' -D'PLUGIN_DIR="${CMAKE_INSTALL_PREFIX}/${LIB_DIR}/lmms/"' ${PULSEAUDIO_DEFINITIONS} ${PORTAUDIO_DEFINITIONS})
++ADD_DEFINITIONS(-D'LIB_DIR="${CMAKE_INSTALL_PREFIX}/${LIB_DIR}/"' -D'PLUGIN_DIR="${CMAKE_INSTALL_PREFIX}/${LIB_DIR}/lmms/"' -D'LIBEXEC_DIR="${LIBEXEC_INSTALL_DIR}"' ${PULSEAUDIO_DEFINITIONS} ${PORTAUDIO_DEFINITIONS})
+ 
+ INCLUDE_DIRECTORIES(${CMAKE_BINARY_DIR} ${CMAKE_BINARY_DIR}/include ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/include ${SDL_INCLUDE_DIR} ${PORTAUDIO_INCLUDE_DIR} ${PULSEAUDIO_INCLUDE_DIR} ${JACK_INCLUDE_DIRS} ${OGGVORBIS_INCLUDE_DIR} ${SAMPLERATE_INCLUDE_DIRS} ${SNDFILE_INCLUDE_DIRS})
+ LINK_DIRECTORIES(${CMAKE_INSTALL_PREFIX}/lib ${ASOUND_LIBRARY_DIR} ${JACK_LIBRARY_DIRS} ${SAMPLERATE_LIBRARY_DIRS} ${SNDFILE_LIBRARY_DIRS})
+diff --git a/plugins/vst_base/CMakeLists.txt b/plugins/vst_base/CMakeLists.txt
+index 274efa6..817a2fe 100644
+--- a/plugins/vst_base/CMakeLists.txt
++++ b/plugins/vst_base/CMakeLists.txt
+@@ -35,7 +35,7 @@ ADD_CUSTOM_COMMAND(
+ 
+ SET_DIRECTORY_PROPERTIES(PROPERTIES ADDITIONAL_MAKE_CLEAN_FILES RemoteVstPlugin.exe.so)
+ 
+-INSTALL(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/RemoteVstPlugin ${CMAKE_CURRENT_BINARY_DIR}/RemoteVstPlugin.exe.so DESTINATION ${PLUGIN_DIR})
++INSTALL(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/RemoteVstPlugin ${CMAKE_CURRENT_BINARY_DIR}/RemoteVstPlugin.exe.so DESTINATION ${LIBEXEC_INSTALL_DIR})
+ 
+ ENDIF(LMMS_BUILD_LINUX AND NOT WANT_VST_NOWINE)
+ 
+diff --git a/plugins/zynaddsubfx/CMakeLists.txt b/plugins/zynaddsubfx/CMakeLists.txt
+index 9eee0f8..566cb07 100644
+--- a/plugins/zynaddsubfx/CMakeLists.txt
++++ b/plugins/zynaddsubfx/CMakeLists.txt
+@@ -99,7 +99,7 @@ ENDIF(WIN32)
+ SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/${PLUGIN_DIR}")
+ SET(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+ ADD_EXECUTABLE(RemoteZynAddSubFx RemoteZynAddSubFx.cpp ${ZYN_SRC_GUI} ${WINRC})
+-INSTALL(TARGETS RemoteZynAddSubFx RUNTIME DESTINATION ${PLUGIN_DIR})
++INSTALL(TARGETS RemoteZynAddSubFx RUNTIME DESTINATION ${LIBEXEC_INSTALL_DIR})
+ TARGET_LINK_LIBRARIES(RemoteZynAddSubFx -lpthread -L${CMAKE_CURRENT_BINARY_DIR} -lZynAddSubFxCore ${CMAKE_CURRENT_BINARY_DIR}/fltk/lib/libfltk.a)
+ ADD_DEPENDENCIES(RemoteZynAddSubFx ZynAddSubFxCore)
+ 
+diff --git a/src/core/RemotePlugin.cpp b/src/core/RemotePlugin.cpp
+index 55fe530..cd1218e 100644
+--- a/src/core/RemotePlugin.cpp
++++ b/src/core/RemotePlugin.cpp
+@@ -130,7 +130,7 @@ bool RemotePlugin::init( const QString &pluginExecutable,
+ 		reset( new shmFifo(), new shmFifo() );
+ 		m_failed = false;
+ 	}
+-	QString exec = configManager::inst()->pluginDir() +
++	QString exec = QString( LIBEXEC_DIR ) +
+ 					QDir::separator() + pluginExecutable;
+ 
+ 	QStringList args;
+-- 
+tg: (5a35d32..) t/libexecdir (depends on: stable-0.4)

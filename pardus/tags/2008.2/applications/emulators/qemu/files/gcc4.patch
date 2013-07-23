@@ -1,0 +1,233 @@
+diff -ur qemu-0.9.1/Makefile.target qemu-fixed/Makefile.target
+--- qemu-0.9.1/Makefile.target	2008-01-06 21:38:41.000000000 +0200
++++ qemu-fixed/Makefile.target	2008-01-09 18:50:01.000000000 +0200
+@@ -144,6 +144,7 @@
+ 
+ ifeq ($(ARCH),ppc)
+ CPPFLAGS+= -D__powerpc__
++OP_CFLAGS+= -fno-section-anchors
+ BASE_LDFLAGS+=-Wl,-T,$(SRC_PATH)/$(ARCH).ld
+ endif
+ 
+diff -ur qemu-0.9.1/softmmu_header.h qemu-fixed/softmmu_header.h
+--- qemu-0.9.1/softmmu_header.h	2008-01-06 21:38:42.000000000 +0200
++++ qemu-fixed/softmmu_header.h	2008-01-09 19:07:23.000000000 +0200
+@@ -189,9 +189,11 @@
+ #else
+ #error unsupported size
+ #endif
++                  "pushl %%ecx\n"
+                   "pushl %6\n"
+                   "call %7\n"
+                   "popl %%eax\n"
++                  "popl %%ecx\n"
+                   "jmp 2f\n"
+                   "1:\n"
+                   "addl 8(%%edx), %%eax\n"
+@@ -209,14 +211,18 @@
+                   : "r" (ptr),
+ /* NOTE: 'q' would be needed as constraint, but we could not use it
+    with T1 ! */
++#if DATA_SIZE == 1 || DATA_SIZE == 2
++                  "q" (v),
++#else
+                   "r" (v),
++#endif
+                   "i" ((CPU_TLB_SIZE - 1) << CPU_TLB_ENTRY_BITS),
+                   "i" (TARGET_PAGE_BITS - CPU_TLB_ENTRY_BITS),
+                   "i" (TARGET_PAGE_MASK | (DATA_SIZE - 1)),
+                   "m" (*(uint32_t *)offsetof(CPUState, tlb_table[CPU_MMU_INDEX][0].addr_write)),
+                   "i" (CPU_MMU_INDEX),
+                   "m" (*(uint8_t *)&glue(glue(__st, SUFFIX), MMUSUFFIX))
+-                  : "%eax", "%ecx", "%edx", "memory", "cc");
++                  : "%eax", "%edx", "memory", "cc");
+ }
+ 
+ #else
+diff -ur qemu-0.9.1/target-alpha/cpu.h qemu-fixed/target-alpha/cpu.h
+--- qemu-0.9.1/target-alpha/cpu.h	2008-01-06 21:38:44.000000000 +0200
++++ qemu-fixed/target-alpha/cpu.h	2008-01-09 18:51:26.000000000 +0200
+@@ -275,6 +275,8 @@
+      * used to emulate 64 bits target on 32 bits hosts
+      */
+     target_ulong t0, t1, t2;
++#elif defined(HOST_I386)
++    target_ulong t2;
+ #endif
+     /* */
+     double ft0, ft1, ft2;
+diff -ur qemu-0.9.1/target-alpha/exec.h qemu-fixed/target-alpha/exec.h
+--- qemu-0.9.1/target-alpha/exec.h	2008-01-06 21:38:44.000000000 +0200
++++ qemu-fixed/target-alpha/exec.h	2008-01-09 18:52:07.000000000 +0200
+@@ -40,7 +40,11 @@
+ 
+ register uint64_t T0 asm(AREG1);
+ register uint64_t T1 asm(AREG2);
++#ifndef HOST_I386
+ register uint64_t T2 asm(AREG3);
++#else
++#define T2 (env->t2)
++#endif
+ 
+ #endif /* TARGET_LONG_BITS > HOST_LONG_BITS */
+ 
+diff -ur qemu-0.9.1/target-alpha/op_template.h qemu-fixed/target-alpha/op_template.h
+--- qemu-0.9.1/target-alpha/op_template.h	2008-01-06 21:38:44.000000000 +0200
++++ qemu-fixed/target-alpha/op_template.h	2008-01-09 18:54:36.000000000 +0200
+@@ -29,14 +29,28 @@
+ #if !defined(HOST_SPARC) && !defined(HOST_SPARC64)
+ void OPPROTO glue(op_reset_FT, REG) (void)
+ {
++#ifdef HOST_PPC
++    union baeh { double d; unsigned int i[2];};
++    union baeh *p = (union baeh*)&(glue(FT, REG));
++    p->i[0] = 0;
++    p->i[1] = 0;
++#else
+     glue(FT, REG) = 0;
+     RETURN();
++#endif
+ }
+ #else
+ void OPPROTO glue(op_reset_FT, REG) (void)
+ {
++#ifdef HOST_PPC
++  union baeh { double d; unsigned int i[2];};
++  union baeh *p = (union baeh*)&(glue(helper_reset_FT, REG));
++  p->i[0] = 0;
++  p->i[1] = 0;
++#else
+     glue(helper_reset_FT, REG)();
+     RETURN();
++#endif
+ }
+ #endif
+ 
+diff -ur qemu-0.9.1/target-arm/cpu.h qemu-fixed/target-arm/cpu.h
+--- qemu-0.9.1/target-arm/cpu.h	2008-01-06 21:38:44.000000000 +0200
++++ qemu-fixed/target-arm/cpu.h	2008-01-09 18:55:18.000000000 +0200
+@@ -66,6 +66,10 @@
+  */
+ 
+ typedef struct CPUARMState {
++#if defined(HOST_I386)
++  uint32_t t1;
++#endif
++
+     /* Regs for current mode.  */
+     uint32_t regs[16];
+     /* Frequently accessed CPSR bits are stored separately for efficiently.
+diff -ur qemu-0.9.1/target-arm/exec.h qemu-fixed/target-arm/exec.h
+--- qemu-0.9.1/target-arm/exec.h	2008-01-06 21:38:44.000000000 +0200
++++ qemu-fixed/target-arm/exec.h	2008-01-09 18:55:47.000000000 +0200
+@@ -23,7 +23,11 @@
+ register struct CPUARMState *env asm(AREG0);
+ register uint32_t T0 asm(AREG1);
+ register uint32_t T1 asm(AREG2);
++#ifndef HOST_I386
+ register uint32_t T2 asm(AREG3);
++#else
++#define T2 (env->t1)
++#endif
+ 
+ /* TODO: Put these in FP regs on targets that have such things.  */
+ /* It is ok for FT0s and FT0d to overlap.  Likewise FT1s and FT1d.  */
+diff -ur qemu-0.9.1/target-i386/cpu.h qemu-fixed/target-i386/cpu.h
+--- qemu-0.9.1/target-i386/cpu.h	2008-01-06 21:38:45.000000000 +0200
++++ qemu-fixed/target-i386/cpu.h	2008-01-09 18:56:13.000000000 +0200
+@@ -470,6 +470,8 @@
+ #if TARGET_LONG_BITS > HOST_LONG_BITS
+     /* temporaries if we cannot store them in host registers */
+     target_ulong t0, t1, t2;
++#elif defined(HOST_I386)
++    target_ulong t1;
+ #endif
+ 
+     /* standard registers */
+diff -ur qemu-0.9.1/target-i386/exec.h qemu-fixed/target-i386/exec.h
+--- qemu-0.9.1/target-i386/exec.h	2008-01-06 21:38:45.000000000 +0200
++++ qemu-fixed/target-i386/exec.h	2008-01-09 18:56:42.000000000 +0200
+@@ -44,7 +44,11 @@
+ /* XXX: use unsigned long instead of target_ulong - better code will
+    be generated for 64 bit CPUs */
+ register target_ulong T0 asm(AREG1);
++#ifndef HOST_I386
+ register target_ulong T1 asm(AREG2);
++#else
++#define T1 (env->t1)
++#endif
+ register target_ulong T2 asm(AREG3);
+ 
+ /* if more registers are available, we define some registers too */
+diff -ur qemu-0.9.1/target-mips/cpu.h qemu-fixed/target-mips/cpu.h
+--- qemu-0.9.1/target-mips/cpu.h	2008-01-06 21:38:45.000000000 +0200
++++ qemu-fixed/target-mips/cpu.h	2008-01-09 18:57:07.000000000 +0200
+@@ -149,6 +149,8 @@
+     target_ulong t0;
+     target_ulong t1;
+     target_ulong t2;
++#elif defined(HOST_I386)
++    target_ulong t1;
+ #endif
+     target_ulong HI[MIPS_DSP_ACC][MIPS_TC_MAX];
+     target_ulong LO[MIPS_DSP_ACC][MIPS_TC_MAX];
+diff -ur qemu-0.9.1/target-mips/exec.h qemu-fixed/target-mips/exec.h
+--- qemu-0.9.1/target-mips/exec.h	2008-01-06 21:38:45.000000000 +0200
++++ qemu-fixed/target-mips/exec.h	2008-01-09 18:57:36.000000000 +0200
+@@ -17,7 +17,11 @@
+ #else
+ register target_ulong T0 asm(AREG1);
+ register target_ulong T1 asm(AREG2);
++#ifndef HOST_I386
+ register target_ulong T2 asm(AREG3);
++#else
++#define T2 (env->t1)
++#endif
+ #endif
+ 
+ #if defined (USE_HOST_FLOAT_REGS)
+diff -ur qemu-0.9.1/target-ppc/cpu.h qemu-fixed/target-ppc/cpu.h
+--- qemu-0.9.1/target-ppc/cpu.h	2008-01-06 21:38:45.000000000 +0200
++++ qemu-fixed/target-ppc/cpu.h	2008-01-09 18:58:47.000000000 +0200
+@@ -546,6 +546,8 @@
+      * used to emulate 64 bits registers on 32 bits hosts
+      */
+     uint64_t t0, t1, t2;
++#elif defined(HOST_I386)
++    uint64_t t1;
+ #endif
+     ppc_avr_t avr0, avr1, avr2;
+ 
+diff -ur qemu-0.9.1/target-ppc/exec.h qemu-fixed/target-ppc/exec.h
+--- qemu-0.9.1/target-ppc/exec.h	2008-01-06 21:38:45.000000000 +0200
++++ qemu-fixed/target-ppc/exec.h	2008-01-09 18:59:15.000000000 +0200
+@@ -41,7 +41,11 @@
+ #else
+ register unsigned long T0 asm(AREG1);
+ register unsigned long T1 asm(AREG2);
++#ifndef HOST_I386
+ register unsigned long T2 asm(AREG3);
++#else
++#define T2 (env->t1)
++#endif
+ #define TDX "%016lx"
+ #endif
+ /* We may, sometime, need 64 bits registers on 32 bits targets */
+diff -ur qemu-0.9.1/target-sparc/exec.h qemu-fixed/target-sparc/exec.h
+--- qemu-0.9.1/target-sparc/exec.h	2008-01-06 21:38:45.000000000 +0200
++++ qemu-fixed/target-sparc/exec.h	2008-01-09 18:59:54.000000000 +0200
+@@ -32,9 +32,13 @@
+ 
+ #else
+ #define REGWPTR env->regwptr
++#ifndef HOST_I386
+ register uint32_t T2 asm(AREG3);
+-#endif
+ #define reg_T2
++#else
++#define T2 (env->t2)
++#endif
++#endif
+ #endif
+ 
+ #define FT0 (env->ft0)

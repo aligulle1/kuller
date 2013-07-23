@@ -1,0 +1,63 @@
+Index: inputproto-1.4.3/XI.h
+===================================================================
+--- inputproto-1.4.3/XI.h.orig
++++ inputproto-1.4.3/XI.h
+@@ -52,10 +52,8 @@ SOFTWARE.
+ #ifndef _XI_H_
+ #define _XI_H_
+ 
+-#include <X11/Xmd.h> /* CARD32 */
+-
+-#define sz_xGetExtensionVersionReq		8
+-#define sz_xGetExtensionVersionReply		32
++#define sz_xGetExtensionVersionReq             8
++#define sz_xGetExtensionVersionReply           32
+ #define sz_xListInputDevicesReq			4
+ #define sz_xListInputDevicesReply		32
+ #define sz_xOpenDeviceReq			8
+@@ -216,6 +214,13 @@ SOFTWARE.
+ #define Relative                0
+ #define Absolute                1
+ 
++/* Merged from Metrolink tree for XINPUT stuff */
++#define TS_Raw                  57
++#define TS_Scaled               58
++#define SendCoreEvents          59
++#define DontSendCoreEvents      60
++/* End of merged section       */
++
+ #define ProximityState          (1L << 1)
+ #define InProximity             (0L << 1)
+ #define OutOfProximity          (1L << 1)
+@@ -263,12 +268,16 @@ SOFTWARE.
+ #define XI_DeviceBusy	3
+ #define XI_BadClass	4
+ 
+-/* Make XEventClass be a CARD32 for 64 bit servers.  Don't affect client
++/*
++ * Make XEventClass be a CARD32 for 64 bit servers.  Don't affect client
+  * definition of XEventClass since that would be a library interface change.
+  * See the top of X.h for more _XSERVER64 magic.
++ *
++ * But, don't actually use the CARD32 type.  We can't get it defined here
++ * without polluting the namespace.
+  */
+ #ifdef _XSERVER64
+-typedef	CARD32		XEventClass;
++typedef	unsigned int	XEventClass;
+ #else
+ typedef	unsigned long	XEventClass;
+ #endif
+Index: inputproto-1.4.3/XIproto.h
+===================================================================
+--- inputproto-1.4.3/XIproto.h.orig
++++ inputproto-1.4.3/XIproto.h
+@@ -1386,6 +1386,8 @@ typedef struct {
+      CARD32         button_threshold;
+ } xDeviceAbsCalibCtl;
+ 
++#define xDeviceTSCalibrationCtl xDeviceAbsCalibCtl
++
+ typedef struct {
+      CARD16         control B16;
+      CARD16         length B16;

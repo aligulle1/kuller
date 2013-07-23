@@ -1,0 +1,84 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>module-ipheth-driver</Name>
+        <Homepage>http://giagio.com/wiki/moin.cgi/iPhoneEthernetDriver</Homepage>
+        <Packager>
+            <Name>İnanç Yıldırgan</Name>
+            <Email>inancyildirgan@gmail.com</Email>
+        </Packager>
+        <License>as-is</License>
+        <Summary>iPhone ethernet driver kernel module and pairing program</Summary>
+        <Description>This is a Linux Kernel driver that adds support for iPhone tethering through USB cables. Unlike other solutions out there, you don't need to jailbreak your phone or install third-party proxy applications.</Description>
+        <Archive sha1sum="3fa2ec00c7752e697f8edb235f8c34ce6d7d5935" type="tarbz2">http://pardusarchives.googlecode.com/files/ipheth.tar.bz2</Archive>
+        <BuildDependencies>
+            <Dependency releaseFrom="3">libiphone</Dependency>
+            <Dependency release="130">kernel-module-headers</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <Patch>udevrules.patch</Patch>
+            <Patch>modprobe_conf.patch</Patch>
+            <Patch>makefile_pair.patch</Patch>
+            <Patch>makefile_driver.patch</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>module-ipheth-driver</Name>
+        <IsA>driver</IsA>
+        <Summary>Kernel module for iPhone ethernet driver</Summary>
+        <RuntimeDependencies>
+            <Dependency release="130">kernel</Dependency>
+            <Dependency>module-ipheth-driver-userspace</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="library" permanent="true">/lib/modules</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>module-ipheth-driver-userspace</Name>
+        <IsA>data</IsA>
+        <Summary>Modprobe rules for ipheth kernel driver</Summary>
+        <Files>
+            <Path fileType="data">/etc/modprobe.d</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>ipheth-pair</Name>
+        <IsA>app:console</IsA>
+        <PartOf>hardware.mobile</PartOf>
+        <Summary>iPhone pairing program</Summary>
+        <RuntimeDependencies>
+            <AnyDependency>
+                <Dependency>module-ipheth-driver</Dependency>
+                <Dependency>module-pae-ipheth-driver</Dependency>
+            </AnyDependency>
+            <Dependency releaseFrom="3">libiphone</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="executable">/usr/bin</Path>
+            <Path fileType="data">/lib/udev/rules.d</Path>
+        </Files>
+    </Package>
+
+    <History>
+        <Update release="2">
+            <Date>2009-01-13</Date>
+            <Version>1.0</Version>
+            <Comment>Depend on correct libiphone</Comment>
+            <Name>Onur Küçük</Name>
+            <Email>onur@pardus.org.tr</Email>
+        </Update>
+        <Update release="1">
+            <Date>2009-01-01</Date>
+            <Version>1.0</Version>
+            <Comment>First release.</Comment>
+            <Name>İnanç Yıldırgan</Name>
+            <Email>inancyildirgan@gmail.com</Email>
+        </Update>
+    </History>
+</PISI>
+

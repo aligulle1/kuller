@@ -1,0 +1,635 @@
+diff -Nuar b/migration4/COPYING a/migration4/COPYING
+--- b/migration4/COPYING	2009-07-17 18:26:08.454077724 +0300
++++ a/migration4/COPYING	2009-07-17 18:27:05.115076743 +0300
+@@ -108,14 +108,11 @@
+ 
+     c) If the modified program normally reads commands interactively
+     when run, you must cause it, when started running for such
+-    interactive use in the most ordinary way, to print or display an
+     announcement including an appropriate copyright notice and a
+     notice that there is no warranty (or else, saying that you provide
+     a warranty) and that users may redistribute the program under
+     these conditions, and telling the user how to view a copy of this
+     License.  (Exception: if the Program itself is interactive but
+-    does not normally print such an announcement, your work based on
+-    the Program is not required to print an announcement.)
+ 
+ These requirements apply to the modified work as a whole.  If
+ identifiable sections of that work are not derived from the Program,
+diff -Nuar b/migration4/setup.py a/migration4/setup.py
+--- b/migration4/setup.py	2009-07-17 18:26:08.446078354 +0300
++++ a/migration4/setup.py	2009-07-17 18:27:05.118077257 +0300
+@@ -54,13 +54,10 @@
+         # Clear all
+         os.system("rm -rf build")
+         # Copy codes
+-        print "Copying PYs..."
+         os.system("cp -R src build/")
+         # Copy compiled UIs and RCs
+-        print "Generating UIs..."
+         for filename in glob.glob1("src/migration/gui/ui", "*.ui"):
+             os.system("/usr/kde/4/bin/pykde4uic -o build/migration/gui/ui/%s.py src/migration/gui/ui/%s" % (filename.split(".")[0], filename))
+-        print "Generating RCs..."
+         for filename in glob.glob1("src/migration/gui/ui", "*.qrc"):
+             os.system("/usr/bin/pyrcc4 src/migration/gui/ui/%s -o build/%s_rc.py" % (filename, filename.split(".")[0]))
+ 
+@@ -76,20 +73,16 @@
+         autostart_dir = os.path.join(kde_dir, "share/autostart")
+         project_dir = os.path.join(kde_dir, "share/apps", about.appName)
+         # Make directories
+-        print "Making directories..."
+         makeDirs(bin_dir)
+         #makeDirs(locale_dir)
+         makeDirs(autostart_dir)
+         makeDirs(project_dir)
+         # Install desktop files
+-        print "Installing desktop files..."
+         for filename in glob.glob1("data", "*.desktop"):
+             shutil.copy("data/%s" % filename, autostart_dir)
+         # Install codes
+-        print "Installing codes..."
+         os.system("cp -R build/* %s/" % project_dir)
+         # Install locales
+-        print "Installing locales..."
+         for filename in glob.glob1("po", "*.po"):
+             lang = filename.rsplit(".", 1)[0]
+             os.system("msgfmt po/%s.po -o po/%s.mo" % (lang, lang))
+@@ -99,10 +92,8 @@
+                 pass
+             shutil.copy("po/%s.mo" % lang, os.path.join(locale_dir, "%s/LC_MESSAGES" % lang, "%s.mo" % about.catalog))
+         # Rename
+-        print "Renaming application.py..."
+         #shutil.move(os.path.join(project_dir, "application.py"), os.path.join(project_dir, "%s.py" % about.appName))
+         # Modes
+-        print "Changing file modes..."
+         os.chmod(os.path.join(project_dir, "%s.py" % about.appName), 0755)
+         # Symlink
+         try:
+diff -Nuar b/migration4/src/migration/gui/ScrOptions.py a/migration4/src/migration/gui/ScrOptions.py
+--- b/migration4/src/migration/gui/ScrOptions.py	2009-07-17 18:26:08.451078532 +0300
++++ a/migration4/src/migration/gui/ScrOptions.py	2009-07-17 18:27:05.122075903 +0300
+@@ -36,7 +36,6 @@
+ 
+         # Wallpaper:
+         if sources.has_key("Wallpaper Path"):
+-            print "Wallpaper Path"
+             self.wallpaperGroup = QtGui.QButtonGroup(self)
+             self.wallpaperLayout = QtGui.QHBoxLayout(self.wallpaperGroup)
+             self.box.addWidget(self.wallpaperGroup)
+@@ -87,7 +86,6 @@
+ 
+         # Bookmarks:
+         if sources.has_key("Firefox Profile Path") or sources.has_key("Favorites Path"):
+-            print "Firefox Profile Path"
+ 
+             self.bookmarks = QtGui.QGroupBox("Bookmarks", self)
+             self.bookmarks.setTitle(i18n("Bookmarks"))
+@@ -98,7 +96,6 @@
+ 
+             # FF Bookmarks:
+             if sources.has_key("Firefox Profile Path"):
+-                print "Firefox Profile Path"
+ 
+                 self.fireFoxBookmarks = QtGui.QCheckBox(self.bookmarks)
+                 self.fireFoxBookmarks.setObjectName("FFBookmarks")
+@@ -109,7 +106,6 @@
+ 
+             # Opera Bookmarks:
+             if sources.has_key("Opera Profile Path"):
+-                print "Opera Profile Path"
+ 
+                 self.operaBookmarks = QCheckBox(self.bookmarks)
+                 self.operaBookmarks.setObjectName("OperaBookmarks")
+@@ -120,7 +116,6 @@
+ 
+             # IE Bookmarks:
+             if sources.has_key("Favorites Path"):
+-                print "Internet Explorer favorites"
+ 
+                 self.IEBookmarks = QtGui.QCheckBox(self.bookmarks)
+                 self.IEBookmarks.setObjectName("IEBookmarks")
+@@ -132,7 +127,6 @@
+ 
+         # Mail Accounts:
+         if sources.has_key("Windows Mail Path") or sources.has_key("Thunderbird Profile Path"):
+-            print "Mail Accounts"
+ 
+             self.mailAccounts = QtGui.QGroupBox("MailAccounts", self)
+             self.mailAccounts.setTitle(i18n("E-Mail and News Accounts"))
+@@ -142,7 +136,6 @@
+ 
+             # Windows Mail Accounts:
+             if sources.has_key("Windows Mail Path"):
+-                print "Windows Mail Path"
+ 
+                 self.winMail = QtGui.QCheckBox(self.mailAccounts)
+                 self.winMail.setObjectName("WinMail")
+@@ -153,7 +146,6 @@
+ 
+             # Thunderbird Accounts:
+             if sources.has_key("Thunderbird Profile Path"):
+-                print "Thunderbird Profile Path"
+ 
+                 self.TB = QtGui.QCheckBox(self.mailAccounts)
+                 self.TB.setObjectName("TB")
+@@ -173,7 +165,6 @@
+ 
+         # IM Accounts:
+         if sources.has_key("Contacts Path") or sources.has_key("GTalk Key"):
+-            print "IMAccounts"
+ 
+             self.IMAccounts = QtGui.QGroupBox("IMAccounts", self)
+             self.IMAccounts.setTitle(i18n("Instant Messenger Accounts"))
+@@ -183,7 +174,6 @@
+ 
+             # MSN Accounts:
+             if sources.has_key("Contacts Path"):
+-                print "MSN Accounts"
+ 
+                 self.MSN = QtGui.QCheckBox(self.IMAccounts)
+                 self.MSN.setObjectName("MSN")
+@@ -194,7 +184,6 @@
+ 
+             # GTalk Accounts:
+             if sources.has_key("GTalk Key"):
+-                print "GTalk"
+ 
+                 self.GTalk = QtGui.QCheckBox(self.IMAccounts)
+                 self.GTalk.setObjectName("GTalk")
+@@ -233,8 +222,6 @@
+         return options
+ 
+     def shown(self):
+-        print "ScrOptions.shown() çağrldı..."
+-        print "ctx.sources:%s" % ctx.sources
+         if ctx.sources:
+             self.creator(ctx.sources)
+ 
+diff -Nuar b/migration4/src/migration/gui/ScrProgress.py a/migration4/src/migration/gui/ScrProgress.py
+--- b/migration4/src/migration/gui/ScrProgress.py	2009-07-17 18:26:08.450076930 +0300
++++ a/migration4/src/migration/gui/ScrProgress.py	2009-07-17 18:27:05.127075872 +0300
+@@ -244,7 +244,6 @@
+             self.progresspage.addOperation(i18n("Wallpaper"), size)
+             self.progresspage.makeProgress(3)
+ 
+-        print "Wallpaper:makeProgress eklendi!"
+ 
+         # Firefox:
+         if ctx.options.has_key("Firefox Profile Path"):
+@@ -256,7 +255,6 @@
+                 logging.info(i18n("Firefox bookmarks loaded."))
+             self.progresspage.makeProgress(10)
+ 
+-        print "Firefox:makeProgress eklendi!"
+ 
+         # Opera:
+         if ctx.options.has_key("Opera Profile Path"):
+@@ -268,7 +266,6 @@
+                 logging.info(i18n("Opera bookmarks loaded."))
+             self.progresspage.makeProgress(10)
+ 
+-        print "Opera:makeProgress eklendi!"
+ 
+         # Internet Explorer:
+         if ctx.options.has_key("Favorites Path"):
+@@ -281,21 +278,16 @@
+             self.progresspage.makeProgress(10)
+ 
+ 
+-        print "IE:makeProgress eklendi!"
+ 
+         # Bookmarks:
+         size = bookmark.size()
+-        print "bookmark.size():%d" % size
+         if size > 0:
+             lockfile = os.path.join(ctx.destinations["Firefox Profile Path"], "lock")
+             while os.path.lexists(lockfile):
+-                print "warning giriliyor..."
+                 if warning(self.progresspage, i18n("Firefox is open. Please close it first to continue...")) == QtGui.QMessageBox.Cancel:
+-                    #print "burayı geçti mi?"
+                     break
+             self.progresspage.addOperation(i18n("Bookmarks"), size)
+ 
+-        print "Bookmark:makeProgress eklendi!"
+ 
+         # Windows Mail:
+         if ctx.options.has_key("Windows Mail Path"):
+@@ -308,7 +300,6 @@
+ 
+             self.progresspage.makeProgress(15)
+ 
+-        print "WindowsMail:makeProgress eklendi!"
+ 
+         # Thunderbird:
+         if ctx.options.has_key("Thunderbird Profile Path"):
+@@ -320,7 +311,6 @@
+                 logging.info(i18n("Thunderbird accounts loaded."))
+             self.progresspage.makeProgress(15)
+ 
+-        print "Thunderbird:makeProgress eklendi!"
+ 
+         # MSN Messenger Accounts:
+         if ctx.options.has_key("Contacts Path"):
+@@ -332,7 +322,6 @@
+                 logging.info(i18n("MSN accounts loaded."))
+             self.progresspage.makeProgress(5)
+ 
+-        print "MSN:makeProgress eklendi!"
+ 
+         # GTalk Accounts:
+         if ctx.options.has_key("GTalk Key"):
+@@ -344,7 +333,6 @@
+                 logging.info(i18n("GTalk accounts loaded."))
+             self.progresspage.makeProgress(5)
+ 
+-        print "GTalk:makeProgress eklendi!"
+ 
+         # Mail Accounts:
+         size = account.accountSize(["POP3", "IMAP", "SMTP"])
+@@ -352,7 +340,6 @@
+             # TODO: Control KMail to be closed
+             self.progresspage.addOperation(i18n("E-Mail Accounts"), size)
+ 
+-        print "Mail Accounts:makeProgress eklendi!"
+ 
+         # E-Mails:
+         if ctx.options.has_key("Copy E-Mails"):
+@@ -360,7 +347,6 @@
+             if size > 0:
+                 self.progresspage.addOperation(i18n("E-Mail Messages"), size)
+ 
+-        print "E-mails:makeProgress eklendi!"
+ 
+         # News Accounts:
+         size = account.accountSize(["NNTP"])
+@@ -368,7 +354,6 @@
+             # TODO: Control KNode to be closed
+             self.progresspage.addOperation(i18n("News Accounts"), size)
+ 
+-        print "New Accounts:makeProgress eklendi!"
+ 
+         # IM Accounts:
+         size = account.accountSize(["Jabber", "MSN"])
+@@ -376,12 +361,9 @@
+             # TODO: Control Kopete to be closed
+             self.progresspage.addOperation(i18n("Instant Messenger Accounts"), size)
+ 
+-        print "IM Accounts:makeProgress eklendi!"
+ 
+         # Files:
+-        #print "ctx.fileOptions:%s" % ctx.fileOptions
+         #for k,v in ctx.fileOptions.items():
+-        #     print "ctx.fileOptions[%s]=%s" %(k,v)
+         #ctx.options.update(ctx.filesOptions)
+         if ctx.filesOptions:
+             if ctx.filesOptions.has_key("links"):
+@@ -424,20 +406,17 @@
+             else:
+                 self.progresspage.go(i18n("Wallpaper changed."), ctx.OK, size)
+ 
+-        print "Wallpaper: apply!"
+ 
+         # Bookmarks:
+         size = bookmark.size()
+         if size > 0:
+             try:
+-                print "ctx.destinations[\"Firefox Profile Path\"]:%s" % ctx.destinations["Firefox Profile Path"]
+                 bookmark.setFFBookmarks(ctx.destinations["Firefox Profile Path"])
+             except Exception, err:
+                 self.progresspage.go(err, ctx.ERROR, size)
+             else:
+                 self.progresspage.go(i18n("Bookmarks saved."), ctx.OK, size)
+ 
+-        print "BookMark: apply!"
+ 
+         # Mail Accounts:
+         size = account.accountSize(["POP3", "IMAP", "SMTP"])
+@@ -449,7 +428,6 @@
+             else:
+                 self.progresspage.go(i18n("Mail Accounts saved."), ctx.OK, size)
+ 
+-        print "Mail: apply!"
+         # E-Mails:
+         if ctx.options.has_key("Copy E-Mails"):
+             size = account.mailSize()
+@@ -461,7 +439,6 @@
+                 else:
+                     self.progresspage.go(i18n("Accounts saved."), ctx.OK, 0)
+ 
+-        print "E-mails: apply!"
+         # News Accounts:
+         size = account.accountSize(["NNTP"])
+         if size > 0:
+@@ -472,7 +449,6 @@
+             else:
+                 self.progresspage.go(i18n("News Accounts saved."), ctx.OK, size)
+ 
+-        print "News: apply!"
+         # IM Accounts:
+         size = account.accountSize(["Jabber", "MSN"])
+         if size > 0:
+@@ -483,7 +459,6 @@
+             else:
+                 self.progresspage.go(i18n("Instant Messenger Accounts saved."), ctx.OK, size)
+ 
+-        print "IM: apply!"
+         # Links:
+         if ctx.filesOptions:
+             if ctx.filesOptions.has_key("links"):
+@@ -492,7 +467,6 @@
+                     files.createLink(link)
+                     self.progresspage.go(unicode(i18n("Link '%s' created.")) % link["localname"], ctx.OK, 1000)
+ 
+-            print "LINKS: apply!"
+             # Folders:
+             if ctx.filesOptions.has_key("folders"):
+                 folders = ctx.filesOptions["folders"]
+@@ -500,7 +474,6 @@
+                     foldername = os.path.join(ctx.filesOptions["copy destination"], folder["localname"])
+                     files.copyFolder(folder, ctx.filesOptions["copy destination"], self.progresspage)
+ 
+-        print "Folders: apply!"
+         # The end:
+         if self.progresspage.progressbar2.value() == 0:
+             self.progresspage.label.setText(unicode(i18n("Nothing done, because no option selected. You can close the wizard...")))
+diff -Nuar b/migration4/src/migration/gui/ScrUserFiles.py a/migration4/src/migration/gui/ScrUserFiles.py
+--- b/migration4/src/migration/gui/ScrUserFiles.py	2009-07-17 18:26:08.448082946 +0300
++++ a/migration4/src/migration/gui/ScrUserFiles.py	2009-07-17 18:27:05.132075847 +0300
+@@ -82,7 +82,6 @@
+         if os.path.isdir(self.path):
+             filelist = os.listdir(self.path)
+             for thefile in filelist:
+-                print "file:%s" % thefile
+                 if thefile in files.ignoreList:
+                     continue
+                 realname = os.path.join(self.path, thefile)
+@@ -146,7 +145,6 @@
+         QtGui.QWidget.__init__(self,None)
+         self.ui = Ui_userFilesWidget()
+         self.ui.setupUi(self)
+-        print "os.getenv(\"HOME\"):%s" % os.getenv("HOME")
+         self.ui.destination.setText(os.getenv("HOME"))
+         self.connect(self.ui.copy, SIGNAL("toggled(bool)"), self.slotRadiosClicked)
+         self.connect(self.ui.nothing, SIGNAL("toggled(bool checked)"), self.slotRadiosClicked)
+diff -Nuar b/migration4/src/migration/gui/ScrUser.py a/migration4/src/migration/gui/ScrUser.py
+--- b/migration4/src/migration/gui/ScrUser.py	2009-07-17 18:26:08.447078663 +0300
++++ a/migration4/src/migration/gui/ScrUser.py	2009-07-17 18:27:05.134077266 +0300
+@@ -43,7 +43,6 @@
+         self.connect(self.checkState, SIGNAL("stateChanged(int)"), self.slotUserCheck)
+ 
+     def slotUserCheck(self):
+-        print "ctx.user=%s" % self.getData()[2]
+         ctx.user = self.getData()
+ 
+     def setData(self, data):
+@@ -78,7 +77,6 @@
+     def addUsers(self):
+         "Searches old users and adds them to UserListViewWidget"
+         self.users = partition.allUsers()
+-        print "len(users)=%d" % len(self.users)
+         for user in self.users:
+             part, parttype, username, userdir = user
+             if parttype == "Windows XP":
+diff -Nuar b/migration4/src/migration/utils/account.py a/migration4/src/migration/utils/account.py
+--- b/migration4/src/migration/utils/account.py	2009-07-17 18:26:08.452077708 +0300
++++ a/migration4/src/migration/utils/account.py	2009-07-17 18:27:05.146075870 +0300
+@@ -267,7 +267,6 @@
+                 generalGroup = config.group("General")
+                 defaultAccount = generalGroup.readEntry("default-transport")
+                 if defaultAccount:
+-                    print "defaultSMTPAccount:%s" % defaultAccount
+                     groupname = QString("Transport ").append(defaultAccount)
+                     transportGroup = config.group(groupname)
+                     accountGroups.append(transportGroup)
+@@ -278,12 +277,9 @@
+                     if each.contains("Account") and not each.endsWith("Wizard"):
+                         account = config.group(each)
+                         accountGroups.append(account)
+-            print "accountGroups:%s" % accountGroups
+             return accountGroups
+ 
+         for account in self.accounts:
+-            print "account type:%s ve host:%s" % (account["type"], account["host"])
+-            print "account keys%s" % account.keys()
+             # Add POP3 Account:
+             if account["type"] == "POP3":
+                 validAccount = None
+@@ -292,7 +288,6 @@
+                         if not isKMailAccountValid(accountGroup, account):
+                             continue
+ 
+-                    print "Popa girdir...."
+ 
+                 config = KConfig("kmailrc")
+                 configGroup = KConfigGroup(config, "Account")
+@@ -336,14 +331,11 @@
+ 
+             # Add IMAP Account:
+             elif account["type"] == "IMAP":
+-                print "imap de.."
+                 if getResourceConfigGroup(account):
+                     for accountGroup in getResourceConfigGroup(account):
+-                        print "iskmailAccount girilecek"
+                         if not isKMailAccountValid(accountGroup, account):
+                             continue
+ 
+-                        print "IMAP girddiii"
+ 
+                 config = KConfig("kmailrc")
+                 configGroup = KConfigGroup(config, "Account")
+@@ -373,7 +365,6 @@
+                 if not isKMailAccountValid(accountGroup, account):
+                     return
+ 
+-                print "SMTP girdi...."
+                 config = KConfig("mailtransports")
+                 configGroup = KConfigGroup(config, "Transport")
+ 
+@@ -475,12 +466,9 @@
+     def write(self):
+         "Prints accounts"
+ #        for account in self.accounts:
+-#            print account["type"]
+ #            for key in account.keys():
+ #                if key not in ["type", "folders"]:
+-#                    print "%15s : %s" % (key, account[key])
+ #        for folder in self.folders:
+-#            print "%30s : %s" % folder
+ 
+     def accountSize(self, accounttypes=None):
+         "Size of accounts"
+@@ -581,46 +569,31 @@
+ 
+ def isKMailAccountValid(group, account):
+     "Check if the account is valid and not already in KMail accounts"
+-    print "group%s" % group
+-    print "account[\"type\"]:%s" % account["type"]
+-    print "YESSS"
+     if group :
+-        print "isKMailAccountValid:True dondu"
+         return True
+ 
+     if (not account.has_key("type")) or (not account.has_key("host")) or (not account.has_key("user")):
+-        print "isKMailAccountValid:False dondu"
+         return False
+ 
+     # Check all accounts
+     if account["type"] == "SMTP":
+         host = group.readEntry("host")
+-        print "smptp.host%s" % host
+         user = group.readEntry("user")
+-        print "smtp.user:%s" % user
+         if account["host"] == host and account["user"] == user:
+-            print "isKMailAccountValid: SMTPFalse dondu"
+             return False
+     elif account["type"] == "POP3":
+         type = group.readEntry("Type")
+         host = group.readEntry("host")
+-        print "pop.host:%s" % host
+         user = group.readEntry("login")
+-        print "pop.user:%s" % user
+         if "Pop" == type and account["host"] == host and account[login] == user:
+-            print "isKMailAccountValid: POP3 False dondu"
+             return False
+     elif account["type"] == "IMAP":
+         type = group.readEntry("Type")
+         host = group.readEntry("host")
+-        print "imap.host:%s" % host
+         user = group.readEntry("login")
+-        print "imap.user:%s" % user
+         if ("Imap" == type or "DImap" == type) and account["host"] == host and account["login"] == user:
+-            print "isKMailAccountValid: IMAP False dondu"
+             return False
+ 
+-    print "isKMailAccountValid:True dondu"
+     return True
+ 
+ def getOutlookExpressFolders(path, relative=""):
+diff -Nuar b/migration4/src/migration/utils/bookmark.py a/migration4/src/migration/utils/bookmark.py
+--- b/migration4/src/migration/utils/bookmark.py	2009-07-17 18:26:08.453077485 +0300
++++ a/migration4/src/migration/utils/bookmark.py	2009-07-17 18:27:05.150075975 +0300
+@@ -38,7 +38,6 @@
+         else:
+             mainnode.appendChild(headernode)
+ 
+-        print "Document:%s" % self.document.toxml()
+ 
+     def getOperaBookmarks(self, path):
+         "Gets Opera Bookmarks from a opera6.adr file"
+@@ -131,7 +130,6 @@
+     def setFFBookmarks(self, path):
+         """Adds bookmarks to firefox"""
+ 
+-        print "setFFBookmarks.path:%s" % path
+         if os.path.lexists(os.path.join(path, "lock")):
+             raise Exception, "Firefox is in use. Bookmarks could not be saved."
+ 
+@@ -187,7 +185,6 @@
+ 
+     def setFF3Bookmarks(self, databasepath):
+         "Adds bookmarks to firefox using places.sqlite database"
+-        print "Firefox3 üzerinde işlem yapılıyor...."
+         def getText(nodelist):
+             rc = ""
+             for node in nodelist:
+@@ -196,13 +193,10 @@
+             return rc
+ 
+         def handleNode(node, cursor, parentid, position):
+-            print "!!!!handleNode!!!!!"
+-            print "node.tagName:%s" % node.tagName
+             if node.tagName == "bookmarks":
+                 # Handle children:
+                 children = node.childNodes
+                 for child in children:
+-                    print "position:%d" % position
+                     handleNode(child, cursor, parentid, position)
+                     position += 1
+             elif node.tagName == "group":
+@@ -210,58 +204,38 @@
+                 header = node.getElementsByTagName("header")[0]
+                 title = getText(header.childNodes)
+                 # Add group:
+-                print "parentid1:%d" % parentid
+-                print "position:%s" % position
+-                print "title:%s" % title
+-                print "(parentid:%s, position:%s, title:%s)" % (parentid, position, title)
+                 cursor.execute("INSERT INTO moz_bookmarks ('type', 'parent', 'position', 'title') VALUES (2, ?, ?, ?)", (parentid, position, title))
+                 parentid = cursor.lastrowid
+-                #print "parentid2:%d" % parentid
+                 if not parentid:    # Hack for lastrowid error
+                     result = cursor.execute("SELECT max(id) FROM moz_bookmarks")
+                     parentid = result.fetchone()[0]
+-                    print "parentid3:%d" % parentid
+-                print "parentid3 basılmadı...."
+                 # Handle children:
+                 children = node.childNodes
+                 position = 0
+                 for child in children:
+                     handleNode(child, cursor, parentid, position)
+-                    print "position:%d" % position
+                     position += 1
+             elif node.tagName == "bookmark":
+                 # Get title and url:
+                 namenode = node.getElementsByTagName("name")[0]
+-                #print "namenode:%s" % namenode
+ 
+                 urlnode = node.getElementsByTagName("url")[0]
+-                #print "urlnode:%s" % urlnode
+                 title = getText(namenode.childNodes)
+-                print "bookmark title%s" % title
+                 url = getText(urlnode.childNodes)
+-                print "bookmark url:%s" % url
+                 # Add bookmark:
+                 result = cursor.execute("SELECT id FROM moz_places WHERE url=?", (url,)).fetchone()
+                 if result:
+                     fk = result[0]
+-                    print "select ile fk = result[0]:%s" % fk
+                 else:
+-                    print "INSERT INTO moz_places ('%s','%s')" % (url, title)
+                     result = cursor.execute("INSERT INTO moz_places ('url','title') VALUES (?, ?)", (url, title))
+                     if result:
+                         fk = cursor.lastrowid
+                         if not fk:    # Hack for lastrowid error
+                             result = cursor.execute("SELECT max(id) FROM moz_places")
+                             fk = result.fetchone()[0]
+-                        print "insert ile fk = result[0]:%s" % fk
+                     #else:
+-                    #    print "result false düştü..."
+-                    #print "fk = cursor.lastrowid:%s" % fk
+-                #print "INSERT INTO moz_bookmarks ('type', 'fk', 'parent', 'position', 'title') VALUES oldugu yerde...."
+-                #print "(fk :%s, parentid:%s, position:%s, title:%s)" % (fk, parentid, position, title)
+ 
+                 cursor.execute("INSERT INTO moz_bookmarks ('type', 'fk', 'parent', 'position', 'title') VALUES (1, ?, ?, ?, ?)", (fk, parentid, position, title))
+-                #print "buraya gelindi ve eklenmiş olması grekkkk..."
+ 
+         # Connect to database:
+         conn = sqlite.connect(databasepath, 5.0)
+@@ -274,7 +248,6 @@
+             newpos = maxpos+1
+         else:
+             newpos = 0
+-        print "maxpos:%d" % maxpos
+ 
+         # Hande bookmarks:
+         data = handleNode(self.document.documentElement, cursor, 2, newpos)
+diff -Nuar b/migration4/src/migration.py a/migration4/src/migration.py
+--- b/migration4/src/migration.py	2009-07-17 18:26:08.447078663 +0300
++++ a/migration4/src/migration.py	2009-07-17 18:27:05.137075936 +0300
+@@ -185,8 +185,6 @@
+             self.ui.mainStack.setCurrentIndex(id)
+             _widget = self.ui.mainStack.currentWidget()
+             _widget.update()
+-            print "_widget.shown() çağrılacak..."
+-            print "_widget.title:%s" % _widget.title
+             _widget.shown()
+ 
+         if self.ui.mainStack.currentIndex() == len(self.screens) - 1 :
+diff -Nuar b/migration4/src/migration-user.py a/migration4/src/migration-user.py
+--- b/migration4/src/migration-user.py	2009-07-17 18:26:08.446078354 +0300
++++ a/migration4/src/migration-user.py	2009-07-17 18:27:05.139077131 +0300
+@@ -14,4 +14,3 @@
+ from migration.utils import partition
+ 
+ users = partition.allUsers()
+-print len(users)

@@ -1,0 +1,192 @@
+Index: kdm/config.def
+===================================================================
+--- kdm/config.def.orig
++++ kdm/config.def
+@@ -930,7 +930,7 @@ Description:
+ 
+ Key: ExportList
+ Type: list
+-Default: ""
++Default: "LC_ALL,XCURSOR_THEME"
+ User: core
+ Instance: #"LD_LIBRARY_PATH,ANOTHER_IMPORTANT_VAR"
+ Merge: xdm(P_List)
+@@ -1244,7 +1244,7 @@ Type: enum
+  None/BO_NONE: no boot manager
+  Grub/BO_GRUB: Grub boot manager
+  Lilo/BO_LILO: Lilo boot manager (Linux on i386 &amp; x86-64 only)
+-Default: None
++Default: Grub
+ User: core
+ User: greeter
+ Instance: #Grub
+@@ -1448,7 +1448,7 @@ Description:
+ 
+ Key: TerminateServer
+ Type: bool
+-Default: false
++Default: true
+ User: core
+ Instance: #:*/!
+ Merge: xdm
+@@ -1549,7 +1549,7 @@ Description:
+ Key: Resources
+ # XXX strictly speaking this is supposed to be a string list, i think.
+ Type: string
+-Default: ""
++Default: "/etc/X11/xdm/Xresources"
+ User: core
+ Instance: #*/""
+ Update: cp_resources
+@@ -1581,7 +1581,7 @@ Description:
+ 
+ Key: Setup
+ Type: string
+-Default: ""
++Default: *KDMCONF "/Xsetup"
+ User: core
+ # will be overwritten
+ Instance: #*/""
+@@ -1602,7 +1602,7 @@ Description:
+ 
+ Key: Startup
+ Type: string
+-Default: ""
++Default: *KDMCONF "/Xstartup"
+ User: core
+ # will be overwritten
+ Instance: #*/""
+@@ -1620,7 +1620,7 @@ Description:
+ 
+ Key: Reset
+ Type: string
+-Default: ""
++Default: *KDMCONF "/Xreset"
+ User: core
+ # will be overwritten
+ Instance: #*/""
+@@ -1638,7 +1638,7 @@ Description:
+ 
+ Key: Session
+ Type: string
+-Default: XBINDIR "/xterm -ls -T"
++Default: "/usr/lib/X11/xinit/Xsession"
+ #Merge: xdm - incompatible!
+ User: core
+ # will be overwritten
+@@ -1921,7 +1921,7 @@ Description:
+ 
+ Key: SessionsDirs
+ Type: list
+-Default: KDMDATA "/sessions"
++Default: "/usr/share/xsessions"
+ User: core
+ User: greeter-c
+ Instance: #*/"/etc/X11/sessions,/usr/share/xsessions"
+@@ -2096,7 +2096,7 @@ Description:
+ # This needs to come _in front_ of the font settings to be effective!
+ Key: AntiAliasing
+ Type: bool
+-Default: false
++Default: true
+ User: greeter
+ Instance: #*/!
+ Comment: &
+@@ -2105,30 +2105,30 @@ Description:
+ 
+ Key: GreetFont
+ Type: string
+-Default: "Serif,20,5,0,50,0"
+-CDefault: "Serif,20,bold"
++Default: "DejaVu Sans,20,5,0,50,0"
++CDefault: "DejaVu Sans,20,bold"
+ User: greeter:font
+-Instance: #*/"Serif,20,5,0,50,0"
++Instance: #*/"DejaVu Sans,20,5,0,50,0"
+ Comment: &
+ Description:
+  The font for the greeter headline.
+ 
+ Key: StdFont
+ Type: string
+-Default: "Sans Serif,10,5,0,50,0"
+-CDefault: "Sans Serif,10"
++Default: "DejaVu Sans,10,5,0,50,0"
++CDefault: "DejaVu Sans,10"
+ User: greeter(normalFont):font
+-Instance: #*/"Sans Serif,10,5,0,50,0"
++Instance: #*/"DejaVu Sans,10,5,0,50,0"
+ Comment: &
+ Description:
+  The normal font used in the greeter.
+ 
+ Key: FailFont
+ Type: string
+-Default: "Sans Serif,10,5,0,75,0"
+-CDefault: "Sans Serif,10,bold"
++Default: "DejaVu Sans,10,5,0,75,0"
++CDefault: "DejaVu Sans,10,bold"
+ User: greeter:font
+-Instance: #*/"Sans Serif,10,5,0,75,0"
++Instance: #*/"DejaVu Sans,10,5,0,75,0"
+ Comment: &
+ Description:
+  The font used for the <quote>Login Failed</quote> message.
+@@ -2147,9 +2147,9 @@ Description:
+ 
+ Key: Language
+ Type: string
+-Default: "en_US"
++Default: ""
+ User: greeter-c
+-Instance: #*/"de_DE"
++Instance: #*/"tr"
+ Update: upd_language
+ Comment: &
+ Description:
+@@ -2268,9 +2268,9 @@ Type: enum
+  PreferAdmin/FACE_PREFER_ADMIN: prefer &lt;<option>FaceDir</option>&gt;, fallback on $<envar>HOME</envar>
+  PreferUser/FACE_PREFER_USER: ... and the other way round
+  UserOnly/FACE_USER_ONLY: from the user's <filename>$<envar>HOME</envar>/.face[.icon]</filename>
+-Default: AdminOnly
++Default: PreferUser
+ User: greeter
+-Instance: #*/PreferUser
++Instance: */PreferUser
+ Comment:
+  Specify, where the users' pictures should be taken from.
+ Description:
+@@ -2597,7 +2597,7 @@ Description:
+ 
+ Key: UseTheme
+ Type: bool
+-Default: false
++Default: true
+ User: greeter
+ Instance: #*/true
+ Comment: &
+@@ -2606,9 +2606,9 @@ Description:
+ 
+ Key: Theme
+ Type: string
+-Default: ""
++Default: "pardus"
+ User: greeter
+-Instance: */KDMDATA "/themes/circles"
++Instance: */KDMDATA "/themes/pardus"
+ Comment: &
+ Description:
+  The theme to use for the greeter. Can point to either a directory or an XML
+Index: kdm/kfrontend/genkdmconf.c
+===================================================================
+--- kdm/kfrontend/genkdmconf.c.orig
++++ kdm/kfrontend/genkdmconf.c
+@@ -721,7 +721,7 @@ static const char def_background[] =
+ "Program=\n"
+ "ReverseBlending=false\n"
+ "UseSHM=false\n"
+-"Wallpaper=default_blue.jpg\n"
++"Wallpaper=/usr/kde/3.5/share/apps/kdm/themes/pardus/background.jpg\n"
+ "WallpaperList=\n"
+ "WallpaperMode=Scaled\n";
+ 

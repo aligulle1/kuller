@@ -1,0 +1,1590 @@
+diff --git a/fdi/fdi.dtd b/fdi/fdi.dtd
+index 3658ea9..7682805 100644
+--- a/fdi/fdi.dtd
++++ b/fdi/fdi.dtd
+@@ -65,7 +65,7 @@
+ <!ELEMENT remove (#PCDATA) >
+ <!ATTLIST remove
+     key    CDATA #REQUIRED
+-    type   (strlist) #REQUIRED
++    type   (strlist) #IMPLIED
+ >
+ 
+ <!ELEMENT spawn (#PCDATA) >
+diff --git a/fdi/information/10freedesktop/10-laptop-panel-hardware.fdi b/fdi/information/10freedesktop/10-laptop-panel-hardware.fdi
+index 38ed284..9dbf8f2 100644
+--- a/fdi/information/10freedesktop/10-laptop-panel-hardware.fdi
++++ b/fdi/information/10freedesktop/10-laptop-panel-hardware.fdi
+@@ -1,29 +1,27 @@
+ <?xml version="1.0" encoding="ISO-8859-1"?> <!-- -*- SGML -*- --> 
+ <deviceinfo version="0.2">
+-  <!-- On some broken laptops, the brightness control is all done in hardware
+-       but the hardware also synthesizes keypresses when the brightness is
+-       changed. This gives power manager software problems as the brightness
+-       can get into a feedback state so the panel flashes uncontrollably.
+-       This is a hardware "feature" seen on some IBM and Lenovo laptops. -->
++  <!-- Some laptops have software controllable backlights and will provide
++       notifications on keypresses, but will also change the brightness
++       directly in firmware. If software changes the value in response to
++       a press, there's a risk that a further event will be generated and
++       a feedback loop occur. brightness_in_hardware indicates to clients
++       that they should not act in response to keypress notifications. -->
+   <device>
+     <match key="info.category" string="laptop_panel">
+-      <match key="/org/freedesktop/Hal/devices/computer:system.hardware.vendor" string="TOSHIBA">
+-        <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" string="SATELLITE M100">
++      <!-- For Asus EeePC -->
++      <match key="/org/freedesktop/Hal/devices/computer:system.hardware.vendor"
++          string="ASUSTeK Computer INC.">
++        <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" string="701">
+           <merge key="laptop_panel.brightness_in_hardware" type="bool">true</merge>
+         </match>
+       </match>
+-      <match key="/org/freedesktop/Hal/devices/computer:system.hardware.vendor" string="IBM">
+-        <match key="/org/freedesktop/Hal/devices/computer:system.hardware.version" contains="ThinkPad">
++      <match key="/org/freedesktop/Hal/devices/computer:system.hardware.vendor" string="TOSHIBA">
++        <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" string="SATELLITE M100">
+           <merge key="laptop_panel.brightness_in_hardware" type="bool">true</merge>
+         </match>
+       </match>
+-      <match key="/org/freedesktop/Hal/devices/computer:system.hardware.vendor" string="LENOVO">
+-        <match key="/org/freedesktop/Hal/devices/computer:system.hardware.version" contains="ThinkPad">
+-          <merge key="laptop_panel.brightness_in_hardware" type="bool">true</merge>
+-        </match>
+-        <match key="/org/freedesktop/Hal/devices/computer:system.hardware.version" string="3000 N100">
+-          <merge key="laptop_panel.brightness_in_hardware" type="bool">true</merge>
+-        </match>
++      <match key="linux.sysfs_path" string="/sys/class/backlight/thinkpad_screen">
++        <merge key="laptop_panel.brightness_in_hardware" type="bool">true</merge>
+       </match>
+     </match>
+   </device>
+diff --git a/fdi/information/10freedesktop/10-modem.fdi b/fdi/information/10freedesktop/10-modem.fdi
+index b5b6200..0caa8c1 100644
+--- a/fdi/information/10freedesktop/10-modem.fdi
++++ b/fdi/information/10freedesktop/10-modem.fdi
+@@ -4,6 +4,20 @@
+   <device>
+     <match key="info.category" string="serial">
+ 
++      <!-- Vendor: HP -->
++      <match key="@info.parent:usb.vendor_id" int="0x03f0">
++        <!-- HP HS2300 (Sierra Wireless MC8775) -->
++        <match key="@info.parent:usb.product_id" int="0x1e1d">
++          <match key="@info.parent:usb.interface.number" int="0">
++            <match key="serial.port" int="0">
++              <append key="info.capabilities" type="strlist">modem</append>
++              <append key="modem.command_sets" type="strlist">GSM-07.07</append>
++              <append key="modem.command_sets" type="strlist">GSM-07.05</append>
++            </match>
++          </match>
++        </match>
++      </match>
++
+       <!-- Option -->
+       <match key="@info.parent:usb.vendor_id" int="0x0af0">
+         <!-- Colt,Ricola,Ricola Light,Ricola Quad,Ricola Quad Light,Ricola Ndis,Ricola Ndis Light;Ricola Ndis Quad,Ricola Ndis Quad Light, 
+@@ -42,9 +56,8 @@
+         </match>
+       </match>
+ 
+-      <!-- Vendor: HP -->
++      <!-- Sierra Wireless MC5720 -->
+       <match key="@info.parent:usb.vendor_id" int="0x0f30">
+-        <!-- Sierra Wireless MC5720 -->
+         <match key="@info.parent:usb.product_id" int="0x1b1d">
+           <match key="@info.parent:usb.interface.number" int="0">
+             <match key="serial.port" int="0">
+@@ -53,16 +66,6 @@
+             </match>
+           </match>
+         </match>
+-        <!-- HP HS2300 (Sierra Wireless MC8775) -->
+-        <match key="@info.parent:usb.product_id" int="0x1e1d">
+-          <match key="@info.parent:usb.interface.number" int="0">
+-            <match key="serial.port" int="0">
+-              <append key="info.capabilities" type="strlist">modem</append>
+-              <append key="modem.command_sets" type="strlist">GSM-07.07</append>
+-              <append key="modem.command_sets" type="strlist">GSM-07.05</append>
+-            </match>
+-          </match>
+-        </match>
+       </match>
+ 
+       <!-- Airprime/Sierra PC 5220 -->
+@@ -77,8 +80,8 @@
+ 
+       <!-- Sierra Wireless -->
+       <match key="@info.parent:usb.vendor_id" int="0x1199">
+-        <!-- EM5625,2x MC5720,2x MC5725,AirCard 595,AirCard 597E,USB Dongle 595U,AirCard 580 -->
+-        <match key="@info.parent:usb.product_id" int_outof="0x0017;0x0018;0x0218;0x0020;0x0220;0x0019;0x0021;0x0120;0x0112">
++        <!-- EM5625,2x MC5720,2x MC5725,AirCard 595,AirCard 597E,USB Dongle 595U,AirCard 580, Compass 597 -->
++        <match key="@info.parent:usb.product_id" int_outof="0x0017;0x0018;0x0218;0x0020;0x0220;0x0019;0x0021;0x0120;0x0112;0x0023">
+           <match key="@info.parent:usb.interface.number" int="0">
+             <match key="serial.port" int="0">
+               <append key="info.capabilities" type="strlist">modem</append>
+@@ -86,9 +89,8 @@
+             </match>
+           </match>
+         </match>
+-	<!-- 2x MC8755,MC8765,MC8775 & AC 875U,MC8775,AirCard 875,MC8780,MC8781,AirCard 880,AirCard 881,AirCard 880 E,AirCard 881 E, -->
+-	<!-- -->
+-        <match key="@info.parent:usb.product_id" int_outof="0x6802;0x6804;0x6803;0x6812;0x6813;0x6820;0x6832;0x6833;0x6850;0x6851;0x6852;0x6853">
++        <!-- 2x MC8755,MC8765,MC8775 & AC 875U,MC8775,AirCard 875,MC8780,MC8781,AirCard 880,AirCard 881,AirCard 880 E,AirCard 881 E, AirCard 881 -->
++        <match key="@info.parent:usb.product_id" int_outof="0x6802;0x6804;0x6803;0x6812;0x6813;0x6820;0x6832;0x6833;0x6850;0x6851;0x6852;0x6853;0x6856">
+           <match key="@info.parent:usb.interface.number" int="0">
+             <match key="serial.port" int="0">
+               <append key="info.capabilities" type="strlist">modem</append>
+@@ -168,8 +170,8 @@
+ 
+       <!-- Pantech -->
+       <match key="@info.parent:usb.vendor_id" int="0x106c">
+-        <!-- PC5740;PC5750 EVDO rev A card -->
+-        <match key="@info.parent:usb.product_id" int_outof="0x3701;0x3702">
++        <!-- PC5740;PC5750;UM150 EVDO rev A card -->
++        <match key="@info.parent:usb.product_id" int_outof="0x3701;0x3702;0x3711">
+           <match key="@info.parent:usb.interface.number" int="0">
+             <append key="info.capabilities" type="strlist">modem</append>
+             <append key="modem.command_sets" type="strlist">IS-707-A</append>
+@@ -217,7 +219,7 @@
+ 	     5510 Mobile Broadband HSDPA ExpressCard == Novatel Merlin XU870 HSDPA/3G,
+ 	     HSDPA 5520,
+ 	  -->
+-        <match key="@info.parent:usb.product_id" int_outof="0x8115;0x8116;0x8118;0x8137">
++        <match key="@info.parent:usb.product_id" int_outof="0x8115;0x8116;0x8118;0x8136;0x8137">
+           <match key="@info.parent:usb.interface.number" int="0">
+             <append key="info.capabilities" type="strlist">modem</append>
+             <append key="modem.command_sets" type="strlist">GSM-07.07</append>
+@@ -226,8 +228,6 @@
+         </match>
+       </match>
+ 
+-      <!-- PCMCIA CARDS -->
+-
+       <!-- Sierra Wireless 850/860 -->
+       <match key="@info.parent:pcmcia.card_id" int="1808">
+         <match key="@info.parent:pcmcia.manf_id" int="402">
+@@ -239,6 +239,21 @@
+         </match>
+       </match>
+ 
++      <!-- T-Mobile IPWireless 4G (IPWireless 3G Data Modem) -->
++      <match key="@info.parent:pcmcia.card_id" int="0x200">
++        <match key="@info.parent:pcmcia.manf_id" int="0x2f2">
++          <match key="@info.parent:pcmcia.prod_id1" string="IPWireless">
++            <match key="@info.parent:pcmcia.prod_id2" string="3G Data Modem">
++              <match key="@info.parent:pcmcia.prod_id3" string="V2">
++                <append key="info.capabilities" type="strlist">modem</append>
++                <append key="modem.command_sets" type="strlist">GSM-07.07</append>
++                <append key="modem.command_sets" type="strlist">GSM-07.05</append>
++              </match>
++            </match>
++          </match>
++        </match>
++      </match>
++
+       <!-- Hayes Accura V.92 Modem PC Card -->
+       <match key="@info.parent:pcmcia.card_id" int="0">
+         <match key="@info.parent:pcmcia.manf_id" int="19">
+@@ -276,6 +291,17 @@
+         </match>
+       </match>
+ 
++      <!-- CMOTECH -->
++      <match key="@info.parent:usb.vendor_id" int="0x16d8">
++        <!-- C-motech CNU-550, CNU-680 (USB, EV-DO) -->
++        <match key="@info.parent:usb.product_id" int_outof="0x5543;0x680a">
++          <match key="@info.parent:usb.interface.number" int="0">
++            <append key="info.capabilities" type="strlist">modem</append>
++            <append key="modem.command_sets" type="strlist">IS-707-A</append>
++          </match>
++        </match>
++      </match>
++
+       <!-- Communication Device Class Abstract Control Model (CDC ACM) modems,
+            typically provided by GSM/CDMA phones -->
+       <match key="@info.parent:usb.interface.class" int="0x02">
+diff --git a/fdi/information/10freedesktop/10-usb-music-players.fdi b/fdi/information/10freedesktop/10-usb-music-players.fdi
+index 962c046..d944573 100644
+--- a/fdi/information/10freedesktop/10-usb-music-players.fdi
++++ b/fdi/information/10freedesktop/10-usb-music-players.fdi
+@@ -265,7 +265,7 @@
+ 	    <append key="portable_audio_player.playlist_path" type="string">PLAYLISTS/%File</append>
+ 	  </match>
+ 	</match>
+- 
++ 	
+ 	<!-- Sony -->
+ 	<match key="@storage.originating_device:usb.vendor_id" int="0x54c">
+           <!-- Sony Network Walkman -->
+@@ -274,7 +274,30 @@
+             <append key="portable_audio_player.output_formats" type="strlist">audio/vnd.sony.atrac3</append>
+             <append key="portable_audio_player.input_formats" type="strlist">audio/mpeg</append>
+           </match>
++          <!-- Sony Walkman NWD-B105 -->
++          <match key="@storage.originating_device:usb.product_id" int="0x317">
++            <addset key="portable_audio_player.access_method.protocols" type="strlist">storage</addset>
++            <append key="portable_audio_player.output_formats" type="strlist">audio/x-ms-wma</append>
++            <append key="portable_audio_player.input_formats" type="strlist">audio/mpeg</append>
++            <append key="portable_audio_player.audio_folders" type="strlist">Music/</append>
++            <append key="portable_audio_player.audio_folders" type="strlist">Record/Voice/</append>
++            <append key="portable_audio_player.playlist_format" type="strlist"></append>
++            <append key="portable_audio_player.playlist_path" type="string"></append>
++          </match>
+ 	</match>
++
++	<!-- LG Fusic Phone -->
++        <match key="@storage.originating_device:usb.vendor_id" int="0x05c6">
++          <match key="@storage.originating_device:usb.product_id" int="0x1000">
++            <addset key="info.capabilities" type="strlist">portable_audio_player</addset>
++            <merge key="info.category" type="string">portable_audio_player</merge>
++            <addset key="portable_audio_player.access_method.protocols" type="strlist">storage</addset>
++            <addset key="portable_audio_player.output_formats" type="strlist">audio/aac</addset>
++            <addset key="portable_audio_player.audio_folders" type="strlist">MUSIC</addset>
++            <append key="portable_audio_player.playlist_path" type="string">MUSIC/AllMyMusic.m3u</append>
++            <addset key="portable_audio_player.playlist_format" type="strlist">audio/x-mpegurl</addset>
++          </match>
++        </match>
+ 	
+ 	<!-- Jetflash MP3 Player, AKA NAPA LCD-HD, AKA Medion, AKA Tevion  and other -->
+ 	<match key="@storage.originating_device:usb.vendor_id" int="0x066f">
+@@ -353,6 +376,11 @@
+             <append key="portable_audio_player.output_formats" type="strlist">audio/x-wav</append>
+             <append key="portable_audio_player.input_formats" type="strlist">audio/x-wav</append>
+           </match>
++          <!-- Lyra TH1100A -->
++          <match key="@storage.originating_device:usb.product_id" int="0x778">
++           <addset key="portable_audio_player.access_method.protocols" type="strlist">storage</addset>
++           <append key="portable_audio_player.output_formats" type="strlist">audio/x-wav</append>
++          </match>         
+ 	</match>
+ 
+ 	<!-- SanDisk -->
+@@ -393,6 +421,15 @@
+           </match>
+ 	</match>
+ 
++        <!-- Olympus -->
++        <match key="@storage.originating_device:usb.vendor_id" int="0x07b4">
++          <!-- DS-2 voice recorder -->
++          <match key="@storage.originating_device:usb.product_id" int="0x020e">
++            <addset key="portable_audio_player.access_method.protocols" type="strlist">storage</addset>
++            <append key="portable_audio_player.output_formats" type="strlist">audio/x-ms-wma</append>
++          </match>
++        </match>
++
+ 	<!-- Peak Digital Audio Player -->
+         <match key="@storage.originating_device:usb.vendor_id" int="0xd7d">
+           <match key="@storage.originating_device:usb.product_id" int="0x1651">
+@@ -614,31 +651,8 @@
+              <append key="portable_audio_player.input_formats" type="strlist">audio/amr</append>
+              <append key="portable_audio_player.audio_folders" type="strlist">Music/</append>
+           </match>
+-
+ 	</match>
+ 
+- 	<!-- LG Fusic Phone -->
+-        <match key="@storage.originating_device:usb.vendor_id" int="0x05c6">
+-          <match key="@storage.originating_device:usb.product_id" int="0x1000">
+-            <addset key="info.capabilities" type="strlist">portable_audio_player</addset>
+-            <merge key="info.category" type="string">portable_audio_player</merge>
+-            <addset key="portable_audio_player.access_method.protocols" type="strlist">storage</addset>
+-            <addset key="portable_audio_player.output_formats" type="strlist">audio/aac</addset>
+-            <addset key="portable_audio_player.audio_folders" type="strlist">MUSIC</addset>
+-            <append key="portable_audio_player.playlist_path" type="string">MUSIC/AllMyMusic.m3u</append>
+-            <addset key="portable_audio_player.playlist_format" type="strlist">audio/x-mpegurl</addset>
+-          </match>
+-        </match>
+- 
+-        <!-- Olympus -->
+-        <match key="@storage.originating_device:usb.vendor_id" int="0x07b4">
+-          <!-- DS-2 voice recorder -->
+-          <match key="@storage.originating_device:usb.product_id" int="0x020e">
+-            <addset key="portable_audio_player.access_method.protocols" type="strlist">storage</addset>
+-            <append key="portable_audio_player.output_formats" type="strlist">audio/x-ms-wma</append>
+-          </match>
+-        </match>
+-
+ 	<match key="@storage.originating_device:usb.vendor_id" int="0x1006">
+           <!-- iGP 100 -->
+           <match key="@storage.originating_device:usb.product_id" int="0x2001">
+@@ -752,6 +766,15 @@
+           </match>
+         </match>
+ 
++	<!-- Amazon -->
++	<match key="@storage.originating_device:usb.vendor_id" int="0x1949">
++	  <!-- Amazon Kindle -->
++	  <match key="@storage.originating_device:usb.product_id" int="0x0001">
++	    <addset key="portable_audio_player.access_method.protocols" type="strlist">storage</addset>
++	    <append key="portable_audio_player.audio_folders" type="strlist">music/</append>
++	  </match>
++	</match>
++
+         <!-- Motorola -->
+         <match key="@storage.originating_device:usb.vendor_id" int="0x22b8">
+           <!-- Motorola iTunes enabled phone -->
+diff --git a/fdi/information/10freedesktop/20-video-quirk-pm-acer.fdi b/fdi/information/10freedesktop/20-video-quirk-pm-acer.fdi
+index a4518c4..71099e6 100644
+--- a/fdi/information/10freedesktop/20-video-quirk-pm-acer.fdi
++++ b/fdi/information/10freedesktop/20-video-quirk-pm-acer.fdi
+@@ -79,7 +79,7 @@
+             <merge key="power_management.quirk.vbe_post" type="bool">true</merge>
+           </match>
+         </match>
+-        <match key="system.hardware.product" contains_outof="5020;5500">
++        <match key="system.hardware.product" contains_outof="5000;5020;5500">
+           <merge key="power_management.quirk.vbe_post" type="bool">true</merge>
+         </match>
+         <match key="system.hardware.product" contains="1640">
+diff --git a/fdi/information/10freedesktop/20-video-quirk-pm-asus.fdi b/fdi/information/10freedesktop/20-video-quirk-pm-asus.fdi
+index 448d1ca..8c3bc23 100644
+--- a/fdi/information/10freedesktop/20-video-quirk-pm-asus.fdi
++++ b/fdi/information/10freedesktop/20-video-quirk-pm-asus.fdi
+@@ -5,7 +5,7 @@
+       <match key="system.hardware.product" prefix_outof="U5F ;M2000E">
+         <merge key="power_management.quirk.s3_bios" type="bool">true</merge>
+       </match>
+-      <match key="system.hardware.product" prefix_outof="K8N-E-Deluxe;L2000D;M6Ne;M51Sr ">
++      <match key="system.hardware.product" prefix_outof="K8N-E-Deluxe;L2000D;M6Ne;M51Sr ;U6S">
+         <merge key="power_management.quirk.s3_mode" type="bool">true</merge>
+       </match>
+       <!--NOTE: s2ram list the F3F with power_management.quirk.none=true -->
+diff --git a/fdi/information/10freedesktop/20-video-quirk-pm-dell.fdi b/fdi/information/10freedesktop/20-video-quirk-pm-dell.fdi
+index 34a8b5a..81cd1e3 100644
+--- a/fdi/information/10freedesktop/20-video-quirk-pm-dell.fdi
++++ b/fdi/information/10freedesktop/20-video-quirk-pm-dell.fdi
+@@ -5,6 +5,10 @@
+ 
+       <!-- Dell Latitude -->
+       <match key="system.hardware.product" prefix="Latitude">
++        <match key="system.hardware.product" contains="C500">
++          <merge key="power_management.quirk.dpms_suspend" type="bool">true</merge>
++          <merge key="power_management.quirk.vbe_post" type="bool">true</merge>
++        </match>
+         <match key="system.hardware.product" contains="C600">
+           <merge key="power_management.quirk.radeon_off" type="bool">true</merge>
+         </match>
+diff --git a/fdi/information/10freedesktop/20-video-quirk-pm-fujitsu.fdi b/fdi/information/10freedesktop/20-video-quirk-pm-fujitsu.fdi
+index 2d73b4a..e318b26 100644
+--- a/fdi/information/10freedesktop/20-video-quirk-pm-fujitsu.fdi
++++ b/fdi/information/10freedesktop/20-video-quirk-pm-fujitsu.fdi
+@@ -4,7 +4,7 @@
+     <match key="system.hardware.vendor" prefix="FUJITSU">
+       
+       <match key="system.hardware.product" contains_ncase="amilo">
+-        <match key="system.hardware.product" contains_outof="A1667G Serie;Pa 1510;Li 1718">
++        <match key="system.hardware.product" contains_outof="A1667G Serie;Pa 1510;Li 1718;M1425">
+           <merge key="power_management.quirk.s3_bios" type="bool">true</merge>
+         </match>
+         <match key="system.hardware.product" contains_outof="Pro V3205;Pro Edition V3405;Pro Edition V3505;Xi 1546;Si 1520;A7640;Pi 1505;A1645">
+@@ -43,11 +43,11 @@
+         <match key="system.hardware.product" contains_outof="P7010D;S2110">
+           <merge key="power_management.quirk.s3_bios" type="bool">true</merge>
+         </match>
+-        <match key="system.hardware.product" contains_outof="E8410;T4010">
++        <match key="system.hardware.product" contains_outof="E8410;T4010;S2210">
+           <merge key="power_management.quirk.s3_bios" type="bool">true</merge>
+           <merge key="power_management.quirk.s3_mode" type="bool">true</merge>
+         </match>
+-        <match key="system.hardware.product" contains="S7110">
++        <match key="system.hardware.product" contains_outof="S7020;S7110">
+           <merge key="power_management.quirk.vbe_post" type="bool">true</merge>
+           <merge key="power_management.quirk.reset_brightness" type="bool">true</merge>
+         </match>
+diff --git a/fdi/information/10freedesktop/20-video-quirk-pm-hp.fdi b/fdi/information/10freedesktop/20-video-quirk-pm-hp.fdi
+index 1096984..ed0dac0 100644
+--- a/fdi/information/10freedesktop/20-video-quirk-pm-hp.fdi
++++ b/fdi/information/10freedesktop/20-video-quirk-pm-hp.fdi
+@@ -65,7 +65,7 @@
+     </match>
+ 
+     <match key="system.hardware.vendor" prefix="Hewlett-Packard">
+-      <match key="system.hardware.product" contains_outof="V2000 (EP381UA#;X1000 (DK454AV)">
++      <match key="system.hardware.product" contains_outof="V2000 (EP381UA#;X1000 (DK454AV); 6715s">
+         <merge key="power_management.quirk.s3_bios" type="bool">true</merge>
+       </match>
+       <match key="system.hardware.product" contains="HP OmniBook XT1000">
+diff --git a/fdi/information/10freedesktop/20-video-quirk-pm-ibm.fdi b/fdi/information/10freedesktop/20-video-quirk-pm-ibm.fdi
+index 48a79ed..37c47fa 100644
+--- a/fdi/information/10freedesktop/20-video-quirk-pm-ibm.fdi
++++ b/fdi/information/10freedesktop/20-video-quirk-pm-ibm.fdi
+@@ -22,6 +22,11 @@
+         </match>
+       </match>
+ 
++      <!-- A31-->
++      <match key="system.hardware.product" prefix="2652">
++        <merge key="power_management.quirk.radeon_off" type="bool">true</merge>
++        <merge key="power_management.quirk.dpms_suspend" type="bool">true</merge>
++      </match>
+       <!-- X31, T30 , A31p-->
+       <match key="system.hardware.product" prefix_outof="2366;2653">
+         <merge key="power_management.quirk.radeon_off" type="bool">true</merge>
+@@ -29,18 +34,21 @@
+       <!-- X22, X40; X32 -->
+       <match key="system.hardware.product" prefix_outof="2662;2672;2673">
+         <merge key="power_management.quirk.radeon_off" type="bool">true</merge>
+-        <merge key="power_management.quirk.s3_bios" type="bool">true</merge>
+-        <merge key="power_management.quirk.s3_mode" type="bool">true</merge>
++        <match key="system.hardware.version" contains_not="X31">
++          <merge key="power_management.quirk.s3_bios" type="bool">true</merge>
++          <merge key="power_management.quirk.s3_mode" type="bool">true</merge>
++        </match>
+       </match>
+       <!-- X31 -->
+-      <match key="system.hardware.product" prefix_outof="2672;2673;2884">
++      <match key="system.hardware.product" prefix_outof="2672;2673;2884;2885">
+         <match key="system.hardware.version" contains="X31">
+           <merge key="power_management.quirk.dpms_suspend" type="bool">true</merge>
+           <!-- already added above
+-            <merge key="power_management.quirk.s3_bios" type="bool">true</merge>
+-            <merge key="power_management.quirk.s3_mode" type="bool">true</merge>
+             <merge key="power_management.quirk.radeon_off" type="bool">true</merge>
+-	  -->
++           -->
++        </match>
++        <match key="system.hardware.version" contains="X32">
++          <merge key="power_management.quirk.dpms_suspend" type="bool">true</merge>
+         </match>
+       </match>
+       <!-- R50p, R52, X41t, X40, T30, T41p, T41p, T42, X40, Z60t, X41, Z60m, T32 (2647) -->
+diff --git a/fdi/information/10freedesktop/20-video-quirk-pm-lenovo.fdi b/fdi/information/10freedesktop/20-video-quirk-pm-lenovo.fdi
+index 85c9666..5ecbabc 100644
+--- a/fdi/information/10freedesktop/20-video-quirk-pm-lenovo.fdi
++++ b/fdi/information/10freedesktop/20-video-quirk-pm-lenovo.fdi
+@@ -25,13 +25,13 @@
+         </match>
+       </match>
+ 
+-      <!-- T60*, Z61* -->
++      <!-- T60*, Z61*, R61e -->
+       <match key="system.hardware.version" prefix="ThinkPad ">
+         <match key="system.hardware.version" suffix="T60">
+           <merge key="power_management.quirk.s3_bios" type="bool">true</merge>
+           <merge key="power_management.quirk.s3_mode" type="bool">true</merge>
+         </match>
+-        <match key="system.hardware.version" contains_outof="T60p;Z61m;Z61t;Z60m;Z61p">
++        <match key="system.hardware.version" contains_outof="T60p;Z61m;Z61t;Z60m;Z61p;R61e">
+           <merge key="power_management.quirk.s3_bios" type="bool">true</merge>
+           <merge key="power_management.quirk.s3_mode" type="bool">true</merge>
+         </match>
+diff --git a/fdi/information/10freedesktop/20-video-quirk-pm-misc.fdi b/fdi/information/10freedesktop/20-video-quirk-pm-misc.fdi
+index 905aa4b..9855a26 100644
+--- a/fdi/information/10freedesktop/20-video-quirk-pm-misc.fdi
++++ b/fdi/information/10freedesktop/20-video-quirk-pm-misc.fdi
+@@ -1,6 +1,13 @@
+ <?xml version="1.0" encoding="ISO-8859-1"?> <!-- -*- SGML -*- --> 
+ <deviceinfo version="0.2">
+   <device>
++    <match key="system.hardware.vendor" string="AIRIS">
++      <match key="system.hardware.version" string="VT6413A">
++        <merge key="power_management.quirk.s3_bios" type="bool">true</merge>
++      </match>
++    </match>
++  </device>
++  <device>
+     <match key="system.hardware.vendor" prefix="COMPAL">
+       <match key="system.hardware.product" contains_outof="HEL80C;HEL80I;HEL81I">
+         <merge key="power_management.quirk.none" type="bool">true</merge>
+@@ -292,6 +299,9 @@
+         <merge key="power_management.quirk.s3_bios" type="bool">true</merge>
+         <merge key="power_management.quirk.s3_mode" type="bool">true</merge>
+       </match>
++      <match key="system.hardware.product" prefix="MT6920">
++        <merge key="power_management.quirk.vbe_post" type="bool">true</merge>
++      </match>
+       <match key="system.hardware.product" contains="MX6922B ">
+         <merge key="power_management.quirk.none" type="bool">true</merge>
+       </match>
+diff --git a/fdi/information/10freedesktop/20-video-quirk-pm-samsung.fdi b/fdi/information/10freedesktop/20-video-quirk-pm-samsung.fdi
+index 0ceeb4d..8585303 100644
+--- a/fdi/information/10freedesktop/20-video-quirk-pm-samsung.fdi
++++ b/fdi/information/10freedesktop/20-video-quirk-pm-samsung.fdi
+@@ -2,7 +2,7 @@
+ <deviceinfo version="0.2">
+   <device>
+     <match key="system.hardware.vendor" prefix_ncase="Samsung">
+-      <match key="system.hardware.product" string_outof="Q35/Q36;SM40S;SQ45S70">
++      <match key="system.hardware.product" string_outof="Q35/Q36;SM40S;SQ45S70S">
+         <merge key="power_management.quirk.s3_bios" type="bool">true</merge>
+         <merge key="power_management.quirk.s3_mode" type="bool">true</merge>
+       </match>
+diff --git a/fdi/information/10freedesktop/20-video-quirk-pm-sony.fdi b/fdi/information/10freedesktop/20-video-quirk-pm-sony.fdi
+index 8260f78..d13f5cc 100644
+--- a/fdi/information/10freedesktop/20-video-quirk-pm-sony.fdi
++++ b/fdi/information/10freedesktop/20-video-quirk-pm-sony.fdi
+@@ -29,6 +29,11 @@
+ 	<merge key="power_management.quirk.vbestate_restore" type="bool">true</merge>
+ 	<merge key="power_management.quirk.vbemode_restore" type="bool">true</merge>
+       </match>
++      <match key="system.hardware.product" contains_outof="PCG-Z1MP">
++	<merge key="power_management.quirk.vbe_post" type="bool">true</merge>
++	<merge key="power_management.quirk.vbemode_restore" type="bool">true</merge>
++	<merge key="power_management.quirk.vbestate_restore" type="bool">true</merge>
++      </match>
+       <match key="system.hardware.product" contains_outof="PCG-Z1RMP;VGN-TX770P">
+ 	<merge key="power_management.quirk.vbe_post" type="bool">true</merge>
+ 	<merge key="power_management.quirk.vbemode_restore" type="bool">true</merge>
+diff --git a/fdi/information/10freedesktop/20-video-quirk-pm-toshiba.fdi b/fdi/information/10freedesktop/20-video-quirk-pm-toshiba.fdi
+index 8fdaf29..e8b01b8 100644
+--- a/fdi/information/10freedesktop/20-video-quirk-pm-toshiba.fdi
++++ b/fdi/information/10freedesktop/20-video-quirk-pm-toshiba.fdi
+@@ -62,7 +62,7 @@
+ 
+       <!-- Portege Laptops -->
+       <match key="system.hardware.product" prefix="PORTEGE">
+-        <match key="system.hardware.product" contains="R500">
++        <match key="system.hardware.product" contains_outof="R200;R205;R500">
+           <merge key="power_management.quirk.s3_bios" type="bool">true</merge>
+           <merge key="power_management.quirk.s3_mode" type="bool">true</merge>
+         </match>
+diff --git a/fdi/information/10freedesktop/21-video-quirk-nvidia.fdi b/fdi/information/10freedesktop/21-video-quirk-nvidia.fdi
+new file mode 100644
+index 0000000..3b7956b
+--- /dev/null
++++ b/fdi/information/10freedesktop/21-video-quirk-nvidia.fdi
+@@ -0,0 +1,22 @@
++<?xml version="1.0" encoding="ISO-8859-1"?> <!-- -*- SGML -*- --> 
++<!-- According to nvidia, the only currently supported way to resume g80
++     class hardware is to re-run a cached copy of the video BIOS. No other
++     quirks will be effective -->
++<deviceinfo version="0.2">
++  <device>
++    <match key="system.hardware.primary_video.vendor" int="0x10de">
++      <match key="system.hardware.primary_video.product" int_outof="0x190;0x191;0x192;0x193;0x194;0x195;0x196;0x197;0x198;0x199;0x19a;0x19b;0x19c;0x19d;0x19e;0x19f;0x400;0x401;0x402;0x403;0x404;0x405;0x406;0x407;0x408;0x409;0x40a;0x40b;0x40c;0x40d;0x40e;0x40f;0x420;0x421;0x422;0x423;0x424;0x425;0x426;0x427;0x428;0x429;0x42a;0x42b;0x42c;0x42d;0x42e;0x42f">
++        <remove key="power_management.quirk.vbestate_restore"></remove>
++        <remove key="power_management.quirk.vbemode_restore"></remove>
++        <remove key="power_management.quirk.dpms_suspend"></remove>
++        <remove key="power_management.quirk.dpms_on"></remove>
++        <remove key="power_management.quirk.radeon_off"></remove>
++        <remove key="power_management.quirk.s3_bios"></remove>
++        <remove key="power_management.quirk.s3_mode"></remove>
++        <remove key="power_management.quirk.vga_mode_3"></remove>
++        <remove key="power_management.quirk.none"></remove>
++        <merge key="power_management.quirk.vbe_post" type="bool">true</merge>
++      </match>
++    </match>
++  </device>
++</deviceinfo>
+diff --git a/fdi/information/10freedesktop/30-keymap-acer.fdi b/fdi/information/10freedesktop/30-keymap-acer.fdi
+index c0a4e57..e544363 100644
+--- a/fdi/information/10freedesktop/30-keymap-acer.fdi
++++ b/fdi/information/10freedesktop/30-keymap-acer.fdi
+@@ -7,189 +7,33 @@
+     <match key="@input.originating_device:info.linux.driver" string="atkbd">
+ 
+       <match key="/org/freedesktop/Hal/devices/computer:system.hardware.vendor" prefix="Acer">
+-        <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" prefix="Aspire">
+-          <!-- Laptops without extra Euro and Dollar keys, pre mid-2004 & pre 'folio' design -->
+-          <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains="1510">
+-            <append key="input.keymap.data" type="strlist">e025:help</append> <!-- Fn+F1 Hotkey help -->
+-            <append key="input.keymap.data" type="strlist">e026:setup</append> <!-- Fn+F2 Acer eSettings -->
+-            <append key="input.keymap.data" type="strlist">e027:battery</append> <!-- Fn+F3 Power Management -->
+-            <append key="input.keymap.data" type="strlist">e073:prog2</append> <!-- "P2" programmable button -->
+-            <append key="input.keymap.data" type="strlist">e074:prog1</append> <!-- "P1" programmable button -->
+-            <append key="info.capabilities" type="strlist">input.keymap</append>
+-          </match>
+-          <!-- Laptops without extra Euro and Dollar keys -->
+-          <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains_outof="1350;1360;1520">
+-            <append key="input.keymap.data" type="strlist">e025:help</append> <!-- Fn+F1 Hotkey help -->
+-            <append key="input.keymap.data" type="strlist">e026:setup</append> <!-- Fn+F2 Acer eSettings -->
+-            <append key="input.keymap.data" type="strlist">e027:battery</append> <!-- Fn+F3 Power Management -->
+-            <append key="input.keymap.data" type="strlist">e029:switchvideomode</append> <!-- Fn+F5 Display toggle -->
+-            <append key="input.keymap.data" type="strlist">e055:wlan</append> <!-- Wireless (toggle) on-to-off -->
+-            <append key="input.keymap.data" type="strlist">e056:wlan</append> <!-- Wireless (toggle) off-to-on -->
+-            <append key="input.keymap.data" type="strlist">e057:bluetooth</append> <!-- Bluetooth (toggle) on-to-off -->
+-            <append key="input.keymap.data" type="strlist">e058:bluetooth</append> <!-- Bluetooth (toggle) off-to-on -->
+-            <append key="input.keymap.data" type="strlist">e071:f22</append> <!-- Fn+F7 Touchpad toggle (off-to-on) -->
+-            <append key="input.keymap.data" type="strlist">e072:f22</append> <!-- Fn+F7 Touchpad toggle (on-to-off) -->
+-            <append key="input.keymap.data" type="strlist">e073:prog2</append> <!-- "P" programmable button -->
+-            <append key="input.keymap.data" type="strlist">e074:prog1</append> <!-- "e" Acer eManager button -->
+-            <append key="info.capabilities" type="strlist">input.keymap</append>
+-          </match>
+-          <!-- Laptops with extra Euro and Dollar keys -->
+-          <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains_outof="3020;3030;3040;3610;3620;4720;5020;5030;5040;7110;9410;9300;9420">
+-            <append key="input.keymap.data" type="strlist">e025:help</append> <!-- Fn+F1 Hotkey help -->
+-            <append key="input.keymap.data" type="strlist">e026:setup</append> <!-- Fn+F2 Acer eSettings -->
+-            <append key="input.keymap.data" type="strlist">e027:battery</append> <!-- Fn+F3 Power Management -->
+-            <append key="input.keymap.data" type="strlist">e029:switchvideomode</append> <!-- Fn+F5 Display toggle -->
+-            <append key="input.keymap.data" type="strlist">e033:euro</append> <!-- Euro symbol -->
+-            <append key="input.keymap.data" type="strlist">e034:dollar</append> <!-- Dollar symbol -->
+-            <append key="input.keymap.data" type="strlist">e055:wlan</append> <!-- Wireless (toggle) on-to-off -->
+-            <append key="input.keymap.data" type="strlist">e056:wlan</append> <!-- Wireless (toggle) off-to-on -->
+-            <append key="input.keymap.data" type="strlist">e057:bluetooth</append> <!-- Bluetooth (toggle) on-to-off -->
+-            <append key="input.keymap.data" type="strlist">e058:bluetooth</append> <!-- Bluetooth (toggle) off-to-on -->
+-            <append key="input.keymap.data" type="strlist">e071:f22</append> <!-- Fn+F7 Touchpad toggle (off-to-on) -->
+-            <append key="input.keymap.data" type="strlist">e072:f22</append> <!-- Fn+F7 Touchpad toggle (on-to-off) -->
+-            <append key="input.keymap.data" type="strlist">e073:prog2</append> <!-- "P" programmable button -->
+-            <append key="input.keymap.data" type="strlist">e074:prog1</append> <!-- "e" Acer eManager button -->
+-            <append key="info.capabilities" type="strlist">input.keymap</append>
+-          </match>
+-          <!-- Laptops with extra Euro and Dollar keys, and Fn+Right (Brightness Up) needs mapping (type 1) -->
+-          <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains_outof="1410;1640;1680;1690;3050;3680;5050;5570;5580;5600;8100">
+-            <append key="input.keymap.data" type="strlist">e025:help</append> <!-- Fn+F1 Hotkey help -->
+-            <append key="input.keymap.data" type="strlist">e026:setup</append> <!-- Fn+F2 Acer eSettings -->
+-            <append key="input.keymap.data" type="strlist">e027:battery</append> <!-- Fn+F3 Power Management -->
+-            <append key="input.keymap.data" type="strlist">e029:switchvideomode</append> <!-- Fn+F5 Display toggle -->
+-            <append key="input.keymap.data" type="strlist">e033:euro</append> <!-- Euro symbol -->
+-            <append key="input.keymap.data" type="strlist">e034:dollar</append> <!-- Dollar symbol -->
+-            <append key="input.keymap.data" type="strlist">e055:wlan</append> <!-- Wireless (toggle) on-to-off -->
+-            <append key="input.keymap.data" type="strlist">e056:wlan</append> <!-- Wireless (toggle) off-to-on -->
+-            <append key="input.keymap.data" type="strlist">e057:bluetooth</append> <!-- Bluetooth (toggle) on-to-off -->
+-            <append key="input.keymap.data" type="strlist">e058:bluetooth</append> <!-- Bluetooth (toggle) off-to-on -->
+-            <append key="input.keymap.data" type="strlist">e06e:brightnessup</append> <!-- Fn+Right Brightness Up -->
+-            <append key="input.keymap.data" type="strlist">e06f:brightnessdown</append> <!-- Fn+Left Brightness Down -->
+-            <append key="input.keymap.data" type="strlist">e071:f22</append> <!-- Fn+F7 Touchpad toggle (off-to-on) -->
+-            <append key="input.keymap.data" type="strlist">e072:f23</append> <!-- Fn+F7 Touchpad toggle (on-to-off) -->
+-            <append key="input.keymap.data" type="strlist">e073:prog2</append> <!-- "P" programmable button -->
+-            <append key="input.keymap.data" type="strlist">e074:prog1</append> <!-- "e" Acer eManager button -->
+-            <append key="info.capabilities" type="strlist">input.keymap</append>
+-          </match>
+-          <!-- Laptops with extra Euro and Dollar keys, and Fn+Right (Brightness Up) needs mapping (type 2) -->
+-          <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains_outof="3100;3690;5100;5610;5630;5650;5680;9110">
+-            <append key="input.keymap.data" type="strlist">e025:help</append> <!-- Fn+F1 Hotkey help -->
+-            <append key="input.keymap.data" type="strlist">e026:setup</append> <!-- Fn+F2 Acer eSettings -->
+-            <append key="input.keymap.data" type="strlist">e027:battery</append> <!-- Fn+F3 Power Management -->
+-            <append key="input.keymap.data" type="strlist">e029:switchvideomode</append> <!-- Fn+F5 Display toggle -->
+-            <append key="input.keymap.data" type="strlist">e033:euro</append> <!-- Euro symbol -->
+-            <append key="input.keymap.data" type="strlist">e034:dollar</append> <!-- Dollar symbol -->
+-            <append key="input.keymap.data" type="strlist">e055:wlan</append> <!-- Wireless (toggle) on-to-off -->
+-            <append key="input.keymap.data" type="strlist">e056:wlan</append> <!-- Wireless (toggle) off-to-on -->
+-            <append key="input.keymap.data" type="strlist">e057:bluetooth</append> <!-- Bluetooth (toggle) on-to-off -->
+-            <append key="input.keymap.data" type="strlist">e058:bluetooth</append> <!-- Bluetooth (toggle) off-to-on -->
+-            <append key="input.keymap.data" type="strlist">e059:brightnessup</append> <!-- Fn+Right Brightness Up -->
+-            <append key="input.keymap.data" type="strlist">e06f:brightnessdown</append> <!-- Fn+Left Brightness Down -->
+-            <append key="input.keymap.data" type="strlist">e071:f22</append> <!-- Fn+F7 Touchpad toggle (off-to-on) -->
+-            <append key="input.keymap.data" type="strlist">e072:f23</append> <!-- Fn+F7 Touchpad toggle (on-to-off) -->
+-            <append key="input.keymap.data" type="strlist">e073:prog2</append> <!-- "P" programmable button -->
+-            <append key="input.keymap.data" type="strlist">e074:prog1</append> <!-- "e" Acer eManager button -->
+-            <append key="info.capabilities" type="strlist">input.keymap</append>
+-          </match>
+-        </match>
++        <append key="input.keymap.data" type="strlist">e025:help</append> <!-- Fn+F1 Hotkey help -->
++        <append key="input.keymap.data" type="strlist">e026:setup</append> <!-- Fn+F2 Acer eSettings -->
++        <append key="input.keymap.data" type="strlist">e027:battery</append> <!-- Fn+F3 Power Management -->
++        <append key="input.keymap.data" type="strlist">e029:switchvideomode</append> <!-- Fn+F5 Display toggle -->
++        <append key="input.keymap.data" type="strlist">e033:euro</append> <!-- Euro symbol -->
++        <append key="input.keymap.data" type="strlist">e034:dollar</append> <!-- Dollar symbol -->
++        <append key="input.keymap.data" type="strlist">e054:bluetooth</append> <!-- Bluetooth (toggle) off-to-on -->
++        <append key="input.keymap.data" type="strlist">e055:wlan</append> <!-- Wireless (toggle) on-to-off -->
++        <append key="input.keymap.data" type="strlist">e056:wlan</append> <!-- Wireless (toggle) off-to-on -->
++        <append key="input.keymap.data" type="strlist">e057:bluetooth</append> <!-- Bluetooth (toggle) on-to-off -->
++        <append key="input.keymap.data" type="strlist">e058:bluetooth</append> <!-- Bluetooth (toggle) off-to-on -->
++        <append key="input.keymap.data" type="strlist">e059:brightnessup</append> <!-- Fn+Right Brightness Up -->
++        <append key="input.keymap.data" type="strlist">e06e:brightnessup</append> <!-- Fn+Right Brightness Up -->
++        <append key="input.keymap.data" type="strlist">e06f:brightnessdown</append> <!-- Fn+Left Brightness Down -->
++        <append key="input.keymap.data" type="strlist">e071:f22</append> <!-- Fn+F7 Touchpad toggle (off-to-on) -->
++        <append key="input.keymap.data" type="strlist">e072:f22</append> <!-- Fn+F7 Touchpad toggle (on-to-off) -->
++        <append key="input.keymap.data" type="strlist">e073:prog2</append> <!-- "P2" programmable button -->
++        <append key="input.keymap.data" type="strlist">e074:prog1</append> <!-- "P1" programmable button -->
++        <append key="input.keymap.data" type="strlist">e075:presentation</append> <!-- Minimise all Windows -->
++        <append key="input.keymap.data" type="strlist">e078:fn</append> <!-- Fn key -->
++        <append key="input.keymap.data" type="strlist">e079:sync</append> <!-- Launch NTI shadow -->
++        <append key="info.capabilities" type="strlist">input.keymap</append>
++
+         <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" prefix="Extensa">
+-          <!-- Laptops with extra Euro and Dollar keys -->
+-          <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains="4010">
+-            <append key="input.keymap.data" type="strlist">e025:help</append> <!-- Fn+F1 Hotkey help -->
+-            <append key="input.keymap.data" type="strlist">e026:setup</append> <!-- Fn+F2 Acer eSettings -->
+-            <append key="input.keymap.data" type="strlist">e027:battery</append> <!-- Fn+F3 Power Management -->
+-            <append key="input.keymap.data" type="strlist">e029:switchvideomode</append> <!-- Fn+F5 Display toggle -->
+-            <append key="input.keymap.data" type="strlist">e033:euro</append> <!-- Euro symbol -->
+-            <append key="input.keymap.data" type="strlist">e034:dollar</append> <!-- Dollar symbol -->
+-            <append key="input.keymap.data" type="strlist">e055:wlan</append> <!-- Wireless (toggle) on-to-off -->
+-            <append key="input.keymap.data" type="strlist">e056:wlan</append> <!-- Wireless (toggle) off-to-on -->
+-            <append key="input.keymap.data" type="strlist">e057:bluetooth</append> <!-- Bluetooth (toggle) on-to-off -->
+-            <append key="input.keymap.data" type="strlist">e058:bluetooth</append> <!-- Bluetooth (toggle) off-to-on -->
+-            <append key="input.keymap.data" type="strlist">e071:f22</append> <!-- Fn+F7 Touchpad toggle (off-to-on) -->
+-            <append key="input.keymap.data" type="strlist">e072:f22</append> <!-- Fn+F7 Touchpad toggle (on-to-off) -->
+-            <append key="input.keymap.data" type="strlist">e073:prog2</append> <!-- "P" programmable button -->
+-            <append key="input.keymap.data" type="strlist">e074:prog1</append> <!-- "e" Acer eManager button -->
+-            <append key="info.capabilities" type="strlist">input.keymap</append>
+-          </match>
+-          <!-- Laptops with extra Euro and Dollar keys, and Fn+Right (Brightness Up) needs mapping (type 1) -->
+-          <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains="4100">
+-            <append key="input.keymap.data" type="strlist">e025:help</append> <!-- Fn+F1 Hotkey help -->
+-            <append key="input.keymap.data" type="strlist">e026:setup</append> <!-- Fn+F2 Acer eSettings -->
+-            <append key="input.keymap.data" type="strlist">e027:battery</append> <!-- Fn+F3 Power Management -->
+-            <append key="input.keymap.data" type="strlist">e029:switchvideomode</append> <!-- Fn+F5 Display toggle -->
+-            <append key="input.keymap.data" type="strlist">e033:euro</append> <!-- Euro symbol -->
+-            <append key="input.keymap.data" type="strlist">e034:dollar</append> <!-- Dollar symbol -->
+-            <append key="input.keymap.data" type="strlist">e055:wlan</append> <!-- Wireless (toggle) on-to-off -->
+-            <append key="input.keymap.data" type="strlist">e056:wlan</append> <!-- Wireless (toggle) off-to-on -->
+-            <append key="input.keymap.data" type="strlist">e057:bluetooth</append> <!-- Bluetooth (toggle) on-to-off -->
+-            <append key="input.keymap.data" type="strlist">e058:bluetooth</append> <!-- Bluetooth (toggle) off-to-on -->
+-            <append key="input.keymap.data" type="strlist">e06e:brightnessup</append> <!-- Fn+Right Brightness Up -->
+-            <append key="input.keymap.data" type="strlist">e06f:brightnessdown</append> <!-- Fn+Left Brightness Down -->
+-            <append key="input.keymap.data" type="strlist">e071:f22</append> <!-- Fn+F7 Touchpad toggle (off-to-on) -->
+-            <append key="input.keymap.data" type="strlist">e072:f23</append> <!-- Fn+F7 Touchpad toggle (on-to-off) -->
+-            <append key="input.keymap.data" type="strlist">e073:prog2</append> <!-- "P" programmable button -->
+-            <append key="input.keymap.data" type="strlist">e074:prog1</append> <!-- "e" Acer eManager button -->
+-            <append key="info.capabilities" type="strlist">input.keymap</append>
+-          </match>
+           <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains_outof="5210;5220;5610;5620;5720">
+-            <append key="input.keymap.data" type="strlist">e025:help</append> <!-- Fn+F1 Hotkey help -->
+-            <append key="input.keymap.data" type="strlist">e026:setup</append> <!-- Fn+F2 Acer eSettings -->
+-            <append key="input.keymap.data" type="strlist">e027:battery</append> <!-- Fn+F3 Power Management -->
+-            <append key="input.keymap.data" type="strlist">e029:switchvideomode</append> <!-- Fn+F5 Display toggle -->
+-            <append key="input.keymap.data" type="strlist">e033:euro</append> <!-- Euro symbol -->
+-            <append key="input.keymap.data" type="strlist">e034:dollar</append> <!-- Dollar symbol -->
+-            <append key="input.keymap.data" type="strlist">e054:bluetooth</append> <!-- Bluetooth (toggle) off-to-on -->
+-            <append key="input.keymap.data" type="strlist">e055:wlan</append> <!-- Wireless (toggle) on-to-off -->
+-            <append key="input.keymap.data" type="strlist">e056:wlan</append> <!-- Wireless (toggle) off-to-on -->
+-            <append key="input.keymap.data" type="strlist">e06e:lock</append> <!--  Windows Lock function --> 
+-            <append key="input.keymap.data" type="strlist">e071:f22</append> <!-- Fn+F7 Touchpad toggle (off-to-on) -->
+-            <append key="input.keymap.data" type="strlist">e072:f23</append> <!-- Fn+F7 Touchpad toggle (on-to-off) -->
+-            <append key="input.keymap.data" type="strlist">e073:prog2</append> <!-- "P" programmable button -->
+-            <append key="input.keymap.data" type="strlist">e074:prog1</append> <!-- "e" Acer eManager button -->
+-            <append key="input.keymap.data" type="strlist">e075:presentation</append> <!-- Minimise all Windows -->
+-            <append key="input.keymap.data" type="strlist">e078:fn</append> <!-- Fn key -->
+-            <append key="input.keymap.data" type="strlist">e079:sync</append> <!-- Launch NTI shadow -->
+-            <append key="info.capabilities" type="strlist">input.keymap</append>
+-          </match>
+-        </match>
+-        <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" prefix="Ferrari">
+-          <!-- Laptops with extra Euro and Dollar keys -->
+-          <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains_outof="1000;4000">
+-            <append key="input.keymap.data" type="strlist">e025:help</append> <!-- Fn+F1 Hotkey help -->
+-            <append key="input.keymap.data" type="strlist">e026:setup</append> <!-- Fn+F2 Acer eSettings -->
+-            <append key="input.keymap.data" type="strlist">e027:battery</append> <!-- Fn+F3 Power Management -->
+-            <append key="input.keymap.data" type="strlist">e029:switchvideomode</append> <!-- Fn+F5 Display toggle -->
+-            <append key="input.keymap.data" type="strlist">e033:euro</append> <!-- Euro symbol -->
+-            <append key="input.keymap.data" type="strlist">e034:dollar</append> <!-- Dollar symbol -->
+-            <append key="input.keymap.data" type="strlist">e055:wlan</append> <!-- Wireless (toggle) on-to-off -->
+-            <append key="input.keymap.data" type="strlist">e056:wlan</append> <!-- Wireless (toggle) off-to-on -->
+-            <append key="input.keymap.data" type="strlist">e057:bluetooth</append> <!-- Bluetooth (toggle) on-to-off -->
+-            <append key="input.keymap.data" type="strlist">e058:bluetooth</append> <!-- Bluetooth (toggle) off-to-on -->
+-            <append key="input.keymap.data" type="strlist">e071:f22</append> <!-- Fn+F7 Touchpad toggle (off-to-on) -->
+-            <append key="input.keymap.data" type="strlist">e072:f22</append> <!-- Fn+F7 Touchpad toggle (on-to-off) -->
+-            <append key="input.keymap.data" type="strlist">e073:prog2</append> <!-- "P" programmable button -->
+-            <append key="input.keymap.data" type="strlist">e074:prog1</append> <!-- "e" Acer eManager button -->
+-            <append key="info.capabilities" type="strlist">input.keymap</append>
+-          </match>
+-          <!-- Laptops with extra Euro and Dollar keys, and Fn+Right (Brightness Up) needs mapping (type 1) -->
+-          <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains="5000">
+-            <append key="input.keymap.data" type="strlist">e025:help</append> <!-- Fn+F1 Hotkey help -->
+-            <append key="input.keymap.data" type="strlist">e026:setup</append> <!-- Fn+F2 Acer eSettings -->
+-            <append key="input.keymap.data" type="strlist">e027:battery</append> <!-- Fn+F3 Power Management -->
+-            <append key="input.keymap.data" type="strlist">e029:switchvideomode</append> <!-- Fn+F5 Display toggle -->
+-            <append key="input.keymap.data" type="strlist">e033:euro</append> <!-- Euro symbol -->
+-            <append key="input.keymap.data" type="strlist">e034:dollar</append> <!-- Dollar symbol -->
+-            <append key="input.keymap.data" type="strlist">e055:wlan</append> <!-- Wireless (toggle) on-to-off -->
+-            <append key="input.keymap.data" type="strlist">e056:wlan</append> <!-- Wireless (toggle) off-to-on -->
+-            <append key="input.keymap.data" type="strlist">e057:bluetooth</append> <!-- Bluetooth (toggle) on-to-off -->
+-            <append key="input.keymap.data" type="strlist">e058:bluetooth</append> <!-- Bluetooth (toggle) off-to-on -->
+-            <append key="input.keymap.data" type="strlist">e06e:brightnessup</append> <!-- Fn+Right Brightness Up -->
+-            <append key="input.keymap.data" type="strlist">e06f:brightnessdown</append> <!-- Fn+Left Brightness Down -->
+-            <append key="input.keymap.data" type="strlist">e071:f22</append> <!-- Fn+F7 Touchpad toggle (off-to-on) -->
+-            <append key="input.keymap.data" type="strlist">e072:f23</append> <!-- Fn+F7 Touchpad toggle (on-to-off) -->
+-            <append key="input.keymap.data" type="strlist">e073:prog2</append> <!-- "P" programmable button -->
+-            <append key="input.keymap.data" type="strlist">e074:prog1</append> <!-- "e" Acer eManager button -->
+-            <append key="info.capabilities" type="strlist">input.keymap</append>
++            <remove key="input.keymap.data" type="strlist">e06e:brightnessup</remove>
++	    <append key="input.keymap.data" type="strlist">e06e:lock</append> <!--  Windows Lock function --> 
+           </match>
+         </match>
+         <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" prefix="TravelMate">
+@@ -200,86 +44,6 @@
+             <append key="input.keymap.data" type="strlist">0x69:down</append> 
+             <append key="input.keymap.data" type="strlist">0x6b:fn</append> 
+             <append key="input.keymap.data" type="strlist">0x6c:f23</append> <!-- FIXME: lock tablet device/buttons-->
+-            <append key="info.capabilities" type="strlist">input.keymap</append>
+-          </match>
+-          <!-- Laptops without extra Euro and Dollar keys -->
+-	  <!-- TM6292 really does identify as 6292 instead of 6290 -->
+-          <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains_outof="3000;6292">
+-            <append key="input.keymap.data" type="strlist">e025:help</append> <!-- Fn+F1 Hotkey help -->
+-            <append key="input.keymap.data" type="strlist">e026:setup</append> <!-- Fn+F2 Acer eSettings -->
+-            <append key="input.keymap.data" type="strlist">e027:battery</append> <!-- Fn+F3 Power Management -->
+-            <append key="input.keymap.data" type="strlist">e029:switchvideomode</append> <!-- Fn+F5 Display toggle -->
+-            <append key="input.keymap.data" type="strlist">e055:wlan</append> <!-- Wireless (toggle) on-to-off -->
+-            <append key="input.keymap.data" type="strlist">e056:wlan</append> <!-- Wireless (toggle) off-to-on -->
+-            <append key="input.keymap.data" type="strlist">e057:bluetooth</append> <!-- Bluetooth (toggle) on-to-off -->
+-            <append key="input.keymap.data" type="strlist">e058:bluetooth</append> <!-- Bluetooth (toggle) off-to-on -->
+-            <append key="input.keymap.data" type="strlist">e06e:brightnessup</append> <!-- Fn+Right Brightness Up -->
+-            <append key="input.keymap.data" type="strlist">e06f:brightnessdown</append> <!-- Fn+Left Brightness Down -->
+-            <append key="input.keymap.data" type="strlist">e071:f22</append> <!-- Fn+F7 Touchpad toggle (off-to-on) -->
+-            <append key="input.keymap.data" type="strlist">e072:f23</append> <!-- Fn+F7 Touchpad toggle (on-to-off) -->
+-            <append key="input.keymap.data" type="strlist">e073:prog2</append> <!-- "P" programmable button -->
+-            <append key="input.keymap.data" type="strlist">e074:prog1</append> <!-- "e" Acer eManager button -->
+-            <append key="info.capabilities" type="strlist">input.keymap</append>
+-          </match>
+-          <!-- Laptops with extra Euro and Dollar keys, and Fn+Right (Brightness Up) needs mapping (type 1) -->
+-          <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains_outof="2300;2400;2480;3200;3210;3220;3260;4000;4500">
+-            <append key="input.keymap.data" type="strlist">e025:help</append> <!-- Fn+F1 Hotkey help -->
+-            <append key="input.keymap.data" type="strlist">e026:setup</append> <!-- Fn+F2 Acer eSettings -->
+-            <append key="input.keymap.data" type="strlist">e027:battery</append> <!-- Fn+F3 Power Management -->
+-            <append key="input.keymap.data" type="strlist">e029:switchvideomode</append> <!-- Fn+F5 Display toggle -->
+-            <append key="input.keymap.data" type="strlist">e033:euro</append> <!-- Euro symbol -->
+-            <append key="input.keymap.data" type="strlist">e034:dollar</append> <!-- Dollar symbol -->
+-            <append key="input.keymap.data" type="strlist">e055:wlan</append> <!-- Wireless (toggle) on-to-off -->
+-            <append key="input.keymap.data" type="strlist">e056:wlan</append> <!-- Wireless (toggle) off-to-on -->
+-            <append key="input.keymap.data" type="strlist">e057:bluetooth</append> <!-- Bluetooth (toggle) on-to-off -->
+-            <append key="input.keymap.data" type="strlist">e058:bluetooth</append> <!-- Bluetooth (toggle) off-to-on -->
+-            <append key="input.keymap.data" type="strlist">e06e:brightnessup</append> <!-- Fn+Right Brightness Up -->
+-            <append key="input.keymap.data" type="strlist">e06f:brightnessdown</append> <!-- Fn+Left Brightness Down -->
+-            <append key="input.keymap.data" type="strlist">e071:f22</append> <!-- Fn+F7 Touchpad toggle (off-to-on) -->
+-            <append key="input.keymap.data" type="strlist">e072:f23</append> <!-- Fn+F7 Touchpad toggle (on-to-off) -->
+-            <append key="input.keymap.data" type="strlist">e073:prog2</append> <!-- "P" programmable button -->
+-            <append key="input.keymap.data" type="strlist">e074:prog1</append> <!-- "e" Acer eManager button -->
+-            <append key="info.capabilities" type="strlist">input.keymap</append>
+-          </match>
+-          <!-- Laptops with extra Euro and Dollar keys, and Fn+Right (Brightness Up) needs mapping (type 2) -->
+-          <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains_outof="4650">
+-            <append key="input.keymap.data" type="strlist">e025:help</append> <!-- Fn+F1 Hotkey help -->
+-            <append key="input.keymap.data" type="strlist">e026:setup</append> <!-- Fn+F2 Acer eSettings -->
+-            <append key="input.keymap.data" type="strlist">e027:battery</append> <!-- Fn+F3 Power Management -->
+-            <append key="input.keymap.data" type="strlist">e029:switchvideomode</append> <!-- Fn+F5 Display toggle -->
+-            <append key="input.keymap.data" type="strlist">e033:euro</append> <!-- Euro symbol -->
+-            <append key="input.keymap.data" type="strlist">e034:dollar</append> <!-- Dollar symbol -->
+-            <append key="input.keymap.data" type="strlist">e055:wlan</append> <!-- Wireless (toggle) on-to-off -->
+-            <append key="input.keymap.data" type="strlist">e056:wlan</append> <!-- Wireless (toggle) off-to-on -->
+-            <append key="input.keymap.data" type="strlist">e057:bluetooth</append> <!-- Bluetooth (toggle) on-to-off -->
+-            <append key="input.keymap.data" type="strlist">e058:bluetooth</append> <!-- Bluetooth (toggle) off-to-on -->
+-            <append key="input.keymap.data" type="strlist">e059:brightnessup</append> <!-- Fn+Right Brightness Up -->
+-            <append key="input.keymap.data" type="strlist">e06f:brightnessdown</append> <!-- Fn+Left Brightness Down -->
+-            <append key="input.keymap.data" type="strlist">e071:f22</append> <!-- Fn+F7 Touchpad toggle (off-to-on) -->
+-            <append key="input.keymap.data" type="strlist">e072:f23</append> <!-- Fn+F7 Touchpad toggle (on-to-off) -->
+-            <append key="input.keymap.data" type="strlist">e073:prog2</append> <!-- "P" programmable button -->
+-            <append key="input.keymap.data" type="strlist">e074:prog1</append> <!-- "e" Acer eManager button -->
+-            <append key="info.capabilities" type="strlist">input.keymap</append>
+-          </match>
+-          <!-- Laptops with extra Euro and Dollar keys, and Fn+Left (Brightness Down) needs mapping -->
+-	  <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains_outof="5110;5610;5620">
+-            <append key="input.keymap.data" type="strlist">e025:help</append> <!-- Fn+F1 Hotkey help -->
+-            <append key="input.keymap.data" type="strlist">e026:setup</append> <!-- Fn+F2 Acer eSettings -->
+-            <append key="input.keymap.data" type="strlist">e027:battery</append> <!-- Fn+F3 Power Management -->
+-            <append key="input.keymap.data" type="strlist">e029:switchvideomode</append> <!-- Fn+F5 Display toggle -->
+-            <append key="input.keymap.data" type="strlist">e033:euro</append> <!-- Euro symbol -->
+-            <append key="input.keymap.data" type="strlist">e034:dollar</append> <!-- Dollar symbol -->
+-            <append key="input.keymap.data" type="strlist">e055:wlan</append> <!-- Wireless (toggle) on-to-off -->
+-            <append key="input.keymap.data" type="strlist">e056:wlan</append> <!-- Wireless (toggle) off-to-on -->
+-            <append key="input.keymap.data" type="strlist">e057:bluetooth</append> <!-- Bluetooth (toggle) on-to-off -->
+-            <append key="input.keymap.data" type="strlist">e058:bluetooth</append> <!-- Bluetooth (toggle) off-to-on -->
+-            <append key="input.keymap.data" type="strlist">e059:brightnessdown</append> <!-- Fn+Left Brightness down -->
+-            <append key="input.keymap.data" type="strlist">e06f:brightnessup</append> <!-- Fn+Left Brightness Up -->
+-            <append key="input.keymap.data" type="strlist">e071:f22</append> <!-- Fn+F7 Touchpad toggle (off-to-on) -->
+-            <append key="input.keymap.data" type="strlist">e072:f22</append> <!-- Fn+F7 Touchpad toggle (on-to-off) -->
+-            <append key="input.keymap.data" type="strlist">e073:prog2</append> <!-- "P" programmable button -->
+-            <append key="input.keymap.data" type="strlist">e074:prog1</append> <!-- "e" Acer eManager button -->
+-            <append key="info.capabilities" type="strlist">input.keymap</append>
+           </match>
+         </match>
+       </match>
+diff --git a/fdi/information/10freedesktop/30-keymap-dell.fdi b/fdi/information/10freedesktop/30-keymap-dell.fdi
+index 3b13489..e9f474b 100644
+--- a/fdi/information/10freedesktop/30-keymap-dell.fdi
++++ b/fdi/information/10freedesktop/30-keymap-dell.fdi
+@@ -6,131 +6,31 @@
+     <!-- These are raw scancodes produced by the atkbd driver -->
+     <match key="@input.originating_device:info.linux.driver" string="atkbd">
+ 
+-      <match key="/org/freedesktop/Hal/devices/computer:system.hardware.vendor" prefix="Dell">
+-        <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" prefix="Latitude">
+-          <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains_outof="D420;D820">
+-            <append key="input.keymap.data" type="strlist">e005:brightnessdown</append> <!-- Fn+Down arrow Brightness Down -->
+-            <append key="input.keymap.data" type="strlist">e006:brightnessup</append> <!-- Fn+Up arrow Brightness Up -->
+-            <append key="input.keymap.data" type="strlist">e007:battery</append> <!-- Fn+F3 battery icon -->
+-            <append key="input.keymap.data" type="strlist">e00a:suspend</append> <!-- Fn+F1 hibernate -->
+-            <append key="input.keymap.data" type="strlist">e00b:displaytoggle</append> <!-- Fn+F8 CRT/LCD -->
+-            <append key="input.keymap.data" type="strlist">e00f:switchvideomode</append> <!-- Fn+F7 aspect ratio -->
+-            <append key="input.keymap.data" type="strlist">e013:f23</append> <!-- FIXME Fn+Left arrow Auto Brightness -->
+-            <append key="info.capabilities" type="strlist">input.keymap</append>
+-          </match>
+-          <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains="D610">
+-            <append key="input.keymap.data" type="strlist">e005:brightnessdown</append> <!-- Fn+Down arrow Brightness Down -->
+-            <append key="input.keymap.data" type="strlist">e006:brightnessup</append> <!-- Fn+Up arrow Brightness Up -->
+-            <append key="input.keymap.data" type="strlist">e007:battery</append> <!-- Fn+F3 battery icon -->
+-            <append key="input.keymap.data" type="strlist">e008:wlan</append> <!-- Fn+F2 Turn On/Off Wireless -->
+-            <append key="input.keymap.data" type="strlist">e009:ejectclosecd</append> <!-- Fn+F10 Eject CD -->
+-            <append key="input.keymap.data" type="strlist">e00a:suspend</append> <!-- Fn+F1 hibernate -->
+-            <append key="input.keymap.data" type="strlist">e00b:displaytoggle</append> <!-- Fn+F8 CRT/LCD -->
+-            <append key="info.capabilities" type="strlist">input.keymap</append>
+-          </match>
+-          <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains="D620">
+-            <append key="input.keymap.data" type="strlist">e005:brightnessdown</append> <!-- Fn+Down arrow Brightness Down -->
+-            <append key="input.keymap.data" type="strlist">e006:brightnessup</append> <!-- Fn+Up arrow Brightness Up -->
+-            <append key="input.keymap.data" type="strlist">e007:battery</append> <!-- Fn+F3 battery icon -->
+-            <append key="input.keymap.data" type="strlist">e008:wlan</append> <!-- Turn On/Off Wireless -->
+-            <append key="input.keymap.data" type="strlist">e00a:suspend</append> <!-- Fn+F1 hibernate -->
+-            <append key="input.keymap.data" type="strlist">e00b:displaytoggle</append> <!-- Fn+F8 CRT/LCD -->
+-            <append key="input.keymap.data" type="strlist">e00f:switchvideomode</append> <!-- Fn+F7 aspect ratio -->
+-            <append key="input.keymap.data" type="strlist">e013:f23</append> <!-- Fn+Left arrow Auto Brightness -->
+-            <append key="info.capabilities" type="strlist">input.keymap</append>
+-          </match>
+-          <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains="D630">
+-            <append key="input.keymap.data" type="strlist">e005:brightnessdown</append> <!-- Fn+Down arrow Brightness Down -->
+-            <append key="input.keymap.data" type="strlist">e006:brightnessup</append> <!-- Fn+Up arrow Brightness Up -->
+-            <append key="input.keymap.data" type="strlist">e007:battery</append> <!-- Fn+F3 battery icon -->
+-            <append key="input.keymap.data" type="strlist">e008:wlan</append> <!-- Turn On/Off Wireless -->
+-            <append key="input.keymap.data" type="strlist">e00a:suspend</append> <!-- Fn+F1 hibernate -->
+-            <append key="input.keymap.data" type="strlist">e00b:displaytoggle</append> <!-- Fn+F8 CRT/LCD -->
+-            <append key="input.keymap.data" type="strlist">e00f:switchvideomode</append> <!-- Fn+F7 aspect ratio -->
+-            <append key="input.keymap.data" type="strlist">e011:prog1</append> <!-- Wifi Catcher (DELL Specific) -->
+-            <append key="input.keymap.data" type="strlist">e013:f23</append> <!-- Fn+Left arrow Auto Brightness -->
+-            <append key="info.capabilities" type="strlist">input.keymap</append>
+-          </match>
+-        </match> <!-- prefix="Latitude" -->
+-
+-	<!-- Dell Inspiron 9400, 640m, E1505/6400 -->
+-        <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" prefix_outof="MP061;MXC061;MM061"> 
++      <match key="/org/freedesktop/Hal/devices/computer:system.formfactor" string="laptop">
++        <match key="/org/freedesktop/Hal/devices/computer:system.hardware.vendor" prefix="Dell">
++          <append key="input.keymap.data" type="strlist">e001:playpause</append> <!-- Play/Pause -->
++          <append key="input.keymap.data" type="strlist">e002:stop</append> <!-- Stop -->
++          <append key="input.keymap.data" type="strlist">e003:previoussong</append> <!-- Previous song -->
++          <append key="input.keymap.data" type="strlist">e004:nextsong</append> <!-- Next song -->
+           <append key="input.keymap.data" type="strlist">e005:brightnessdown</append> <!-- Fn+Down arrow Brightness Down -->
+           <append key="input.keymap.data" type="strlist">e006:brightnessup</append> <!-- Fn+Up arrow Brightness Up -->
+           <append key="input.keymap.data" type="strlist">e007:battery</append> <!-- Fn+F3 battery icon -->
+-          <append key="input.keymap.data" type="strlist">e008:wlan</append> <!-- Fn+F2 Toggle WiFi -->
+-          <append key="input.keymap.data" type="strlist">e008:bluetooth</append> <!-- FIXME Bluetooth switch (same as wireless) -->
++          <append key="input.keymap.data" type="strlist">e008:wlan</append> <!-- Fn+F2 Turn On/Off Wireless -->
+           <append key="input.keymap.data" type="strlist">e009:ejectclosecd</append> <!-- Fn+F10 Eject CD -->
+           <append key="input.keymap.data" type="strlist">e00a:suspend</append> <!-- Fn+F1 hibernate -->
+-          <append key="input.keymap.data" type="strlist">e00b:switchvideomode</append> <!-- Fn+F8 CRT/LCD -->
++          <append key="input.keymap.data" type="strlist">e00b:displaytoggle</append> <!-- Fn+F8 CRT/LCD -->
++          <append key="input.keymap.data" type="strlist">e00f:switchvideomode</append> <!-- Fn+F7 aspect ratio -->
++          <append key="input.keymap.data" type="strlist">e010:previoussong</append> <!-- Front panel previous song -->
++          <append key="input.keymap.data" type="strlist">e011:prog1</append> <!-- Wifi Catcher (DELL Specific) -->
+           <append key="input.keymap.data" type="strlist">e012:media</append> <!-- MediaDirect button (house icon) -->
+-          <append key="info.capabilities" type="strlist">input.keymap</append>
+-        </match>
+-
+-        <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" prefix="MXC062"> <!-- Dell XPS M1210 -->
+-          <append key="input.keymap.data" type="strlist">e005:brightnessdown</append> <!-- Fn+Down arrow Brightness Down -->
+-          <append key="input.keymap.data" type="strlist">e006:brightnessup</append> <!-- Fn+Up arrow Brightness Up -->
+-          <append key="input.keymap.data" type="strlist">e007:battery</append> <!-- Fn+F3 Battery icon -->
+-          <append key="input.keymap.data" type="strlist">e008:wlan</append> <!-- Wirelesss switch -->
+-          <append key="input.keymap.data" type="strlist">e008:bluetooth</append> <!-- FIXME Bluetooth switch (same as wireless) -->
+-          <append key="input.keymap.data" type="strlist">e00a:suspend</append> <!-- Fn+F1 Hibernate -->
+-          <append key="input.keymap.data" type="strlist">e00b:switchvideomode</append> <!-- Fn+F8 CRT/LCD -->
+-          <append key="input.keymap.data" type="strlist">e012:media</append> <!-- Dell MediaDirect button Opens Dell Media Experience (a sort of media player) -->
++          <append key="input.keymap.data" type="strlist">e013:f23</append> <!-- FIXME Fn+Left arrow Auto Brightness -->
+           <append key="input.keymap.data" type="strlist">e015:camera</append> <!-- Shutter button Takes a picture if optional camera available -->
++          <append key="input.keymap.data" type="strlist">e019:nextsong</append> <!-- Front panel next song -->
++          <append key="input.keymap.data" type="strlist">e022:playpause</append> <!-- Front panel play/pause -->
++          <append key="input.keymap.data" type="strlist">e024:stop</append> <!-- Front panel stop -->
++          <append key="input.keymap.data" type="strlist">e06d:media</append> <!-- MediaDirect button -->
+           <append key="info.capabilities" type="strlist">input.keymap</append>
+         </match>
+-
+-        <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" prefix="Inspiron">
+-          <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains="8500">
+-            <append key="input.keymap.data" type="strlist">e005:brightnessdown</append> <!-- Fn+Down arrow Brightness Down -->
+-            <append key="input.keymap.data" type="strlist">e006:brightnessup</append> <!-- Fn+Up arrow Brightness Up -->
+-            <append key="input.keymap.data" type="strlist">e007:battery</append> <!-- Fn+F3 battery icon -->
+-            <append key="input.keymap.data" type="strlist">e008:wlan</append> <!-- Fn+F2 Toggle WiFi -->
+-            <append key="input.keymap.data" type="strlist">e009:ejectclosecd</append> <!-- Fn+F10 Eject CD -->
+-            <append key="info.capabilities" type="strlist">input.keymap</append>
+-          </match>
+-          <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains_outof="XPS Gen2;1501">
+-            <append key="input.keymap.data" type="strlist">e005:brightnessdown</append> <!-- Fn+Down arrow Brightness Down -->
+-            <append key="input.keymap.data" type="strlist">e006:brightnessup</append> <!-- Fn+Up arrow Brightness Up -->
+-            <append key="input.keymap.data" type="strlist">e007:battery</append> <!-- Fn+F3 battery icon -->
+-            <append key="input.keymap.data" type="strlist">e008:wlan</append> <!-- Fn+F2 Toggle WiFi -->
+-            <append key="input.keymap.data" type="strlist">e009:ejectclosecd</append> <!-- Fn+F10 Eject CD -->
+-            <append key="input.keymap.data" type="strlist">e00a:suspend</append> <!-- Fn+F1 Hibernate -->
+-            <append key="input.keymap.data" type="strlist">e00b:switchvideomode</append> <!-- Fn+F8 CRT/LCD -->
+-            <append key="info.capabilities" type="strlist">input.keymap</append>
+-          </match>
+-          <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains="1520">
+-            <append key="input.keymap.data" type="strlist">e005:brightnessdown</append> <!-- Fn+Down arrow Brightness Down -->
+-            <append key="input.keymap.data" type="strlist">e006:brightnessup</append> <!-- Fn+Up arrow Brightness Up -->
+-            <append key="input.keymap.data" type="strlist">e007:battery</append> <!-- Fn+F3 battery icon -->
+-            <append key="input.keymap.data" type="strlist">e009:ejectclosecd</append> <!-- Fn+F10 Eject CD -->
+-            <append key="input.keymap.data" type="strlist">e00a:suspend</append> <!-- Fn+F1 Hibernate -->
+-            <append key="input.keymap.data" type="strlist">e00b:switchvideomode</append> <!-- Fn+F8 CRT/LCD -->
+-            <append key="info.capabilities" type="strlist">input.keymap</append>
+-          </match>
+-        </match>
+-
+-        <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" prefix="Precision">
+-          <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains="M20">
+-            <append key="input.keymap.data" type="strlist">e005:brightnessdown</append> <!-- Fn+Down arrow Brightness Down -->
+-            <append key="input.keymap.data" type="strlist">e006:brightnessup</append> <!-- Fn+Up arrow Brightness Up -->
+-            <append key="input.keymap.data" type="strlist">e007:battery</append> <!-- Fn+F3 battery icon -->
+-            <append key="input.keymap.data" type="strlist">e008:wlan</append> <!-- Fn+F2 Turn On/Off Wireless -->
+-            <append key="input.keymap.data" type="strlist">e009:ejectclosecd</append> <!-- Fn+F10 Eject CD -->
+-            <append key="input.keymap.data" type="strlist">e00a:suspend</append> <!-- Fn+F1 hibernate -->
+-            <append key="input.keymap.data" type="strlist">e00b:displaytoggle</append> <!-- Fn+F8 CRT/LCD -->
+-            <append key="info.capabilities" type="strlist">input.keymap</append>
+-          </match>
+-          <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains="M65">
+-            <append key="input.keymap.data" type="strlist">e005:brightnessdown</append> <!-- Fn+Down arrow Brightness Down -->
+-            <append key="input.keymap.data" type="strlist">e006:brightnessup</append> <!-- Fn+Up arrow Brightness Up -->
+-            <append key="input.keymap.data" type="strlist">e007:battery</append> <!-- Fn+F3 battery icon -->
+-            <append key="input.keymap.data" type="strlist">e00a:suspend</append> <!-- Fn+F1 hibernate -->
+-            <append key="input.keymap.data" type="strlist">e00f:switchvideomode</append> <!-- Fn+F7 aspect ratio -->
+-            <append key="input.keymap.data" type="strlist">e013:f23</append> <!-- Fn+Left arrow Auto Brightness -->
+-            <append key="info.capabilities" type="strlist">input.keymap</append>
+-          </match>
+-        </match>
+       </match>
+     </match>
+   </device>
+diff --git a/fdi/information/10freedesktop/30-keymap-hp.fdi b/fdi/information/10freedesktop/30-keymap-hp.fdi
+index 2ec824f..fc714bd 100644
+--- a/fdi/information/10freedesktop/30-keymap-hp.fdi
++++ b/fdi/information/10freedesktop/30-keymap-hp.fdi
+@@ -5,123 +5,34 @@
+ 
+     <!-- These are raw scancodes produced by the atkbd driver -->
+     <match key="@input.originating_device:info.linux.driver" string="atkbd">
+-
+       <match key="/org/freedesktop/Hal/devices/computer:system.hardware.vendor" prefix="Hewlett-Packard">
+-        <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains="dv2500">
+-          <append key="input.keymap.data" type="strlist">e00a:screenlock</append> <!-- FnF6 (lock) -->
+-          <append key="input.keymap.data" type="strlist">e031:help</append>	<!-- FnF1 (help) -->
+-          <append key="input.keymap.data" type="strlist">e059:f22</append>	<!-- touchpad on  -->
+-          <append key="input.keymap.data" type="strlist">e058:f22</append>	<!-- touchpad off -->
+-          <append key="info.capabilities" type="strlist">input.keymap</append>
+-        </match>
+-	<match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains="dv5000">
+-          <append key="input.keymap.data" type="strlist">e031:help</append>     <!-- FnF1 (help) -->
+-          <append key="input.keymap.data" type="strlist">e00a:screenlock</append> <!-- FnF6 (lock) -->
+-          <append key="info.capabilities" type="strlist">input.keymap</append>
+-        </match>
+-	<!-- HP Pavilion dv6426us -->
+-	<match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains="dv6000">
+-          <append key="input.keymap.data" type="strlist">e008:f20</append>	<!-- FIXME: quick play -->
+-          <append key="input.keymap.data" type="strlist">e00e:f21</append>	<!-- FIXME: dvd -->
+-          <append key="info.capabilities" type="strlist">input.keymap</append>
+-        </match>
+-        <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains="dv6500">
+-          <append key="input.keymap.data" type="strlist">e008:f20</append>	<!-- FIXME: quick play -->
+-          <append key="input.keymap.data" type="strlist">e00a:screenlock</append> <!-- FnF6 (lock) -->
+-          <append key="input.keymap.data" type="strlist">e00e:f21</append>	<!-- FIXME: dvd -->
+-          <append key="input.keymap.data" type="strlist">e031:help</append>	<!-- FnF1 (help) -->
+-          <append key="input.keymap.data" type="strlist">e058:f22</append>	<!-- FIXME: touchpad off -->
+-          <append key="input.keymap.data" type="strlist">e059:f22</append>	<!-- FIXME: touchpad on -->
+-          <append key="info.capabilities" type="strlist">input.keymap</append>
+-        </match>
+-	<!-- HP 530 Notebook PC(GN797AA#AKB) -->
+-        <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains="HP 530 Notebook">
+-          <append key="input.keymap.data" type="strlist">e00a:screenlock</append> <!-- FnF6 (lock) -->
+-          <append key="info.capabilities" type="strlist">input.keymap</append>
+-        </match>
+-        <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains="nc2400">
+-          <append key="input.keymap.data" type="strlist">e001:fn_esc</append>	<!-- FnEsc -->
+-          <append key="input.keymap.data" type="strlist">e008:presentation</append>	<!-- Presentation -->
+-          <append key="input.keymap.data" type="strlist">e009:battery</append>	<!-- FnF8 (battery) -->
+-          <append key="input.keymap.data" type="strlist">e00a:f22</append>	<!-- FnF6 -->
+-          <append key="input.keymap.data" type="strlist">e059:info</append>	<!-- I key -->
+-          <append key="info.capabilities" type="strlist">input.keymap</append>
+-        </match>
+-        <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains="2510p">
+-          <append key="input.keymap.data" type="strlist">e008:presentation</append>	<!-- Presentation -->
+-          <append key="input.keymap.data" type="strlist">e009:battery</append>	<!-- FnF8 (battery) -->
+-          <append key="input.keymap.data" type="strlist">e00a:f21</append>	<!-- FnF6 -->
+-          <append key="input.keymap.data" type="strlist">e033:f22</append>     	<!-- FIXME: Auto brightness -->
+-          <append key="input.keymap.data" type="strlist">e058:f23</append>	<!-- FIXME: touchpad off -->
+-          <append key="input.keymap.data" type="strlist">e059:f23</append>	<!-- FIXME: touchpad on -->
+-          <append key="info.capabilities" type="strlist">input.keymap</append>
+-        </match>
+-        <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains="nx5000">
+-          <append key="input.keymap.data" type="strlist">e001:fn_esc</append>	<!-- FnEsc -->
+-          <append key="input.keymap.data" type="strlist">e008:tv</append>	<!-- SVideo/Presentation -->
+-          <append key="input.keymap.data" type="strlist">e009:battery</append>	<!-- FnF8 (battery) -->
+-          <append key="input.keymap.data" type="strlist">e00a:screenlock</append>	<!-- Lock -->
+-          <append key="input.keymap.data" type="strlist">e057:wlan</append>	<!-- Wlan -->
+-          <append key="info.capabilities" type="strlist">input.keymap</append>
+-        </match>
+-        <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains_outof="nc6120;nc6320">
+-          <append key="input.keymap.data" type="strlist">e008:tv</append>	<!-- SVideo -->
+-          <append key="input.keymap.data" type="strlist">e009:battery</append>	<!-- FnF8 (battery) -->
+-          <append key="input.keymap.data" type="strlist">e059:www</append>	<!-- I key -->
+-          <append key="info.capabilities" type="strlist">input.keymap</append>
+-        </match>
+-        <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains_outof="nc6400;nx6125">
+-          <append key="input.keymap.data" type="strlist">e001:fn_esc</append>	<!-- FnEsc -->
+-          <append key="input.keymap.data" type="strlist">e008:presentation</append>	<!-- presentation -->
+-          <append key="input.keymap.data" type="strlist">e009:battery</append>	<!-- FnF8 (battery) -->
+-          <append key="input.keymap.data" type="strlist">e059:info</append>	<!-- I key -->
+-          <append key="info.capabilities" type="strlist">input.keymap</append>
+-        </match>
+-        <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains_outof="nc6230;nw8440;nx6325;6710b;6715;nx9420">
+-          <append key="input.keymap.data" type="strlist">e001:fn_esc</append>	<!-- FnEsc -->
+-          <append key="input.keymap.data" type="strlist">e008:presentation</append>	<!-- presentation -->
+-          <append key="input.keymap.data" type="strlist">e009:battery</append>	<!-- FnF8 (battery) -->
+-          <append key="input.keymap.data" type="strlist">e00a:screenlock</append>	<!-- FnF6 Lock -->
+-          <append key="input.keymap.data" type="strlist">e033:f22</append>      <!-- FIXME: Auto brightness -->
+-          <append key="input.keymap.data" type="strlist">e059:info</append>	<!-- I key -->
+-          <append key="info.capabilities" type="strlist">input.keymap</append>
+-        </match>
+-        <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains="6910p">
+-          <append key="input.keymap.data" type="strlist">e001:fn_esc</append>		<!-- FnEsc -->
+-          <append key="input.keymap.data" type="strlist">e008:presentation</append>	<!-- presentation -->
+-          <append key="input.keymap.data" type="strlist">e009:battery</append>		<!-- FnF8 (battery) -->
+-          <append key="info.capabilities" type="strlist">input.keymap</append>
+-        </match>
+-        <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains_outof="nx7300;nx7400">
+-          <append key="input.keymap.data" type="strlist">e001:fn_esc</append>	<!-- FnEsc -->
+-          <append key="input.keymap.data" type="strlist">e009:battery</append>	<!-- FnF8 (battery) -->
+-          <append key="input.keymap.data" type="strlist">e00a:screenlock</append>	<!-- FnF6 Lock -->
+-          <append key="input.keymap.data" type="strlist">e033:f22</append>     	<!-- FIXME: Auto brightness -->
+-          <append key="info.capabilities" type="strlist">input.keymap</append>
+-        </match>
+-        <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains="nx9105">
+-          <append key="input.keymap.data" type="strlist">e001:fn_esc</append>	<!-- FnEsc -->
+-          <append key="input.keymap.data" type="strlist">e00a:screenlock</append> <!-- FnF6 (lock) -->
+-          <append key="input.keymap.data" type="strlist">e031:help</append>	<!-- FnF1 (help) -->
+-          <append key="info.capabilities" type="strlist">input.keymap</append>
+-        </match>
+-	<match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains="zd7000">
+-          <append key="input.keymap.data" type="strlist">e008:player</append>    <!-- multi-media -->
+-          <append key="input.keymap.data" type="strlist">e00a:screenlock</append><!-- Fn+lock -->
+-          <append key="input.keymap.data" type="strlist">e00b:camera</append>    <!-- camera -->
+-          <append key="input.keymap.data" type="strlist">e031:help</append>      <!-- Fn+F1 (help) -->
+-          <append key="info.capabilities" type="strlist">input.keymap</append>
+-        </match>
+-        <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains="tx1000">
+-          <append key="input.keymap.data" type="strlist">e001:fn_esc</append>	<!-- FnEsc -->
+-          <append key="input.keymap.data" type="strlist">e00a:screenlock</append> <!-- FnF6 (lock) -->
+-          <append key="input.keymap.data" type="strlist">e031:help</append>	<!-- FnF1 (help) -->
+-	  <append key="input.keymap.data" type="strlist">e00e:dvd</append>	<!-- Media Player: DVD mode -->
+-	  <append key="input.keymap.data" type="strlist">e008:pc</append>	<!-- Media Player: Media Mode (PVR or PC?) -->
+-          <append key="input.keymap.data" type="strlist">e059:f22</append>	<!-- touchpad on  -->
+-          <append key="input.keymap.data" type="strlist">e058:f22</append>	<!-- touchpad off -->
+-          <append key="info.capabilities" type="strlist">input.keymap</append>
+-        </match>
++        <append key="input.keymap.data" type="strlist">e001:fn_esc</append>   <!-- FnEsc -->
++        <append key="input.keymap.data" type="strlist">e009:battery</append>  <!-- FnF8 (battery) -->
++        <append key="input.keymap.data" type="strlist">e00a:screenlock</append> <!-- FnF6 (lock) -->
++        <append key="input.keymap.data" type="strlist">e00b:camera</append>     <!-- camera -->
++        <append key="input.keymap.data" type="strlist">e00c:media</append>      <!-- music -->
++        <append key="input.keymap.data" type="strlist">e00e:dvd</append>      <!-- dvd -->
++        <append key="input.keymap.data" type="strlist">e031:help</append>     <!-- FnF1 (help) -->
++        <append key="input.keymap.data" type="strlist">e033:f21</append>      <!-- FIXME: Auto brightness -->
++        <append key="input.keymap.data" type="strlist">e057:wlan</append>     <!-- Wlan -->
++        <append key="info.capabilities" type="strlist">input.keymap</append>
++	<match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains_ncase="Pavilion"> 
++          <!-- Home and entertainment machines -->
++          <append key="input.keymap.data" type="strlist">e008:player</append> <!-- FIXME: quick play -->
++          <append key="input.keymap.data" type="strlist">e058:f22</append>    <!-- touchpad off -->
++          <append key="input.keymap.data" type="strlist">e059:f23</append>    <!-- touchpad on  -->
++        </match>
++	<match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains_ncase="Compaq">
++          <!-- Business and enterprise machines -->
++          <append key="input.keymap.data" type="strlist">e008:presentation</append>   <!-- Presentation -->
++          <append key="input.keymap.data" type="strlist">e059:info</append>   <!-- I key -->
++        </match>
++	<match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains_outof="2510p">
++          <!-- The 2510p seems to be unique in having a touchpad disable button despite being an enterprise model -->
++          <remove key="input.keymap.data" type="strlist">e059:info</remove>
++          <append key="input.keymap.data" type="strlist">e058:f22</append>    <!-- touchpad off -->
++          <append key="input.keymap.data" type="strlist">e059:f23</append>    <!-- touchpad on  -->
++	</match>
+       </match>
+     </match>
+   </device>
+diff --git a/fdi/information/10freedesktop/30-keymap-misc.fdi b/fdi/information/10freedesktop/30-keymap-misc.fdi
+index 171b13d..def976f 100644
+--- a/fdi/information/10freedesktop/30-keymap-misc.fdi
++++ b/fdi/information/10freedesktop/30-keymap-misc.fdi
+@@ -102,35 +102,20 @@
+       </match>
+ 
+       <match key="/org/freedesktop/Hal/devices/computer:system.hardware.vendor" prefix="SAMSUNG">
+-        <!-- Samsung P55-Pro -->
+-        <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains="SP55S">
+-          <append key="input.keymap.data" type="strlist">e003:battery</append> <!-- Fn+F2 battery icon -->
+-          <!-- Fn+F3  euro (generates a sequence of different keypressed events in syslog) -->
+-          <append key="input.keymap.data" type="strlist">e002:displaytoggle</append> <!-- Fn+F4 CRT/LCD -->
+-          <append key="input.keymap.data" type="strlist">e004:prog1</append> <!-- Fn+F5 backlight on/off -->
+-          <append key="input.keymap.data" type="strlist">e031:prog2</append> <!-- Fn+F7 run Samsung Magic Doctor (keypressed event is generated twice) -->
+-          <append key="input.keymap.data" type="strlist">e033:prog3</append> <!-- Fn+F8 switch power mode (battery/dynamic/performance) -->
+-          <append key="input.keymap.data" type="strlist">e006:wlan</append> <!-- Fn+F9 Turn On/Off Wireless -->
+-          <append key="input.keymap.data" type="strlist">e077:f22</append> <!-- Fn+F10 Touchpad on -->
+-          <append key="input.keymap.data" type="strlist">e079:f22</append> <!-- Fn+F10 Touchpad off -->
+-          <append key="input.keymap.data" type="strlist">e008:brightnessup</append> <!-- Fn-Up Brightness up -->
+-          <append key="input.keymap.data" type="strlist">e009:brightnessdown</append> <!-- Fn-Down Brightness down -->
+-          <append key="info.capabilities" type="strlist">input.keymap</append>
+-        </match>
+-        <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" string="SQ45S70S">
+-          <append key="input.keymap.data" type="strlist">e003:battery</append> <!-- Fn+F2 battery icon -->
+-	  <!-- Fn+F3 euro; generates these scancodes according to showkeys(1): 0x38 0x52 0xd2 0x4f 0xcf 0x50 0xd0 0x48 0xc8 0xb8 -->
+-          <append key="input.keymap.data" type="strlist">e002:displaytoggle</append> <!-- Fn+F4 CRT/LCD; -->
+-          <append key="input.keymap.data" type="strlist">e004:prog1</append> <!-- Fn+F5 backlight on/off -->
+-          <append key="input.keymap.data" type="strlist">e031:prog2</append> <!-- Fn+F7 run Samsung Magic Doctor (keypress event is generated twice) -->
+-          <append key="input.keymap.data" type="strlist">e033:prog3</append> <!-- Fn+F8 switch power mode (battery/dynamic/performance) -->
+-          <append key="input.keymap.data" type="strlist">e006:wlan</append> <!-- Fn+F9 Turn On/Off Wireless -->
+-          <append key="input.keymap.data" type="strlist">e077:f22</append> <!-- Fn+F10 Touchpad on -->
+-          <append key="input.keymap.data" type="strlist">e079:f22</append> <!-- Fn+F10 Touchpad off -->
+-          <append key="input.keymap.data" type="strlist">e008:brightnessup</append> <!-- Fn+Up Brightness up -->
+-          <append key="input.keymap.data" type="strlist">e009:brightnessdown</append> <!-- Fn+Down Brightness down -->
+-          <append key="info.capabilities" type="strlist">input.keymap</append>
+-        </match>
++        <append key="input.keymap.data" type="strlist">0075:www</append> <!-- WWW key -->
++        <append key="input.keymap.data" type="strlist">0078:mail</append> <!-- Mail key -->
++        <append key="input.keymap.data" type="strlist">0074:prog1</append> <!-- User key -->
++        <append key="input.keymap.data" type="strlist">e002:displaytoggle</append> <!-- Fn+F4 CRT/LCD -->
++        <append key="input.keymap.data" type="strlist">e003:battery</append> <!-- Fn+F2 battery icon -->
++        <append key="input.keymap.data" type="strlist">e004:prog1</append> <!-- Fn+F5 backlight on/off -->
++        <append key="input.keymap.data" type="strlist">e006:wlan</append> <!-- Fn+F9 Turn On/Off Wireless -->
++        <append key="input.keymap.data" type="strlist">e008:brightnessup</append> <!-- Fn-Up Brightness up -->
++        <append key="input.keymap.data" type="strlist">e009:brightnessdown</append> <!-- Fn-Down Brightness down -->
++        <append key="input.keymap.data" type="strlist">e031:prog2</append> <!-- Fn+F7 run Samsung Magic Doctor (keypressed event is generated twice) -->
++        <append key="input.keymap.data" type="strlist">e033:prog3</append> <!-- Fn+F8 switch power mode (battery/dynamic/performance) -->
++        <append key="input.keymap.data" type="strlist">e077:f22</append> <!-- Fn+F10 Touchpad on -->
++        <append key="input.keymap.data" type="strlist">e079:f22</append> <!-- Fn+F10 Touchpad off -->
++        <append key="info.capabilities" type="strlist">input.keymap</append>
+       </match>
+ 
+       <match key="/org/freedesktop/Hal/devices/computer:system.hardware.vendor" string="TOSHIBA">
+diff --git a/fdi/information/10freedesktop/30-keymap-module-sony-laptop.fdi b/fdi/information/10freedesktop/30-keymap-module-sony-laptop.fdi
+index e94ee96..3661d37 100644
+--- a/fdi/information/10freedesktop/30-keymap-module-sony-laptop.fdi
++++ b/fdi/information/10freedesktop/30-keymap-module-sony-laptop.fdi
+@@ -6,39 +6,26 @@
+          You can find the scancodes in the kernel source of the module (drivers/misc/sony-laptop.c) -->
+     <match key="input.product" string="Sony Vaio Keys">
+       <match key="/org/freedesktop/Hal/devices/computer:system.hardware.vendor" prefix="Sony">
+-        <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" string_outof="PCG-Z1RMP;PCG-Z1XMP;VGN-S1XP(GB);VGN-SZ3XWP_C;VGN-S5VP_B">
+-          <append key="input.keymap.data" type="strlist">0x06:mute</append> <!-- Fn+F2 mute -->
+-          <append key="input.keymap.data" type="strlist">0x07:volumedown</append> <!-- Fn+F3 mixer down -->
+-          <append key="input.keymap.data" type="strlist">0x08:volumeup</append> <!-- Fn+F4 mixer up -->
+-          <append key="input.keymap.data" type="strlist">0x09:brightnessdown</append> <!-- Fn+F5 brightness up -->
+-          <append key="input.keymap.data" type="strlist">0x0a:brightnessup</append> <!-- Fn+F6 brightness down -->
+-          <append key="input.keymap.data" type="strlist">0x0b:switchvideomode</append> <!-- Fn+F7 switch crt/lcd -->
+-          <append key="input.keymap.data" type="strlist">0x10:suspend</append> <!-- Fn+F12 hibernate -->
+-          <append key="info.capabilities" type="strlist">input.keymap</append>
+-        </match>
+-
+-        <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains_outof="VGN-FS790B;VGN-TZ11;VGN-TZ16;VGN-SZ71WN_C">
+-          <append key="input.keymap.data" type="strlist">0x06:mute</append> <!-- Fn+F2 mute -->
+-          <append key="input.keymap.data" type="strlist">0x07:volumedown</append> <!-- Fn+F3 mixer down -->
+-          <append key="input.keymap.data" type="strlist">0x08:volumeup</append> <!-- Fn+F4 mixer up -->
+-          <append key="input.keymap.data" type="strlist">0x09:brightnessdown</append> <!-- Fn+F5 brightness up -->
+-          <append key="input.keymap.data" type="strlist">0x0a:brightnessup</append> <!-- Fn+F6 brightness down -->
+-          <append key="input.keymap.data" type="strlist">0x0b:switchvideomode</append> <!-- Fn+F7 switch crt/lcd -->
+-          <append key="input.keymap.data" type="strlist">0x0e:zoom</append> <!-- Fn+F10 zoom -->
+-          <append key="input.keymap.data" type="strlist">0x10:suspend</append> <!-- Fn+F12 hibernate -->
+-          <append key="info.capabilities" type="strlist">input.keymap</append>
+-        </match>
+-
+-        <match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains_outof="VGN-FZ140E">
+-          <append key="input.keymap.data" type="strlist">0x06:mute</append> <!-- Fn+F2 mute -->
+-          <append key="input.keymap.data" type="strlist">0x09:brightnessdown</append> <!-- Fn+F5 brightness up -->
+-          <append key="input.keymap.data" type="strlist">0x0a:brightnessup</append> <!-- Fn+F6 brightness down -->
+-          <append key="input.keymap.data" type="strlist">0x0b:switchvideomode</append> <!-- Fn+F7 switch crt/lcd -->
+-          <append key="input.keymap.data" type="strlist">0x0e:zoom</append> <!-- Fn+F10 zoom -->
+-          <append key="input.keymap.data" type="strlist">0x10:suspend</append> <!-- Fn+F12 hibernate -->
+-          <append key="info.capabilities" type="strlist">input.keymap</append>
+-        </match>
+-      </match>
++        <append key="input.keymap.data" type="strlist">0x06:mute</append> <!-- Fn+F2 mute -->
++        <append key="input.keymap.data" type="strlist">0x07:volumedown</append> <!-- Fn+F3 mixer down -->
++        <append key="input.keymap.data" type="strlist">0x08:volumeup</append> <!-- Fn+F4 mixer up -->
++        <append key="input.keymap.data" type="strlist">0x09:brightnessdown</append> <!-- Fn+F5 brightness up -->
++        <append key="input.keymap.data" type="strlist">0x0a:brightnessup</append> <!-- Fn+F6 brightness down -->
++        <append key="input.keymap.data" type="strlist">0x0b:switchvideomode</append> <!-- Fn+F7 switch crt/lcd -->
++        <append key="input.keymap.data" type="strlist">0x0e:zoom</append> <!-- Fn+F10 zoom -->
++        <append key="input.keymap.data" type="strlist">0x10:suspend</append> <!-- Fn+F12 hibernate -->
++        <append key="info.capabilities" type="strlist">input.keymap</append>
++	<match key="/org/freedesktop/Hal/devices/computer:system.hardware.product" contains_outof="PCG-C1;PCG-K25;PCG-F1;PCG-F2;PCG-F3;PCG-F4;PCG-F5;PCG-F6;PCG-FX;PCG-FRV;PCG-GR;PCG-TR;PCG-NV;PCG-Z">
++	  <!-- Older Vaios have a different keymap -->
++	  <remove key="input.keymap.data" type="strlist">0x06:mute</remove>
++	  <remove key="input.keymap.data" type="strlist">0x07:volumedown</remove>
++	  <remove key="input.keymap.data" type="strlist">0x08:volumeup</remove>
++	  <remove key="input.keymap.data" type="strlist">0x09:brightnessdown</remove>
++	  <remove key="input.keymap.data" type="strlist">0x0a:brightnessup</remove>
++          <append key="input.keymap.data" type="strlist">0x06:battery</append>
++          <append key="input.keymap.data" type="strlist">0x07:mute</append> 
++	</match>
++     </match>
+     </match>
+   </device>
+ </deviceinfo>
+diff --git a/fdi/information/10freedesktop/30-keymap-module-thinkpad-acpi.fdi b/fdi/information/10freedesktop/30-keymap-module-thinkpad-acpi.fdi
+index 1064cbd..bdc4fe9 100644
+--- a/fdi/information/10freedesktop/30-keymap-module-thinkpad-acpi.fdi
++++ b/fdi/information/10freedesktop/30-keymap-module-thinkpad-acpi.fdi
+@@ -5,137 +5,43 @@
+     <!-- These are buttons synthesized in the thinkpad-acpi kernel module -->
+     <match key="input.product" string="ThinkPad Extra Buttons">
+       <match key="/org/freedesktop/Hal/devices/computer:system.hardware.vendor" prefix="IBM">
+-        <match key="/org/freedesktop/Hal/devices/computer:system.hardware.version" contains="600">
+-          <append key="input.keymap.data" type="strlist">0x02:screenlock</append> <!-- Fn+F3 lock -->
+-          <append key="input.keymap.data" type="strlist">0x03:sleep</append> <!-- Fn+F4 suspend -->
+-          <append key="input.keymap.data" type="strlist">0x06:switchvideomode</append> <!-- Fn+F7 switch video output device -->
+-          <append key="input.keymap.data" type="strlist">0x07:search</append> <!-- Fn+F8 screen expand -->
+-          <append key="input.keymap.data" type="strlist">0x0b:suspend</append> <!-- Fn+F12 hibernate -->
+-          <append key="input.keymap.data" type="strlist">0x17:vendor</append> <!-- ThinkPad/ThinkVantage button -->
+-          <append key="info.capabilities" type="strlist">input.keymap</append>
+-        </match>
+-        <match key="/org/freedesktop/Hal/devices/computer:system.hardware.version" contains="750">
+-          <append key="input.keymap.data" type="strlist">0x02:battery</append> <!-- Fn+F3 battery -->
+-          <append key="input.keymap.data" type="strlist">0x02:screenlock</append> <!-- Fn+F3 lock -->
+-          <append key="input.keymap.data" type="strlist">0x03:sleep</append> <!-- Fn+F4 suspend -->
+-          <append key="input.keymap.data" type="strlist">0x06:switchvideomode</append> <!-- Fn+F7 switch video output device -->
+-          <append key="input.keymap.data" type="strlist">0x07:search</append> <!-- Fn+F8 screen expand -->
+-          <append key="input.keymap.data" type="strlist">0x0a:mode</append> <!-- Fn+F11 power mode -->
+-          <append key="input.keymap.data" type="strlist">0x0b:suspend</append> <!-- Fn+F12 hibernate -->
+-          <append key="input.keymap.data" type="strlist">0x17:vendor</append> <!-- ThinkPad/ThinkVantage button -->
+-          <append key="info.capabilities" type="strlist">input.keymap</append>
+-        </match>
+-        <match key="/org/freedesktop/Hal/devices/computer:system.hardware.version" contains="R5">
+-          <append key="input.keymap.data" type="strlist">0x03:sleep</append> <!-- Fn+F4 suspend -->
+-          <append key="input.keymap.data" type="strlist">0x04:radio</append> <!-- Fn+F5 switch wifi -->
+-          <append key="input.keymap.data" type="strlist">0x06:switchvideomode</append> <!-- Fn+F7 switch video output device -->
+-          <append key="input.keymap.data" type="strlist">0x0b:suspend</append> <!-- Fn+F12 hibernate -->
+-          <append key="input.keymap.data" type="strlist">0x0f:brightnessup</append> <!-- Fn+Home -->
+-          <append key="input.keymap.data" type="strlist">0x10:brightnessdown</append> <!-- Fn+End -->
+-          <append key="input.keymap.data" type="strlist">0x13:zoom</append> <!-- Fn+Space -->
+-          <append key="input.keymap.data" type="strlist">0x17:vendor</append> <!-- ThinkPad/ThinkVantage button -->
+-          <append key="info.capabilities" type="strlist">input.keymap</append>
+-        </match>
+-        <match key="/org/freedesktop/Hal/devices/computer:system.hardware.version" contains_outof="T3;X2;R3;A2">
+-          <append key="input.keymap.data" type="strlist">0x02:screenlock</append> <!-- Fn+F3 lock -->
+-          <append key="input.keymap.data" type="strlist">0x03:sleep</append> <!-- Fn+F4 suspend -->
+-          <append key="input.keymap.data" type="strlist">0x06:switchvideomode</append> <!-- Fn+F7 switch video output device -->
+-          <append key="input.keymap.data" type="strlist">0x0b:suspend</append> <!-- Fn+F12 hibernate -->
+-          <append key="input.keymap.data" type="strlist">0x0f:brightnessup</append> <!-- Fn+Home -->
+-          <append key="input.keymap.data" type="strlist">0x10:brightnessdown</append> <!-- Fn+End -->
+-          <append key="input.keymap.data" type="strlist">0x13:zoom</append> <!-- Fn+Space -->
+-          <append key="input.keymap.data" type="strlist">0x17:vendor</append> <!-- ThinkPad/ThinkVantage button -->
+-          <append key="info.capabilities" type="strlist">input.keymap</append>
+-        </match>
+-        <match key="/org/freedesktop/Hal/devices/computer:system.hardware.version" contains="T4">
+-          <append key="input.keymap.data" type="strlist">0x02:screenlock</append> <!-- Fn+F3 lock -->
+-          <append key="input.keymap.data" type="strlist">0x03:sleep</append> <!-- Fn+F4 suspend -->
+-          <append key="input.keymap.data" type="strlist">0x04:radio</append> <!-- Fn+F5 switch radio -->
+-          <append key="input.keymap.data" type="strlist">0x06:switchvideomode</append> <!-- Fn+F7 switch video output device -->
+-          <append key="input.keymap.data" type="strlist">0x0b:suspend</append> <!-- Fn+F12 hibernate -->
+-          <append key="input.keymap.data" type="strlist">0x0f:brightnessup</append> <!-- Fn+Home -->
+-          <append key="input.keymap.data" type="strlist">0x10:brightnessdown</append> <!-- Fn+End -->
+-          <append key="input.keymap.data" type="strlist">0x13:zoom</append> <!-- Fn+Space -->
+-          <append key="input.keymap.data" type="strlist">0x17:vendor</append> <!-- ThinkPad/ThinkVantage button -->
+-          <append key="info.capabilities" type="strlist">input.keymap</append>
+-        </match>
+-        <match key="/org/freedesktop/Hal/devices/computer:system.hardware.version" contains_outof="X3;G40">
+-          <append key="input.keymap.data" type="strlist">0x02:screenlock</append> <!-- Fn+F3 lock -->
+-          <append key="input.keymap.data" type="strlist">0x03:sleep</append> <!-- Fn+F4 suspend -->
+-          <append key="input.keymap.data" type="strlist">0x06:switchvideomode</append> <!-- Fn+F7 switch video output device -->
+-          <append key="input.keymap.data" type="strlist">0x07:radio</append> <!-- Fn+F8 switch radio -->
+-          <append key="input.keymap.data" type="strlist">0x0b:suspend</append> <!-- Fn+F12 hibernate -->
+-          <append key="input.keymap.data" type="strlist">0x0f:brightnessup</append> <!-- Fn+Home -->
+-          <append key="input.keymap.data" type="strlist">0x10:brightnessdown</append> <!-- Fn+End -->
+-          <append key="input.keymap.data" type="strlist">0x13:zoom</append> <!-- Fn+Space -->
+-          <append key="input.keymap.data" type="strlist">0x17:vendor</append> <!-- ThinkPad/ThinkVantage button -->
+-          <append key="info.capabilities" type="strlist">input.keymap</append>
+-        </match>
+-        <match key="/org/freedesktop/Hal/devices/computer:system.hardware.version" contains="X4">
+-          <append key="input.keymap.data" type="strlist">0x02:screenlock</append> <!-- Fn+F3 lock -->
+-          <append key="input.keymap.data" type="strlist">0x03:sleep</append> <!-- Fn+F4 suspend -->
+-          <append key="input.keymap.data" type="strlist">0x04:radio</append> <!-- Fn+F5 switch radio -->
+-          <append key="input.keymap.data" type="strlist">0x06:switchvideomode</append> <!-- Fn+F7 switch video output device -->
+-          <append key="input.keymap.data" type="strlist">0x08:f24</append> <!-- Fn+F9 undock -->
+-          <append key="input.keymap.data" type="strlist">0x0b:suspend</append> <!-- Fn+F12 hibernate -->
+-          <append key="input.keymap.data" type="strlist">0x0f:brightnessup</append> <!-- Fn+Home -->
+-          <append key="input.keymap.data" type="strlist">0x10:brightnessdown</append> <!-- Fn+End -->
+-          <append key="input.keymap.data" type="strlist">0x13:zoom</append> <!-- Fn+Space -->
+-          <append key="input.keymap.data" type="strlist">0x17:vendor</append> <!-- ThinkPad/ThinkVantage button -->
+-          <append key="info.capabilities" type="strlist">input.keymap</append>
+-        </match>
++        <append key="input.keymap.data" type="strlist">0x01:battery</append> <!-- Fn+F2 battery -->
++        <append key="input.keymap.data" type="strlist">0x02:screenlock</append> <!-- Fn+F3 lock -->
++        <append key="input.keymap.data" type="strlist">0x03:sleep</append> <!-- Fn+F4 suspend -->
++        <append key="input.keymap.data" type="strlist">0x04:radio</append> <!-- Fn+F5 switch radio -->
++        <append key="input.keymap.data" type="strlist">0x06:switchvideomode</append> <!-- Fn+F7 switch video output device -->
++        <append key="input.keymap.data" type="strlist">0x07:zoom</append> <!-- Fn+F8 screen expand -->
++        <append key="input.keymap.data" type="strlist">0x08:f24</append> <!-- Fn+F9 undock -->
++        <append key="input.keymap.data" type="strlist">0x0b:suspend</append> <!-- Fn+F12 hibernate -->
++        <append key="input.keymap.data" type="strlist">0x0f:brightnessup</append> <!-- Fn+Home -->
++        <append key="input.keymap.data" type="strlist">0x10:brightnessdown</append> <!-- Fn+End -->
++        <append key="input.keymap.data" type="strlist">0x11:kbdillumtoggle</append> <!-- Fn+PgUp - ThinkLight -->
++        <append key="input.keymap.data" type="strlist">0x13:zoom</append> <!-- Fn+Space -->
++        <append key="input.keymap.data" type="strlist">0x14:volumeup</append> <!-- Volume Up button -->
++	<append key="input.keymap.data" type="strlist">0x15:volumedown</append> <!-- Volume Down button -->
++        <append key="input.keymap.data" type="strlist">0x16:mute</append> <!-- Mute button -->
++        <append key="input.keymap.data" type="strlist">0x17:vendor</append> <!-- ThinkPad/ThinkVantage button -->
++        <append key="info.capabilities" type="strlist">input.keymap</append>
+       </match>
+-
++      <!-- Lenovo systems have a similar but different layout to IBM systems -->
+       <match key="/org/freedesktop/Hal/devices/computer:system.hardware.vendor" prefix="LENOVO">
+-        <match key="/org/freedesktop/Hal/devices/computer:system.hardware.version" contains_outof="X6;Z6">
+-          <append key="input.keymap.data" type="strlist">0x01:screenlock</append> <!-- Fn+F2 lock -->
+-          <append key="input.keymap.data" type="strlist">0x02:battery</append> <!-- Fn+F3 battery -->
+-          <append key="input.keymap.data" type="strlist">0x03:sleep</append> <!-- Fn+F4 suspend -->
+-          <append key="input.keymap.data" type="strlist">0x04:radio</append> <!-- Fn+F5 wifi -->
+-          <append key="input.keymap.data" type="strlist">0x06:switchvideomode</append> <!-- Fn+F7 switch video output device -->
+-          <append key="input.keymap.data" type="strlist">0x07:f22</append> <!-- Fn+F8 touchpadtoggle -->
+-          <append key="input.keymap.data" type="strlist">0x08:f24</append> <!-- Fn+F9 undock -->
+-          <append key="input.keymap.data" type="strlist">0x0b:suspend</append> <!-- Fn+F12 hibernate -->
+-          <append key="input.keymap.data" type="strlist">0x0f:brightnessup</append> <!-- Fn+Home -->
+-          <append key="input.keymap.data" type="strlist">0x10:brightnessdown</append> <!-- Fn+End -->
+-          <append key="input.keymap.data" type="strlist">0x13:zoom</append> <!-- Fn+Space -->
+-          <append key="input.keymap.data" type="strlist">0x17:vendor</append> <!-- ThinkPad/ThinkVantage button -->
+-          <append key="info.capabilities" type="strlist">input.keymap</append>
+-        </match>
+-        <match key="/org/freedesktop/Hal/devices/computer:system.hardware.version" contains="T6">
+-          <append key="input.keymap.data" type="strlist">0x01:screenlock</append> <!-- Fn+F2 lock -->
+-          <append key="input.keymap.data" type="strlist">0x02:battery</append> <!-- Fn+F3 battery -->
+-          <append key="input.keymap.data" type="strlist">0x03:sleep</append> <!-- Fn+F4 suspend -->
+-          <append key="input.keymap.data" type="strlist">0x04:radio</append> <!-- Fn+F5 wifi -->
+-          <append key="input.keymap.data" type="strlist">0x06:switchvideomode</append> <!-- Fn+F7 switch video output device -->
+-          <append key="input.keymap.data" type="strlist">0x07:f22</append> <!-- Fn+F8 touchpadtoggle -->
+-          <append key="input.keymap.data" type="strlist">0x08:f24</append> <!-- Fn+F9 undock -->
+-          <append key="input.keymap.data" type="strlist">0x0b:suspend</append> <!-- Fn+F12 hibernate -->
+-          <append key="input.keymap.data" type="strlist">0x0f:brightnessup</append> <!-- Fn+Home -->
+-          <append key="input.keymap.data" type="strlist">0x10:brightnessdown</append> <!-- Fn+End -->
+-          <append key="input.keymap.data" type="strlist">0x11:kbdillumtoggle</append> <!-- Fn+PgUp - ThinkLight -->
+-          <append key="input.keymap.data" type="strlist">0x14:volumeup</append> <!-- Volume Up button -->
+-	  <append key="input.keymap.data" type="strlist">0x15:volumedown</append> <!-- Volume Down button -->
+-          <append key="input.keymap.data" type="strlist">0x16:mute</append> <!-- Mute button -->
+-          <append key="input.keymap.data" type="strlist">0x13:zoom</append> <!-- Fn+Space -->
+-          <append key="input.keymap.data" type="strlist">0x17:vendor</append> <!-- ThinkPad/ThinkVantage button -->
+-          <append key="info.capabilities" type="strlist">input.keymap</append>
+-        </match>
+-        <match key="/org/freedesktop/Hal/devices/computer:system.hardware.version" contains="R6">
+-          <append key="input.keymap.data" type="strlist">0x01:screenlock</append> <!-- Fn+F2 lock -->
+-          <append key="input.keymap.data" type="strlist">0x02:battery</append> <!-- Fn+F3 battery -->
+-          <append key="input.keymap.data" type="strlist">0x03:sleep</append> <!-- Fn+F4 suspend -->
+-          <append key="input.keymap.data" type="strlist">0x04:radio</append> <!-- Fn+F5 wifi -->
+-          <append key="input.keymap.data" type="strlist">0x06:switchvideomode</append> <!-- Fn+F7 switch video output device -->
+-          <append key="input.keymap.data" type="strlist">0x07:prog1</append> <!-- Fn+F8 ultranav -->
+-          <append key="input.keymap.data" type="strlist">0x08:ejectcd</append> <!-- Fn+F9 eject -->
+-          <append key="input.keymap.data" type="strlist">0x0b:suspend</append> <!-- Fn+F12 hibernate -->
+-          <append key="input.keymap.data" type="strlist">0x0f:brightnessup</append> <!-- Fn+Home -->
+-          <append key="input.keymap.data" type="strlist">0x10:brightnessdown</append> <!-- Fn+End -->
+-          <append key="input.keymap.data" type="strlist">0x13:zoom</append> <!-- Fn+Space -->
+-          <append key="input.keymap.data" type="strlist">0x17:vendor</append> <!-- ThinkPad/ThinkVantage button -->
+-          <append key="info.capabilities" type="strlist">input.keymap</append>
+-        </match>
++        <append key="input.keymap.data" type="strlist">0x01:screenlock</append> <!-- Fn+F2 lock -->
++        <append key="input.keymap.data" type="strlist">0x02:battery</append> <!-- Fn+F3 battery -->
++        <append key="input.keymap.data" type="strlist">0x03:sleep</append> <!-- Fn+F4 suspend -->
++        <append key="input.keymap.data" type="strlist">0x04:radio</append> <!-- Fn+F5 wifi -->
++        <append key="input.keymap.data" type="strlist">0x06:switchvideomode</append> <!-- Fn+F7 switch video output device -->
++        <append key="input.keymap.data" type="strlist">0x07:f22</append> <!-- Fn+F8 touchpadtoggle -->
++        <append key="input.keymap.data" type="strlist">0x08:f24</append> <!-- Fn+F9 undock -->
++        <append key="input.keymap.data" type="strlist">0x0b:suspend</append> <!-- Fn+F12 hibernate -->
++        <append key="input.keymap.data" type="strlist">0x0f:brightnessup</append> <!-- Fn+Home -->
++        <append key="input.keymap.data" type="strlist">0x10:brightnessdown</append> <!-- Fn+End -->
++        <append key="input.keymap.data" type="strlist">0x11:kbdillumtoggle</append> <!-- Fn+PgUp - ThinkLight -->
++        <append key="input.keymap.data" type="strlist">0x13:zoom</append> <!-- Fn+Space -->
++        <append key="input.keymap.data" type="strlist">0x14:volumeup</append> <!-- Volume Up button -->
++	<append key="input.keymap.data" type="strlist">0x15:volumedown</append> <!-- Volume Down button -->
++        <append key="input.keymap.data" type="strlist">0x16:mute</append> <!-- Mute button -->
++        <append key="input.keymap.data" type="strlist">0x17:vendor</append> <!-- ThinkPad/ThinkVantage button -->
++        <append key="info.capabilities" type="strlist">input.keymap</append>
+       </match>
+     </match>
+   </device>
+diff --git a/fdi/information/10freedesktop/99-video-quirk-default.fdi b/fdi/information/10freedesktop/99-video-quirk-default.fdi
+new file mode 100644
+index 0000000..f0e5c93
+--- /dev/null
++++ b/fdi/information/10freedesktop/99-video-quirk-default.fdi
+@@ -0,0 +1,40 @@
++<?xml version="1.0" encoding="ISO-8859-1"?> <!-- -*- SGML -*- --> 
++<deviceinfo version="0.2">
++  <!-- The aim of this file is to handle systems without any default video
++       quirks. The vast majority of hardware will not function without either
++       quirks or kernel support. pm-utils checks for kernel support before
++       utilising quirks, so these become a no-op if it's available. On the
++       assumption that quirks will, by and large, do more help than harm we can
++       provide some defaults. If any machine-specific quirks have been provided
++       then this code won't add any further ones -->
++  <device>
++    <match key="info.udi" string="/org/freedesktop/Hal/devices/computer">
++      <match key="power_management.quirk.vbestate_restore" exists="false">
++        <match key="power_management.quirk.vbemode_restore" exists="false">
++          <match key="power_management.quirk.dpms_suspend" exists="false">
++            <match key="power_management.quirk.vga_mode_3" exists="false">
++              <match key="power_management.quirk.dpms_on" exists="false">
++                <match key="power_management.quirk.radeon_off" exists="false">
++                  <match key="power_management.quirk.vbe_post" exists="false">
++                    <match key="power_management.quirk.s3_bios" exists="false">
++                      <match key="power_management.quirk.s3_mode" exists="false">
++                        <match key="power_management.quirk.none" exists="false">
++           	          <merge key="power_management.quirk.vbe_post" type="bool">true</merge>
++           	          <merge key="power_management.quirk.dpms_on" type="bool">true</merge>
++           	          <merge key="power_management.quirk.vbestate_restore" type="bool">true</merge>
++           	          <merge key="power_management.quirk.vbemode_restore" type="bool">true</merge>
++           	          <merge key="power_management.quirk.dpms_suspend" type="bool">true</merge>
++           	          <merge key="power_management.quirk.vga_mode_3" type="bool">true</merge>
++          	        </match>
++          	      </match>
++          	    </match>
++                  </match>
++                </match>
++              </match>
++            </match>
++          </match>
++        </match>
++      </match>
++    </match>
++  </device>
++</deviceinfo>
+diff --git a/fdi/information/10freedesktop/Makefile.am b/fdi/information/10freedesktop/Makefile.am
+index 48766ab..98783e2 100644
+--- a/fdi/information/10freedesktop/Makefile.am
++++ b/fdi/information/10freedesktop/Makefile.am
+@@ -59,7 +59,8 @@ dist_fdi_DATA +=				\
+ 		20-video-quirk-pm-misc.fdi	\
+ 		20-video-quirk-pm-samsung.fdi   \
+ 		20-video-quirk-pm-sony.fdi	\
+-		20-video-quirk-pm-toshiba.fdi
++		20-video-quirk-pm-toshiba.fdi	\
++		21-video-quirk-nvidia.fdi
+ endif
+ 
+ if BUILD_KEYMAPS
+diff --git a/fdi/preprobe/10osvendor/10-ide-drives.fdi b/fdi/preprobe/10osvendor/10-ide-drives.fdi
+index 0749499..26844b8 100644
+--- a/fdi/preprobe/10osvendor/10-ide-drives.fdi
++++ b/fdi/preprobe/10osvendor/10-ide-drives.fdi
+@@ -3,6 +3,19 @@
+ <deviceinfo version="0.2">
+ 
+   <device>
++    <!-- Handle weird Dell Laptops that slow down the system if the optical 
++        drive is polled (RH Bug #138148) -->
++    <match key="storage.bus" string="ide">
++      <match key="storage.model" string="HL-DT-STCD-RW/DVD-ROM GCC-4240N">
++       <match key="block.device" string="/dev/hdb">
++          <merge key="storage.media_check_enabled" type="bool">false</merge>
++       </match>
++       <match key="block.device" string="/dev/hdd">
++          <merge key="storage.media_check_enabled" type="bool">false</merge>
++       </match>
++      </match>
++    </match>
++
+     <!-- Handle weird IDE drives (Jaz and Zip) by matching on the IDE model -->
+     <match key="storage.bus" string="ide">
+       <match key="storage.drive_type" string="disk">
+diff --git a/fdi/preprobe/10osvendor/20-broken-usb-sticks.fdi b/fdi/preprobe/10osvendor/20-broken-usb-sticks.fdi
+index 19b2bfc..5e56980 100644
+--- a/fdi/preprobe/10osvendor/20-broken-usb-sticks.fdi
++++ b/fdi/preprobe/10osvendor/20-broken-usb-sticks.fdi
+@@ -16,6 +16,11 @@
+ 	      <merge key="info.ignore" type="bool">true</merge>
+ 	    </match>
+ 	  </match>
++	  <match key="storage.vendor" string="Intuix">
++            <match key="storage.model" string="U3">
++              <merge key="info.ignore" type="bool">true</merge>
++            </match>
++          </match>
+ 	</match>
+       </match>
+      <!-- some usb sticks don't like polling -->
+@@ -29,6 +34,12 @@
+          <merge key="storage.media_check_enabled" type="bool">false</merge>
+        </match>
+      </match>
++     <!-- Ignore the Huawei E220 USB HSDPA modem -->
++     <match key="@storage.originating_device:usb.vendor_id" int="0x12d1">
++       <match key="@storage.originating_device:usb.product_id" int="0x1003">
++         <merge key="info.ignore" type="bool">true</merge>
++       </match>
++     </match>
+    </match>
+   </device>
+ </deviceinfo>

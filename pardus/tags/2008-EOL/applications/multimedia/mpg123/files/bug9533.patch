@@ -1,0 +1,35 @@
+# Patch from Mandriva: http://www.mandriva.com/en/security/advisories?name=MDVSA-2009:093
+# For more information, see: http://bugs.pardus.org.tr/show_bug.cgi?id=9533
+diff -Nur b/src/libmpg123/id3.c a/src/libmpg123/id3.c
+--- b/src/libmpg123/id3.c	2008-08-29 09:43:55.000000000 +0300
++++ a/src/libmpg123/id3.c	2009-04-23 20:17:11.000000000 +0300
+@@ -179,17 +179,17 @@
+ */
+ void store_id3_text(mpg123_string *sb, char *source, size_t source_size, const int noquiet)
+ {
+-	int encoding;
++	unsigned int encoding;
+ 	int bwidth;
+ 	if(!source_size)
+ 	{
+ 		debug("Empty id3 data!");
+ 		return;
+ 	}
+-	encoding = source[0];
++	encoding = (unsigned int) source[0];
+ 	++source;
+ 	--source_size;
+-	debug1("encoding: %i", encoding);
++	debug1("encoding: %u", encoding);
+ 	/* A note: ID3v2.3 uses UCS-2 non-variable 16bit encoding, v2.4 uses UTF16.
+ 	   UTF-16 uses a reserved/private range in UCS-2 to add the magic, so we just always treat it as UTF. */
+ 	if(encoding > 3)
+@@ -208,7 +208,7 @@
+ 	if(source_size % bwidth)
+ 	{
+ 		/* When we need two bytes for a character, it's strange to have an uneven bytestream length. */
+-		if(noquiet) warning2("Weird tag size %d for encoding %d - I will probably trim too early or something but I think the MP3 is broken.", (int)source_size, encoding);
++		if(noquiet) warning2("Weird tag size %d for encoding %u - I will probably trim too early or something but I think the MP3 is broken.", (int)source_size, encoding);
+ 		source_size -= source_size % bwidth;
+ 	}
+ 	text_converters[encoding](sb, (unsigned char*)source, source_size);

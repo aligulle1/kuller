@@ -1,0 +1,1020 @@
+diff -pruN powertop-1.9/bluetooth.c powertop-1.10-svn/bluetooth.c
+--- powertop-1.9/bluetooth.c	2007-09-29 21:58:57.000000000 +0300
++++ powertop-1.10-svn/bluetooth.c	2008-03-27 20:20:59.000000000 +0200
+@@ -90,7 +90,7 @@ static int previous_bytes = -1;
+ 
+ void turn_bluetooth_off(void)
+ {
+-	system("hciconfig hci0 down &> /dev/null");
++	system("/usr/sbin/hciconfig hci0 down &> /dev/null");
+ 	system("/sbin/rmmod hci_usb &> /dev/null");
+ }
+ 
+diff -pruN powertop-1.9/Changelog powertop-1.10-svn/Changelog
+--- powertop-1.9/Changelog	2007-10-28 00:43:50.000000000 +0300
++++ powertop-1.10-svn/Changelog	2008-03-27 20:44:50.000000000 +0200
+@@ -1,3 +1,19 @@
++
++1.10 --
++	* add the "P" key to show the PIDs of the processes when possible
++	* Add support for reading C-state info via sysfs
++	  (Kevin Hilman, Venki Pallipadi)
++	* Show USB suspend statistics of USB devices in "-d" dump mode
++	* Show USB suspend statistics as a low priority hint for busy
++	devices
++	* Add support for using the sysfs power supply class
++	  (Donnie Berkholz)
++ 	* Fix USB suspend suggestion to take semi blacklisted stuff into
++	  account
++	* Add support for Intel's 4965 wireless power saving mode
++	* On new enough cpus (and kernel 2.6.25), report which C-states the
++	  cpu and bios report/support.
++
+ 1.9 --
+ 	* add support for mac80211 based wireless power saving
+ 	* improve bluetooth inactivity detection (David Woodhouse)
+diff -pruN powertop-1.9/display.c powertop-1.10-svn/display.c
+--- powertop-1.9/display.c	2007-10-29 19:46:04.000000000 +0200
++++ powertop-1.10-svn/display.c	2008-03-27 06:37:57.000000000 +0200
+@@ -163,15 +163,18 @@ void show_title_bar(void) 
+ 
+ void show_cstates(void) 
+ {
+-	int i;
++	int i, count = 0;
+ 	werase(cstate_window);
+ 
+-	for (i=0; i<6; i++) {
++	for (i=0; i < 10; i++) {
+ 		if (i == topcstate+1)
+ 			wattron(cstate_window, A_BOLD);
+ 		else
+ 			wattroff(cstate_window, A_BOLD);			
+-		print(cstate_window, i, 0, "%s", cstate_lines[i]);
++		if (strlen(cstate_lines[i]) && count <= 6) {
++			print(cstate_window, count, 0, "%s", cstate_lines[i]);
++			count++;
++		}
+ 	}
+ 
+ 	for (i=0; i<5; i++) {
+@@ -244,7 +247,12 @@ void show_timerstats(int nostats, int ti
+ 					wattron(timerstat_window, A_BOLD);
+ 				else
+ 					wattroff(timerstat_window, A_BOLD);
+-				print(timerstat_window, i+1, 0," %5.1f%% (%5.1f)   %s \n", lines[i].count * 100.0 / linectotal,
++				if (showpids)
++					print(timerstat_window, i+1, 0," %5.1f%% (%5.1f)   [%6s] %s \n", lines[i].count * 100.0 / linectotal,
++						lines[i].count * 1.0 / ticktime, 
++						lines[i].pid, lines[i].string);
++				else
++					print(timerstat_window, i+1, 0," %5.1f%% (%5.1f)   %s \n", lines[i].count * 100.0 / linectotal,
+ 						lines[i].count * 1.0 / ticktime, 
+ 						lines[i].string);
+ 				}
+diff -pruN powertop-1.9/intelcstates.c powertop-1.10-svn/intelcstates.c
+--- powertop-1.9/intelcstates.c	1970-01-01 02:00:00.000000000 +0200
++++ powertop-1.10-svn/intelcstates.c	2008-03-27 20:44:50.000000000 +0200
+@@ -0,0 +1,151 @@
++/*
++ * Copyright 2008, Intel Corporation
++ *
++ * This file is part of PowerTOP
++ *
++ * This program file is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License as published by the
++ * Free Software Foundation; version 2 of the License.
++ *
++ * This program is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
++ * for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program in a file named COPYING; if not, write to the
++ * Free Software Foundation, Inc.,
++ * 51 Franklin Street, Fifth Floor,
++ * Boston, MA 02110-1301 USA
++ *
++ * Authors:
++ * 	Arjan van de Ven <arjan@linux.intel.com>
++ */
++
++#include <unistd.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <stdint.h>
++#include <sys/types.h>
++#include <dirent.h>
++#include <ctype.h>
++
++#include "powertop.h"
++
++#ifdef __i386
++
++
++/*
++ * Perform a CPU ID operation; with various registers set
++ */
++static void cpuid(      unsigned int *eax,
++                        unsigned int *ebx,
++                        unsigned int *ecx,
++                        unsigned int *edx)
++{
++        /* call the cpuid instruction with the registers as input and output */
++        __asm__("cpuid"
++                : "=a" (*eax),
++                  "=b" (*ebx),
++                  "=c" (*ecx),
++                  "=d" (*edx)
++                : "0" (*eax),
++                  "1" (*ebx),
++                  "2" (*ecx),
++                  "3" (*edx)
++                );
++}
++
++#endif
++
++
++void print_intel_cstates(void)
++{
++#ifdef __i386__ 
++
++        int bios_table[8];
++        int bioscount = 0;
++	DIR *cpudir;
++	DIR *dir;
++	struct dirent *entry;
++	FILE *file = NULL;
++	char line[4096];
++	char filename[128], *f;
++	int len, i;
++	unsigned int eax, ebx, ecx, edx;
++	
++	memset(bios_table, 0, sizeof(bios_table)); 
++
++
++	cpudir = opendir("/sys/devices/system/cpu");
++	if (!cpudir)
++		return;
++
++	/* Loop over cpuN entries */
++	while ((entry = readdir(cpudir))) {
++		if (strlen(entry->d_name) < 3)
++			continue;
++
++		if (!isdigit(entry->d_name[3]))
++			continue;
++
++		len = sprintf(filename, "/sys/devices/system/cpu/%s/cpuidle",
++			      entry->d_name);
++
++		dir = opendir(filename);
++		if (!dir)
++			return;
++
++		/* For each C-state, there is a stateX directory which
++		 * contains a 'usage' and a 'time' (duration) file */
++		while ((entry = readdir(dir))) {
++			if (strlen(entry->d_name) < 3)
++				continue;
++			sprintf(filename + len, "/%s/desc", entry->d_name);
++			file = fopen(filename, "r");
++			if (file) {
++
++				memset(line, 0, 4096);
++				f = fgets(line, 4096, file);
++				fclose(file);
++				if (f == NULL)
++					break;
++			
++				f = strstr(line, "MWAIT ");
++				if (f) {
++					f += 6;
++					bios_table[(strtoull(f, NULL, 16)>>4) + 1]++;
++					bioscount++;
++				}
++			}
++		}
++		closedir(dir);
++
++	}
++	closedir(cpudir);
++	if (!bioscount)
++		return;
++
++	eax = 5;
++	ebx = 0; ecx = 0; edx = 0;
++	cpuid(&eax, &ebx, &ecx, &edx);
++	if (!edx || ((ecx&1) == 0))
++		return;
++	
++	printf(_("Your CPU supports the following C-states : "));
++	i = 0;
++	while (edx) {
++		if (edx&7)
++			printf("C%i ", i);
++		edx = edx >> 4;
++		i++;
++	}
++	printf("\n");
++	printf(_("Your BIOS reports the following C-states : "));
++	for (i = 0; i < 8; i++)
++		if (bios_table[i])
++			printf("C%i ", i);
++	printf("\n");
++#endif
++}
+diff -pruN powertop-1.9/Makefile powertop-1.10-svn/Makefile
+--- powertop-1.9/Makefile	2007-10-04 01:25:41.000000000 +0300
++++ powertop-1.10-svn/Makefile	2008-03-27 20:44:50.000000000 +0200
+@@ -2,7 +2,7 @@ BINDIR=/usr/bin
+ LOCALESDIR=/usr/share/locale
+ MANDIR=/usr/share/man/man1
+ WARNFLAGS=-Wall  -W -Wshadow
+-CFLAGS?=-Os -g ${WARNFLAGS}
++CFLAGS?=-O0 -g ${WARNFLAGS}
+ CC?=gcc
+ 
+ 
+@@ -16,7 +16,7 @@ CC?=gcc
+ #
+ 
+ OBJS = powertop.o config.o process.o misctips.o bluetooth.o display.o suggestions.o wireless.o cpufreq.o \
+-	sata.o xrandr.o ethernet.o cpufreqstats.o usb.o urbnum.o
++	sata.o xrandr.o ethernet.o cpufreqstats.o usb.o urbnum.o intelcstates.o
+ 	
+ 
+ powertop: $(OBJS) Makefile powertop.h
+diff -pruN powertop-1.9/powertop.c powertop-1.10-svn/powertop.c
+--- powertop-1.9/powertop.c	2007-10-29 19:45:56.000000000 +0200
++++ powertop-1.10-svn/powertop.c	2008-03-27 20:44:50.000000000 +0200
+@@ -35,17 +35,20 @@
+ #include <assert.h>
+ #include <locale.h>
+ #include <time.h>
++#include <sys/stat.h>
+ 
+ #include "powertop.h"
+ 
+ uint64_t start_usage[8], start_duration[8];
+ uint64_t last_usage[8], last_duration[8];
+-
++char cnames[8][10];
+ 
+ double ticktime = 15.0;
+ 
+ int interrupt_0, total_interrupt;
+ 
++int showpids = 0;
++
+ static int maxcstate = 0;
+ int topcstate = 0;
+ 
+@@ -62,7 +65,8 @@ struct irqdata {
+ 
+ struct irqdata interrupts[IRQCOUNT];
+ 
+-#define FREQ 3579.545
++#define FREQ_ACPI 3579.545
++static unsigned long FREQ;
+ 
+ int nostats;
+ 
+@@ -94,6 +98,27 @@ void push_line(char *string, int count)
+ 		lines = realloc (lines, (linesize ? (linesize *= 2) : (linesize = 64)) * sizeof (struct line));
+ 	lines[linehead].string = strdup (string);
+ 	lines[linehead].count = count;
++	lines[linehead].pid[0] = 0;
++	linehead++;
++}
++
++void push_line_pid(char *string, int count, char *pid) 
++{
++	int i;
++	assert(string != NULL);
++	for (i = 0; i < linehead; i++)
++		if (strcmp(string, lines[i].string) == 0) {
++			lines[i].count += count;
++			if (pid && strcmp(lines[i].pid, pid)!=0)
++				lines[i].pid[0] = 0;
++			return;
++		}
++	if (linehead == linesize)
++		lines = realloc (lines, (linesize ? (linesize *= 2) : (linesize = 64)) * sizeof (struct line));
++	lines[linehead].string = strdup (string);
++	lines[linehead].count = count;
++	if (pid)
++		strcpy(lines[linehead].pid, pid);
+ 	linehead++;
+ }
+ 
+@@ -236,7 +261,7 @@ static void do_proc_irq(void)
+ 	fclose(file);
+ }
+ 
+-static void read_data(uint64_t * usage, uint64_t * duration)
++static void read_data_acpi(uint64_t * usage, uint64_t * duration)
+ {
+ 	DIR *dir;
+ 	struct dirent *entry;
+@@ -286,6 +311,136 @@ static void read_data(uint64_t * usage, 
+ 	closedir(dir);
+ }
+ 
++static void read_data_cpuidle(uint64_t * usage, uint64_t * duration)
++{
++	DIR *cpudir;
++	DIR *dir;
++	struct dirent *entry;
++	FILE *file = NULL;
++	char line[4096];
++	char filename[128], *f;
++	int len, clevel = 0;
++
++	memset(usage, 0, 64);
++	memset(duration, 0, 64);
++
++	cpudir = opendir("/sys/devices/system/cpu");
++	if (!cpudir)
++		return;
++
++	/* Loop over cpuN entries */
++	while ((entry = readdir(cpudir))) {
++		if (strlen(entry->d_name) < 3)
++			continue;
++
++		if (!isdigit(entry->d_name[3]))
++			continue;
++
++		len = sprintf(filename, "/sys/devices/system/cpu/%s/cpuidle",
++			      entry->d_name);
++
++		dir = opendir(filename);
++		if (!dir)
++			return;
++
++		clevel = 0;
++
++		/* For each C-state, there is a stateX directory which
++		 * contains a 'usage' and a 'time' (duration) file */
++		while ((entry = readdir(dir))) {
++			if (strlen(entry->d_name) < 3)
++				continue;
++			sprintf(filename + len, "/%s/desc", entry->d_name);
++			file = fopen(filename, "r");
++			if (file) {
++
++				memset(line, 0, 4096);
++				f = fgets(line, 4096, file);
++				fclose(file);
++				if (f == NULL)
++					break;
++			
++				f = strstr(line, "MWAIT ");
++				if (f) {
++					f += 6;
++					clevel = (strtoull(f, NULL, 16)>>4) + 1;
++				}
++				sprintf(cnames[clevel], "C%i", clevel);
++				f = strstr(line, "POLL IDLE");
++				if (f) {
++					clevel = 0;
++					sprintf(cnames[clevel], "%s", _("polling"));
++				}
++
++				f = strstr(line, "ACPI HLT");
++				if (f) {
++					clevel = 1;
++					sprintf(cnames[clevel], "%s", "C1 halt");
++				}
++			}
++			sprintf(filename + len, "/%s/usage", entry->d_name);
++			file = fopen(filename, "r");
++			if (!file)
++				continue;
++
++			memset(line, 0, 4096);
++			f = fgets(line, 4096, file);
++			fclose(file);
++			if (f == NULL)
++				break;
++
++			usage[clevel] += 1+strtoull(line, NULL, 10);
++
++			sprintf(filename + len, "/%s/time", entry->d_name);
++			file = fopen(filename, "r");
++			if (!file)
++				continue;
++		
++			memset(line, 0, 4096);
++			f = fgets(line, 4096, file);
++			fclose(file);
++			if (f == NULL)
++				break;
++
++			duration[clevel] += 1+strtoull(line, NULL, 10);
++
++			clevel++;
++			if (clevel > maxcstate)
++				maxcstate = clevel;
++		
++		}
++		closedir(dir);
++
++	}
++	closedir(cpudir);
++}
++
++static void read_data(uint64_t * usage, uint64_t * duration)
++{
++	int r;
++	struct stat s;
++
++	/* Then check for CPUidle */
++	r = stat("/sys/devices/system/cpu/cpu0/cpuidle", &s);
++	if (!r) {
++		read_data_cpuidle(usage, duration);
++		
++		/* perform residency calculations based on usecs */
++		FREQ = 1000;
++		return;
++	}
++
++	/* First, check for ACPI */
++	r = stat("/proc/acpi/processor", &s);
++	if (!r) {
++		read_data_acpi(usage, duration);
++
++		/* perform residency calculations based on ACPI timer */
++		FREQ = FREQ_ACPI;
++		return;
++	}
++}
++
+ void stop_timerstats(void)
+ {
+ 	FILE *file;
+@@ -320,7 +475,9 @@ void sort_lines(void)
+ 	qsort (lines, linehead, sizeof (struct line), line_compare);
+ }
+ 
+-void print_battery(void)
++
++
++int print_battery_proc(void)
+ {
+ 	DIR *dir;
+ 	struct dirent *dirent;
+@@ -332,7 +489,7 @@ void print_battery(void)
+ 
+ 	dir = opendir("/proc/acpi/battery");
+ 	if (!dir)
+-		return;
++		return 0;
+ 
+ 	while ((dirent = readdir(dir))) {
+ 		int dontcount = 0;
+@@ -404,9 +561,115 @@ void print_battery(void)
+ 	}
+ 
+ 	show_acpi_power_line(rate, cap, prev_bat_cap - cap, time(NULL) - prev_bat_time);
++	return 1;
+ }
+ 
+-char cstate_lines[6][200];
++void print_battery_sysfs(void)
++{
++	DIR *dir;
++	struct dirent *dirent;
++	FILE *file;
++	double rate = 0;
++	double cap = 0;
++
++	char filename[256];
++	
++	if (print_battery_proc())
++		return;
++
++	dir = opendir("/sys/class/power_supply");
++	if (!dir) {
++		return;
++	}
++
++	while ((dirent = readdir(dir))) {
++		int dontcount = 0;
++		double voltage = 0.0;
++		double amperes_drawn = 0.0;
++		double watts_drawn = 0.0;
++		double watts_left = 0.0;
++		char line[1024];
++
++		if (strstr(dirent->d_name, "AC"))
++			continue;
++
++		sprintf(filename, "/sys/class/power_supply/%s/present", dirent->d_name);
++		file = fopen(filename, "r");
++		if (!file)
++			continue;
++		int s;
++		if ((s = getc(file)) != EOF) {
++			if (s == 0)
++				break;
++		}
++		fclose(file);
++
++		sprintf(filename, "/sys/class/power_supply/%s/status", dirent->d_name);
++		file = fopen(filename, "r");
++		if (!file)
++			continue;
++		memset(line, 0, 1024);
++		if (fgets(line, 1024, file) != NULL) {
++			if (!strstr(line, "Discharging"))
++				dontcount = 1;
++		}
++		fclose(file);
++
++		sprintf(filename, "/sys/class/power_supply/%s/voltage_now", dirent->d_name);
++		file = fopen(filename, "r");
++		if (!file)
++			continue;
++		memset(line, 0, 1024);
++		if (fgets(line, 1024, file) != NULL) {
++			voltage = strtoull(line, NULL, 10) / 1000000.0;
++		}
++		fclose(file);
++
++		sprintf(filename, "/sys/class/power_supply/%s/energy_now", dirent->d_name);
++		file = fopen(filename, "r");
++		if (!file)
++			continue;
++		memset(line, 0, 1024);
++		if (fgets(line, 1024, file) != NULL) {
++			watts_left = strtoull(line, NULL, 10) / 1000000.0;
++		}
++		fclose(file);
++
++		sprintf(filename, "/sys/class/power_supply/%s/current_now", dirent->d_name);
++		file = fopen(filename, "r");
++		if (!file)
++			continue;
++		memset(line, 0, 1024);
++		if (fgets(line, 1024, file) != NULL) {
++			watts_drawn = strtoull(line, NULL, 10) / 1000000.0;
++		}
++		fclose(file);
++	
++		if (!dontcount) {
++			rate += watts_drawn + voltage * amperes_drawn;
++		}
++		cap += watts_left;
++		
++
++	}
++	closedir(dir);
++	if (prev_bat_cap - cap < 0.001 && rate < 0.001)
++		last_bat_time = 0;
++	if (!last_bat_time) {
++		last_bat_time = prev_bat_time = time(NULL);
++		last_bat_cap = prev_bat_cap = cap;
++	}
++	if (time(NULL) - last_bat_time >= 400) {
++		prev_bat_cap = last_bat_cap;
++		prev_bat_time = last_bat_time;
++		last_bat_time = time(NULL);
++		last_bat_cap = cap;
++	}
++
++	show_acpi_power_line(rate, cap, prev_bat_cap - cap, time(NULL) - prev_bat_time);
++}
++
++char cstate_lines[12][200];
+ 
+ void usage()
+ {
+@@ -470,6 +733,7 @@ int main(int argc, char **argv)
+ 	do_proc_irq();
+ 	do_cpufreq_stats();
+ 	count_usb_urbs();
++	count_usb_urbs();
+ 
+ 	memset(cur_usage, 0, sizeof(cur_usage));
+ 	memset(cur_duration, 0, sizeof(cur_duration));
+@@ -477,6 +741,8 @@ int main(int argc, char **argv)
+ 	if (geteuid() != 0)
+ 		printf(_("PowerTOP needs to be run as root to collect enough information\n"));
+ 	printf(_("Collecting data for %i seconds \n"), (int)ticktime);
++	printf("\n\n");
++	print_intel_cstates();
+ 	stop_timerstats();
+ 
+ 	while (1) {
+@@ -530,7 +796,7 @@ int main(int argc, char **argv)
+ 		memset(&cstate_lines, 0, sizeof(cstate_lines));
+ 		topcstate = -4;
+ 		if (totalevents == 0 && maxcstate <= 1) {
+-			sprintf(cstate_lines[5],_("< Detailed C-state information is only available on Mobile CPUs (laptops) >\n"));
++			sprintf(cstate_lines[5],_("< Detailed C-state information is not available.>\n"));
+ 		} else {
+ 			double sleept, percentage;;
+ 			c0 = sysconf(_SC_NPROCESSORS_ONLN) * ticktime * 1000 * FREQ - totalticks;
+@@ -542,16 +808,19 @@ int main(int argc, char **argv)
+ 			sprintf(cstate_lines[1], _("C0 (cpu running)        (%4.1f%%)\n"), percentage);
+ 			if (percentage > 50)
+ 				topcstate = 0;
+-			for (i = 0; i < 4; i++)
++			for (i = 0; i < 8; i++)
+ 				if (cur_usage[i]) {
+ 					sleept = (cur_duration[i] - last_duration[i]) / (cur_usage[i] - last_usage[i]
+ 											+ 0.1) / FREQ;
+ 					percentage = (cur_duration[i] -
+ 					      last_duration[i]) * 100 /
+ 					     (sysconf(_SC_NPROCESSORS_ONLN) * ticktime * 1000 * FREQ);
++
++					if (cnames[i][0]==0)
++						sprintf(cnames[i],"C%i",i+1);
+ 					sprintf
+-					    (cstate_lines[2+i], _("C%i\t\t%5.1fms (%4.1f%%)\n"),
+-					     i + 1, sleept, percentage);
++					    (cstate_lines[2+i], _("%s\t\t%5.1fms (%4.1f%%)\n"),
++					     cnames[i], sleept, percentage);
+ 					if (maxsleep < sleept)
+ 						maxsleep = sleept;
+ 					if (percentage > 50)
+@@ -625,7 +894,7 @@ int main(int argc, char **argv)
+ 			if (deferrable)
+ 				continue;
+ 			sprintf(line2, "%15s : %s", process, func);
+-			push_line(line2, cnt);
++			push_line_pid(line2, cnt, pid);
+ 		}
+ 		if (file)
+ 			pclose(file);
+@@ -648,7 +917,7 @@ int main(int argc, char **argv)
+ 			show_wakeups(wakeups_per_second, ticktime, c0 * 100.0 / (sysconf(_SC_NPROCESSORS_ONLN) * ticktime * 1000 * FREQ) );
+ 		}
+ 		count_usb_urbs();
+-		print_battery();
++		print_battery_sysfs();
+ 		count_lines();
+ 		sort_lines();
+ 
+@@ -679,7 +948,9 @@ int main(int argc, char **argv)
+ 				suggestion_activate();
+ 				ticktime = 2;
+ 				displaytime = -1.0;
+-			}
++			} else
++			if (keychar == 'P')
++				showpids = !showpids;
+ 		}
+ 
+ 		if (wakeups_per_second < 0)
+@@ -769,9 +1040,11 @@ int main(int argc, char **argv)
+ 		suggest_WOL_off();
+ 		suggest_writeback_time();
+ 		suggest_usb_autosuspend();
++		usb_activity_hint();
+ 
+ 		if (dump) {
+ 			print_all_suggestions();
++			display_usb_activity();
+ 			exit(EXIT_SUCCESS);
+ 		}
+ 
+@@ -795,5 +1068,6 @@ int main(int argc, char **argv)
+ 
+ 		
+ 	}
++
+ 	return 0;
+ }
+diff -pruN powertop-1.9/powertop.h powertop-1.10-svn/powertop.h
+--- powertop-1.9/powertop.h	2007-10-04 01:25:41.000000000 +0300
++++ powertop-1.10-svn/powertop.h	2008-03-27 20:44:50.000000000 +0200
+@@ -31,6 +31,7 @@
+ struct line {
+ 	char	*string;
+ 	int	count;
++	char 	pid[12];
+ };
+ 
+ typedef void (suggestion_func)(void);
+@@ -58,17 +59,20 @@ void suggest_xrandr_TV_off(void);
+ void suggest_WOL_off(void);
+ void suggest_writeback_time(void);
+ void suggest_usb_autosuspend(void);
++void usb_activity_hint(void);
+ 
+ 
+ 
+ 
+-extern char cstate_lines[6][200];
++extern char cstate_lines[12][200];
+ extern char cpufreqstrings[5][80];
+ 
+ extern int topcstate;
+ extern int topfreq;  
+ extern int dump;
+ 
++extern int showpids;
++
+ extern char status_bar_slots[10][40];
+ extern char suggestion_key;
+ extern suggestion_func *suggestion_activate; 
+@@ -113,6 +117,9 @@ void push_line(char *string, int count);
+ void  do_cpufreq_stats(void);
+ void count_usb_urbs(void);
+ 
++void display_usb_activity(void);
++void activate_usb_autosuspend(void);
++void print_intel_cstates(void);
+ 
+ 
+ #endif
+diff -pruN powertop-1.9/process.c powertop-1.10-svn/process.c
+--- powertop-1.9/process.c	2007-06-23 21:37:59.000000000 +0300
++++ powertop-1.10-svn/process.c	2007-12-13 23:52:01.000000000 +0200
+@@ -79,7 +79,7 @@ void suggest_process_death(char *process
+ 	int i;
+ 
+ 	for (i = 0; i < linecount; i++) {
+-		if (strstr(slines[i].string, process_match)) {
++		if (slines[i].string && strstr(slines[i].string, process_match)) {
+ 			char hotkey_string[300];
+ 			sprintf(hotkey_string, _(" K - kill %s "), tokill);
+ 			strcpy(process_to_kill, tokill);
+diff -pruN powertop-1.9/urbnum.c powertop-1.10-svn/urbnum.c
+--- powertop-1.9/urbnum.c	2007-10-04 01:25:41.000000000 +0300
++++ powertop-1.10-svn/urbnum.c	2008-03-27 06:57:39.000000000 +0200
+@@ -39,8 +39,9 @@ struct device_data {
+ 	struct device_data *next;
+ 	char pathname[4096];
+ 	char human_name[4096];
+-	uint64_t urbs;
+-	uint64_t previous_urbs;
++	uint64_t urbs, active, connected;
++	uint64_t previous_urbs, previous_active, previous_connected;
++	int controller;
+ };
+ 
+ 
+@@ -52,6 +53,8 @@ static void cachunk_urbs(void)
+ 	ptr = devices;
+ 	while (ptr) {
+ 		ptr->previous_urbs = ptr->urbs;
++		ptr->previous_active = ptr->active;
++		ptr->previous_connected = ptr->connected;
+ 		ptr = ptr->next;
+ 	}
+ }
+@@ -63,9 +66,25 @@ static void update_urbnum(char *path, ui
+ 	char fullpath[4096];
+ 	char name[4096], vendor[4096];
+ 	ptr = devices;
++
+ 	while (ptr) {
+ 		if (strcmp(ptr->pathname, path)==0) {
+ 			ptr->urbs = count;
++			sprintf(fullpath, "%s/power/active_duration", path);
++			file = fopen(fullpath, "r");
++			if (!file)
++				return;
++			fgets(name, 4096, file);
++			ptr->active = strtoull(name, NULL, 10);
++			fclose(file);
++			sprintf(fullpath, "%s/power/connected_duration", path);
++			file = fopen(fullpath, "r");
++			if (!file)
++				return;
++			fgets(name, 4096, file);
++			ptr->connected = strtoull(name, NULL, 10);
++			fclose(file);
++
+ 			return;
+ 		}
+ 		ptr = ptr->next;
+@@ -102,6 +121,9 @@ static void update_urbnum(char *path, ui
+ 		strcpy(ptr->human_name, path);
+ 	else
+ 		sprintf(ptr->human_name, _("USB device %4s : %s (%s)"), shortname, name, vendor);
++
++	if (strstr(ptr->human_name, "Host Controller"))
++		ptr->controller = 1;
+ 	
+ }
+ 
+@@ -145,3 +167,53 @@ void count_usb_urbs(void)
+ 	}
+ }
+ 
++
++void display_usb_activity(void)
++{
++	struct device_data *dev;
++	printf("\n");
++	printf("%s\n", _("Recent USB suspend statistics"));
++	printf("%s\n", _("Active  Device name"));
++	dev = devices;
++	while (dev) {
++		printf("%5.1f%%\t%s\n", 100.0*(dev->active - dev->previous_active) / 
++			(0.00001 + dev->connected - dev->previous_connected), dev->human_name);
++		dev = dev->next;
++	}
++
++}
++
++void usb_activity_hint(void)
++{
++	int total_active = 0;
++	int pick;
++	struct device_data *dev;
++	dev = devices;
++	while (dev) {
++		if (dev->active-1 > dev->previous_active && !dev->controller)
++			total_active++;
++		dev = dev->next;
++	}
++	if (!total_active)
++		return;
++
++	pick = rand() % total_active;
++	total_active = 0;
++	dev = devices;
++	while (dev) {
++		if (dev->active-1 > dev->previous_active && !dev->controller) {
++			if (total_active == pick) {
++				char usb_hint[8000];
++				sprintf(usb_hint, _("A USB device is active %4.1f%% of the time:\n%s"),
++				 100.0*(dev->active - dev->previous_active) / 
++				(0.00001 + dev->connected - dev->previous_connected),
++				dev->human_name);
++				add_suggestion(usb_hint,
++				1, 'U', _(" U - Enable USB suspend "), activate_usb_autosuspend);
++			}
++			total_active++;
++		}
++		dev = dev->next;
++	}
++
++}
+diff -pruN powertop-1.9/usb.c powertop-1.10-svn/usb.c
+--- powertop-1.9/usb.c	2007-08-21 00:00:32.000000000 +0300
++++ powertop-1.10-svn/usb.c	2008-03-27 06:57:39.000000000 +0200
+@@ -32,9 +32,7 @@
+ 
+ #include "powertop.h"
+ 
+-int alpm_activated;
+-
+-static void activate_usb_autosuspend(void)
++void activate_usb_autosuspend(void)
+ {
+ 	DIR *dir;
+ 	struct dirent *dirent;
+@@ -52,12 +50,17 @@ static void activate_usb_autosuspend(voi
+ 		file = fopen(filename, "w");
+ 		if (!file)
+ 			continue;
+-		fprintf(file, "1\n");
++		fprintf(file, "0\n");
++		fclose(file);
++		sprintf(filename, "/sys/bus/usb/devices/%s/power/level", dirent->d_name);
++		file = fopen(filename, "w");
++		if (!file)
++			continue;
++		fprintf(file, "auto\n");
+ 		fclose(file);
+ 	}
+ 
+ 	closedir(dir);
+-	alpm_activated = 1;
+ }
+ 
+ void suggest_usb_autosuspend(void)
+@@ -69,9 +72,6 @@ void suggest_usb_autosuspend(void)
+ 	char line[1024];
+ 	int need_hint  = 0;
+ 
+-	if (alpm_activated)
+-		return;
+-
+ 
+ 	dir = opendir("/sys/bus/usb/devices");
+ 	if (!dir)
+@@ -89,10 +89,27 @@ void suggest_usb_autosuspend(void)
+ 			fclose(file);
+ 			continue;
+ 		}
+-		if (strtoull(line, NULL,10)<1)
++		if (strtoll(line, NULL,10)<0)
++			need_hint = 1;
++
++		fclose(file);
++
++
++		sprintf(filename, "/sys/bus/usb/devices/%s/power/level", dirent->d_name);
++		file = fopen(filename, "r");
++		if (!file)
++			continue;
++		memset(line, 0, 1024);
++		if (fgets(line, 1023,file)==NULL) {
++			fclose(file);
++			continue;
++		}
++		if (strstr(line, "on"))
+ 			need_hint = 1;
+ 
+ 		fclose(file);
++
++
+ 	}
+ 
+ 	closedir(dir);
+@@ -104,3 +121,5 @@ void suggest_usb_autosuspend(void)
+ 				45, 'U', _(" U - Enable USB suspend "), activate_usb_autosuspend);
+ 	}
+ }
++
++
+diff -pruN powertop-1.9/wireless.c powertop-1.10-svn/wireless.c
+--- powertop-1.9/wireless.c	2007-09-27 02:22:40.000000000 +0300
++++ powertop-1.10-svn/wireless.c	2008-03-27 06:30:50.000000000 +0200
+@@ -134,9 +134,45 @@ static int need_wireless_suggest_new(voi
+ 	return 1;
+ }
+ 
++void find_4965(void)
++{
++	static int tried_4965 = 0;
++	DIR *dir;
++	struct dirent *dirent;
++	char pathname[PATH_MAX];
++
++	if (tried_4965++)
++		return;
++
++	dir = opendir("/sys/bus/pci/drivers/iwl4965");
++	while (dir && (dirent = readdir(dir))) {
++		if (dirent->d_name[0]=='.')
++			continue;
++		sprintf(pathname, "/sys/bus/pci/drivers/iwl4965/%s/power_level", dirent->d_name);
++		if (!access(pathname, W_OK))
++			strcpy(powersave_path, pathname);
++	}
++	if (dir)
++		closedir(dir);
++	dir = opendir("/sys/bus/pci/drivers/iwl3945");
++	if (!dir)
++		return;
++	while ((dirent = readdir(dir))) {
++		if (dirent->d_name[0]=='.')
++			continue;
++		sprintf(pathname, "/sys/bus/pci/drivers/iwl4965/%s/power_level", dirent->d_name);
++		if (!access(pathname, W_OK))
++			strcpy(powersave_path, pathname);
++	}
++
++	closedir(dir);
++
++}
++
+ 
+ void find_wireless_nic(void) 
+ {
++	static int found = 0;
+ 	FILE *file;
+ 	int sock;
+ 	struct ifreq ifr;
+@@ -145,6 +181,9 @@ void find_wireless_nic(void) 
+ 	int ifaceup = 0;
+ 	int ret;
+ 
++	if (found++)
++		return;
++
+ 	wireless_nic[0] = 0;
+ 	rfkill_path[0] = 0;
+ 	powersave_path[0] = 0;
+@@ -213,7 +252,7 @@ void activate_wireless_suggestion_new(vo
+ 	file = fopen(powersave_path, "w");
+ 	if (!file)
+ 		return;
+-	fprintf(file,"5\n");
++	fprintf(file,"1\n");
+ 	fclose(file);
+ }
+ 
+@@ -231,8 +270,9 @@ void suggest_wireless_powersave(void)
+ 	char sug[1024];
+ 	int ret;
+ 
+-	if (strlen(wireless_nic)==0)
++	if (strlen(wireless_nic)==0) 
+ 		find_wireless_nic();
++	find_4965();
+ 	ret = check_unused_wiresless_up();
+ 
+ 	if (ret >= 0 && need_wireless_suggest(wireless_nic)) {

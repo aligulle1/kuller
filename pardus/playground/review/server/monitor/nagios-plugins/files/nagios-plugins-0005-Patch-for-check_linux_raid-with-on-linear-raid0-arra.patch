@@ -1,0 +1,53 @@
+From e84e5e6caafb1ac02cb8a4a7b18a2d8eebf298b2 Mon Sep 17 00:00:00 2001
+From: Thomas Guyot-Sionnest <dermoth@aei.ca>
+Date: Tue, 5 Oct 2010 23:19:03 -0400
+Subject: [PATCH 5/6] Patch for check_linux_raid with on linear/raid0 arrays
+
+Fixes bug #3049988, Debian bug #579049
+---
+ contrib/check_linux_raid.pl |   12 +++++++++---
+ 1 files changed, 9 insertions(+), 3 deletions(-)
+
+diff --git a/contrib/check_linux_raid.pl b/contrib/check_linux_raid.pl
+index 1647b8b..3a15ac8 100644
+--- a/contrib/check_linux_raid.pl
++++ b/contrib/check_linux_raid.pl
+@@ -71,7 +71,8 @@ while(defined $nextdev){
+ 		} elsif (/^($nextdev)\s*:/) {
+ 			$device=$1;
+ 			$devices{$device}=$device;
+-			if (/active/) {
++			if (/\sactive/) {
++				$status{$device} = ''; # Shall be filled later if available
+ 				$active{$device} = 1;
+ 			}
+ 		}
+@@ -80,7 +81,11 @@ while(defined $nextdev){
+ }
+ 
+ foreach my $k (sort keys %devices){
+-	if ($status{$k} =~ /_/) {
++	if (!exists($status{$k})) {
++		$msg .= sprintf " %s inactive with no status information.",
++			$devices{$k};
++		$code = max_state($code, "CRITICAL");
++	} elsif ($status{$k} =~ /_/) {
+ 		if (defined $recovery{$k}) {
+ 			$msg .= sprintf " %s status=%s, recovery=%s, finish=%s.",
+ 				$devices{$k}, $status{$k}, $recovery{$k}, $finish{$k};
+@@ -94,10 +99,11 @@ foreach my $k (sort keys %devices){
+ 		$code = max_state($code, "OK");
+ 	} else {
+ 		if ($active{$k}) {
+-			$msg .= sprintf " %s active with no status information.\n",
++			$msg .= sprintf " %s active with no status information.",
+ 				$devices{$k};
+ 			$code = max_state($code, "OK");
+ 		} else {
++			# This should't run anymore, but is left as a catch-all
+ 			$msg .= sprintf " %s does not exist.\n", $devices{$k};
+ 			$code = max_state($code, "CRITICAL");
+ 		}
+-- 
+1.7.2.3
+

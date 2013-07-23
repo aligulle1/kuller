@@ -1,0 +1,106 @@
+diff -x build -Naur kdebase-runtime-4.3.3-orig/kioslave/trash/discspaceutil.cpp kdebase-runtime-4.3.3/kioslave/trash/discspaceutil.cpp
+--- kdebase-runtime-4.3.3-orig/kioslave/trash/discspaceutil.cpp	2009-11-11 09:07:13.202654699 +0200
++++ kdebase-runtime-4.3.3/kioslave/trash/discspaceutil.cpp	2009-11-11 15:36:16.699181211 +0200
+@@ -23,6 +23,8 @@
+ #include <QtCore/QFileInfo>
+ 
+ #include <kdiskfreespaceinfo.h>
++#include <kmountpoint.h>
++#include <kio/global.h>
+ #include <kdebug.h>
+ 
+ #include "discspaceutil.h"
+@@ -76,6 +78,15 @@
+     return mFullSize;
+ }
+ 
++qulonglong DiscSpaceUtil::freeSpace() const
++{
++    KDiskFreeSpaceInfo info = KDiskFreeSpaceInfo::freeSpaceInfo( mDirectory );
++    if ( info.isValid() )
++        return info.available();
++
++    return 0;
++}
++
+ QString DiscSpaceUtil::mountPoint() const
+ {
+     return mMountPoint;
+diff -x build -Naur kdebase-runtime-4.3.3-orig/kioslave/trash/discspaceutil.h kdebase-runtime-4.3.3/kioslave/trash/discspaceutil.h
+--- kdebase-runtime-4.3.3-orig/kioslave/trash/discspaceutil.h	2009-11-11 09:07:13.172556861 +0200
++++ kdebase-runtime-4.3.3/kioslave/trash/discspaceutil.h	2009-11-11 14:39:58.532306351 +0200
+@@ -54,6 +54,11 @@
+     qulonglong size() const;
+ 
+     /**
++     * Returns the free space of the partition in bytes.
++     */
++    qulonglong freeSpace() const;
++
++    /**
+      * Returns the mount point of the directory.
+      */
+     QString mountPoint() const;
+diff -x build -Naur kdebase-runtime-4.3.3-orig/kioslave/trash/trashimpl.cpp kdebase-runtime-4.3.3/kioslave/trash/trashimpl.cpp
+--- kdebase-runtime-4.3.3-orig/kioslave/trash/trashimpl.cpp	2009-11-11 09:07:13.204306623 +0200
++++ kdebase-runtime-4.3.3/kioslave/trash/trashimpl.cpp	2009-11-11 15:36:15.723306469 +0200
+@@ -1065,22 +1065,33 @@
+             if ( info.deletionDate.daysTo( currentDate ) > maxDays )
+               del( info.trashId, info.fileId );
+         }
++    }
+ 
+-        return true;
++    DiscSpaceUtil util(trashPath + QString::fromLatin1("/files/"));
++    qulonglong freeSpace = util.freeSpace();
++    // calculate size of the files to be put into the trash
++    qulonglong additionalSize = DiscSpaceUtil::sizeOfPath( origPath );
++    // current used space of trash
++    qulonglong trashUsedSpace = DiscSpaceUtil::sizeOfPath(trashPath + QString::fromLatin1("/files/"));
++
++    // if we do not have enough empty space in the partition of Trash, return false
++    if (!useSizeLimit and (freeSpace < additionalSize))
++    {
++        m_lastErrorCode = KIO::ERR_SLAVE_DEFINED;
++        m_lastErrorMessage = i18n( "Not enough disk space to move file into trash.");
++        return false;
+     }
+ 
+     if ( useSizeLimit ) { // check if size limit exceeded
+ 
+-        // calculate size of the files to be put into the trash
+-        qulonglong additionalSize = DiscSpaceUtil::sizeOfPath( origPath );
+-
+-        DiscSpaceUtil util(trashPath + QString::fromLatin1("/files/"));
+         if ( util.usage( additionalSize ) >= percent ) {
++
+             if ( actionType == 0 ) { // warn the user only
+                 m_lastErrorCode = KIO::ERR_SLAVE_DEFINED;
+                 m_lastErrorMessage = i18n( "The trash has reached its maximum size!\nCleanup the trash manually." );
+                 return false;
+-            } else {
++            }
++            else {
+                 // before we start to remove any files from the trash,
+                 // check whether the new file will fit into the trash
+                 // at all...
+@@ -1116,7 +1127,18 @@
+                 }
+             }
+         }
+-    }
++
++        // check again if we have enough empty space in the partition of Trash
++        // recalculate free space, some files may be removed above
++        freeSpace = util.freeSpace();
++        if (freeSpace < additionalSize)
++        {
++            m_lastErrorCode = KIO::ERR_SLAVE_DEFINED;
++            m_lastErrorMessage = i18n( "Not enough disk space to move file into trash.");
++            return false;
++        }
++
++    } //end-if useSizeLimit
+ 
+     return true;
+ }

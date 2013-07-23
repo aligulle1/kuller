@@ -1,0 +1,14 @@
+Index: libkonq/konq_popupmenu.cc
+===================================================================
+--- libkonq/konq_popupmenu.cc	(revision 600625)
++++ libkonq/konq_popupmenu.cc	(working copy)
+@@ -575,6 +575,9 @@
+     if ( isCurrentTrash )
+     {
+         act = new KAction( i18n( "&Empty Trash Bin" ), "emptytrash", 0, this, SLOT( slotPopupEmptyTrashBin() ), &m_ownActions, "empytrash" );
++        KSimpleConfig trashConfig( "trashrc", true );
++        trashConfig.setGroup( "Status" );
++        act->setEnabled( !trashConfig.readBoolEntry( "Empty", true ) );
+         addAction( act );
+     }
+     addGroup( "editactions" );

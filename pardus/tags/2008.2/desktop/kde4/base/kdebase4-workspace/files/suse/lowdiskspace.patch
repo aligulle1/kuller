@@ -1,0 +1,484 @@
+Subject: Dialog notifying about running low on disk space
+From: Lubos Lunak
+Feature: bnc#199054
+Patch-upstream: no
+
+Index: freespacenotifier/freespacenotifier.cpp
+===================================================================
+--- /dev/null
++++ freespacenotifier/freespacenotifier.cpp
+@@ -0,0 +1,161 @@
++/* This file is part of the KDE Project
++   Copyright (c) 2006 Lukas Tinkl <ltinkl@suse.cz>
++   Copyright (c) 2008 Lubos Lunak <l.lunak@suse.cz>
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 2 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.
++*/
++
++#include "freespacenotifier.h"
++
++#include <sys/vfs.h>
++#include <unistd.h>
++
++#include <qdir.h>
++#include <qfile.h>
++#include <qlabel.h>
++#include <qspinbox.h>
++
++#include <kconfig.h>
++#include <kdebug.h>
++#include <klocale.h>
++#include <krun.h>
++
++#include "freespacewidget.h"
++
++
++FreeSpaceNotifier::FreeSpaceNotifier( QObject* parent )
++    : QObject( parent )
++    , lastAvailTimer( NULL )
++    , dialog( NULL )
++    , lastAvail( -1 )
++{
++    connect( &timer, SIGNAL( timeout() ), SLOT( checkFreeDiskSpace() ) );
++    KConfig cfg( "lowdiskspace" );
++    KConfigGroup group( &cfg, "General" );
++    limit = group.readEntry( "WarnMinimumFreeSpace", 200 ); // MiB
++    if( limit != 0 )
++        timer.start( 1000 * 60 /* 1 minute */ );
++}
++
++FreeSpaceNotifier::~FreeSpaceNotifier()
++{
++    delete dialog;
++}
++
++void FreeSpaceNotifier::checkFreeDiskSpace()
++{
++    if ( dialog )
++        return;
++    struct statfs sfs;
++    if ( statfs( QFile::encodeName( QDir::homeDirPath() ), &sfs ) == 0 )
++    {
++        long avail = ( getuid() ? sfs.f_bavail : sfs.f_bfree );
++
++        if (avail < 0 || sfs.f_blocks <= 0)
++            return; // we better do not say anything about it
++        
++        int availpct = int( 100 * avail / sfs.f_blocks );
++        avail = ((long long)avail) * sfs.f_bsize / ( 1024 * 1024 ); // to MiB
++        bool warn = false;
++        if( avail < limit ) // avail disk space dropped under a limit
++        {
++            if( lastAvail < 0 ) // always warn the first time
++            {
++                lastAvail = avail;
++                warn = true;
++            }
++            else if( avail > lastAvail ) // the user freed some space
++                lastAvail = avail;       // so warn if it goes low again
++            else if( avail < lastAvail * 0.5 ) // available dropped to a half of previous one, warn again
++            {
++                warn = true;
++                lastAvail = avail;
++            }
++            // do not change lastAvail otherwise, to handle free space slowly going down
++        }
++        if ( warn )
++        {
++            dialog = new KDialog;
++            dialog->setCaption( i18n( "Low Disk Space" ));
++            dialog->setButtons( KDialog::Yes | KDialog::No | KDialog::Cancel );
++            dialog->setDefaultButton( KDialog::Yes );
++            dialog->setEscapeButton( KDialog::No );
++            dialog->setButtonText( KDialog::Yes, i18n( "Open File Manager" ));
++            dialog->setButtonText( KDialog::No, i18n( "Do Nothing" ));
++            dialog->setButtonText( KDialog::Cancel, i18n( "Disable Warning" ));
++            widget = new FreeSpaceWidget( dialog );
++            dialog->setMainWidget( widget );
++
++            QString text = i18n( "You are running low on disk space on your home partition (currently %2%, %1 MiB free).",
++                avail, availpct );
++            widget->warningLabel->setText( text );
++            widget->spinbox->setMinValue( 0 );
++            widget->spinbox->setMaxValue( 100000 );
++            widget->spinbox->setValue( limit );
++            connect( dialog, SIGNAL( yesClicked() ), SLOT( slotYes() ) );
++            connect( dialog, SIGNAL( noClicked() ), SLOT( slotNo() ) );
++            connect( dialog, SIGNAL( cancelClicked() ), SLOT( slotCancel() ) );
++            dialog->show();
++        }
++    }
++}
++
++void FreeSpaceNotifier::slotYes()
++{
++    ( void ) new KRun( KUrl::fromPathOrUrl( QDir::homeDirPath() ), dialog );
++    cleanupDialog( widget->spinbox->value());
++}
++
++void FreeSpaceNotifier::slotNo()
++{
++    cleanupDialog( widget->spinbox->value());
++}
++
++void FreeSpaceNotifier::slotCancel()
++{
++    cleanupDialog( 0 ); // set limit to zero
++}
++
++void FreeSpaceNotifier::cleanupDialog( long newLimit )
++{
++    dialog->deleteLater();
++    dialog = NULL;
++    if( limit != newLimit )
++    {
++        KConfig cfg( "lowdiskspace" );
++        KConfigGroup group( &cfg, "General" );
++        limit = newLimit;
++        group.writeEntry( "WarnMinimumFreeSpace", int( limit ));
++        if( limit == 0 )
++            timer.stop();
++    }
++    if( limit != 0 )
++    { // warn again if constanly below limit for too long
++        if( lastAvailTimer == NULL )
++        { 
++            lastAvailTimer = new QTimer( this );
++            connect( lastAvailTimer, SIGNAL( timeout()), SLOT( resetLastAvailable()));
++        }
++        lastAvailTimer->start( 1000 * 60 * 60 /* 1 hour*/ ); 
++    }
++}
++
++void FreeSpaceNotifier::resetLastAvailable()
++{
++    lastAvail = -1;
++    lastAvailTimer->deleteLater();
++    lastAvailTimer = NULL;
++}
++
++#include "freespacenotifier.moc"
+Index: freespacenotifier/freespacenotifier.h
+===================================================================
+--- /dev/null
++++ freespacenotifier/freespacenotifier.h
+@@ -0,0 +1,51 @@
++/* This file is part of the KDE Project
++   Copyright (c) 2006 Lukas Tinkl <ltinkl@suse.cz>
++   Copyright (c) 2008 Lubos Lunak <l.lunak@suse.cz>
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 2 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.
++*/
++
++#ifndef _FREESPACENOTIFIER_H_
++#define _FREESPACENOTIFIER_H_
++
++#include <qtimer.h>
++
++#include <kdialog.h>
++
++class FreeSpaceWidget;
++
++class FreeSpaceNotifier
++: public QObject
++{
++    Q_OBJECT
++    public:
++        FreeSpaceNotifier( QObject* parent = NULL );
++        virtual ~FreeSpaceNotifier();
++    private slots:
++        void checkFreeDiskSpace();
++        void resetLastAvailable();
++        void slotYes();
++        void slotNo();
++        void slotCancel();
++    private:
++        void cleanupDialog( long newLimit );
++        QTimer timer;
++        QTimer* lastAvailTimer;
++        KDialog* dialog;
++        FreeSpaceWidget* widget;
++        long limit;
++        long lastAvail; // used to supress repeated warnings when available space hasn't changed
++};
++
++#endif
+Index: freespacenotifier/freespacewidget.ui
+===================================================================
+--- /dev/null
++++ freespacenotifier/freespacewidget.ui
+@@ -0,0 +1,118 @@
++<!DOCTYPE UI><UI version="3.3" stdsetdef="1">
++<class>FreeSpaceWidget</class>
++<widget class="QWidget">
++    <property name="name">
++        <cstring>Form1</cstring>
++    </property>
++    <property name="geometry">
++        <rect>
++            <x>0</x>
++            <y>0</y>
++            <width>489</width>
++            <height>108</height>
++        </rect>
++    </property>
++    <property name="caption">
++        <string>Form1</string>
++    </property>
++    <vbox>
++        <property name="name">
++            <cstring>unnamed</cstring>
++        </property>
++        <widget class="QLabel">
++            <property name="name">
++                <cstring>warningLabel</cstring>
++            </property>
++            <property name="text">
++                <string></string>
++            </property>
++        </widget>
++        <widget class="QLabel">
++            <property name="name">
++                <cstring>textLabel2</cstring>
++            </property>
++            <property name="text">
++                <string>Would you like to run a file manager to free some disk space and fix the problem?</string>
++            </property>
++        </widget>
++        <spacer>
++            <property name="name">
++                <cstring>spacer3</cstring>
++            </property>
++            <property name="orientation">
++                <enum>Vertical</enum>
++            </property>
++            <property name="sizeType">
++                <enum>Expanding</enum>
++            </property>
++            <property name="sizeHint">
++                <size>
++                    <width>20</width>
++                    <height>40</height>
++                </size>
++            </property>
++        </spacer>
++        <widget class="QLayoutWidget">
++            <property name="name">
++                <cstring>layout3</cstring>
++            </property>
++            <hbox>
++                <property name="name">
++                    <cstring>unnamed</cstring>
++                </property>
++                <widget class="QLabel">
++                    <property name="name">
++                        <cstring>textLabel3</cstring>
++                    </property>
++                    <property name="text">
++                        <string>Warn again when the free space is below</string>
++                    </property>
++                </widget>
++                <widget class="QSpinBox">
++                    <property name="name">
++                        <cstring>spinbox</cstring>
++                    </property>
++                    <property name="suffix">
++                        <string> MiB</string>
++                    </property>
++                </widget>
++                <spacer>
++                    <property name="name">
++                        <cstring>spacer1</cstring>
++                    </property>
++                    <property name="orientation">
++                        <enum>Horizontal</enum>
++                    </property>
++                    <property name="sizeType">
++                        <enum>Expanding</enum>
++                    </property>
++                    <property name="sizeHint">
++                        <size>
++                            <width>30</width>
++                            <height>20</height>
++                        </size>
++                    </property>
++                </spacer>
++            </hbox>
++        </widget>
++        <spacer>
++            <property name="name">
++                <cstring>spacer2</cstring>
++            </property>
++            <property name="orientation">
++                <enum>Vertical</enum>
++            </property>
++            <property name="sizeType">
++                <enum>Expanding</enum>
++            </property>
++            <property name="sizeHint">
++                <size>
++                    <width>20</width>
++                    <height>16</height>
++                </size>
++            </property>
++        </spacer>
++    </vbox>
++</widget>
++<layoutdefaults spacing="6" margin="11"/>
++</UI>
+Index: freespacenotifier/CMakeLists.txt
+===================================================================
+--- /dev/null
++++ freespacenotifier/CMakeLists.txt
+@@ -0,0 +1,19 @@
++add_definitions (-DQT3_SUPPORT -DQT3_SUPPORT_WARNINGS)
++
++
++########### next target ###############
++
++set(kded_susefreespacenotifier_SRCS freespacenotifier.cpp module.cpp)
++
++kde4_add_ui3_files(kded_susefreespacenotifier_SRCS freespacewidget.ui)
++
++kde4_add_plugin(kded_susefreespacenotifier ${kded_susefreespacenotifier_SRCS})
++
++target_link_libraries(kded_susefreespacenotifier ${KDE4_KIO_LIBS} )
++
++install(TARGETS kded_susefreespacenotifier  DESTINATION ${PLUGIN_INSTALL_DIR} )
++
++
++########### install files ###############
++
++install( FILES freespacenotifier.desktop  DESTINATION  ${SERVICES_INSTALL_DIR}/kded )
+Index: freespacenotifier/module.cpp
+===================================================================
+--- /dev/null
++++ freespacenotifier/module.cpp
+@@ -0,0 +1,37 @@
++/* This file is part of the KDE Project
++   Copyright (c) 2006 Lukas Tinkl <ltinkl@suse.cz>
++   Copyright (c) 2008 Lubos Lunak <l.lunak@suse.cz>
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 2 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.
++*/
++
++#include "module.h"
++
++#include <kpluginfactory.h>
++#include <kpluginloader.h>
++
++K_PLUGIN_FACTORY(FreeSpaceNotifierModuleFactory,
++                 registerPlugin<FreeSpaceNotifierModule>();
++    )
++K_EXPORT_PLUGIN(FreeSpaceNotifierModuleFactory("freespacenotifier"))
++
++
++// KhotKeysModule
++
++FreeSpaceNotifierModule::FreeSpaceNotifierModule(QObject* parent, const QList<QVariant>&)
++    : KDEDModule(parent)
++{
++}
++
++#include "module.moc"
+Index: freespacenotifier/module.h
+===================================================================
+--- /dev/null
++++ freespacenotifier/module.h
+@@ -0,0 +1,38 @@
++/* This file is part of the KDE Project
++   Copyright (c) 2006 Lukas Tinkl <ltinkl@suse.cz>
++   Copyright (c) 2008 Lubos Lunak <l.lunak@suse.cz>
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 2 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.
++*/
++
++#ifndef MODULE_H
++#define MODULE_H
++
++#include <kdedmodule.h>
++#include <QtCore/QObject>
++#include <QtDBus/QtDBus>
++
++#include "freespacenotifier.h"
++
++class FreeSpaceNotifierModule
++    : public KDEDModule
++    {
++    Q_OBJECT
++    public:
++        FreeSpaceNotifierModule(QObject* parent, const QList<QVariant>&);
++    private:
++        FreeSpaceNotifier notifier;
++    };
++
++#endif
+Index: freespacenotifier/freespacenotifier.desktop
+===================================================================
+--- /dev/null
++++ freespacenotifier/freespacenotifier.desktop
+@@ -0,0 +1,7 @@
++[Desktop Entry]
++Name=Free Space Notifier
++Type=Service
++X-KDE-ServiceTypes=KDEDModule
++X-KDE-Library=freespacenotifier
++X-KDE-DBus-ModuleName=freespacenotifier
++X-KDE-Kded-autoload=true
+Index: CMakeLists.txt
+===================================================================
+--- CMakeLists.txt.orig
++++ CMakeLists.txt
+@@ -96,6 +96,8 @@ include_directories(
+   ${CMAKE_CURRENT_SOURCE_DIR}/libs
+   ${CMAKE_CURRENT_SOURCE_DIR}/libs/kworkspace
+ )
++add_subdirectory( freespacenotifier )
++
+ # libs
+ add_subdirectory(cmake)
+ add_subdirectory(libs)

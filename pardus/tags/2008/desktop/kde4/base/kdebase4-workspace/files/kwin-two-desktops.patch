@@ -1,0 +1,35 @@
+Index: kwin/kcmkwin/kwindesktop/desktop.cpp
+===================================================================
+--- kwin/kcmkwin/kwindesktop/desktop.cpp	(revision 763694)
++++ kwin/kcmkwin/kwindesktop/desktop.cpp	(working copy)
+@@ -79,7 +79,7 @@
+   lay->setSpacing(KDialog::spacingHint());
+ 
+   QLabel *label = new QLabel(i18n("N&umber of desktops: "), number_group);
+-  _numInput = new KIntNumInput(4, number_group);
++  _numInput = new KIntNumInput(2, number_group);
+   _numInput->setRange(1, maxDesktops, 1);
+   connect(_numInput, SIGNAL(valueChanged(int)), SLOT(slotValueChanged(int)));
+   connect(_numInput, SIGNAL(valueChanged(int)), SLOT( changed() ));
+@@ -243,7 +243,7 @@
+ 
+ void KDesktopConfig::defaults()
+ {
+-  int n = 4;
++  int n = 2;
+   _numInput->setValue(n);
+ 
+   for(int i = 0; i < maxDesktops; i++)
+Index: kwin/workspace.cpp
+===================================================================
+--- kwin/workspace.cpp	(revision 763694)
++++ kwin/workspace.cpp	(working copy)
+@@ -1081,7 +1081,7 @@
+         groupname.sprintf("Desktops-screen-%d", screen_number);
+     KConfigGroup group(c,groupname);
+ 
+-    int n = group.readEntry("Number", 4);
++    int n = group.readEntry("Number", 2);
+     number_of_desktops = n;
+     delete workarea;
+     workarea = new QRect[ n + 1 ];

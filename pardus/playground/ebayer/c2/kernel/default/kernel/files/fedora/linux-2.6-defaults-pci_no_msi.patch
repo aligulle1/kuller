@@ -1,0 +1,70 @@
+Index: linux-2.6.31/Documentation/kernel-parameters.txt
+===================================================================
+--- linux-2.6.31.orig/Documentation/kernel-parameters.txt
++++ linux-2.6.31/Documentation/kernel-parameters.txt
+@@ -1807,7 +1807,10 @@ and is between 256 and 4096 characters. 
+ 		check_enable_amd_mmconf [X86] check for and enable
+ 				properly configured MMIO access to PCI
+ 				config space on AMD family 10h CPU
+-		nomsi		[MSI] If the PCI_MSI kernel config parameter is
++		msi		[MSI] If the PCI_MSI kernel config parameter is
++				enabled, this kernel boot option can be used to
++				enable the use of MSI interrupts system-wide.
++		nomsi	[MSI] If the PCI_MSI kernel config parameter is
+ 				enabled, this kernel boot option can be used to
+ 				disable the use of MSI interrupts system-wide.
+ 		noioapicquirk	[APIC] Disable all boot interrupt quirks.
+Index: linux-2.6.31/drivers/pci/msi.c
+===================================================================
+--- linux-2.6.31.orig/drivers/pci/msi.c
++++ linux-2.6.31/drivers/pci/msi.c
+@@ -23,7 +23,7 @@
+ #include "pci.h"
+ #include "msi.h"
+ 
+-static int pci_msi_enable = 1;
++static int pci_msi_enable = 0;
+ 
+ /* Arch hooks */
+ 
+@@ -823,6 +823,11 @@ int pci_msi_enabled(void)
+ }
+ EXPORT_SYMBOL(pci_msi_enabled);
+ 
++void pci_yes_msi(void)
++{
++	pci_msi_enable = 1;
++}
++
+ void pci_msi_init_pci_dev(struct pci_dev *dev)
+ {
+ 	INIT_LIST_HEAD(&dev->msi_list);
+Index: linux-2.6.31/drivers/pci/pci.c
+===================================================================
+--- linux-2.6.31.orig/drivers/pci/pci.c
++++ linux-2.6.31/drivers/pci/pci.c
+@@ -2659,6 +2659,8 @@ static int __init pci_setup(char *str)
+ 		if (*str && (str = pcibios_setup(str)) && *str) {
+ 			if (!strcmp(str, "nomsi")) {
+ 				pci_no_msi();
++			} else if (!strcmp(str, "msi")) {
++				pci_yes_msi();
+ 			} else if (!strcmp(str, "noaer")) {
+ 				pci_no_aer();
+ 			} else if (!strcmp(str, "nodomains")) {
+Index: linux-2.6.31/drivers/pci/pci.h
+===================================================================
+--- linux-2.6.31.orig/drivers/pci/pci.h
++++ linux-2.6.31/drivers/pci/pci.h
+@@ -112,9 +112,11 @@ extern unsigned int pci_pm_d3_delay;
+ 
+ #ifdef CONFIG_PCI_MSI
+ void pci_no_msi(void);
++void pci_yes_msi(void);
+ extern void pci_msi_init_pci_dev(struct pci_dev *dev);
+ #else
+ static inline void pci_no_msi(void) { }
++static inline void pci_yes_msi(void) { }
+ static inline void pci_msi_init_pci_dev(struct pci_dev *dev) { }
+ #endif
+ 

@@ -1,0 +1,32 @@
+diff -Nur KoboDeluxe-0.4pre10-old/sound/audio.c KoboDeluxe-0.4pre10/sound/audio.c
+--- KoboDeluxe-0.4pre10-old/sound/audio.c	2007-04-04 21:42:51.335082969 +0300
++++ KoboDeluxe-0.4pre10/sound/audio.c	2007-04-04 21:43:10.801123681 +0300
+@@ -344,7 +344,7 @@
+ #else
+ #define	TS(x)
+ #endif
+-	unsigned frames, bufs;
++	unsigned frames, bufs, rest;
+ 	Sint16 *outbuf = (Sint16 *)stream;
+ 	float dbt;
+ 
+@@ -354,11 +354,18 @@
+ 		return;
+ 	}
+ 
+-	bufs = len / (a_settings.buffersize * sizeof(Sint16) * 2);
++	bufs = len / (a_settings.buffersize * sizeof(Sint16) * 2) + 1;
+ 	frames = len / sizeof(Sint16) / 2 / bufs;
++	rest = (len - frames * bufs * sizeof(Sint16) * 2) / (sizeof(Sint16) * 2);
++	if (rest)
++	  bufs++;
++	else
++	  rest = frames;
+ 	dbt = ceil((float)frames / (float)a_settings.samplerate);
+ 	while(bufs--)
+ 	{
++	  if (bufs == 0)
++	    frames = rest;
+ 	  TS(0);
+ 	  TS(1);
+ 		aev_client("_run_commands()");

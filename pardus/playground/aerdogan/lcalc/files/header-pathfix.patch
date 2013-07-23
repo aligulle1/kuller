@@ -1,0 +1,82 @@
+--- Makefile.org	2007-09-03 06:52:36.000000000 +0300
++++ Makefile	2008-01-23 01:32:52.000000000 +0200
+@@ -19,7 +19,7 @@
+ #multiprecision requires older version of gmp 4.1.4
+ #PREPROCESSOR_DEFINE = -DUSE_MPFR
+ ifeq ($(PREPROCESSOR_DEFINE),-DUSE_MPFR)
+-  GMP_FLAGS= -L/usr/local/lib -lmpfr -lgmpxx -lgmp
++  GMP_FLAGS= -L/usr/lib -lmpfr -lgmpxx -lgmp
+ else
+   GMP_FLAGS=
+ endif
+@@ -55,13 +55,13 @@
+ 
+ ifeq ($(PARI_DEFINE),-DINCLUDE_PARI)
+     #location of pari.h.
+-    LOCATION_PARI_H = /usr/local/include/pari #usual location
++    LOCATION_PARI_H = /usr/include/pari #usual location
+     #LOCATION_PARI_H = /usr/local/pari/pari-2.1.5/include/pari  #for caedmon
+ 
+     #location of libpari.a or of libpari.so
+     #depending on whether static or dynamic libraries are being used.
+     #On mac os x it's the former, on linux I think usually the latter.
+-    LOCATION_PARI_LIBRARY = /usr/local/lib #usual location
++    LOCATION_PARI_LIBRARY = /usr/lib #usual location
+     #LOCATION_PARI_LIBRARY = /usr/local/pari/pari-2.1.5/lib #for caedmon
+ else
+     #supplied as a dummy so as to avoid more ifeq's below
+@@ -114,7 +114,7 @@
+ #become clear which libraries the computer can find.
+ 
+ 
+-INSTALL_DIR= /usr/local
++INSTALL_DIR= /usr
+ 
+ #object files for the libLfunction library
+ OBJ_L = Lglobals.o Lgamma.o Lriemannsiegel.o
+@@ -125,7 +125,7 @@
+ OBJECTS = $(OBJ3)
+ 
+ all:
+-	make libLfunction.a
++	make libLfunction.so
+ #   make examples
+ 	make lcalc
+ 
+@@ -135,7 +135,7 @@
+ #temporary for linking to with sample programs.
+ examples:
+ #	$(CC) $(CCFLAGS) $(INCLUDEFILES) example_programs/example.cc libLfunction.a -o example_programs/example $(GMP_FLAGS)
+-	$(CC) $(CCFLAGS) $(INCLUDEFILES) example_programs/shit.cc libLfunction.a -o example_programs/shit $(GMP_FLAGS)
++	$(CC) $(CCFLAGS) $(INCLUDEFILES) example_programs/shit.cc libLfunctions.so -o example_programs/shit $(GMP_FLAGS)
+ 
+ .cc.o:
+ 	$(CC) $(CCFLAGS) $(INCLUDEFILES) -c $<
+@@ -230,17 +230,21 @@
+ 	$(CC) $(CCFLAGS) $(INCLUDEFILES) -I$(LOCATION_PARI_H) $(PARI_DEFINE) -c Lcommandline.cc
+ 
+ 
+-libLfunction.a: $(OBJ_L)
+-	ar ruv libLfunction.a $(OBJ_L)
+-	ranlib libLfunction.a
++#libLfunction.a: $(OBJ_L)
++#	ar ruv libLfunction.a $(OBJ_L)
++#	ranlib libLfunction.a
++
++libLfunction.so: $(OBJ_L)
++	$(CC) $(CFLAGS) -fPIC -shared -Wl,-soname=libLfunctions.so -o $@ $(OBJ_L)
++
+ 
+ clean:
+-	rm -f *.o lcalc libLfunction.a example_programs/example
++	rm -f *.o lcalc libLfunction.so example_programs/example
+ 
+ install:
+ 	cp -f lcalc $(INSTALL_DIR)/bin/.
+-	cp -f libLfunction.a $(INSTALL_DIR)/lib/.
+-	ranlib $(INSTALL_DIR)/lib/libLfunction.a
++	cp -f libLfunction.so $(INSTALL_DIR)/lib/.
++	#ranlib $(INSTALL_DIR)/lib/libLfunction.
+ 	cp -rf ../include $(INSTALL_DIR)/include/Lfunction
+ 
+ 

@@ -1,0 +1,155 @@
+diff -up kdebase-workspace-4.0.5/plasma/applets/kickoff/CMakeLists.txt.kickoff-suspend kdebase-workspace-4.0.5/plasma/applets/kickoff/CMakeLists.txt
+--- kdebase-workspace-4.0.5/plasma/applets/kickoff/CMakeLists.txt.kickoff-suspend	2008-03-27 21:34:51.000000000 +0100
++++ kdebase-workspace-4.0.5/plasma/applets/kickoff/CMakeLists.txt	2008-06-01 13:53:49.000000000 +0200
+@@ -55,13 +55,13 @@ ENDIF (CMAKE_BUILD_TYPE MATCHES Debug)
+ # Kickoff Plasma Applet
+ set ( Applet_SRCS ${Kickoff_SRCS} applet/applet.cpp )
+ kde4_add_plugin(plasma_applet_launcher ${Applet_SRCS})
+-target_link_libraries(plasma_applet_launcher plasma ${Kickoff_LIBS}) 
++target_link_libraries(plasma_applet_launcher plasma solidcontrol ${Kickoff_LIBS}) 
+ install(TARGETS plasma_applet_launcher DESTINATION ${PLUGIN_INSTALL_DIR})
+ install(FILES applet/plasma-applet-launcher.desktop DESTINATION ${SERVICES_INSTALL_DIR})
+ 
+ # Simple KMenu Plasma Applet
+ set ( SimpleApplet_SRCS ${Kickoff_SRCS} simpleapplet/menuview.cpp simpleapplet/simpleapplet.cpp )
+ kde4_add_plugin(plasma_applet_simplelauncher ${SimpleApplet_SRCS})
+-target_link_libraries(plasma_applet_simplelauncher plasma ${Kickoff_LIBS}) 
++target_link_libraries(plasma_applet_simplelauncher plasma solidcontrol ${Kickoff_LIBS}) 
+ install(TARGETS plasma_applet_simplelauncher DESTINATION ${PLUGIN_INSTALL_DIR})
+ install(FILES simpleapplet/plasma-applet-simplelauncher.desktop DESTINATION ${SERVICES_INSTALL_DIR})
+diff -up kdebase-workspace-4.0.5/plasma/applets/kickoff/core/itemhandlers.cpp.kickoff-suspend kdebase-workspace-4.0.5/plasma/applets/kickoff/core/itemhandlers.cpp
+--- kdebase-workspace-4.0.5/plasma/applets/kickoff/core/itemhandlers.cpp.kickoff-suspend	2008-03-27 21:34:51.000000000 +0100
++++ kdebase-workspace-4.0.5/plasma/applets/kickoff/core/itemhandlers.cpp	2008-06-01 13:53:49.000000000 +0200
+@@ -29,6 +29,8 @@
+ #include <KService>
+ #include <KToolInvocation>
+ #include <solid/powermanagement.h>
++#include <solid/control/powermanager.h>
++#include <kjob.h>
+ 
+ // KDE Base
+ #include <kworkspace/kworkspace.h>
+@@ -83,6 +85,18 @@ bool LeaveItemHandler::openUrl(const QUr
+         // decouple dbus call, otherwise we'll run into a dead-lock
+         QTimer::singleShot(0, this, SLOT(logout()));
+         return true;
++    } else if (m_logoutAction == "standby") {
++        // decouple dbus call, otherwise we'll run into a dead-lock
++        QTimer::singleShot(0, this, SLOT(standby()));
++        return true;
++    } else if (m_logoutAction == "suspendram") {
++        // decouple dbus call, otherwise we'll run into a dead-lock
++        QTimer::singleShot(0, this, SLOT(suspendRAM()));
++        return true;
++    } else if (m_logoutAction == "suspenddisk") {
++        // decouple dbus call, otherwise we'll run into a dead-lock
++        QTimer::singleShot(0, this, SLOT(suspendDisk()));
++        return true;
+     }
+ 
+     return false;
+@@ -128,3 +142,27 @@ void LeaveItemHandler::switchUser()
+         krunner.switchUser();
+     }
+ }
++
++void LeaveItemHandler::standby()
++{
++    Solid::Control::PowerManager::SuspendMethod spdMethod = Solid::Control::PowerManager::Standby;
++    KJob *job = Solid::Control::PowerManager::suspend( spdMethod );
++    if (job != 0)
++       job->start();
++}
++
++void LeaveItemHandler::suspendRAM()
++{
++    Solid::Control::PowerManager::SuspendMethod spdMethod = Solid::Control::PowerManager::ToRam;
++    KJob *job = Solid::Control::PowerManager::suspend( spdMethod );
++    if (job != 0)
++       job->start();
++}
++
++void LeaveItemHandler::suspendDisk()
++{
++    Solid::Control::PowerManager::SuspendMethod spdMethod = Solid::Control::PowerManager::ToDisk;
++    KJob *job = Solid::Control::PowerManager::suspend( spdMethod );
++    if (job != 0)
++       job->start();
++}
+diff -up kdebase-workspace-4.0.5/plasma/applets/kickoff/core/itemhandlers.h.kickoff-suspend kdebase-workspace-4.0.5/plasma/applets/kickoff/core/itemhandlers.h
+--- kdebase-workspace-4.0.5/plasma/applets/kickoff/core/itemhandlers.h.kickoff-suspend	2008-03-27 21:34:51.000000000 +0100
++++ kdebase-workspace-4.0.5/plasma/applets/kickoff/core/itemhandlers.h	2008-06-01 13:53:49.000000000 +0200
+@@ -42,6 +42,9 @@ private Q_SLOTS:
+     void logout();
+     void lock();
+     void switchUser();
++    void standby();
++    void suspendRAM();
++    void suspendDisk();
+ 
+ private:
+     QString m_logoutAction;
+diff -up kdebase-workspace-4.0.5/plasma/applets/kickoff/core/leavemodel.cpp.kickoff-suspend kdebase-workspace-4.0.5/plasma/applets/kickoff/core/leavemodel.cpp
+--- kdebase-workspace-4.0.5/plasma/applets/kickoff/core/leavemodel.cpp.kickoff-suspend	2008-03-27 21:34:51.000000000 +0100
++++ kdebase-workspace-4.0.5/plasma/applets/kickoff/core/leavemodel.cpp	2008-06-01 22:28:23.000000000 +0200
+@@ -27,6 +27,7 @@
+ #include <KLocalizedString>
+ #include <KIcon>
+ #include <solid/powermanagement.h>
++#include <solid/control/powermanager.h>
+ 
+ // Local
+ #include "core/models.h"
+@@ -39,6 +40,7 @@ class LeaveModel::Private
+ 
+ QStandardItem* LeaveModel::createStandardItem(const QString& url)
+ {
++    KGlobal::locale()->insertCatalog("ksmserver");
+     //Q_ASSERT(KUrl(url).scheme() == "leave");
+     QStandardItem *item = new QStandardItem();
+     const QString basename = QFileInfo(url).baseName();
+@@ -77,6 +79,21 @@ QStandardItem* LeaveModel::createStandar
+         item->setIcon(KIcon("system-restart"));
+         item->setData(i18n("Restart the computer"),Kickoff::SubTitleRole);
+     }
++    else if (basename == "standby") {
++        item->setText(i18n("Standby"));
++        item->setIcon(KIcon("system-suspend"));
++        item->setData(i18n("Pause without logging out"),Kickoff::SubTitleRole);
++    }
++    else if (basename == "suspenddisk") {
++        item->setText(i18n("Suspend to Disk"));
++        item->setIcon(KIcon("system-suspend-hibernate"));
++        item->setData(i18n("Pause without logging out"),Kickoff::SubTitleRole);
++    }
++    else if (basename == "suspendram") {
++        item->setText(i18n("Suspend to RAM"));
++        item->setIcon(KIcon("system-suspend-hibernate"));
++        item->setData(i18n("Pause without logging out"),Kickoff::SubTitleRole);
++    }
+     else {
+         item->setText(basename);
+         item->setData(url,Kickoff::SubTitleRole);
+@@ -122,6 +139,22 @@ LeaveModel::LeaveModel(QObject *parent)
+             systemOptions->appendRow(hibernateOption);
+         }
+ 
++        Solid::Control::PowerManager::SuspendMethods spdMethods = Solid::Control::PowerManager::supportedSuspendMethods();
++        if( spdMethods & Solid::Control::PowerManager::Standby ) {
++            QStandardItem *standbyOption = createStandardItem("leave:/standby");
++            systemOptions->appendRow(standbyOption);
++        }
++
++        if( spdMethods & Solid::Control::PowerManager::ToRam ) {
++            QStandardItem *suspendramOption = createStandardItem("leave:/suspendram");
++            systemOptions->appendRow(suspendramOption);
++        }
++
++        if( spdMethods & Solid::Control::PowerManager::ToDisk ) {
++            QStandardItem *suspenddiskOption = createStandardItem("leave:/suspenddisk");
++            systemOptions->appendRow(suspenddiskOption);
++        }
++
+         // Shutdown
+         QStandardItem *shutDownOption = createStandardItem("leave:/shutdown");
+         systemOptions->appendRow(shutDownOption);

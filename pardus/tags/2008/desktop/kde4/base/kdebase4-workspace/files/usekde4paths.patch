@@ -1,0 +1,32 @@
+--- startkde.cmake	2008-01-11 18:31:51.000000000 +0200
++++ startkde.cmake	2008-01-11 18:41:22.000000000 +0200
+@@ -6,6 +6,7 @@
+ # When the X server dies we get a HUP signal from xinit. We must ignore it
+ # because we still need to do some cleanup.
+ trap 'echo GOT SIGHUP' HUP
++export PATH=/usr/kde/4/bin:$PATH
+ 
+ # Check if a KDE session already is running
+ if kcheckrunning >/dev/null 2>&1; then
+@@ -55,7 +55,7 @@
+ # The user's personal KDE directory is usually ~/.kde, but this setting
+ # may be overridden by setting KDEHOME.
+ 
+-kdehome=$HOME/.kde
++kdehome=$HOME/.kde4
+ test -n "$KDEHOME" && kdehome=`echo "$KDEHOME"|sed "s,^~/,$HOME/,"`
+ 
+ # see kstartupconfig source for usage
+Index: kstartupconfig/kstartupconfig.cpp
+===================================================================
+--- kstartupconfig/kstartupconfig.cpp	(revision 758759)
++++ kstartupconfig/kstartupconfig.cpp	(working copy)
+@@ -81,7 +81,7 @@
+     else if( getenv( "HOME" ))
+         {
+         strlcpy( kdehome, getenv( "HOME" ), 1024 );
+-        strlcat( kdehome, "/.kde", 1024  );
++        strlcat( kdehome, "/.kde4", 1024  );
+         }
+     else
+         return 1;

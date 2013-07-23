@@ -1,0 +1,192 @@
+-- general.h
++++ general.h	2005-12-09 17:53:24.000000000 +0100
+@@ -21,10 +21,13 @@
+ #if !defined (_GENERAL_H_)
+ #define _GENERAL_H_
+ 
++#include <time.h>
++#include <sys/types.h>
+ #include "stdc.h"
+ 
+ #include "bashtypes.h"
+ #include "chartypes.h"
++#include "bashline.h"
+ 
+ #if defined (HAVE_SYS_RESOURCE_H) && defined (RLIMTYPE)
+ #  if defined (HAVE_SYS_TIME_H)
+--- jobs.c
++++ jobs.c	2005-12-09 17:53:24.000000000 +0100
+@@ -189,10 +189,10 @@
+ #endif
+ 
+ /* Last child made by the shell.  */
+-pid_t last_made_pid = NO_PID;
++volatile pid_t last_made_pid = NO_PID;
+ 
+ /* Pid of the last asynchronous child. */
+-pid_t last_asynchronous_pid = NO_PID;
++volatile pid_t last_asynchronous_pid = NO_PID;
+ 
+ /* The pipeline currently being built. */
+ PROCESS *the_pipeline = (PROCESS *)NULL;
+@@ -205,7 +205,7 @@
+ 
+ /* If this is non-zero, $LINES and $COLUMNS are reset after every process
+    exits from get_tty_state(). */
+-int check_window_size;
++int check_window_size = 1;
+ 
+ /* Functions local to this file. */
+ 
+--- jobs.h
++++ jobs.h	2005-12-09 17:53:24.000000000 +0100
+@@ -162,7 +162,7 @@
+ extern struct jobstats js;
+ 
+ extern pid_t original_pgrp, shell_pgrp, pipeline_pgrp;
+-extern pid_t last_made_pid, last_asynchronous_pid;
++extern volatile pid_t last_made_pid, last_asynchronous_pid;
+ extern int asynchronous_notification;
+ 
+ extern JOB **jobs;
+--- parse.y
++++ parse.y	2005-12-09 17:53:24.000000000 +0100
+@@ -1186,7 +1186,7 @@
+ 
+ #if defined (READLINE)
+ char *current_readline_prompt = (char *)NULL;
+-char *current_readline_line = (char *)NULL;
++unsigned char *current_readline_line = (unsigned char *)NULL;
+ int current_readline_line_index = 0;
+ 
+ static int
+--- shell.c
++++ shell.c	2005-12-09 17:53:24.000000000 +0100
+@@ -460,7 +460,7 @@
+   if (dump_translatable_strings)
+     read_but_dont_execute = 1;
+ 
+-  if (running_setuid && privileged_mode == 0)
++  if (running_setuid && privileged_mode == 0 /* && act_like_sh == 0 */)
+     disable_priv_mode ();
+ 
+   /* Need to get the argument to a -c option processed in the
+--- subst.c
++++ subst.c	2005-12-09 17:53:24.000000000 +0100
+@@ -2658,6 +2658,7 @@
+       last_command_exit_value = EXECUTION_FAILURE;
+       exp_jump_to_top_level ((result == &expand_word_error) ? DISCARD : FORCE_EOF);
+       /* NOTREACHED */
++      return NULL; /* make stupid compiler happy */
+     }
+   else
+     return (result);
+--- variables.c
++++ variables.c	2005-12-09 17:59:14.000000000 +0100
+@@ -1183,8 +1183,10 @@
+      arrayind_t unused;
+ {
+   sbrand (strtoul (value, (char **)NULL, 10));
++#if !defined(linux)
+   if (subshell_environment)
+     seeded_subshell = 1;
++#endif
+   return (self);
+ }
+ 
+--- builtins/printf.def
++++ builtins/printf.def	2005-12-09 17:53:24.000000000 +0100
+@@ -37,6 +37,7 @@
+ $END
+ 
+ #include <config.h>
++#include <locale.h>
+ 
+ #include "../bashtypes.h"
+ 
+@@ -487,12 +488,20 @@
+ 	    case 'A':
+ #endif
+ 	      {
+-		char *f;
++		char *f, *lce = getenv("LC_NUMERIC"), *lcl = setlocale(LC_NUMERIC, NULL);
+ 		floatmax_t p;
+ 
+ 		p = getfloatmax ();
+ 		f = mklong (start, FLOATMAX_CONV, sizeof(FLOATMAX_CONV) - 1);
++
++		if (lce && lcl)
++		    setlocale(LC_NUMERIC, lce);
++
+ 		PF (f, p);
++
++		if (lce && lcl)
++		    setlocale(LC_NUMERIC, lcl);
++
+ 		break;
+ 	      }
+ 
+--- builtins/shopt.def
++++ builtins/shopt.def	2005-12-09 17:53:24.000000000 +0100
+@@ -252,9 +252,9 @@
+   allow_null_glob_expansion = glob_dot_filenames = 0;
+   cdable_vars = mail_warning = 0;
+   no_exit_on_failed_exec = print_shift_error = 0;
+-  check_hashed_filenames = cdspelling = expand_aliases = check_window_size = 0;
++  check_hashed_filenames = cdspelling = expand_aliases = 0;
+ 
+-  source_uses_path = promptvars = 1;
++  check_window_size = source_uses_path = promptvars = 1;
+ 
+ #if defined (EXTENDED_GLOB)
+   extended_glob = 0;
+--- doc/Makefile.in
++++ doc/Makefile.in	2005-12-09 17:53:24.000000000 +0100
+@@ -141,7 +141,7 @@
+ 	${RM} $@
+ 	-${DVIPS} $<
+ 
+-all: ps info dvi text html
++all: info html
+ nodvi: ps info text html
+ 
+ PSFILES = bash.ps bashbug.ps article.ps builtins.ps rbash.ps 
+--- doc/bash.1
++++ doc/bash.1	2005-12-09 17:53:24.000000000 +0100
+@@ -4361,8 +4361,8 @@
+ The name of this file is taken from the value of the
+ .SM
+ .B INPUTRC
+-variable.  If that variable is unset, the default is
+-.IR ~/.inputrc .
++environment variable. If that variable is unset, readline will read both
++.IR /etc/inputrc " and " ~/.inputrc .
+ When a program which uses the readline library starts up, the
+ initialization file is read, and the key bindings and variables
+ are set.
+@@ -8796,6 +8796,9 @@
+ .TP
+ .FN ~/.inputrc
+ Individual \fIreadline\fP initialization file
++.TP
++.FN /etc/inputrc
++System \fBreadline\fP initialization file
+ .PD
+ .SH AUTHORS
+ Brian Fox, Free Software Foundation
+--- support/rlvers.sh
++++ support/rlvers.sh	2005-12-09 17:53:24.000000000 +0100
+@@ -27,10 +27,10 @@
+ 
+ # defaults
+ CC=cc
+-RL_LIBDIR=/usr/local/lib
+-RL_INCDIR=/usr/local/include
++RL_LIBDIR=/lib
++RL_INCDIR=/usr/include
+ 
+-TERMCAP_LIB="-ltermcap"
++TERMCAP_LIB="-lncurses"
+ 
+ # cannot rely on the presence of getopts
+ while [ $# -gt 0 ]; do

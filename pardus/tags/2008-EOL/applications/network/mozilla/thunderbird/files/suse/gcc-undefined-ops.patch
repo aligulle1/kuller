@@ -1,0 +1,90 @@
+--- layout/base/nsCSSRendering.cpp.orig	2006-10-25 23:59:19.000000000 +0200
++++ layout/base/nsCSSRendering.cpp	2006-10-26 00:00:04.000000000 +0200
+@@ -1000,14 +1000,14 @@
+             FillOrInvertRect(aContext,  dashRect.x, borderOutside.y,dashRect.width, dashRect.height-adjust,isInvert);
+             FillOrInvertRect(aContext,dashRect.x,(borderOutside.YMost()-(dashRect.height-adjust)),dashRect.width, dashRect.height-adjust,isInvert);
+             currRect.y += (dashRect.height-adjust);
+-            temp = temp-= (dashRect.height-adjust);
++            temp -= (dashRect.height-adjust);
+           } else {
+             adjust = (temp%dashRect.width)/2;                   // adjust a tad longer
+             // draw in the left and right
+             FillOrInvertRect(aContext, dashRect.x, borderOutside.y,dashRect.width, dashRect.height+adjust,isInvert);
+             FillOrInvertRect(aContext, dashRect.x,(borderOutside.YMost()-(dashRect.height+adjust)),dashRect.width, dashRect.height+adjust,isInvert);
+             currRect.y += (dashRect.height+adjust);
+-            temp = temp-= (dashRect.height+adjust);
++            temp -= (dashRect.height+adjust);
+           }
+         
+           if( temp > ywidth)
+@@ -1066,14 +1066,14 @@
+             FillOrInvertRect(aContext, borderOutside.x,dashRect.y,dashRect.width-adjust,dashRect.height,isInvert);
+             FillOrInvertRect(aContext, (borderOutside.XMost()-(dashRect.width-adjust)),dashRect.y,dashRect.width-adjust,dashRect.height,isInvert);
+             currRect.x += (dashRect.width-adjust);
+-            temp = temp-= (dashRect.width-adjust);
++            temp -= (dashRect.width-adjust);
+           } else {
+             adjust = (temp%dashRect.width)/2;
+             // draw in the left and right
+             FillOrInvertRect(aContext, borderOutside.x,dashRect.y,dashRect.width+adjust,dashRect.height,isInvert);
+             FillOrInvertRect(aContext, (borderOutside.XMost()-(dashRect.width+adjust)),dashRect.y,dashRect.width+adjust,dashRect.height,isInvert);
+             currRect.x += (dashRect.width+adjust);
+-            temp = temp-= (dashRect.width+adjust);
++            temp -= (dashRect.width+adjust);
+           }
+        
+ 
+--- layout/xul/base/src/nsBox.cpp.orig	2006-10-26 00:00:26.000000000 +0200
++++ layout/xul/base/src/nsBox.cpp	2006-10-26 00:01:30.000000000 +0200
+@@ -863,7 +863,7 @@
+       while (box) {
+         nsRect* overflowArea = box->GetOverflowAreaProperty();
+         nsRect bounds = overflowArea ? *overflowArea + box->GetPosition() :
+-                                         bounds = box->GetRect();
++                                         box->GetRect();
+         rect.UnionRect(rect, bounds);
+ 
+         box->GetNextBox(&box);
+--- intl/unicharutil/src/nsEntityConverter.cpp.orig	2005-04-02 20:44:00.000000000 +0200
++++ intl/unicharutil/src/nsEntityConverter.cpp	2006-10-26 00:07:24.000000000 +0200
+@@ -236,7 +236,8 @@
+     if (IS_HIGH_SURROGATE(inString[i]) &&
+         i + 2 < len &&
+         IS_LOW_SURROGATE(inString[i + 1])) {
+-      key.AppendInt(SURROGATE_TO_UCS4(inString[i], inString[++i]), 10);
++      key.AppendInt(SURROGATE_TO_UCS4(inString[i], inString[i + 1]), 10);
++      ++i;
+     }
+     else {
+       key.AppendInt(inString[i],10);
+--- content/events/src/nsEventStateManager.cpp.orig	2006-08-06 00:19:17.000000000 +0200
++++ content/events/src/nsEventStateManager.cpp	2006-10-26 00:11:16.000000000 +0200
+@@ -4301,7 +4301,7 @@
+               do_QueryInterface(GetDocumentOuterWindow(mDocument));
+             if (newWindow) {
+               nsIFocusController *newFocusController =
+-                newFocusController = newWindow->GetRootFocusController();
++                newWindow->GetRootFocusController();
+               nsCOMPtr<nsPIDOMWindow> oldWindow =
+                 do_QueryInterface(GetDocumentOuterWindow(gLastFocusedDocument));
+               if (oldWindow) {
+--- netwerk/cache/src/nsDiskCacheMap.h.orig	2006-02-04 23:01:22.000000000 +0100
++++ netwerk/cache/src/nsDiskCacheMap.h	2006-10-26 00:15:09.000000000 +0200
+@@ -168,7 +168,7 @@
+         
+         // set blockCount
+         NS_ASSERTION( (blockCount>=1) && (blockCount<=4),"invalid block count");
+-        blockCount = --blockCount;
++        --blockCount;
+         mDataLocation |= (blockCount << eExtraBlocksOffset) & eExtraBlocksMask;
+         
+         mDataLocation |= eLocationInitializedMask;
+@@ -236,7 +236,7 @@
+         
+         // set blockCount
+         NS_ASSERTION( (blockCount>=1) && (blockCount<=4),"invalid block count");
+-        blockCount = --blockCount;
++        --blockCount;
+         mMetaLocation |= (blockCount << eExtraBlocksOffset) & eExtraBlocksMask;
+         
+         mMetaLocation |= eLocationInitializedMask;

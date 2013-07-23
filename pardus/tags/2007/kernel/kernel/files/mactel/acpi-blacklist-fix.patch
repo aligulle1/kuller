@@ -1,0 +1,23 @@
+--- a/drivers/acpi/blacklist.c	2006-09-22 18:03:46.000000000 +0300
++++ a/drivers/acpi/blacklist.c	2006-09-22 18:02:34.000000000 +0300
+@@ -32,6 +32,7 @@
+ #include <linux/acpi.h>
+ #include <acpi/acpi_bus.h>
+ #include <linux/dmi.h>
++#include <linux/efi.h>
+
+ enum acpi_blacklist_predicates {
+        all_versions,
+--- a/drivers/acpi/blacklist.c	2006-06-26 08:32:21.000000000 +0200
++++ a/drivers/acpi/blacklist.c	2006-06-26 08:32:59.000000000 +0200
+@@ -78,6 +78,10 @@
+ static int __init blacklist_by_year(void)
+ {
+ 	int year = dmi_get_year(DMI_BIOS_DATE);
++
++	if (efi_enabled)
++		return 0;
++
+ 	/* Doesn't exist? Likely an old system */
+ 	if (year == -1) 
+ 		return 1;

@@ -1,0 +1,112 @@
+diff -Naur blender-2.46-orig/source/blender/blenkernel/intern/writeffmpeg.c blender-2.46/source/blender/blenkernel/intern/writeffmpeg.c
+--- blender-2.46-orig/source/blender/blenkernel/intern/writeffmpeg.c	2008-07-28 15:33:17.000000000 +0300
++++ blender-2.46/source/blender/blenkernel/intern/writeffmpeg.c	2008-07-28 15:35:25.000000000 +0300
+@@ -29,11 +29,11 @@
+ 
+ #include <stdlib.h>
+ 
+-#include <ffmpeg/avformat.h>
+-#include <ffmpeg/avcodec.h>
+-#include <ffmpeg/rational.h>
+-#include <ffmpeg/swscale.h>
+-#include <ffmpeg/opt.h>
++#include <libavformat/avformat.h>
++#include <libavcodec/avcodec.h>
++#include <libavutil/rational.h>
++#include <libswscale/swscale.h>
++#include <libavcodec/opt.h>
+ 
+ #if LIBAVFORMAT_VERSION_INT < (49 << 16)
+ #define FFMPEG_OLD_FRAME_RATE 1
+diff -Naur blender-2.46-orig/source/blender/imbuf/intern/anim.c blender-2.46/source/blender/imbuf/intern/anim.c
+--- blender-2.46-orig/source/blender/imbuf/intern/anim.c	2008-05-19 17:38:41.000000000 +0300
++++ blender-2.46/source/blender/imbuf/intern/anim.c	2008-07-28 16:06:04.000000000 +0300
+@@ -83,10 +83,10 @@
+ #include "IMB_anim5.h"
+ 
+ #ifdef WITH_FFMPEG
+-#include <ffmpeg/avformat.h>
+-#include <ffmpeg/avcodec.h>
+-#include <ffmpeg/rational.h>
+-#include <ffmpeg/swscale.h>
++#include <libavformat/avformat.h>
++#include <libavcodec/avcodec.h>
++#include <libavutil/rational.h>
++#include <libswscale/swscale.h>
+ 
+ #if LIBAVFORMAT_VERSION_INT < (49 << 16)
+ #define FFMPEG_OLD_FRAME_RATE 1
+diff -Naur blender-2.46-orig/source/blender/imbuf/intern/IMB_anim.h blender-2.46/source/blender/imbuf/intern/IMB_anim.h
+--- blender-2.46-orig/source/blender/imbuf/intern/IMB_anim.h	2008-05-19 17:38:41.000000000 +0300
++++ blender-2.46/source/blender/imbuf/intern/IMB_anim.h	2008-07-28 16:06:04.000000000 +0300
+@@ -76,9 +76,9 @@
+ #endif /* WITH_QUICKTIME */
+ 
+ #ifdef WITH_FFMPEG
+-#include <ffmpeg/avformat.h>
+-#include <ffmpeg/avcodec.h>
+-#include <ffmpeg/swscale.h>
++#include <libavformat/avformat.h>
++#include <libavcodec/avcodec.h>
++#include <libswscale/swscale.h>
+ #endif
+ 
+ #include "IMB_imbuf_types.h"
+diff -Naur blender-2.46-orig/source/blender/imbuf/intern/util.c blender-2.46/source/blender/imbuf/intern/util.c
+--- blender-2.46-orig/source/blender/imbuf/intern/util.c	2008-05-19 17:38:41.000000000 +0300
++++ blender-2.46/source/blender/imbuf/intern/util.c	2008-07-28 16:06:04.000000000 +0300
+@@ -62,8 +62,8 @@
+ #endif
+ 
+ #ifdef WITH_FFMPEG
+-#include <ffmpeg/avcodec.h>
+-#include <ffmpeg/avformat.h>
++#include <libavcodec/avcodec.h>
++#include <libavformat/avformat.h>
+ 
+ #if LIBAVFORMAT_VERSION_INT < (49 << 16)
+ #define FFMPEG_OLD_FRAME_RATE 1
+diff -Naur blender-2.46-orig/source/blender/src/buttons_scene.c blender-2.46/source/blender/src/buttons_scene.c
+--- blender-2.46-orig/source/blender/src/buttons_scene.c	2008-07-28 16:13:29.000000000 +0300
++++ blender-2.46/source/blender/src/buttons_scene.c	2008-07-28 16:20:45.000000000 +0300
+@@ -108,9 +108,9 @@
+ 
+ #ifdef WITH_FFMPEG
+ 
+-#include <ffmpeg/avcodec.h> /* for PIX_FMT_* and CODEC_ID_* */
+-#include <ffmpeg/avformat.h>
+-#include <ffmpeg/opt.h>
++#include <libavcodec/avcodec.h> /* for PIX_FMT_* and CODEC_ID_* */
++#include <libavformat/avformat.h>
++#include <libavcodec/opt.h>
+ 
+ static int ffmpeg_preset_sel = 0;
+ 
+diff -Naur blender-2.46-orig/source/blender/src/hddaudio.c blender-2.46/source/blender/src/hddaudio.c
+--- blender-2.46-orig/source/blender/src/hddaudio.c	2008-07-28 16:13:29.000000000 +0300
++++ blender-2.46/source/blender/src/hddaudio.c	2008-07-28 16:20:45.000000000 +0300
+@@ -33,9 +33,9 @@
+ #endif
+ 
+ #ifdef WITH_FFMPEG
+-#include <ffmpeg/avformat.h>
+-#include <ffmpeg/avcodec.h>
+-#include <ffmpeg/rational.h>
++#include <libavformat/avformat.h>
++#include <libavcodec/avcodec.h>
++#include <libavutil/rational.h>
+ #if LIBAVFORMAT_VERSION_INT < (49 << 16)
+ #define FFMPEG_OLD_FRAME_RATE 1
+ #else
+diff -Naur blender-2.46-orig/user-config.py blender-2.46/user-config.py
+--- blender-2.46-orig/user-config.py	2008-07-28 16:41:13.000000000 +0300
++++ blender-2.46/user-config.py	2008-07-28 16:41:34.000000000 +0300
+@@ -103,7 +103,7 @@
+ BF_FFMPEG_INC = '${BF_FFMPEG}/include'
+ BF_FFMPEG_LIBPATH='${BF_FFMPEG}/lib'
+ import commands
+-BF_FFMPEG_LIB = commands.getoutput('pkg-config libavformat vorbisenc libdc1394 --libs') + '-lgsm'
++BF_FFMPEG_LIB="avformat avcodec swscale avutil"
+ 
+ # Mesa Libs should go here if your using them as well....
+ WITH_BF_STATICOPENGL = 'false'

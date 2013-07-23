@@ -1,0 +1,139 @@
+diff -Nur mplayer-20071025-old/command.c mplayer-20071025/command.c
+--- mplayer-20071025-old/command.c	2007-10-26 04:58:36.000000000 +0300
++++ mplayer-20071025/command.c	2007-10-26 04:59:15.000000000 +0300
+@@ -1307,9 +1307,7 @@
+ #endif
+ 
+     if (source == SUB_SOURCE_VOBSUB) {
+-	vobsub_id =
+-	    mpctx->global_sub_pos -
+-	    mpctx->global_sub_indices[SUB_SOURCE_VOBSUB];
++        vobsub_id = vobsub_get_id_by_index(vo_vobsub, mpctx->global_sub_pos - mpctx->global_sub_indices[SUB_SOURCE_VOBSUB]);
+     } else if (source == SUB_SOURCE_SUBS) {
+ 	mpctx->set_of_sub_pos =
+ 	    mpctx->global_sub_pos - mpctx->global_sub_indices[SUB_SOURCE_SUBS];
+diff -Nur mplayer-20071025-old/mplayer.c mplayer-20071025/mplayer.c
+--- mplayer-20071025-old/mplayer.c	2007-10-26 04:58:33.000000000 +0300
++++ mplayer-20071025/mplayer.c	2007-10-26 04:59:15.000000000 +0300
+@@ -3161,9 +3161,10 @@
+ 
+ if (mpctx->global_sub_size) {
+   // find the best sub to use
+-  if (vobsub_id >= 0) {
++  int vobsub_index_id = vobsub_get_index_by_id(vo_vobsub, vobsub_id);
++  if (vobsub_index_id >= 0) {
+     // if user asks for a vobsub id, use that first.
+-    mpctx->global_sub_pos = mpctx->global_sub_indices[SUB_SOURCE_VOBSUB] + vobsub_id;
++    mpctx->global_sub_pos = mpctx->global_sub_indices[SUB_SOURCE_VOBSUB] + vobsub_index_id;
+   } else if (dvdsub_id >= 0 && mpctx->global_sub_indices[SUB_SOURCE_DEMUX] >= 0) {
+     // if user asks for a dvd sub id, use that next.
+     mpctx->global_sub_pos = mpctx->global_sub_indices[SUB_SOURCE_DEMUX] + dvdsub_id;
+diff -Nur mplayer-20071025-old/vobsub.c mplayer-20071025/vobsub.c
+--- mplayer-20071025-old/vobsub.c	2007-10-26 04:58:36.000000000 +0300
++++ mplayer-20071025/vobsub.c	2007-10-26 04:59:15.000000000 +0300
+@@ -26,6 +26,9 @@
+ #include "libavutil/common.h"
+ 
+ extern int vobsub_id;
++// Record the original -vobsubid set by commandline, since vobsub_id will be
++// overridden if slang match any of vobsub streams.
++static int vobsubid = -2;
+ 
+ /**********************************************************************
+  * RAR stream handling
+@@ -606,6 +609,7 @@
+     packet_queue_t *spu_streams;
+     unsigned int spu_streams_size;
+     unsigned int spu_streams_current;
++    unsigned int spu_valid_streams_size;
+ } vobsub_t;
+ 
+ /* Make sure that the spu stream idx exists. */
+@@ -1058,6 +1062,8 @@
+     vobsub_t *vob = malloc(sizeof(vobsub_t));
+     if(spu)
+       *spu = NULL;
++    if (vobsubid == -2)
++      vobsubid = vobsub_id;
+     if (vob) {
+ 	char *buf;
+ 	vob->custom = 0;
+@@ -1067,6 +1073,7 @@
+ 	vob->spu_streams = NULL;
+ 	vob->spu_streams_size = 0;
+ 	vob->spu_streams_current = 0;
++	vob->spu_valid_streams_size = 0;
+ 	vob->delay = 0;
+ 	vob->forced_subs=0;
+ 	buf = malloc(strlen(name) + 5);
+@@ -1165,8 +1172,11 @@
+ 		    }
+ 		}
+ 		vob->spu_streams_current = vob->spu_streams_size;
+-		while (vob->spu_streams_current-- > 0)
++		while (vob->spu_streams_current-- > 0) {
+ 		    vob->spu_streams[vob->spu_streams_current].current_index = 0;
++		    if (vobsubid == vob->spu_streams_current || vob->spu_streams[vob->spu_streams_current].id)
++			++vob->spu_valid_streams_size;
++		}
+ 		mpeg_free(mpg);
+ 	    }
+ 	    free(buf);
+@@ -1191,7 +1201,7 @@
+ vobsub_get_indexes_count(void *vobhandle)
+ {
+     vobsub_t *vob = (vobsub_t *) vobhandle;
+-    return vob->spu_streams_size;
++    return vob->spu_valid_streams_size;
+ }
+ 
+ char *
+@@ -1201,6 +1211,33 @@
+     return (index < vob->spu_streams_size) ? vob->spu_streams[index].id : NULL;
+ }
+ 
++int vobsub_get_id_by_index(void *vobhandle, unsigned int index)
++{
++    vobsub_t *vob = vobhandle;
++    int i, j;
++    if (vob == NULL)
++        return -1;
++    for (i = 0, j = 0; i < vob->spu_streams_size; ++i)
++        if (i == vobsubid || vob->spu_streams[i].id) {
++            if (j == index)
++                return i;
++            ++j;
++        }
++    return -1;
++}
++
++int vobsub_get_index_by_id(void *vobhandle, int id)
++{
++    vobsub_t *vob = vobhandle;
++    int i, j;
++    if (vob == NULL || id < 0 || id >= vob->spu_streams_size)
++        return -1;
++    for (i = 0, j = 0; i < id; ++i)
++        if (i == vobsubid || vob->spu_streams[i].id)
++            ++j;
++    return j;
++}
++
+ unsigned int 
+ vobsub_get_forced_subs_flag(void const * const vobhandle)
+ {
+diff -Nur mplayer-20071025-old/vobsub.h mplayer-20071025/vobsub.h
+--- mplayer-20071025-old/vobsub.h	2007-10-26 04:58:33.000000000 +0300
++++ mplayer-20071025/vobsub.h	2007-10-26 04:59:15.000000000 +0300
+@@ -10,6 +10,11 @@
+ extern unsigned int vobsub_get_indexes_count(void * /* vobhandle */);
+ extern char *vobsub_get_id(void * /* vobhandle */, unsigned int /* index */);
+ 
++/// Get vobsub id by it's index in the valid streams.
++extern int vobsub_get_id_by_index(void *vobhandle, unsigned int index);
++/// Get index in the valid streams by vobsub id.
++extern int vobsub_get_index_by_id(void *vobhandle, int id);
++
+ extern void *vobsub_out_open(const char *basename, const unsigned int *palette, unsigned int orig_width, unsigned int orig_height, const char *id, unsigned int index);
+ extern void vobsub_out_output(void *me, const unsigned char *packet, int len, double pts);
+ extern void vobsub_out_close(void *me);

@@ -1,0 +1,464 @@
+Index: plasma/applets/CMakeLists.txt
+===================================================================
+--- plasma/applets/CMakeLists.txt	(revision 764726)
++++ plasma/applets/CMakeLists.txt	(working copy)
+@@ -1,3 +1,4 @@
++add_subdirectory(trash)
+ add_subdirectory(analog-clock)
+ add_subdirectory(battery)
+ add_subdirectory(digital-clock)
+Index: plasma/applets/trash/trash.cpp
+===================================================================
+--- plasma/applets/trash/trash.cpp	(revision 0)
++++ plasma/applets/trash/trash.cpp	(revision 0)
+@@ -0,0 +1,310 @@
++/***************************************************************************
++ *   Copyright 2007 by Marco Martin <notmart@gmail.com>                    *
++ *                                                                         *
++ *   This program is free software; you can redistribute it and/or modify  *
++ *   it under the terms of the GNU General Public License as published by  *
++ *   the Free Software Foundation; either version 2 of the License, or     *
++ *   (at your option) any later version.                                   *
++ *                                                                         *
++ *   This program is distributed in the hope that it will be useful,       *
++ *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
++ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
++ *   GNU General Public License for more details.                          *
++ *                                                                         *
++ *   You should have received a copy of the GNU General Public License     *
++ *   along with this program; if not, write to the                         *
++ *   Free Software Foundation, Inc.,                                       *
++ *   51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA .        *
++ ***************************************************************************/
++
++#include "trash.h"
++
++//QT
++#include <QGraphicsSceneDragDropEvent>
++#include <QDesktopWidget>
++#include <QApplication>
++
++//KDE
++#include <KGlobalSettings>
++#include <KDebug>
++#include <KLocale>
++#include <KIconLoader>
++#include <KMimeType>
++#include <KRun>
++#include <KSharedConfig>
++#include <KMessageBox>
++#include <KUrl>
++
++
++#include <konq_operations.h>
++#include <plasma/widgets/icon.h>
++#include <plasma/containment.h>
++
++Trash::Trash(QObject *parent, const QVariantList &args)
++    : Plasma::Applet(parent, args),
++      m_icon(0),
++      m_trashUrl(KUrl("trash:/")),
++      m_count(0)
++{
++}
++
++Trash::~Trash()
++{
++}
++
++void Trash::init()
++{
++    m_icon = new Plasma::Icon(KIcon("user-trash"),QString(),this);
++
++    createMenu();
++
++    connect(m_icon, SIGNAL(activated()), this, SLOT(slotOpen()));
++
++    connect(&m_menu, SIGNAL(aboutToHide()),
++            m_icon, SLOT(setUnpressed()));
++
++    setAcceptDrops(true);
++
++    m_dirLister = new KDirLister();
++    connect( m_dirLister, SIGNAL( clear() ),
++             this, SLOT( slotClear() ) );
++    connect( m_dirLister, SIGNAL( completed() ),
++             this, SLOT( slotCompleted() ) );
++    connect( m_dirLister, SIGNAL( deleteItem( const KFileItem & ) ),
++             this, SLOT( slotDeleteItem( const KFileItem & ) ) );
++
++    m_dirLister->openUrl(m_trashUrl);
++    setDrawStandardBackground(false);
++    m_icon->setDrawBackground(true);
++    m_icon->installSceneEventFilter(this);
++
++    m_data.mainText = i18n("Trash");
++}
++
++Qt::Orientations Trash::expandingDirections() const
++{
++    return 0;
++}
++
++void Trash::createMenu()
++{
++    QAction* open = new QAction(SmallIcon("document-open"),i18n("&Open"), this);
++    actions.append(open);
++    connect(open, SIGNAL(triggered(bool)), this , SLOT(slotOpen()));
++
++    emptyTrash = new QAction(SmallIcon("trash-empty"),i18n("&Empty Trashcan"), this);
++    actions.append(emptyTrash);
++    connect(emptyTrash, SIGNAL(triggered(bool)), this , SLOT(slotEmpty()));
++
++    m_menu.addTitle(i18n("Trash"));
++    m_menu.addAction(open);
++    m_menu.addAction(emptyTrash);
++
++    //add the menu as an action icon
++    QAction* menu = new QAction(SmallIcon("arrow-up-double"),i18n("&Menu"), this);
++    connect(menu, SIGNAL(triggered(bool)), this , SLOT(popup(bool)));
++    m_icon->addAction(menu);
++}
++
++void Trash::popup(bool pressed)
++{
++    if (m_menu.isVisible()) {
++        m_menu.hide();
++        return;
++    }
++
++    QPointF scenePos = mapToScene(boundingRect().topLeft());
++    QGraphicsView *viewWidget = view();
++    QDesktopWidget *desktop = QApplication::desktop();
++    if (viewWidget) {
++        QPoint viewPos = viewWidget->mapFromScene(scenePos);
++        QPoint globalPos = viewWidget->mapToGlobal(viewPos);
++        QRect desktopRect = desktop->availableGeometry(viewWidget);
++        QRect size = mapToView(viewWidget, contentRect());
++
++        const int menuHeight = m_menu.sizeHint().height();
++
++        if (globalPos.ry() - menuHeight < 0) {
++            globalPos.ry() += contentSize().height();
++        }else{
++            globalPos.ry() -= menuHeight;
++        }
++        m_menu.popup(globalPos);
++        m_icon->setPressed();
++    }
++
++}
++
++void Trash::constraintsUpdated(Plasma::Constraints constraints)
++{
++    setDrawStandardBackground(false);
++    if (constraints & Plasma::FormFactorConstraint) {
++        if (formFactor() == Plasma::Planar ||
++            formFactor() == Plasma::MediaCenter) {
++            m_icon->setText(i18n("Trash"));
++            m_showText = true;
++            setMinimumContentSize(m_icon->sizeFromIconSize(IconSize(KIconLoader::Desktop)));
++        } else {
++            m_icon->setText(0);
++            m_icon->setInfoText(0);
++            m_showText = false;
++            setMinimumContentSize(m_icon->sizeFromIconSize(IconSize(KIconLoader::Panel)));
++	}
++        setIcon();
++    }
++    if (constraints & Plasma::SizeConstraint && m_icon) {
++        setContentSize(size());
++        m_icon->resize(size());
++    }
++
++    updateGeometry();
++}
++
++void Trash::slotOpen()
++{
++    if (containment()) {
++        containment()->emitLaunchActivated();
++    }
++    KRun::runUrl(m_trashUrl, "inode/directory", 0);
++}
++
++void Trash::slotEmpty()
++{
++    if (containment()) {
++        containment()->emitLaunchActivated();
++    }
++    const QString text(i18nc("@info", "Do you really want to empty the Trash? All items will get deleted."));
++    const bool del = KMessageBox::warningContinueCancel(&m_menu,
++                                                        text,
++                                                        QString(),
++                                                        KGuiItem(i18nc("@action:button", "Empty Trash"),
++                                                                  KIcon("user-trash"))
++                                                        ) == KMessageBox::Continue;
++    if (del) {
++        KonqOperations::emptyTrash(&m_menu);
++    }
++}
++
++void Trash::setIcon()
++{
++    if (m_count > 0){
++        m_icon->setIcon(KIcon("user-trash-full"));
++        m_data.subText = i18np("One item", "%1 items", m_count);
++        if (m_showText){
++            m_icon->setInfoText(i18np("One item", "%1 items", m_count));
++        }
++    }else{
++        m_icon->setIcon(KIcon("user-trash"));
++        m_data.subText = i18n("Empty");
++        if (m_showText){
++            m_icon->setInfoText(i18n("Empty"));
++        }
++    }
++
++    m_icon->update();
++
++    m_data.image = m_icon->icon().pixmap(IconSize(KIconLoader::Desktop));
++
++    if (!m_showText) {
++        m_icon->setToolTip(m_data);
++    } else {
++        m_icon->setToolTip(Plasma::ToolTipData());
++    }
++
++    emptyTrash->setEnabled(m_count>0);
++}
++
++void Trash::slotClear()
++{
++    m_count = 0;
++    setIcon();
++}
++
++void Trash::slotCompleted()
++{
++    m_count = m_dirLister->items(KDirLister::AllItems).count();
++    setIcon();
++}
++
++void Trash::slotDeleteItem(const KFileItem &)
++{
++    m_count--;
++    setIcon();
++}
++
++QList<QAction*> Trash::contextActions()
++{
++    return actions;
++}
++
++bool Trash::sceneEventFilter( QGraphicsItem * watched, QEvent * event )
++{
++    switch (event->type())
++    {
++        case QEvent::GraphicsSceneMouseMove:
++        {
++            mouseMoveEvent(dynamic_cast<QGraphicsSceneMouseEvent*>(event));
++            break;
++        }
++
++        default:
++            break;
++    }
++
++    return QGraphicsItem::sceneEventFilter(watched, event);
++}
++
++void Trash::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
++{
++    if (!isImmutable() && formFactor() == Plasma::Planar) {
++        QGraphicsItem *parent = parentItem();
++        Plasma::Applet *applet = qgraphicsitem_cast<Plasma::Applet*>(parent);
++
++        if (applet && applet->isContainment()) {
++            // our direct parent is a containment. just move ourselves.
++            QPointF curPos = event->pos();
++            QPointF lastPos = event->lastPos();
++            QPointF delta = curPos-lastPos;
++
++            moveBy(delta.x(),delta.y());
++        } else if (parent) {
++            //don't move the icon as well because our parent (usually an appletHandle) will do it for us
++            //parent->moveBy(delta.x(),delta.y());
++            QPointF curPos = parent->transform().map(event->pos());
++            QPointF lastPos = parent->transform().map(event->lastPos());
++            QPointF delta = curPos-lastPos;
++
++            parent->setPos(parent->pos() + delta);
++        }
++
++        // We don't want any events on mouse release
++        m_icon->setUnpressed();
++    }
++}
++
++void Trash::dropEvent(QGraphicsSceneDragDropEvent *event)
++{
++    if (KUrl::List::canDecode(event->mimeData())) {
++        //FIXME: this hacky workaround must go away when KUrl::List::fromMimeData(event->mimeData()); will be fixed
++        QString payload = event->mimeData()->text();
++        if (payload.isEmpty()) {
++            return;
++        }
++        KUrl::List urls(payload.split("\n"));
++
++        //if there are more than one the last is junk
++        if (urls.count() > 1) {
++            urls.removeLast();
++        }
++        //KUrl::List urls = KUrl::List::fromMimeData(event->mimeData());
++
++        if (urls.count() > 0) {
++            event->accept();
++            KonqOperations::del( &m_menu, KonqOperations::TRASH, urls );
++        }
++    }
++
++}
++
++#include "trash.moc"
++
+Index: plasma/applets/trash/plasma-applet-trash.desktop
+===================================================================
+--- plasma/applets/trash/plasma-applet-trash.desktop	(revision 0)
++++ plasma/applets/trash/plasma-applet-trash.desktop	(revision 0)
+@@ -0,0 +1,30 @@
++[Desktop Entry]
++Name=Trashcan
++Name[es]=Papelera
++Name[et]=Prügikast
++Name[pt]=Caixote do Lixo
++Name[pt_BR]=Caixote do Lixo
++Name[sv]=Papperskorg
++Name[xx]=xxTrashcanxx
++Comment=A trashcan button
++Comment[es]=Un botón de la papelera
++Comment[et]=Prügikasti nupp
++Comment[pt]=Um botão de lixo
++Comment[pt_BR]=Um botão de lixo
++Comment[sv]=En knapp med en papperskorg
++Comment[xx]=xxA trashcan buttonxx
++Type=Service
++Icon=user-trash
++X-KDE-ServiceTypes=Plasma/Applet
++
++X-KDE-Library=plasma_applet_trash
++X-KDE-PluginInfo-Author=Marco Martin
++X-KDE-PluginInfo-Email=martkive@gmail.com
++X-KDE-PluginInfo-Name=trash
++X-KDE-PluginInfo-Version=pre0.1
++X-KDE-PluginInfo-Website=http://plasma.kde.org/
++X-KDE-PluginInfo-Category=File System
++X-KDE-PluginInfo-Depends=
++X-KDE-PluginInfo-License=GPL
++X-KDE-PluginInfo-EnabledByDefault=true
++
+Index: plasma/applets/trash/trash.h
+===================================================================
+--- plasma/applets/trash/trash.h	(revision 0)
++++ plasma/applets/trash/trash.h	(revision 0)
+@@ -0,0 +1,86 @@
++/***************************************************************************
++ *   Copyright 2007 by Marco Martin <notmart@gmail.com>                    *
++ *                                                                         *
++ *                                                                         *
++ *   This program is free software; you can redistribute it and/or modify  *
++ *   it under the terms of the GNU General Public License as published by  *
++ *   the Free Software Foundation; either version 2 of the License, or     *
++ *   (at your option) any later version.                                   *
++ *                                                                         *
++ *   This program is distributed in the hope that it will be useful,       *
++ *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
++ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
++ *   GNU General Public License for more details.                          *
++ *                                                                         *
++ *   You should have received a copy of the GNU General Public License     *
++ *   along with this program; if not, write to the                         *
++ *   Free Software Foundation, Inc.,                                       *
++ *   51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA .        *
++ ***************************************************************************/
++
++#ifndef TRASH_H
++#define TRASH_H
++
++#include <KUrl>
++#include <QAction>
++#include <KMenu>
++#include <QGraphicsView>
++#include <KFileItem>
++#include <KDirLister>
++
++#include <plasma/applet.h>
++//#include <plasma/layouts/boxlayout.h>
++
++class KPropertiesDialog;
++class QAction;
++
++namespace Plasma
++{
++    class Icon;
++}
++
++class Trash : public Plasma::Applet
++{
++    Q_OBJECT
++    public:
++        Trash(QObject *parent, const QVariantList &args);
++        virtual QList<QAction*> contextActions();
++        ~Trash();
++
++        void init();
++        void constraintsUpdated(Plasma::Constraints constraints);
++        Qt::Orientations expandingDirections() const;
++
++    public slots:
++        void slotOpen();
++        void slotEmpty();
++
++    protected:
++        bool sceneEventFilter(QGraphicsItem * watched, QEvent * event);
++        void mouseMoveEvent(QGraphicsSceneMouseEvent *event);
++        void dropEvent(QGraphicsSceneDragDropEvent *event);
++        void createMenu();
++        void setIcon();
++
++    protected slots:
++        void popup(bool pressed);
++        void slotClear();
++        void slotCompleted();
++        void slotDeleteItem(const KFileItem &);
++
++    private:
++        Plasma::Icon* m_icon;
++        QList<QAction*> actions;
++        KPropertiesDialog *m_dialog;
++        KDirLister *m_dirLister;
++        KUrl m_trashUrl;
++        KMenu m_menu;
++        QAction *emptyTrash;
++        int m_count;
++        bool m_showText;
++        Plasma::ToolTipData m_data;
++};
++
++K_EXPORT_PLASMA_APPLET(trash, Trash)
++
++#endif
+Index: plasma/applets/trash/CMakeLists.txt
+===================================================================
+--- plasma/applets/trash/CMakeLists.txt	(revision 0)
++++ plasma/applets/trash/CMakeLists.txt	(revision 0)
+@@ -0,0 +1,9 @@
++
++set(trash_SRCS
++    trash.cpp)
++
++kde4_add_plugin(plasma_applet_trash ${trash_SRCS})
++target_link_libraries(plasma_applet_trash plasma konq ${KDE4_KIO_LIBS})
++
++install(TARGETS plasma_applet_trash DESTINATION ${PLUGIN_INSTALL_DIR})
++install(FILES plasma-applet-trash.desktop DESTINATION ${SERVICES_INSTALL_DIR})

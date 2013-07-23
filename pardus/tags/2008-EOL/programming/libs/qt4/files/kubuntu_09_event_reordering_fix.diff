@@ -1,0 +1,25 @@
+diff --git a/src/gui/kernel/qkeymapper_x11.cpp b/src/gui/kernel/qkeymapper_x11.cpp
+index 814b7df..483d5c5 100644
+--- a/src/gui/kernel/qkeymapper_x11.cpp
++++ b/src/gui/kernel/qkeymapper_x11.cpp
+@@ -1383,11 +1383,17 @@ static Bool qt_keypress_scanner(Display *, XEvent *event, XPointer arg)
+         return false;
+ 
+     qt_auto_repeat_data *data = (qt_auto_repeat_data *) arg;
+-    if (data->error ||
+-        event->xkey.window  != data->window ||
+-        event->xkey.keycode != data->keycode)
++    if (data->error)
+         return false;
+ 
++    if (event->xkey.window  != data->window ||
++        event->xkey.keycode != data->keycode) {
++        // deal breakers: key events in a different window or an event
++        // with a different key code
++        data->error = true;
++        return false;
++    }
++
+     if (event->type == XKeyPress) {
+         data->error = (! data->release || event->xkey.time - data->timestamp > 10);
+         return (! data->error);

@@ -1,0 +1,239 @@
+Index: src/OptionHandlerFactory.cc
+===================================================================
+--- src/OptionHandlerFactory.cc	(revision 1056)
++++ src/OptionHandlerFactory.cc	(working copy)
+@@ -562,6 +562,15 @@
+     handlers.push_back(op);
+   }
+   {
++    SharedHandle<OptionHandler> op(new BooleanOptionHandler
++				   (PREF_HTTP_AUTH_CHALLENGE,
++				    TEXT_HTTP_AUTH_CHALLENGE,
++				    V_FALSE,
++				    OptionHandler::OPT_ARG));
++    op->addTag(TAG_HTTP);
++    handlers.push_back(op);
++  }
++  {
+     SharedHandle<OptionHandler> op(new ParameterOptionHandler
+ 				   (PREF_HTTP_AUTH_SCHEME,
+ 				    TEXT_HTTP_AUTH_SCHEME,
+Index: src/prefs.h
+===================================================================
+--- src/prefs.h	(revision 1056)
++++ src/prefs.h	(working copy)
+@@ -203,6 +203,8 @@
+ extern const std::string PREF_CHECK_CERTIFICATE;
+ // value: true | false
+ extern const std::string PREF_USE_HEAD;
++// value: true | false
++extern const std::string PREF_HTTP_AUTH_CHALLENGE;
+ 
+ /**;
+  * Proxy related preferences
+Index: src/AuthConfigFactory.cc
+===================================================================
+--- src/AuthConfigFactory.cc	(revision 1056)
++++ src/AuthConfigFactory.cc	(working copy)
+@@ -62,21 +62,27 @@
+   if(request->getProtocol() == Request::PROTO_HTTP ||
+      request->getProtocol() == Request::PROTO_HTTPS) {
+ 
+-    if(!request->getUsername().empty()) {
+-      // TODO setting "/" as path. Should we use request->getDir() instead?
+-      updateBasicCred(BasicCred(request->getUsername(), request->getPassword(),
+-				request->getHost(), "/", true));
+-      return createAuthConfig(request->getUsername(), request->getPassword());
+-    }
+-    std::deque<BasicCred>::const_iterator i =
+-      findBasicCred(request->getHost(), request->getDir());
+-    if(i == _basicCreds.end()) {
+-      return SharedHandle<AuthConfig>();
++    if(_option->getAsBool(PREF_HTTP_AUTH_CHALLENGE)) {
++      if(!request->getUsername().empty()) {
++	// TODO setting "/" as path. Should we use request->getDir() instead?
++	updateBasicCred(BasicCred(request->getUsername(), request->getPassword(),
++				  request->getHost(), "/", true));
++	return createAuthConfig(request->getUsername(), request->getPassword());
++      }
++      std::deque<BasicCred>::const_iterator i =
++	findBasicCred(request->getHost(), request->getDir());
++      if(i == _basicCreds.end()) {
++	return SharedHandle<AuthConfig>();
++      } else {
++	return createAuthConfig((*i)._user, (*i)._password);
++      }
+     } else {
+-      return createAuthConfig((*i)._user, (*i)._password);
++      if(!request->getUsername().empty()) {
++	return createAuthConfig(request->getUsername(), request->getPassword());
++      } else {
++	return createHttpAuthResolver()->resolveAuthConfig(request->getHost());
++      }
+     }
+-
+-    return createHttpAuthResolver()->resolveAuthConfig(request->getHost());
+   } else if(request->getProtocol() == Request::PROTO_FTP) {
+     if(!request->getUsername().empty()) {
+       return createAuthConfig(request->getUsername(), request->getPassword());
+Index: src/HttpSkipResponseCommand.cc
+===================================================================
+--- src/HttpSkipResponseCommand.cc	(revision 1056)
++++ src/HttpSkipResponseCommand.cc	(working copy)
+@@ -159,7 +159,8 @@
+     return prepareForRetry(_httpResponse->getRetryAfter());
+   } else if(_httpResponse->getResponseStatus() >= HttpHeader::S400) {
+     if(_httpResponse->getResponseStatus() == HttpHeader::S401) {
+-      if(!_httpResponse->getHttpRequest()->authenticationUsed() &&
++      if(e->option->getAsBool(PREF_HTTP_AUTH_CHALLENGE) &&
++	 !_httpResponse->getHttpRequest()->authenticationUsed() &&
+ 	 e->getAuthConfigFactory()->activateBasicCred
+ 	 (req->getHost(), req->getDir())) {
+ 	return prepareForRetry(0);
+Index: src/prefs.cc
+===================================================================
+--- src/prefs.cc	(revision 1056)
++++ src/prefs.cc	(working copy)
+@@ -199,6 +199,8 @@
+ const std::string PREF_CHECK_CERTIFICATE("check-certificate");
+ // value: true | false
+ const std::string PREF_USE_HEAD("use-head");
++// value: true | false
++const std::string PREF_HTTP_AUTH_CHALLENGE("http-auth-challenge");
+ 
+ /** 
+  * Proxy related preferences
+Index: src/usage_text.h
+===================================================================
+--- src/usage_text.h	(revision 1056)
++++ src/usage_text.h	(working copy)
+@@ -478,3 +478,11 @@
+   "                              BitTorrent tracker. Although this function is\n"\
+   "                              named 'external', it can accept any kind of IP\n"\
+   "                              addresses.")
++#define TEXT_HTTP_AUTH_CHALLENGE \
++_(" --http-auth-challenge[=true|false] Send HTTP authorization header only when it\n"\
++  "                              is requested by the server. If false is set, then\n"\
++  "                              authorization header is always sent to the server.\n"\
++  "                              There is an exception: if username and password\n"\
++  "                              are embedded in URI, authorization header is\n"\
++  "                              always sent to the server regardless of this\n"\
++  "                              option.")
+Index: test/HttpRequestTest.cc
+===================================================================
+--- test/HttpRequestTest.cc	(revision 1056)
++++ test/HttpRequestTest.cc	(working copy)
+@@ -41,7 +41,8 @@
+ public:
+   void setUp()
+   {
+-    _option.reset(new Option());    
++    _option.reset(new Option());
++    _option->put(PREF_HTTP_AUTH_CHALLENGE, V_TRUE);
+     _authConfigFactory.reset(new AuthConfigFactory(_option.get()));
+   }
+ 
+Index: test/AuthConfigFactoryTest.cc
+===================================================================
+--- test/AuthConfigFactoryTest.cc	(revision 1056)
++++ test/AuthConfigFactoryTest.cc	(working copy)
+@@ -14,12 +14,14 @@
+ 
+   CPPUNIT_TEST_SUITE(AuthConfigFactoryTest);
+   CPPUNIT_TEST(testCreateAuthConfig_http);
++  CPPUNIT_TEST(testCreateAuthConfig_httpNoChallenge);
+   CPPUNIT_TEST(testCreateAuthConfig_ftp);
+   CPPUNIT_TEST(testUpdateBasicCred);
+   CPPUNIT_TEST_SUITE_END();
+   
+ public:
+   void testCreateAuthConfig_http();
++  void testCreateAuthConfig_httpNoChallenge();
+   void testCreateAuthConfig_ftp();
+   void testUpdateBasicCred();
+ };
+@@ -34,6 +36,7 @@
+ 
+   Option option;
+   option.put(PREF_NO_NETRC, V_FALSE);
++  option.put(PREF_HTTP_AUTH_CHALLENGE, V_TRUE);
+ 
+   AuthConfigFactory factory(&option);
+ 
+@@ -60,12 +63,11 @@
+ 		       factory.createAuthConfig(req)->getAuthText());
+ 
+   // See default token in netrc is ignored.
+-  SharedHandle<Request> mirrorReq(new Request());
+   req->setUrl("http://mirror/");
+ 
+   CPPUNIT_ASSERT(!factory.activateBasicCred("mirror", "/"));
+ 
+-  CPPUNIT_ASSERT(factory.createAuthConfig(mirrorReq).isNull());
++  CPPUNIT_ASSERT(factory.createAuthConfig(req).isNull());
+ 
+   // with Netrc + user defined
+   option.put(PREF_HTTP_USER, "userDefinedUser");
+@@ -84,6 +86,52 @@
+ 		       factory.createAuthConfig(req)->getAuthText());  
+ }
+ 
++void AuthConfigFactoryTest::testCreateAuthConfig_httpNoChallenge()
++{
++  SharedHandle<Request> req(new Request());
++  req->setUrl("http://localhost/download/aria2-1.0.0.tar.bz2");
++
++  Option option;
++  option.put(PREF_NO_NETRC, V_FALSE);
++
++  AuthConfigFactory factory(&option);
++
++  // without auth info
++  CPPUNIT_ASSERT(factory.createAuthConfig(req).isNull());
++
++  // with Netrc
++  SharedHandle<Netrc> netrc(new Netrc());
++  netrc->addAuthenticator
++    (SharedHandle<Authenticator>(new Authenticator("localhost",
++						   "localhostuser",
++						   "localhostpass",
++						   "localhostacct")));
++  netrc->addAuthenticator
++    (SharedHandle<Authenticator>(new DefaultAuthenticator("default", "defaultpassword", "defaultaccount")));
++  factory.setNetrc(netrc);
++
++  // not activated
++  CPPUNIT_ASSERT_EQUAL(std::string("localhostuser:localhostpass"),
++		       factory.createAuthConfig(req)->getAuthText());
++
++  // See default token in netrc is ignored.
++  req->setUrl("http://mirror/");
++
++  CPPUNIT_ASSERT(factory.createAuthConfig(req).isNull());
++
++  // with Netrc + user defined
++  option.put(PREF_HTTP_USER, "userDefinedUser");
++  option.put(PREF_HTTP_PASSWD, "userDefinedPassword");
++
++  CPPUNIT_ASSERT_EQUAL(std::string("userDefinedUser:userDefinedPassword"),
++		       factory.createAuthConfig(req)->getAuthText());
++
++  // username and password in URI
++  req->setUrl("http://aria2user:aria2password@localhost/download/aria2-1.0.0.tar.bz2");
++  CPPUNIT_ASSERT_EQUAL(std::string("aria2user:aria2password"),
++		       factory.createAuthConfig(req)->getAuthText());  
++}
++
+ void AuthConfigFactoryTest::testCreateAuthConfig_ftp()
+ {
+   SharedHandle<Request> req(new Request());
+@@ -128,6 +176,7 @@
+ {
+   Option option;
+   option.put(PREF_NO_NETRC, V_FALSE);
++  option.put(PREF_HTTP_AUTH_CHALLENGE, V_TRUE);
+ 
+   AuthConfigFactory factory(&option);
+ 
+
+ 	  	 

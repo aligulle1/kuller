@@ -1,0 +1,13 @@
+--- Python-2.4.3/Lib/tarfile.py.org  2006-06-17 22:36:02.000000000 +0300
++++ Python-2.4.3/Lib/tarfile.py      2006-06-17 22:37:28.000000000 +0300
+@@ -1403,7 +1403,9 @@
+             ti = TarInfo()
+             ti.name  = upperdirs
+             ti.type  = DIRTYPE
+-            ti.mode  = 0777
++            umask = os.umask(0)
++            ti.mode  = 0777 & ~umask
++            os.umask(umask)
+             ti.mtime = tarinfo.mtime
+             ti.uid   = tarinfo.uid
+             ti.gid   = tarinfo.gid

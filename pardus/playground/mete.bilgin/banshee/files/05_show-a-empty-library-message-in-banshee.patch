@@ -1,0 +1,70 @@
+From 5543c28330668e5290518cade47b79ad966d404c Mon Sep 17 00:00:00 2001
+From: Didier Roche <didrocks@ubuntu.com>
+Date: Mon, 5 Jul 2010 13:16:55 +0200
+Upstream bug report: https://bugzilla.gnome.org/show_bug.cgi?id=623588
+Subject: [PATCH 5/5] show a empty library message in banshee
+
+This enables showing to banshee and netbook interface a message if the library
+us empty (Bertrand Lorentz and Alex Launi)
+---
+ .../Banshee.Library/MusicLibrarySource.cs          |    9 +++++++++
+ .../Banshee.MeeGo/MediaPanelContents.cs            |   12 +++++++++++-
+ 2 files changed, 20 insertions(+), 1 deletions(-)
+
+Index: banshee.git/src/Core/Banshee.Services/Banshee.Library/MusicLibrarySource.cs
+===================================================================
+--- banshee.git.orig/src/Core/Banshee.Services/Banshee.Library/MusicLibrarySource.cs	2010-09-06 18:33:02.595809037 +0100
++++ banshee.git/src/Core/Banshee.Services/Banshee.Library/MusicLibrarySource.cs	2010-09-06 18:33:18.868187362 +0100
+@@ -85,6 +85,15 @@
+                     DatabaseTrackModel.Reload ();
+                 }
+             ));
++
++            DatabaseTrackModel.Reloaded += delegate {
++                if (TrackModel.Count == 0) {
++                    SetStatus (String.Format ("Please move your music to {0}", GetDefaultBaseDirectory ()),
++                               false, false, "dialog-info");
++                } else {
++                    HideStatus ();
++                }
++            };
+         }
+ 
+         public override string GetPluralItemCountString (int count)
+Index: banshee.git/src/Extensions/Banshee.MeeGo/Banshee.MeeGo/MediaPanelContents.cs
+===================================================================
+--- banshee.git.orig/src/Extensions/Banshee.MeeGo/Banshee.MeeGo/MediaPanelContents.cs	2010-09-06 18:33:02.585807567 +0100
++++ banshee.git/src/Extensions/Banshee.MeeGo/Banshee.MeeGo/MediaPanelContents.cs	2010-09-06 18:33:18.868187362 +0100
+@@ -62,7 +62,7 @@
+         {
+         }
+ 
+-        public MediaPanelContents () : base (2, 2, false)
++        public MediaPanelContents () : base (3, 2, false)
+         {
+             BorderWidth = 5;
+             RowSpacing = 6;
+@@ -73,6 +73,7 @@
+             BuildHeader ();
+             BuildLibrary ();
+             BuildNowPlaying ();
++            BuildMessageBar ();
+             ConnectEvents ();
+ 
+             SetSource (ServiceManager.SourceManager.ActiveSource);
+@@ -189,6 +190,15 @@
+                 0, 0);
+         }
+ 
++        private void BuildMessageBar ()
++        {
++            ConnectedMessageBar bar = new ConnectedMessageBar ();
++            Attach (bar, 0, 2, 2, 3,
++                    AttachOptions.Expand | AttachOptions.Fill,
++                    AttachOptions.Shrink, 0, 0);
++            bar.ShowAll ();
++        }
++
+         private ScrolledWindow SetupView (Widget view)
+         {
+             var scrolled = new ScrolledWindow () {

@@ -1,0 +1,39 @@
+Index: utils/opcontrol
+===================================================================
+RCS file: /cvsroot/oprofile/oprofile/utils/opcontrol,v
+retrieving revision 1.140
+diff -U2 -u -r1.140 opcontrol
+--- utils/opcontrol	25 Sep 2007 17:24:32 -0000	1.140
++++ utils/opcontrol	5 Oct 2007 15:38:12 -0000
+@@ -1668,13 +1668,23 @@
+ do_init
+ if test `id -u` != "0"; then
+-    if test "$1" = "--dump" -a -z "$2"; then
+-	ONLY_DUMP=yes
+-	do_dump
+-	exit 0;
+-    elif test "$1" = "--list-events" -a -z "$2"; then
+-	exec $OPHELP
++    if test -z "$2"; then
++	case "$1" in 
++	--dump|-d)
++	    ONLY_DUMP=yes
++	    do_dump
++	    exit 0;
++	    ;;
++	--list-events|-l)
++	    exec $OPHELP
++	    exit 0;
++	    ;;
++	*)
++	    echo "Normal users are limited to either '--dump' or '--list-events'." >&2
++	    exit 1
++	    ;;
++	esac
+     else
+-	echo "Normal users are limited to either '--dump' or '--list-events'." >&2
+-	exit 1
++	    echo "Normal users are limited to either '--dump' or '--list-events'." >&2
++	    exit 1
+     fi
+ fi

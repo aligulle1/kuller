@@ -1,0 +1,38 @@
+diff -Naur usbmanager.orig/src/shexec.py usbmanager/src/shexec.py
+--- usbmanager.orig/src/shexec.py	2010-03-14 17:31:06.405635554 +0200
++++ usbmanager/src/shexec.py	2010-03-14 19:07:29.869371814 +0200
+@@ -63,7 +63,7 @@
+         return False
+     return ret
+     
+-sudo_modes = ("gksudo", "gksu", "beesu")
++sudo_modes = ("xdg-su", "gksudo", "gksu", "beesu")
+ for sudo_mode in sudo_modes:
+     ret = whereis_command(sudo_mode)
+     if ret == False:
+@@ -73,14 +73,14 @@
+ 
+ def run_sudo_command(command):
+     print ' * Attention: Going sudo!'
+-    print ' **', SUDO_MODE + ' "' + command + '"'
++    print ' **', 'xdg-su -c' + ' "' + command + '"'
+     proc = sp.Popen(shell = False, stdin = sp.PIPE, stdout = sp.PIPE,
+                    stderr = sp.PIPE, args = [SUDO_MODE, command])
+     #(output, error) = proc.communicate()
+     return proc
+ 
+ def format(new_fs, new_label, block_device, fs_options, out_func):
+-    command = SUDO_MODE+' "'+SUPPORTED_FS[new_fs]+' '+block_device +' '
++    command = "xdg-su -c"+' "'+SUPPORTED_FS[new_fs]+' '+block_device +' '
+     if new_fs == "FAT16":
+         decode_func = fat16_decode
+     if new_fs == "FAT32":
+@@ -180,7 +180,7 @@
+ def umount(device):
+     if SUDO_MODE is None:
+         return False, "NO SUDO"
+-    command = SUDO_MODE + ' "umount '+device.mount_point+'"'
++    command = "xdg-su -c" + ' "umount '+device.mount_point+'"'
+     proc = sp.Popen([command], shell=True, stdin=sp.PIPE, stdout=sp.PIPE, stderr=sp.PIPE)
+     err = proc.stderr.readlines()
+     ret = proc.communicate()

@@ -1,0 +1,67 @@
+diff -urNad ghostscript-8.60.dfsg.5~/lib/dumphint ghostscript-8.60.dfsg.5/lib/dumphint
+--- ghostscript-8.60.dfsg.5~/lib/dumphint	2007-07-16 17:17:37.000000000 +0100
++++ ghostscript-8.60.dfsg.5/lib/dumphint	2007-07-16 18:25:11.000000000 +0100
+@@ -27,4 +27,4 @@
+ 	exit 1
+ fi
+ 
+-exec "$GS_EXECUTABLE" -q -dNODISPLAY $OPTIONS -- dumphint.ps "$1"
++exec "$GS_EXECUTABLE" -q -dNODISPLAY $OPTIONS -- "`dirname $0`/dumphint.ps" "$1"
+diff -urNad ghostscript-8.60.dfsg.5~/lib/dvipdf ghostscript-8.60.dfsg.5/lib/dvipdf
+--- ghostscript-8.60.dfsg.5~/lib/dvipdf	2007-07-16 17:17:37.000000000 +0100
++++ ghostscript-8.60.dfsg.5/lib/dvipdf	2007-07-16 18:27:21.000000000 +0100
+@@ -44,4 +44,4 @@
+ 
+ # We have to include the options twice because -I only takes effect if it
+ # appears before other options.
+-exec dvips $DVIPSOPTIONS -q -f "$infile" | $GS_EXECUTABLE $OPTIONS -q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -sOutputFile="$outfile" $OPTIONS -c .setpdfwrite -
++exec dvips -Ppdf $DVIPSOPTIONS -q -f "$infile" | $GS_EXECUTABLE $OPTIONS -q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -sOutputFile="$outfile" $OPTIONS -c .setpdfwrite -
+diff -urNad ghostscript-8.60.dfsg.5~/lib/pdf2ps ghostscript-8.60.dfsg.5/lib/pdf2ps
+--- ghostscript-8.60.dfsg.5~/lib/pdf2ps	2007-07-16 17:17:37.000000000 +0100
++++ ghostscript-8.60.dfsg.5/lib/pdf2ps	2007-07-16 18:34:57.000000000 +0100
+@@ -20,19 +20,24 @@
+ 	esac
+ 	shift
+ done
+-
+-if [ $# -eq 2 ] 
+-then
+-    outfile=$2
+-elif [ $# -eq 1 ]
++if [ -t 1 ]
+ then
+-    outfile=`basename "$1" \.pdf`.ps
++    if [ $# -eq 2 ] 
++    then
++        outfile=$2
++    elif [ $# -eq 1 ]
++    then
++        outfile=`basename "$1" \.pdf`.ps
++    else
++        echo "Usage: `basename $0` [-dASCII85EncodePages=false] [-dLanguageLevel=1|2|3] input.pdf [output.ps]" 1>&2
++        exit 1
++    fi
++    OUTFILE="-sOutputFile=$outfile"
+ else
+-    echo "Usage: `basename $0` [-dASCII85EncodePages=false] [-dLanguageLevel=1|2|3] input.pdf [output.ps]" 1>&2
+-    exit 1
++    OUTFILE="-sOutputFile=%stdout%"
+ fi
+ 
+ # Doing an initial 'save' helps keep fonts from being flushed between pages.
+ # We have to include the options twice because -I only takes effect if it
+ # appears before other options.
+-exec "$GS_EXECUTABLE" $OPTIONS -q -dNOPAUSE -dBATCH -dSAFER -sDEVICE=pswrite "-sOutputFile=$outfile" $OPTIONS -c save pop -f "$1"
++exec "$GS_EXECUTABLE" $OPTIONS -q -dNOPAUSE -dBATCH -dSAFER -sDEVICE=pswrite $OUTFILE $OPTIONS -c save pop -f "$1"
+diff -urNad ghostscript-8.60.dfsg.5~/lib/ps2epsi ghostscript-8.60.dfsg.5/lib/ps2epsi
+--- ghostscript-8.60.dfsg.5~/lib/ps2epsi	2007-07-16 17:17:37.000000000 +0100
++++ ghostscript-8.60.dfsg.5/lib/ps2epsi	2007-07-16 18:37:38.000000000 +0100
+@@ -75,7 +75,7 @@
+ 		}
+ 	' U="$USERNAME$LOGNAME"  F=1 - F=2 "${infile}" >"$tmpfile"
+ 
+-"$GS_EXECUTABLE" -q -dNOPAUSE -dSAFER -dDELAYSAFER -r72 -sDEVICE=bit -sOutputFile=/dev/null "$tmpfile" ps2epsi.ps "$tmpfile" <"${infile}" 1>&2
++"$GS_EXECUTABLE" -q -sPAPERSIZE=a0 -dNOPAUSE -dSAFER -dDELAYSAFER -r72 -sDEVICE=bit -sOutputFile=/dev/null "$tmpfile" ps2epsi.ps "$tmpfile" <"${infile}" 1>&2
+ rm -f "$tmpfile"
+ rm -rf "$tmpdir"
+ 

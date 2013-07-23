@@ -1,0 +1,432 @@
+commit 1344e17eed27c5bd47ce260916c88dd2636e81b9
+Author: John (J5) Palmieri <johnp@redhat.com>
+Date:   Mon Jan 7 20:59:48 2008 -0500
+
+    bump version for future release
+
+diff --git a/setup.py b/setup.py
+index dfc6a59..6d8519b 100755
+--- a/setup.py
++++ b/setup.py
+@@ -5,7 +5,7 @@ from subprocess import *
+ import os
+ import glob
+ 
+-DFEET_VERSION='0.1.8'
++DFEET_VERSION='0.1.9'
+ 
+ #Create an array with all the locale filenames
+ I18NFILES = []
+
+commit 23ef7b6fcaea0d1863799348efe24d1bf192f2fe
+Author: John (J5) Palmieri <johnp@redhat.com>
+Date:   Tue Jan 8 12:19:06 2008 -0500
+
+    forgot to add this icon though it is added to the tarballs
+
+diff --git a/icons/16x16/dfeet-icon-default-service.png b/icons/16x16/dfeet-icon-default-service.png
+new file mode 100644
+index 0000000..3b9a387
+Binary files /dev/null and b/icons/16x16/dfeet-icon-default-service.png differ
+
+commit a0dc5b271fa8aec4e0b270494e86bbdb96145b13
+Author: John (J5) Palmieri <johnp@redhat.com>
+Date:   Tue Jan 8 12:33:10 2008 -0500
+
+    add the rest of the basic types
+    
+    * Patch by Marcel Holtmann <marcel at holtmann dot org>
+
+diff --git a/dfeet/dbus_utils.py b/dfeet/dbus_utils.py
+index e495798..10554bf 100644
+--- a/dfeet/dbus_utils.py
++++ b/dfeet/dbus_utils.py
+@@ -67,10 +67,18 @@ def convert_complex_type(subsig):
+ def convert_simple_type(c):
+     result = None
+ 
+-    if c == 'i':
++    if c == 'n':
++        result = 'Int16'
++    elif c == 'q':
++        result = 'UInt16'
++    elif c == 'i':
+         result = 'Int32'
+     elif c == 'u':
+         result = 'UInt32'
++    elif c == 'x':
++        result = 'Int64'
++    elif c == 't':
++        result = 'UInt64'
+     elif c == 's':
+         result = 'String'
+     elif c == 'b':
+@@ -79,6 +87,8 @@ def convert_simple_type(c):
+         result = 'Byte'
+     elif c == 'o':
+         result = 'Object Path'
++    elif c == 'g':
++        result = 'Signature'
+     elif c == 'd':
+         result = 'Double'
+     elif c == 'v':
+
+commit 0600a912239396465efcdbba2f0333c7c89f5cb9
+Author: John (J5) Palmieri <johnp@redhat.com>
+Date:   Thu Jan 10 10:30:15 2008 -0500
+
+    fix buttons in the execute dialog
+    
+    * Close now uses gtk-close stock button
+    * Execute now has an accelerator key
+
+diff --git a/ui/executedialog.ui b/ui/executedialog.ui
+index 7611b47..92b8c0c 100644
+--- a/ui/executedialog.ui
++++ b/ui/executedialog.ui
+@@ -116,7 +116,8 @@
+             <property name="visible">True</property>
+             <child>
+               <object class="GtkButton" id="closebutton1">
+-                <property name="label" context="yes" translatable="yes">Close</property>
++                <property name="label" context="yes" translatable="yes">gtk-close</property>
++	        <property name="use_stock">True</property>
+                 <property name="visible">True</property>
+                 <signal handler="execute_dialog_close_cb" name="clicked"/>
+               </object>
+@@ -124,7 +125,8 @@
+             <child>
+               <object class="GtkButton" id="executebutton1">
+                 <property name="is_focus">True</property>
+-                <property name="label" context="yes" translatable="yes">Execute</property>
++                <property name="use_underline">True</property>
++                <property name="label" context="yes" translatable="yes">_Execute</property>
+                 <property name="visible">True</property>
+                 <signal handler="execute_dbus_method_cb" name="clicked"/>
+               </object>
+@@ -132,7 +134,7 @@
+                 <property name="position">1</property>
+               </packing>
+             </child>
+-          </object>
++         </object>
+           <packing>
+             <property name="expand">False</property>
+             <property name="pack_type">end</property>
+
+commit 0a86a34e29f56ec006a0844860d773ce510bfccd
+Author: John (J5) Palmieri <johnp@redhat.com>
+Date:   Thu Feb 14 10:12:59 2008 -0500
+
+    fix for methods that return 0
+    
+    * methods that returned 0 were displayed as if the method did not return
+      anything - changing the conditional from if not result to if result is None
+      fixes this
+
+diff --git a/dfeet/_ui/executemethoddialog.py b/dfeet/_ui/executemethoddialog.py
+index 9d30fbd..1d667da 100644
+--- a/dfeet/_ui/executemethoddialog.py
++++ b/dfeet/_ui/executemethoddialog.py
+@@ -49,7 +49,7 @@ class ExecuteMethodDialog:
+                              #        from parameter errors?
+             result = str(e) 
+ 
+-        if not result:
++        if result is None:
+             result = 'This method did not return anything'
+         else:
+             result = str(result)
+
+commit 45e3001ffc65fd2fa7c858bb1d53e1387bed3b61
+Author: John (J5) Palmieri <johnp@redhat.com>
+Date:   Sun Sep 14 14:16:18 2008 -0400
+
+    move to setuptools from distutil
+
+diff --git a/setup.py b/setup.py
+index 6d8519b..b3c244a 100755
+--- a/setup.py
++++ b/setup.py
+@@ -1,6 +1,11 @@
+ #!/usr/bin/env python
+ 
+-from distutils.core import setup
++try:
++    from setuptools import setup, find_packages
++except ImportError:
++    from ez_setup import use_setuptools
++    use_setuptools()
++    from setuptools import setup, find_packages
+ from subprocess import *
+ import os
+ import glob
+
+commit 5495a60fe6a0253b5da01eec1a836fc3bb6ee59d
+Author: John (J5) Palmieri <johnp@redhat.com>
+Date:   Sun Oct 12 13:00:26 2008 -0400
+
+    add frames around elements and add a bottom pane for a console
+
+diff --git a/ui/mainwindow.ui b/ui/mainwindow.ui
+index b45ad0d..2cbf850 100644
+--- a/ui/mainwindow.ui
++++ b/ui/mainwindow.ui
+@@ -9,44 +9,78 @@
+     <property name="visible">True</property>
+     <property name="width_request">300</property>
+     <child>
+-      <object class="GtkVBox" id="vbox1">
++      <object class="GtkVPaned" id="vpaned1">
+         <property name="visible">True</property>
+-          <child>
+-            <object class="GtkMenuBar" id="menubar1" constructor="default-uiman" />
+-            <packing>
+-              <property name="expand">False</property>
++        <child>
++          <object class="GtkFrame" id="frame1">
++            <property name="visible">True</property>
++            <child>
++              <object class="GtkVBox" id="vbox1">
++                <property name="visible">True</property>
++                <child>
++                  <object class="GtkMenuBar" id="menubar1" constructor="default-uiman" />
++                  <packing>
++                    <property name="expand">False</property>
++                  </packing>
++                </child>
++                <child>
++                  <object constructor="default-uiman" class="GtkToolbar" id="toolbar1">
++                    <property name="toolbar_style">both-horiz</property>
++                    <property name="visible">True</property>
++                  </object>
++                  <packing>
++                    <property name="expand">False</property>
++                  </packing>
++                </child>
++                <child>
++                  <object class="GtkNotebook" id="display_notebook">
++                    <property name="enable_popup">True</property>
++                    <property name="is_focus">True</property>
++                    <property name="scrollable">True</property>
++                    <property name="visible">True</property>
++                    <child>
++                      <placeholder/>
++                    </child>
++                  </object>
++                </child>
++              </object>
++            </child>
++          </object>
++          <packing>
++              <property name="shrink">False</property>
++              <property name="resize">True</property>
+             </packing>
+-          </child>
+-          <child>
+-            <object constructor="default-uiman" class="GtkToolbar" id="toolbar1">
+-              <property name="toolbar_style">both-horiz</property>
+-              <property name="visible">True</property>
+-            </object>
+-            <packing>
+-              <property name="expand">False</property>
+-            </packing>
+-          </child>
+-          <child>
+-            <object class="GtkNotebook" id="display_notebook">
+-              <property name="enable_popup">True</property>
+-              <property name="is_focus">True</property>
+-              <property name="scrollable">True</property>
+-              <property name="visible">True</property>
+-              <child>
+-                <placeholder/>
+-              </child>
+-            </object>
+-          </child>
+-          <child>
+-            <object class="GtkStatusbar" id="statusbar1">
+-              <property name="visible">True</property>
+-            </object>
+-            <packing>
+-              <property name="expand">False</property>
+-              <property name="pack_type">end</property>
+-            </packing>
+-          </child>
+-        </object>
++        </child>
++        <child>
++          <object class="GtkFrame" id="frame2">
++            <property name="visible">True</property>
++            <child>
++              <object class="GtkNotebook" id="console_notebook">
++                <property name="enable_popup">True</property>
++                <property name="is_focus">True</property>
++                <property name="scrollable">True</property>
++                <property name="visible">True</property>
++                <child>
++                  <placeholder/>
++                </child>
++              </object>
++            </child>
++          </object>
++          <packing>
++            <property name="shrink">False</property>
++            <property name="resize">True</property>
++          </packing>
++        </child>
++        <child>
++          <object class="GtkStatusbar" id="statusbar1">
++            <property name="visible">True</property>
++          </object>
++          <packing>
++            <property name="expand">False</property>
++            <property name="pack_type">end</property>
++          </packing>
++        </child>
++      </object>
+     </child>
+   </object>
+ </interface>
+
+commit 523baca1f25fcbce047eba915c6bf6e9ccd28a76
+Author: Will Thompson <will.thompson@collabora.co.uk>
+Date:   Fri Jan 9 19:04:51 2009 +0000
+
+    Remove dbus.Foo type wrappers from returned values
+
+diff --git a/dfeet/_ui/executemethoddialog.py b/dfeet/_ui/executemethoddialog.py
+index 1d667da..1ce7821 100644
+--- a/dfeet/_ui/executemethoddialog.py
++++ b/dfeet/_ui/executemethoddialog.py
+@@ -4,6 +4,25 @@ from dfeet import _util
+ 
+ from uiloader import UILoader
+ 
++def unwrap(x):
++    """Hack to unwrap D-Bus values, so that they're easier to read when
++    printed."""
++
++    if isinstance(x, list):
++        return map(unwrap, x)
++
++    if isinstance(x, tuple):
++        return tuple(map(unwrap, x))
++
++    if isinstance(x, dict):
++        return dict([(unwrap(k), unwrap(v)) for k, v in x.iteritems()])
++
++    for t in [unicode, str, long, int, float, bool]:
++        if isinstance(x, t):
++            return t(x)
++
++    return x
++
+ class ExecuteMethodDialog:
+     def __init__(self, busname, method):
+         signal_dict = { 
+@@ -51,12 +70,9 @@ class ExecuteMethodDialog:
+ 
+         if result is None:
+             result = 'This method did not return anything'
+-        else:
+-            result = str(result)
+ 
+-        # FIXME: Format results for pretty print
+-        self.prettyprint_textview.get_buffer().set_text(result)
+-        self.source_textview.get_buffer().set_text(result)
++        self.prettyprint_textview.get_buffer().set_text(str(unwrap(result)))
++        self.source_textview.get_buffer().set_text(str(result))
+ 
+     def run(self):
+         self.dialog.run()
+
+commit fb7e4a296b00f0b3867258eed5af6673492eb160
+Author: Will Thompson <will.thompson@collabora.co.uk>
+Date:   Fri Jan 9 19:12:36 2009 +0000
+
+    Use pprint to slightly prettify method output
+
+diff --git a/dfeet/_ui/executemethoddialog.py b/dfeet/_ui/executemethoddialog.py
+index 1ce7821..934460e 100644
+--- a/dfeet/_ui/executemethoddialog.py
++++ b/dfeet/_ui/executemethoddialog.py
+@@ -4,6 +4,8 @@ from dfeet import _util
+ 
+ from uiloader import UILoader
+ 
++from pprint import pformat
++
+ def unwrap(x):
+     """Hack to unwrap D-Bus values, so that they're easier to read when
+     printed."""
+@@ -71,7 +73,9 @@ class ExecuteMethodDialog:
+         if result is None:
+             result = 'This method did not return anything'
+ 
+-        self.prettyprint_textview.get_buffer().set_text(str(unwrap(result)))
++        prettified = pformat(unwrap(result))
++        self.prettyprint_textview.get_buffer().set_text(prettified)
++
+         self.source_textview.get_buffer().set_text(str(result))
+ 
+     def run(self):
+
+commit 0cfadef0fe0ed909a559565115394b046a1496a7
+Author: Will Thompson <will.thompson@collabora.co.uk>
+Date:   Fri Jan 9 19:34:44 2009 +0000
+
+    Add a Quit item to the File menu
+
+diff --git a/dfeet/DFeetApp.py b/dfeet/DFeetApp.py
+index 963ae2c..c4687ab 100644
+--- a/dfeet/DFeetApp.py
++++ b/dfeet/DFeetApp.py
+@@ -20,7 +20,8 @@ class DFeetApp:
+         signal_dict = {'add_session_bus': self.add_session_bus_cb,
+                        'add_system_bus': self.add_system_bus_cb,
+                        'add_bus_address': self.add_bus_address_cb,
+-                       'execute_method': self.execute_current_method_cb}
++                       'execute_method': self.execute_current_method_cb,
++                       'quit': self.quit_cb}
+ 
+         self.ICON_SIZE_CLOSE_BUTTON = gtk.icon_size_register('ICON_SIZE_CLOSE_BUTTON', 14, 14)
+ 
+@@ -127,6 +128,9 @@ class DFeetApp:
+ 
+         dialog.destroy()
+ 
++    def quit_cb(self, action):
++        self._quit_dfeet(self.main_window, None)
++
+     def _quit_dfeet(self, main_window, event):
+         settings = Settings.get_instance()
+         size = main_window.get_size()
+diff --git a/ui/default-actiongroup.ui b/ui/default-actiongroup.ui
+index 12cc808..99ae2c7 100644
+--- a/ui/default-actiongroup.ui
++++ b/ui/default-actiongroup.ui
+@@ -49,7 +49,15 @@
+             <signal handler="execute_method" name="activate"/>
+           </object>
+         </child>
+-
++        <child>
++          <object class="GtkAction" id="quit">
++            <property name="name">quit</property>
++            <property name="label" translatable="yes">_Quit</property>
++            <property name="tooltip" translatable="yes">Quit D-Feet</property>
++            <property name="stock_id">gtk-quit</property>
++            <signal handler="quit" name="activate"/>
++          </object>
++        </child>
+       </object>
+     </child>
+     <ui>
+@@ -58,6 +66,7 @@
+           <menuitem name="ConnSessionMenu" action="add_session_bus" />
+           <menuitem name="ConnSystemMenu" action="add_system_bus" />
+           <menuitem name="ConnOtherMenu" action="add_bus_address" />
++          <menuitem name="QuitMenu" action="quit" />
+         </menu>
+       </menubar>
+       <toolbar name="toolbar1">

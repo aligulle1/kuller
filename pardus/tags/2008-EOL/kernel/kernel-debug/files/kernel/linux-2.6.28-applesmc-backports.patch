@@ -1,0 +1,972 @@
+commit 9f86f28df14e06b12908d6475ee2462f0555bf34
+Author: Roberto De Ioris <roberto@unbit.it>
+Date:   Fri Aug 15 00:40:30 2008 -0700
+
+    applesmc: support for Intel iMac
+    
+    This adds support for fans and temperature sensors on intel iMac.
+    
+    Tested on iMac 24" 2.8ghz (iMac8,1), it supports the following sensors:
+    
+    cpu A
+    ambient
+    gpu
+    gpu diode
+    gpu heatsink
+    hd bay 1
+    memory controller
+    optical drive
+    power
+    
+    Signed-off-by: Roberto De Ioris <roberto@unbit.it>
+    Cc: Nicolas Boichat <nicolas@boichat.ch>
+    Cc: Jean Delvare <khali@linux-fr.org>
+    Cc: Mark M. Hoffman <mhoffman@lightlink.com>
+    Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+    Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+
+diff --git a/drivers/hwmon/applesmc.c b/drivers/hwmon/applesmc.c
+index aacc0c4..52d842b 100644
+--- a/drivers/hwmon/applesmc.c
++++ b/drivers/hwmon/applesmc.c
+@@ -98,6 +98,9 @@ static const char* temperature_sensors_sets[][36] = {
+ 	  "TH1P", "TH2P", "TH3P", "TMAP", "TMAS", "TMBS", "TM0P", "TM0S",
+ 	  "TM1P", "TM1S", "TM2P", "TM2S", "TM3S", "TM8P", "TM8S", "TM9P",
+ 	  "TM9S", "TN0H", "TS0C", NULL },
++/* Set 5: iMac */
++	{ "TC0D", "TA0P", "TG0P", "TG0D", "TG0H", "TH0P", "Tm0P", "TO0P",
++	  "Tp0C", NULL },
+ };
+ 
+ /* List of keys used to read/write fan speeds */
+@@ -1223,6 +1226,8 @@ static __initdata struct dmi_match_data applesmc_dmi_data[] = {
+ 	{ .accelerometer = 0, .light = 0, .temperature_set = 3 },
+ /* MacPro: temperature set 4 */
+ 	{ .accelerometer = 0, .light = 0, .temperature_set = 4 },
++/* iMac: temperature set 5 */
++	{ .accelerometer = 0, .light = 0, .temperature_set = 5 },
+ };
+ 
+ /* Note that DMI_MATCH(...,"MacBook") will match "MacBookPro1,1".
+@@ -1248,6 +1253,10 @@ static __initdata struct dmi_system_id applesmc_whitelist[] = {
+ 	  DMI_MATCH(DMI_BOARD_VENDOR,"Apple"),
+ 	  DMI_MATCH(DMI_PRODUCT_NAME,"MacPro2") },
+ 		(void*)&applesmc_dmi_data[4]},
++	{ applesmc_dmi_match, "Apple iMac", {
++	  DMI_MATCH(DMI_BOARD_VENDOR,"Apple"),
++	  DMI_MATCH(DMI_PRODUCT_NAME,"iMac") },
++		(void*)&applesmc_dmi_data[5]},
+ 	{ .ident = NULL }
+ };
+ 
+
+commit f91a79fe86a0becdf2506c189cdde154e82c787c
+Author: Guilherme M. Schroeder <guilherme.m.schroeder@gmail.com>
+Date:   Fri Aug 15 00:40:32 2008 -0700
+
+    applesmc: add support for Macbook
+    
+    Add support for Macbook v3 (sensors and accelerometer).
+    
+    Signed-off-by: Nicolas Boichat <nicolas@boichat.ch>
+    Cc: "Mark M. Hoffman" <mhoffman@lightlink.com>
+    Cc: Jean Delvare <khali@linux-fr.org>
+    Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+    Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+
+diff --git a/drivers/hwmon/applesmc.c b/drivers/hwmon/applesmc.c
+index 52d842b..b06b8e0 100644
+--- a/drivers/hwmon/applesmc.c
++++ b/drivers/hwmon/applesmc.c
+@@ -101,6 +101,9 @@ static const char* temperature_sensors_sets[][36] = {
+ /* Set 5: iMac */
+ 	{ "TC0D", "TA0P", "TG0P", "TG0D", "TG0H", "TH0P", "Tm0P", "TO0P",
+ 	  "Tp0C", NULL },
++/* Set 6: Macbook3 set */
++	{ "TB0T", "TC0D", "TC0P", "TM0P", "TN0P", "TTF0", "TW0P", "Th0H",
++	  "Th0S", "Th1H", NULL },
+ };
+ 
+ /* List of keys used to read/write fan speeds */
+@@ -1228,6 +1231,8 @@ static __initdata struct dmi_match_data applesmc_dmi_data[] = {
+ 	{ .accelerometer = 0, .light = 0, .temperature_set = 4 },
+ /* iMac: temperature set 5 */
+ 	{ .accelerometer = 0, .light = 0, .temperature_set = 5 },
++/* MacBook3: accelerometer and temperature set 6 */
++	{ .accelerometer = 1, .light = 0, .temperature_set = 6 },
+ };
+ 
+ /* Note that DMI_MATCH(...,"MacBook") will match "MacBookPro1,1".
+@@ -1237,10 +1242,14 @@ static __initdata struct dmi_system_id applesmc_whitelist[] = {
+ 	  DMI_MATCH(DMI_BOARD_VENDOR,"Apple"),
+ 	  DMI_MATCH(DMI_PRODUCT_NAME,"MacBookPro") },
+ 		(void*)&applesmc_dmi_data[0]},
+-	{ applesmc_dmi_match, "Apple MacBook", {
++	{ applesmc_dmi_match, "Apple MacBook (v2)", {
+ 	  DMI_MATCH(DMI_BOARD_VENDOR,"Apple"),
+ 	  DMI_MATCH(DMI_PRODUCT_NAME,"MacBook2") },
+ 		(void*)&applesmc_dmi_data[1]},
++	{ applesmc_dmi_match, "Apple MacBook (v3)", {
++	  DMI_MATCH(DMI_BOARD_VENDOR,"Apple"),
++	  DMI_MATCH(DMI_PRODUCT_NAME,"MacBook3") },
++		(void*)&applesmc_dmi_data[6]},
+ 	{ applesmc_dmi_match, "Apple MacBook", {
+ 	  DMI_MATCH(DMI_BOARD_VENDOR,"Apple"),
+ 	  DMI_MATCH(DMI_PRODUCT_NAME,"MacBook") },
+
+commit 05224091af06177c0ce7c1fae1f498455b47a6be
+Author: Henrik Rydberg <rydberg@euromail.se>
+Date:   Sat Oct 18 20:27:35 2008 -0700
+
+    hwmon: applesmc: specified number of bytes to read should match actual
+    
+    At one single place in the code, the specified number of bytes to read and
+    the actual number of bytes read differ by one.  This one-liner patch fixes
+    that inconsistency.
+    
+    Signed-off-by: Henrik Rydberg <rydberg@euromail.se>
+    Cc: Nicolas Boichat <nicolas@boichat.ch>
+    Cc: Riki Oktarianto <rkoktarianto@gmail.com>
+    Cc: Mark M. Hoffman <mhoffman@lightlink.com>
+    Cc: Jean Delvare <khali@linux-fr.org>
+    Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+    Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+
+diff --git a/drivers/hwmon/applesmc.c b/drivers/hwmon/applesmc.c
+index b06b8e0..b401975 100644
+--- a/drivers/hwmon/applesmc.c
++++ b/drivers/hwmon/applesmc.c
+@@ -325,7 +325,7 @@ static int applesmc_get_key_type(char* key, char* type)
+ 			return -EIO;
+ 	}
+ 
+-	outb(5, APPLESMC_DATA_PORT);
++	outb(6, APPLESMC_DATA_PORT);
+ 
+ 	for (i = 0; i < 6; i++) {
+ 		if (__wait_status(0x05))
+
+commit 84d2d7f2ee98dc9bd799790c89b5eb8280af2d37
+Author: Henrik Rydberg <rydberg@euromail.se>
+Date:   Sat Oct 18 20:27:38 2008 -0700
+
+    hwmon: applesmc: fix the 'wait status failed: c != 8' problem
+    
+    On many Macbooks since mid 2007, the Pro, C2D and Air models, applesmc
+    fails to read some or all SMC ports.  This problem has various effects,
+    such as flooded logfiles, malfunctioning temperature sensors,
+    accelerometers failing to initialize, and difficulties getting backlight
+    functionality to work properly.
+    
+    The root of the problem seems to be the command protocol.  The current
+    code sends out a command byte, then repeatedly polls for an ack before
+    continuing to send or recieve data.  From experiments leading to this
+    patch, it seems the command protocol never quite worked or changed so that
+    one now sends a command byte, waits a little bit, polls for an ack, and if
+    it fails, repeats the whole thing by sending the command byte again.
+    
+    This patch implements a send_command function according to the new
+    interpretation of the protocol, and should work also for earlier models.
+    
+    Signed-off-by: Henrik Rydberg <rydberg@euromail.se>
+    Cc: Nicolas Boichat <nicolas@boichat.ch>
+    Cc: Riki Oktarianto <rkoktarianto@gmail.com>
+    Cc: Mark M. Hoffman <mhoffman@lightlink.com>
+    Cc: Jean Delvare <khali@linux-fr.org>
+    Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+    Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+
+diff --git a/drivers/hwmon/applesmc.c b/drivers/hwmon/applesmc.c
+index b401975..d5bd0ca 100644
+--- a/drivers/hwmon/applesmc.c
++++ b/drivers/hwmon/applesmc.c
+@@ -191,6 +191,26 @@ static int __wait_status(u8 val)
+ }
+ 
+ /*
++ * special treatment of command port - on newer macbooks, it seems necessary
++ * to resend the command byte before polling the status again. Callers must
++ * hold applesmc_lock.
++ */
++static int send_command(u8 cmd)
++{
++	int i;
++	for (i = 0; i < 1000; i++) {
++		outb(cmd, APPLESMC_CMD_PORT);
++		udelay(5);
++		if ((inb(APPLESMC_CMD_PORT) & APPLESMC_STATUS_MASK) == 0x0c)
++			return 0;
++		udelay(5);
++	}
++	printk(KERN_WARNING "applesmc: command failed: %x -> %x\n",
++		cmd, inb(APPLESMC_CMD_PORT));
++	return -EIO;
++}
++
++/*
+  * applesmc_read_key - reads len bytes from a given key, and put them in buffer.
+  * Returns zero on success or a negative error on failure. Callers must
+  * hold applesmc_lock.
+@@ -205,8 +225,7 @@ static int applesmc_read_key(const char* key, u8* buffer, u8 len)
+ 		return -EINVAL;
+ 	}
+ 
+-	outb(APPLESMC_READ_CMD, APPLESMC_CMD_PORT);
+-	if (__wait_status(0x0c))
++	if (send_command(APPLESMC_READ_CMD))
+ 		return -EIO;
+ 
+ 	for (i = 0; i < 4; i++) {
+@@ -249,8 +268,7 @@ static int applesmc_write_key(const char* key, u8* buffer, u8 len)
+ 		return -EINVAL;
+ 	}
+ 
+-	outb(APPLESMC_WRITE_CMD, APPLESMC_CMD_PORT);
+-	if (__wait_status(0x0c))
++	if (send_command(APPLESMC_WRITE_CMD))
+ 		return -EIO;
+ 
+ 	for (i = 0; i < 4; i++) {
+@@ -284,8 +302,7 @@ static int applesmc_get_key_at_index(int index, char* key)
+ 	readkey[2] = index >> 8;
+ 	readkey[3] = index;
+ 
+-	outb(APPLESMC_GET_KEY_BY_INDEX_CMD, APPLESMC_CMD_PORT);
+-	if (__wait_status(0x0c))
++	if (send_command(APPLESMC_GET_KEY_BY_INDEX_CMD))
+ 		return -EIO;
+ 
+ 	for (i = 0; i < 4; i++) {
+@@ -315,8 +332,7 @@ static int applesmc_get_key_type(char* key, char* type)
+ {
+ 	int i;
+ 
+-	outb(APPLESMC_GET_KEY_TYPE_CMD, APPLESMC_CMD_PORT);
+-	if (__wait_status(0x0c))
++	if (send_command(APPLESMC_GET_KEY_TYPE_CMD))
+ 		return -EIO;
+ 
+ 	for (i = 0; i < 4; i++) {
+
+commit 02fcbd144d684167aa67b1d3ad68f18d265f2d08
+Author: Henrik Rydberg <rydberg@euromail.se>
+Date:   Sat Oct 18 20:27:39 2008 -0700
+
+    hwmon: applesmc: prolong status wait
+    
+    The time to wait for a status change while reading or writing to the SMC
+    ports is a balance between read reliability and system performance.  The
+    current setting yields rougly three errors in a thousand when
+    simultaneously reading three different temperature values on a Macbook
+    Air.  This patch increases the setting to a value yielding roughly one
+    error in ten thousand, with no noticable system performance degradation.
+    
+    Signed-off-by: Henrik Rydberg <rydberg@euromail.se>
+    Cc: Nicolas Boichat <nicolas@boichat.ch>
+    Cc: Riki Oktarianto <rkoktarianto@gmail.com>
+    Cc: Mark M. Hoffman <mhoffman@lightlink.com>
+    Cc: Jean Delvare <khali@linux-fr.org>
+    Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+    Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+
+diff --git a/drivers/hwmon/applesmc.c b/drivers/hwmon/applesmc.c
+index d5bd0ca..9a43c4b 100644
+--- a/drivers/hwmon/applesmc.c
++++ b/drivers/hwmon/applesmc.c
+@@ -163,7 +163,7 @@ static unsigned int key_at_index;
+ static struct workqueue_struct *applesmc_led_wq;
+ 
+ /*
+- * __wait_status - Wait up to 2ms for the status port to get a certain value
++ * __wait_status - Wait up to 10ms for the status port to get a certain value
+  * (masked with 0x0f), returning zero if the value is obtained.  Callers must
+  * hold applesmc_lock.
+  */
+@@ -173,7 +173,7 @@ static int __wait_status(u8 val)
+ 
+ 	val = val & APPLESMC_STATUS_MASK;
+ 
+-	for (i = 0; i < 200; i++) {
++	for (i = 0; i < 1000; i++) {
+ 		if ((inb(APPLESMC_CMD_PORT) & APPLESMC_STATUS_MASK) == val) {
+ 			if (debug)
+ 				printk(KERN_DEBUG
+
+commit 8bd1a12a51871f0c870612d8220b1485d6aefc73
+Author: Henrik Rydberg <rydberg@euromail.se>
+Date:   Sat Oct 18 20:27:39 2008 -0700
+
+    hwmon: applesmc: allow for variable ALV0 and ALV1 package length
+    
+    On some recent Macbooks, the package length for the light sensors ALV0 and
+    ALV1 has changed from 6 to 10.  This patch allows for a variable package
+    length encompassing both variants.
+    
+    Signed-off-by: Henrik Rydberg <rydberg@euromail.se>
+    Cc: Nicolas Boichat <nicolas@boichat.ch>
+    Cc: Riki Oktarianto <rkoktarianto@gmail.com>
+    Cc: Mark M. Hoffman <mhoffman@lightlink.com>
+    Cc: Jean Delvare <khali@linux-fr.org>
+    Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+    Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+
+diff --git a/drivers/hwmon/applesmc.c b/drivers/hwmon/applesmc.c
+index 9a43c4b..de696b6 100644
+--- a/drivers/hwmon/applesmc.c
++++ b/drivers/hwmon/applesmc.c
+@@ -57,8 +57,8 @@
+ 
+ #define KEY_COUNT_KEY		"#KEY" /* r-o ui32 */
+ 
+-#define LIGHT_SENSOR_LEFT_KEY	"ALV0" /* r-o {alv (6 bytes) */
+-#define LIGHT_SENSOR_RIGHT_KEY	"ALV1" /* r-o {alv (6 bytes) */
++#define LIGHT_SENSOR_LEFT_KEY	"ALV0" /* r-o {alv (6-10 bytes) */
++#define LIGHT_SENSOR_RIGHT_KEY	"ALV1" /* r-o {alv (6-10 bytes) */
+ #define BACKLIGHT_KEY		"LKSB" /* w-o {lkb (2 bytes) */
+ 
+ #define CLAMSHELL_KEY		"MSLD" /* r-o ui8 (unused) */
+@@ -543,17 +543,27 @@ out:
+ static ssize_t applesmc_light_show(struct device *dev,
+ 				struct device_attribute *attr, char *sysfsbuf)
+ {
++	static int data_length;
+ 	int ret;
+ 	u8 left = 0, right = 0;
+-	u8 buffer[6];
++	u8 buffer[10], query[6];
+ 
+ 	mutex_lock(&applesmc_lock);
+ 
+-	ret = applesmc_read_key(LIGHT_SENSOR_LEFT_KEY, buffer, 6);
++	if (!data_length) {
++		ret = applesmc_get_key_type(LIGHT_SENSOR_LEFT_KEY, query);
++		if (ret)
++			goto out;
++		data_length = clamp_val(query[0], 0, 10);
++		printk(KERN_INFO "applesmc: light sensor data length set to "
++			"%d\n", data_length);
++	}
++
++	ret = applesmc_read_key(LIGHT_SENSOR_LEFT_KEY, buffer, data_length);
+ 	left = buffer[2];
+ 	if (ret)
+ 		goto out;
+-	ret = applesmc_read_key(LIGHT_SENSOR_RIGHT_KEY, buffer, 6);
++	ret = applesmc_read_key(LIGHT_SENSOR_RIGHT_KEY, buffer, data_length);
+ 	right = buffer[2];
+ 
+ out:
+
+commit f5274c972bac2d14c092a9c634e03f51785c7b76
+Author: Henrik Rydberg <rydberg@euromail.se>
+Date:   Sat Oct 18 20:27:40 2008 -0700
+
+    hwmon: applesmc: add support for Macbook Air
+    
+    This patch adds accelerometer, backlight and temperature sensor support
+    for the Macbook Air.
+    
+    Signed-off-by: Henrik Rydberg <rydberg@euromail.se>
+    Cc: Nicolas Boichat <nicolas@boichat.ch>
+    Cc: Riki Oktarianto <rkoktarianto@gmail.com>
+    Cc: Mark M. Hoffman <mhoffman@lightlink.com>
+    Cc: Jean Delvare <khali@linux-fr.org>
+    Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+    Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+
+diff --git a/drivers/hwmon/applesmc.c b/drivers/hwmon/applesmc.c
+index de696b6..b57bd82 100644
+--- a/drivers/hwmon/applesmc.c
++++ b/drivers/hwmon/applesmc.c
+@@ -104,6 +104,9 @@ static const char* temperature_sensors_sets[][36] = {
+ /* Set 6: Macbook3 set */
+ 	{ "TB0T", "TC0D", "TC0P", "TM0P", "TN0P", "TTF0", "TW0P", "Th0H",
+ 	  "Th0S", "Th1H", NULL },
++/* Set 7: Macbook Air */
++	{ "TB0T", "TB1S", "TB1T", "TB2S", "TB2T", "TC0D", "TC0P", "TCFP",
++	  "TTF0", "TW0P", "Th0H", "Tp0P", "TpFP", "Ts0P", "Ts0S", NULL },
+ };
+ 
+ /* List of keys used to read/write fan speeds */
+@@ -1259,11 +1262,17 @@ static __initdata struct dmi_match_data applesmc_dmi_data[] = {
+ 	{ .accelerometer = 0, .light = 0, .temperature_set = 5 },
+ /* MacBook3: accelerometer and temperature set 6 */
+ 	{ .accelerometer = 1, .light = 0, .temperature_set = 6 },
++/* MacBook Air: accelerometer, backlight and temperature set 7 */
++	{ .accelerometer = 1, .light = 1, .temperature_set = 7 },
+ };
+ 
+ /* Note that DMI_MATCH(...,"MacBook") will match "MacBookPro1,1".
+  * So we need to put "Apple MacBook Pro" before "Apple MacBook". */
+ static __initdata struct dmi_system_id applesmc_whitelist[] = {
++	{ applesmc_dmi_match, "Apple MacBook Air", {
++	  DMI_MATCH(DMI_BOARD_VENDOR, "Apple"),
++	  DMI_MATCH(DMI_PRODUCT_NAME, "MacBookAir") },
++		(void*)&applesmc_dmi_data[7]},
+ 	{ applesmc_dmi_match, "Apple MacBook Pro", {
+ 	  DMI_MATCH(DMI_BOARD_VENDOR,"Apple"),
+ 	  DMI_MATCH(DMI_PRODUCT_NAME,"MacBookPro") },
+
+commit 7b5e3cb28f52f42d8cf2b36771be580f33bbc7ae
+Author: Andrew Morton <akpm@linux-foundation.org>
+Date:   Sat Oct 18 20:27:41 2008 -0700
+
+    drivers/hwmon/applesmc.c: remove unneeded casts
+    
+    dmi_system_id.driver_data is already void*.
+    
+    Cc: Henrik Rydberg <rydberg@euromail.se>
+    Cc: Nicolas Boichat <nicolas@boichat.ch>
+    Cc: Riki Oktarianto <rkoktarianto@gmail.com>
+    Cc: Mark M. Hoffman <mhoffman@lightlink.com>
+    Cc: Jean Delvare <khali@linux-fr.org>
+    Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+    Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+
+diff --git a/drivers/hwmon/applesmc.c b/drivers/hwmon/applesmc.c
+index b57bd82..208520c 100644
+--- a/drivers/hwmon/applesmc.c
++++ b/drivers/hwmon/applesmc.c
+@@ -1272,35 +1272,35 @@ static __initdata struct dmi_system_id applesmc_whitelist[] = {
+ 	{ applesmc_dmi_match, "Apple MacBook Air", {
+ 	  DMI_MATCH(DMI_BOARD_VENDOR, "Apple"),
+ 	  DMI_MATCH(DMI_PRODUCT_NAME, "MacBookAir") },
+-		(void*)&applesmc_dmi_data[7]},
++		&applesmc_dmi_data[7]},
+ 	{ applesmc_dmi_match, "Apple MacBook Pro", {
+ 	  DMI_MATCH(DMI_BOARD_VENDOR,"Apple"),
+ 	  DMI_MATCH(DMI_PRODUCT_NAME,"MacBookPro") },
+-		(void*)&applesmc_dmi_data[0]},
++		&applesmc_dmi_data[0]},
+ 	{ applesmc_dmi_match, "Apple MacBook (v2)", {
+ 	  DMI_MATCH(DMI_BOARD_VENDOR,"Apple"),
+ 	  DMI_MATCH(DMI_PRODUCT_NAME,"MacBook2") },
+-		(void*)&applesmc_dmi_data[1]},
++		&applesmc_dmi_data[1]},
+ 	{ applesmc_dmi_match, "Apple MacBook (v3)", {
+ 	  DMI_MATCH(DMI_BOARD_VENDOR,"Apple"),
+ 	  DMI_MATCH(DMI_PRODUCT_NAME,"MacBook3") },
+-		(void*)&applesmc_dmi_data[6]},
++		&applesmc_dmi_data[6]},
+ 	{ applesmc_dmi_match, "Apple MacBook", {
+ 	  DMI_MATCH(DMI_BOARD_VENDOR,"Apple"),
+ 	  DMI_MATCH(DMI_PRODUCT_NAME,"MacBook") },
+-		(void*)&applesmc_dmi_data[2]},
++		&applesmc_dmi_data[2]},
+ 	{ applesmc_dmi_match, "Apple Macmini", {
+ 	  DMI_MATCH(DMI_BOARD_VENDOR,"Apple"),
+ 	  DMI_MATCH(DMI_PRODUCT_NAME,"Macmini") },
+-		(void*)&applesmc_dmi_data[3]},
++		&applesmc_dmi_data[3]},
+ 	{ applesmc_dmi_match, "Apple MacPro2", {
+ 	  DMI_MATCH(DMI_BOARD_VENDOR,"Apple"),
+ 	  DMI_MATCH(DMI_PRODUCT_NAME,"MacPro2") },
+-		(void*)&applesmc_dmi_data[4]},
++		&applesmc_dmi_data[4]},
+ 	{ applesmc_dmi_match, "Apple iMac", {
+ 	  DMI_MATCH(DMI_BOARD_VENDOR,"Apple"),
+ 	  DMI_MATCH(DMI_PRODUCT_NAME,"iMac") },
+-		(void*)&applesmc_dmi_data[5]},
++		&applesmc_dmi_data[5]},
+ 	{ .ident = NULL }
+ };
+ 
+
+commit d7549905f157f217b888edb0f2055f5090eaf1d8
+Author: Henrik Rydberg <rydberg@euromail.se>
+Date:   Sat Oct 18 20:27:41 2008 -0700
+
+    hwmon: applesmc: Add support for Macbook Pro 4
+    
+    Adds temperature sensor support for the Macbook Pro 4.
+    
+    Signed-off-by: Henrik Rydberg <rydberg@euromail.se>
+    Cc: Nicolas Boichat <nicolas@boichat.ch>
+    Cc: Riki Oktarianto <rkoktarianto@gmail.com>
+    Cc: Mark M. Hoffman <mhoffman@lightlink.com>
+    Cc: Jean Delvare <khali@linux-fr.org>
+    Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+    Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+
+diff --git a/drivers/hwmon/applesmc.c b/drivers/hwmon/applesmc.c
+index 208520c..efca98a 100644
+--- a/drivers/hwmon/applesmc.c
++++ b/drivers/hwmon/applesmc.c
+@@ -107,6 +107,9 @@ static const char* temperature_sensors_sets[][36] = {
+ /* Set 7: Macbook Air */
+ 	{ "TB0T", "TB1S", "TB1T", "TB2S", "TB2T", "TC0D", "TC0P", "TCFP",
+ 	  "TTF0", "TW0P", "Th0H", "Tp0P", "TpFP", "Ts0P", "Ts0S", NULL },
++/* Set 8: Macbook Pro 4,1 (Penryn) */
++	{ "TB0T", "TC0D", "TC0P", "TG0D", "TG0H", "TTF0", "TW0P", "Th0H",
++	  "Th1H", "Th2H", "Tm0P", "Ts0P", NULL },
+ };
+ 
+ /* List of keys used to read/write fan speeds */
+@@ -1264,6 +1267,8 @@ static __initdata struct dmi_match_data applesmc_dmi_data[] = {
+ 	{ .accelerometer = 1, .light = 0, .temperature_set = 6 },
+ /* MacBook Air: accelerometer, backlight and temperature set 7 */
+ 	{ .accelerometer = 1, .light = 1, .temperature_set = 7 },
++/* MacBook Pro 4: accelerometer, backlight and temperature set 8 */
++	{ .accelerometer = 1, .light = 1, .temperature_set = 8 },
+ };
+ 
+ /* Note that DMI_MATCH(...,"MacBook") will match "MacBookPro1,1".
+@@ -1273,6 +1278,10 @@ static __initdata struct dmi_system_id applesmc_whitelist[] = {
+ 	  DMI_MATCH(DMI_BOARD_VENDOR, "Apple"),
+ 	  DMI_MATCH(DMI_PRODUCT_NAME, "MacBookAir") },
+ 		&applesmc_dmi_data[7]},
++	{ applesmc_dmi_match, "Apple MacBook Pro 4", {
++	  DMI_MATCH(DMI_BOARD_VENDOR, "Apple"),
++	  DMI_MATCH(DMI_PRODUCT_NAME, "MacBookPro4") },
++		&applesmc_dmi_data[8]},
+ 	{ applesmc_dmi_match, "Apple MacBook Pro", {
+ 	  DMI_MATCH(DMI_BOARD_VENDOR,"Apple"),
+ 	  DMI_MATCH(DMI_PRODUCT_NAME,"MacBookPro") },
+
+commit 07e8dbd3ebbdedc71335049dd4b0d542cb038d7d
+Author: Henrik Rydberg <rydberg@euromail.se>
+Date:   Sat Oct 18 20:27:42 2008 -0700
+
+    hwmon: applesmc: Add support for Macbook Pro 3
+    
+    Add temperature sensor support for Macbook Pro 3.
+    
+    Signed-off-by: Henrik Rydberg <rydberg@euromail.se>
+    Cc: Nicolas Boichat <nicolas@boichat.ch>
+    Cc: Riki Oktarianto <rkoktarianto@gmail.com>
+    Cc: Mark M. Hoffman <mhoffman@lightlink.com>
+    Cc: Jean Delvare <khali@linux-fr.org>
+    Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+    Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+
+diff --git a/drivers/hwmon/applesmc.c b/drivers/hwmon/applesmc.c
+index efca98a..59266ce 100644
+--- a/drivers/hwmon/applesmc.c
++++ b/drivers/hwmon/applesmc.c
+@@ -110,6 +110,9 @@ static const char* temperature_sensors_sets[][36] = {
+ /* Set 8: Macbook Pro 4,1 (Penryn) */
+ 	{ "TB0T", "TC0D", "TC0P", "TG0D", "TG0H", "TTF0", "TW0P", "Th0H",
+ 	  "Th1H", "Th2H", "Tm0P", "Ts0P", NULL },
++/* Set 9: Macbook Pro 3,1 (Santa Rosa) */
++	{ "TALP", "TB0T", "TC0D", "TC0P", "TG0D", "TG0H", "TTF0", "TW0P",
++	  "Th0H", "Th1H", "Th2H", "Tm0P", "Ts0P", NULL },
+ };
+ 
+ /* List of keys used to read/write fan speeds */
+@@ -1269,6 +1272,8 @@ static __initdata struct dmi_match_data applesmc_dmi_data[] = {
+ 	{ .accelerometer = 1, .light = 1, .temperature_set = 7 },
+ /* MacBook Pro 4: accelerometer, backlight and temperature set 8 */
+ 	{ .accelerometer = 1, .light = 1, .temperature_set = 8 },
++/* MacBook Pro 3: accelerometer, backlight and temperature set 9 */
++	{ .accelerometer = 1, .light = 1, .temperature_set = 9 },
+ };
+ 
+ /* Note that DMI_MATCH(...,"MacBook") will match "MacBookPro1,1".
+@@ -1282,6 +1287,10 @@ static __initdata struct dmi_system_id applesmc_whitelist[] = {
+ 	  DMI_MATCH(DMI_BOARD_VENDOR, "Apple"),
+ 	  DMI_MATCH(DMI_PRODUCT_NAME, "MacBookPro4") },
+ 		&applesmc_dmi_data[8]},
++	{ applesmc_dmi_match, "Apple MacBook Pro 3", {
++	  DMI_MATCH(DMI_BOARD_VENDOR, "Apple"),
++	  DMI_MATCH(DMI_PRODUCT_NAME, "MacBookPro3") },
++		&applesmc_dmi_data[9]},
+ 	{ applesmc_dmi_match, "Apple MacBook Pro", {
+ 	  DMI_MATCH(DMI_BOARD_VENDOR,"Apple"),
+ 	  DMI_MATCH(DMI_PRODUCT_NAME,"MacBookPro") },
+
+commit 8c9398d1e9766e3659e277acb2e8ca1c17684139
+Author: Henrik Rydberg <rydberg@euromail.se>
+Date:   Sat Oct 18 20:27:43 2008 -0700
+
+    hwmon: applesmc: lighter wait mechanism, drastic improvement
+    
+    The read fail ratio is sensitive to the delay between the first byte
+    written and the first byte read; apparently the sensors cannot be rushed.
+    Increasing the minimum wait time, without changing the total wait time,
+    improves the fail ratio from a 8% chance that any of the sensors fails in
+    one read, down to 0.4%, on a Macbook Air.  On a Macbook Pro 3,1, the
+    effect is even more apparent.  By reducing the number of status polls, the
+    ratio is further improved to below 0.1%.  Finally, increasing the total
+    wait time brings the fail ratio down to virtually zero.
+    
+    Signed-off-by: Henrik Rydberg <rydberg@euromail.se>
+    Tested-by: Bob McElrath <bob@mcelrath.org>
+    Cc: Nicolas Boichat <nicolas@boichat.ch>
+    Cc: "Mark M. Hoffman" <mhoffman@lightlink.com>
+    Cc: Jean Delvare <khali@linux-fr.org>
+    Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+    Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+
+diff --git a/drivers/hwmon/applesmc.c b/drivers/hwmon/applesmc.c
+index 59266ce..bc011da 100644
+--- a/drivers/hwmon/applesmc.c
++++ b/drivers/hwmon/applesmc.c
+@@ -49,6 +49,9 @@
+ 
+ #define APPLESMC_MAX_DATA_LENGTH 32
+ 
++#define APPLESMC_MIN_WAIT	0x0040
++#define APPLESMC_MAX_WAIT	0x8000
++
+ #define APPLESMC_STATUS_MASK	0x0f
+ #define APPLESMC_READ_CMD	0x10
+ #define APPLESMC_WRITE_CMD	0x11
+@@ -172,25 +175,25 @@ static unsigned int key_at_index;
+ static struct workqueue_struct *applesmc_led_wq;
+ 
+ /*
+- * __wait_status - Wait up to 10ms for the status port to get a certain value
++ * __wait_status - Wait up to 32ms for the status port to get a certain value
+  * (masked with 0x0f), returning zero if the value is obtained.  Callers must
+  * hold applesmc_lock.
+  */
+ static int __wait_status(u8 val)
+ {
+-	unsigned int i;
++	int us;
+ 
+ 	val = val & APPLESMC_STATUS_MASK;
+ 
+-	for (i = 0; i < 1000; i++) {
++	for (us = APPLESMC_MIN_WAIT; us < APPLESMC_MAX_WAIT; us <<= 1) {
++		udelay(us);
+ 		if ((inb(APPLESMC_CMD_PORT) & APPLESMC_STATUS_MASK) == val) {
+ 			if (debug)
+ 				printk(KERN_DEBUG
+-						"Waited %d us for status %x\n",
+-						i*10, val);
++					"Waited %d us for status %x\n",
++					2 * us - APPLESMC_MIN_WAIT, val);
+ 			return 0;
+ 		}
+-		udelay(10);
+ 	}
+ 
+ 	printk(KERN_WARNING "applesmc: wait status failed: %x != %x\n",
+@@ -206,13 +209,12 @@ static int __wait_status(u8 val)
+  */
+ static int send_command(u8 cmd)
+ {
+-	int i;
+-	for (i = 0; i < 1000; i++) {
++	int us;
++	for (us = APPLESMC_MIN_WAIT; us < APPLESMC_MAX_WAIT; us <<= 1) {
+ 		outb(cmd, APPLESMC_CMD_PORT);
+-		udelay(5);
++		udelay(us);
+ 		if ((inb(APPLESMC_CMD_PORT) & APPLESMC_STATUS_MASK) == 0x0c)
+ 			return 0;
+-		udelay(5);
+ 	}
+ 	printk(KERN_WARNING "applesmc: command failed: %x -> %x\n",
+ 		cmd, inb(APPLESMC_CMD_PORT));
+
+commit 6e3530fa241ae759313496f67295c9252691ed04
+Author: Henrik Rydberg <rydberg@euromail.se>
+Date:   Thu Nov 6 12:53:19 2008 -0800
+
+    hwmon: applesmc: add support for iMac 5
+    
+    Add temperature sensor support for iMac 5.
+    
+    Signed-off-by: Henrik Rydberg <rydberg@euromail.se>
+    Tested-by: Ricky Campbell <johnrcampbell@gmail.com>
+    Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+    Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+
+diff --git a/drivers/hwmon/applesmc.c b/drivers/hwmon/applesmc.c
+index bc011da..80d545d 100644
+--- a/drivers/hwmon/applesmc.c
++++ b/drivers/hwmon/applesmc.c
+@@ -116,6 +116,8 @@ static const char* temperature_sensors_sets[][36] = {
+ /* Set 9: Macbook Pro 3,1 (Santa Rosa) */
+ 	{ "TALP", "TB0T", "TC0D", "TC0P", "TG0D", "TG0H", "TTF0", "TW0P",
+ 	  "Th0H", "Th1H", "Th2H", "Tm0P", "Ts0P", NULL },
++/* Set 10: iMac 5,1 */
++	{ "TA0P", "TC0D", "TC0P", "TG0D", "TH0P", "TO0P", "Tm0P", NULL },
+ };
+ 
+ /* List of keys used to read/write fan speeds */
+@@ -1276,6 +1278,8 @@ static __initdata struct dmi_match_data applesmc_dmi_data[] = {
+ 	{ .accelerometer = 1, .light = 1, .temperature_set = 8 },
+ /* MacBook Pro 3: accelerometer, backlight and temperature set 9 */
+ 	{ .accelerometer = 1, .light = 1, .temperature_set = 9 },
++/* iMac 5: light sensor only, temperature set 10 */
++	{ .accelerometer = 0, .light = 0, .temperature_set = 10 },
+ };
+ 
+ /* Note that DMI_MATCH(...,"MacBook") will match "MacBookPro1,1".
+@@ -1317,6 +1321,10 @@ static __initdata struct dmi_system_id applesmc_whitelist[] = {
+ 	  DMI_MATCH(DMI_BOARD_VENDOR,"Apple"),
+ 	  DMI_MATCH(DMI_PRODUCT_NAME,"MacPro2") },
+ 		&applesmc_dmi_data[4]},
++	{ applesmc_dmi_match, "Apple iMac 5", {
++	  DMI_MATCH(DMI_BOARD_VENDOR, "Apple"),
++	  DMI_MATCH(DMI_PRODUCT_NAME, "iMac5") },
++		&applesmc_dmi_data[10]},
+ 	{ applesmc_dmi_match, "Apple iMac", {
+ 	  DMI_MATCH(DMI_BOARD_VENDOR,"Apple"),
+ 	  DMI_MATCH(DMI_PRODUCT_NAME,"iMac") },
+
+commit 181209a1d91756bfd83b1d6ce2008cea3ca225b6
+Author: Henrik Rydberg <rydberg@euromail.se>
+Date:   Thu Nov 6 12:53:20 2008 -0800
+
+    hwmon: applesmc: add support for Macbook 5
+    
+    Add accelerometer, backlight and temperature sensor support for the new
+    unibody Macbook 5.
+    
+    Signed-off-by: Henrik Rydberg <rydberg@euromail.se>
+    Tested-by: David M. Lary <dmlary@gmail.com>
+    Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+    Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+
+diff --git a/drivers/hwmon/applesmc.c b/drivers/hwmon/applesmc.c
+index 80d545d..074f7f4 100644
+--- a/drivers/hwmon/applesmc.c
++++ b/drivers/hwmon/applesmc.c
+@@ -118,6 +118,9 @@ static const char* temperature_sensors_sets[][36] = {
+ 	  "Th0H", "Th1H", "Th2H", "Tm0P", "Ts0P", NULL },
+ /* Set 10: iMac 5,1 */
+ 	{ "TA0P", "TC0D", "TC0P", "TG0D", "TH0P", "TO0P", "Tm0P", NULL },
++/* Set 11: Macbook 5,1 */
++	{ "TB0T", "TB1T", "TB2T", "TB3T", "TC0D", "TC0P", "TN0D", "TN0P",
++	  "TTF0", "Th0H", "Th1H", "ThFH", "Ts0P", "Ts0S", NULL },
+ };
+ 
+ /* List of keys used to read/write fan speeds */
+@@ -1280,6 +1283,8 @@ static __initdata struct dmi_match_data applesmc_dmi_data[] = {
+ 	{ .accelerometer = 1, .light = 1, .temperature_set = 9 },
+ /* iMac 5: light sensor only, temperature set 10 */
+ 	{ .accelerometer = 0, .light = 0, .temperature_set = 10 },
++/* MacBook 5: accelerometer, backlight and temperature set 11 */
++	{ .accelerometer = 1, .light = 1, .temperature_set = 11 },
+ };
+ 
+ /* Note that DMI_MATCH(...,"MacBook") will match "MacBookPro1,1".
+@@ -1309,6 +1314,10 @@ static __initdata struct dmi_system_id applesmc_whitelist[] = {
+ 	  DMI_MATCH(DMI_BOARD_VENDOR,"Apple"),
+ 	  DMI_MATCH(DMI_PRODUCT_NAME,"MacBook3") },
+ 		&applesmc_dmi_data[6]},
++	{ applesmc_dmi_match, "Apple MacBook 5", {
++	  DMI_MATCH(DMI_BOARD_VENDOR, "Apple"),
++	  DMI_MATCH(DMI_PRODUCT_NAME, "MacBook5") },
++		&applesmc_dmi_data[11]},
+ 	{ applesmc_dmi_match, "Apple MacBook", {
+ 	  DMI_MATCH(DMI_BOARD_VENDOR,"Apple"),
+ 	  DMI_MATCH(DMI_PRODUCT_NAME,"MacBook") },
+
+commit a66603257bf88bbe2c9fd6a97ee5dc24de15d196
+Author: Henrik Rydberg <rydberg@euromail.se>
+Date:   Thu Nov 6 12:53:21 2008 -0800
+
+    hwmon: applesmc: add support for Macbook Pro 5
+    
+    Add accelerometer, backlight and temperature sensor support for the new
+    unibody Macbook Pro 5.
+    
+    Signed-off-by: Henrik Rydberg <rydberg@euromail.se>
+    Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+    Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+
+diff --git a/drivers/hwmon/applesmc.c b/drivers/hwmon/applesmc.c
+index 074f7f4..9f04283 100644
+--- a/drivers/hwmon/applesmc.c
++++ b/drivers/hwmon/applesmc.c
+@@ -121,6 +121,10 @@ static const char* temperature_sensors_sets[][36] = {
+ /* Set 11: Macbook 5,1 */
+ 	{ "TB0T", "TB1T", "TB2T", "TB3T", "TC0D", "TC0P", "TN0D", "TN0P",
+ 	  "TTF0", "Th0H", "Th1H", "ThFH", "Ts0P", "Ts0S", NULL },
++/* Set 12: Macbook Pro 5,1 */
++	{ "TB0T", "TB1T", "TB2T", "TB3T", "TC0D", "TC0F", "TC0P", "TG0D",
++	  "TG0F", "TG0H", "TG0P", "TG0T", "TG1H", "TN0D", "TN0P", "TTF0",
++	  "Th2H", "Tm0P", "Ts0P", "Ts0S", NULL },
+ };
+ 
+ /* List of keys used to read/write fan speeds */
+@@ -1285,6 +1289,8 @@ static __initdata struct dmi_match_data applesmc_dmi_data[] = {
+ 	{ .accelerometer = 0, .light = 0, .temperature_set = 10 },
+ /* MacBook 5: accelerometer, backlight and temperature set 11 */
+ 	{ .accelerometer = 1, .light = 1, .temperature_set = 11 },
++/* MacBook Pro 5: accelerometer, backlight and temperature set 12 */
++	{ .accelerometer = 1, .light = 1, .temperature_set = 12 },
+ };
+ 
+ /* Note that DMI_MATCH(...,"MacBook") will match "MacBookPro1,1".
+@@ -1294,6 +1300,10 @@ static __initdata struct dmi_system_id applesmc_whitelist[] = {
+ 	  DMI_MATCH(DMI_BOARD_VENDOR, "Apple"),
+ 	  DMI_MATCH(DMI_PRODUCT_NAME, "MacBookAir") },
+ 		&applesmc_dmi_data[7]},
++	{ applesmc_dmi_match, "Apple MacBook Pro 5", {
++	  DMI_MATCH(DMI_BOARD_VENDOR, "Apple"),
++	  DMI_MATCH(DMI_PRODUCT_NAME, "MacBookPro5") },
++		&applesmc_dmi_data[12]},
+ 	{ applesmc_dmi_match, "Apple MacBook Pro 4", {
+ 	  DMI_MATCH(DMI_BOARD_VENDOR, "Apple"),
+ 	  DMI_MATCH(DMI_PRODUCT_NAME, "MacBookPro4") },
+
+commit eefc488f96cdde6e152b45675b50bf380b95d99f
+Author: Henrik Rydberg <rydberg@euromail.se>
+Date:   Thu Nov 6 12:53:22 2008 -0800
+
+    hwmon: applesmc: add support for iMac 8
+    
+    Add temperature sensor support for iMac 8.
+    
+    Signed-off-by: Henrik Rydberg <rydberg@euromail.se>
+    Tested-by: Klaus Doblmann <klaus.doblmann@gmail.com>
+    Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+    Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+
+diff --git a/drivers/hwmon/applesmc.c b/drivers/hwmon/applesmc.c
+index 9f04283..be32859 100644
+--- a/drivers/hwmon/applesmc.c
++++ b/drivers/hwmon/applesmc.c
+@@ -125,6 +125,9 @@ static const char* temperature_sensors_sets[][36] = {
+ 	{ "TB0T", "TB1T", "TB2T", "TB3T", "TC0D", "TC0F", "TC0P", "TG0D",
+ 	  "TG0F", "TG0H", "TG0P", "TG0T", "TG1H", "TN0D", "TN0P", "TTF0",
+ 	  "Th2H", "Tm0P", "Ts0P", "Ts0S", NULL },
++/* Set 13: iMac 8,1 */
++	{ "TA0P", "TC0D", "TC0H", "TC0P", "TG0D", "TG0H", "TG0P", "TH0P",
++	  "TL0P", "TO0P", "TW0P", "Tm0P", "Tp0P", NULL },
+ };
+ 
+ /* List of keys used to read/write fan speeds */
+@@ -1291,6 +1294,8 @@ static __initdata struct dmi_match_data applesmc_dmi_data[] = {
+ 	{ .accelerometer = 1, .light = 1, .temperature_set = 11 },
+ /* MacBook Pro 5: accelerometer, backlight and temperature set 12 */
+ 	{ .accelerometer = 1, .light = 1, .temperature_set = 12 },
++/* iMac 8: light sensor only, temperature set 13 */
++	{ .accelerometer = 0, .light = 0, .temperature_set = 13 },
+ };
+ 
+ /* Note that DMI_MATCH(...,"MacBook") will match "MacBookPro1,1".
+@@ -1340,6 +1345,10 @@ static __initdata struct dmi_system_id applesmc_whitelist[] = {
+ 	  DMI_MATCH(DMI_BOARD_VENDOR,"Apple"),
+ 	  DMI_MATCH(DMI_PRODUCT_NAME,"MacPro2") },
+ 		&applesmc_dmi_data[4]},
++	{ applesmc_dmi_match, "Apple iMac 8", {
++	  DMI_MATCH(DMI_BOARD_VENDOR, "Apple"),
++	  DMI_MATCH(DMI_PRODUCT_NAME, "iMac8") },
++		&applesmc_dmi_data[13]},
+ 	{ applesmc_dmi_match, "Apple iMac 5", {
+ 	  DMI_MATCH(DMI_BOARD_VENDOR, "Apple"),
+ 	  DMI_MATCH(DMI_PRODUCT_NAME, "iMac5") },
+
+commit 468cc0320ed083e26364d9febde2679d981ed6a6
+Author: Henrik Rydberg <rydberg@euromail.se>
+Date:   Wed Nov 12 13:24:58 2008 -0800
+
+    hwmon: applesmc: add support for Macbook 4
+    
+    This patch adds accelerometer and temperature sensor support for Macbook 4.
+    
+    Signed-off-by: Henrik Rydberg <rydberg@euromail.se>
+    Cc: Nicolas Boichat <nicolas@boichat.ch
+    Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+    Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+
+diff --git a/drivers/hwmon/applesmc.c b/drivers/hwmon/applesmc.c
+index be32859..488e45c 100644
+--- a/drivers/hwmon/applesmc.c
++++ b/drivers/hwmon/applesmc.c
+@@ -1280,7 +1280,7 @@ static __initdata struct dmi_match_data applesmc_dmi_data[] = {
+ 	{ .accelerometer = 0, .light = 0, .temperature_set = 4 },
+ /* iMac: temperature set 5 */
+ 	{ .accelerometer = 0, .light = 0, .temperature_set = 5 },
+-/* MacBook3: accelerometer and temperature set 6 */
++/* MacBook3, MacBook4: accelerometer and temperature set 6 */
+ 	{ .accelerometer = 1, .light = 0, .temperature_set = 6 },
+ /* MacBook Air: accelerometer, backlight and temperature set 7 */
+ 	{ .accelerometer = 1, .light = 1, .temperature_set = 7 },
+@@ -1329,6 +1329,10 @@ static __initdata struct dmi_system_id applesmc_whitelist[] = {
+ 	  DMI_MATCH(DMI_BOARD_VENDOR,"Apple"),
+ 	  DMI_MATCH(DMI_PRODUCT_NAME,"MacBook3") },
+ 		&applesmc_dmi_data[6]},
++	{ applesmc_dmi_match, "Apple MacBook 4", {
++	  DMI_MATCH(DMI_BOARD_VENDOR, "Apple"),
++	  DMI_MATCH(DMI_PRODUCT_NAME, "MacBook4") },
++		&applesmc_dmi_data[6]},
+ 	{ applesmc_dmi_match, "Apple MacBook 5", {
+ 	  DMI_MATCH(DMI_BOARD_VENDOR, "Apple"),
+ 	  DMI_MATCH(DMI_PRODUCT_NAME, "MacBook5") },
+
+commit 9ca791bbd464d7968db1530b433cc397a4c348c1
+Author: Henrik Rydberg <rydberg@euromail.se>
+Date:   Wed Nov 19 15:36:06 2008 -0800
+
+    hwmon: applesmc: Add support for iMac 6
+    
+    Add temperature sensor support for iMac 6.
+    
+    Signed-off-by: Henrik Rydberg <rydberg@euromail.se>
+    Tested-by: Caleb Hyde <caleb.hyde@gmail.com>
+    Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+    Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+
+diff --git a/drivers/hwmon/applesmc.c b/drivers/hwmon/applesmc.c
+index 488e45c..10977b3 100644
+--- a/drivers/hwmon/applesmc.c
++++ b/drivers/hwmon/applesmc.c
+@@ -128,6 +128,9 @@ static const char* temperature_sensors_sets[][36] = {
+ /* Set 13: iMac 8,1 */
+ 	{ "TA0P", "TC0D", "TC0H", "TC0P", "TG0D", "TG0H", "TG0P", "TH0P",
+ 	  "TL0P", "TO0P", "TW0P", "Tm0P", "Tp0P", NULL },
++/* Set 14: iMac 6,1 */
++	{ "TA0P", "TC0D", "TC0H", "TC0P", "TG0D", "TG0H", "TG0P", "TH0P",
++	  "TO0P", "Tp0P", NULL },
+ };
+ 
+ /* List of keys used to read/write fan speeds */
+@@ -1296,6 +1299,8 @@ static __initdata struct dmi_match_data applesmc_dmi_data[] = {
+ 	{ .accelerometer = 1, .light = 1, .temperature_set = 12 },
+ /* iMac 8: light sensor only, temperature set 13 */
+ 	{ .accelerometer = 0, .light = 0, .temperature_set = 13 },
++/* iMac 6: light sensor only, temperature set 14 */
++	{ .accelerometer = 0, .light = 0, .temperature_set = 14 },
+ };
+ 
+ /* Note that DMI_MATCH(...,"MacBook") will match "MacBookPro1,1".
+@@ -1353,6 +1358,10 @@ static __initdata struct dmi_system_id applesmc_whitelist[] = {
+ 	  DMI_MATCH(DMI_BOARD_VENDOR, "Apple"),
+ 	  DMI_MATCH(DMI_PRODUCT_NAME, "iMac8") },
+ 		&applesmc_dmi_data[13]},
++	{ applesmc_dmi_match, "Apple iMac 6", {
++	  DMI_MATCH(DMI_BOARD_VENDOR, "Apple"),
++	  DMI_MATCH(DMI_PRODUCT_NAME, "iMac6") },
++		&applesmc_dmi_data[14]},
+ 	{ applesmc_dmi_match, "Apple iMac 5", {
+ 	  DMI_MATCH(DMI_BOARD_VENDOR, "Apple"),
+ 	  DMI_MATCH(DMI_PRODUCT_NAME, "iMac5") },
+
+commit 45a3a36b6333b9ddfb0c57602d959a8d05bc47e4
+Author: Henrik Rydberg <rydberg@euromail.se>
+Date:   Wed Nov 19 15:36:42 2008 -0800
+
+    drivers/hwmon/applesmc.c: add generic MacPro support
+    
+    In order to analyze the SMC of the newer MacPros, applesmc needs to
+    recognize the machine.  This patch adds the missing generic dmi_match
+    entry for MacPro models.
+    
+    Signed-off-by: Henrik Rydberg <rydberg@euromail.se>
+    Cc: Nicolas Boichat <nicolas@boichat.ch>
+    Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+    Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+
+diff --git a/drivers/hwmon/applesmc.c b/drivers/hwmon/applesmc.c
+index 10977b3..f7dce8b 100644
+--- a/drivers/hwmon/applesmc.c
++++ b/drivers/hwmon/applesmc.c
+@@ -1354,6 +1354,10 @@ static __initdata struct dmi_system_id applesmc_whitelist[] = {
+ 	  DMI_MATCH(DMI_BOARD_VENDOR,"Apple"),
+ 	  DMI_MATCH(DMI_PRODUCT_NAME,"MacPro2") },
+ 		&applesmc_dmi_data[4]},
++	{ applesmc_dmi_match, "Apple MacPro", {
++	  DMI_MATCH(DMI_BOARD_VENDOR, "Apple"),
++	  DMI_MATCH(DMI_PRODUCT_NAME, "MacPro") },
++		&applesmc_dmi_data[4]},
+ 	{ applesmc_dmi_match, "Apple iMac 8", {
+ 	  DMI_MATCH(DMI_BOARD_VENDOR, "Apple"),
+ 	  DMI_MATCH(DMI_PRODUCT_NAME, "iMac8") },

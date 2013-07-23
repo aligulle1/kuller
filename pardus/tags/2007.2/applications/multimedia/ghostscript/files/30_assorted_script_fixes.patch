@@ -1,0 +1,94 @@
+--- ghostscript-8.60.dfsg.1.orig/lib/afmdiff.awk	2007-05-08 00:11:15.000000000 +0900
++++ ghostscript-8.60.dfsg.1/lib/afmdiff.awk	2007-05-08 00:11:29.000000000 +0900
+@@ -1,3 +1,4 @@
++#!/usr/bin/awk -f
+ ###=====================================================================
+ ### Read two Adobe Font Metric files, and compute tables of the
+ ### differences in character repertoire, declared widths (WX), and
+diff -urN ghostscript-8.60.dfsg.1.orig/lib/dumphint ghostscript-8.60.dfsg.1/lib/dumphint
+--- ghostscript-8.60.dfsg.1.orig/lib/dumphint	2007-05-08 00:11:15.000000000 +0900
++++ ghostscript-8.60.dfsg.1/lib/dumphint	2007-05-08 00:11:29.000000000 +0900
+@@ -22,4 +22,4 @@
+ 	exit 1
+ fi
+ 
+-exec $GS_EXECUTABLE -q -dNODISPLAY $OPTIONS -- dumphint.ps "$1"
++exec $GS_EXECUTABLE -q -dNODISPLAY $OPTIONS -- /usr/share/gs-esp/8.15/lib/dumphint.ps "$1"
+diff -urN ghostscript-8.60.dfsg.1.orig/lib/dvipdf ghostscript-8.60.dfsg.1/lib/dvipdf
+--- ghostscript-8.60.dfsg.1.orig/lib/dvipdf	2007-05-08 00:11:15.000000000 +0900
++++ ghostscript-8.60.dfsg.1/lib/dvipdf	2007-05-08 00:11:29.000000000 +0900
+@@ -42,4 +42,4 @@
+ 
+ # We have to include the options twice because -I only takes effect if it
+ # appears before other options.
+-exec dvips -q -f "$infile" | $GS_EXECUTABLE $OPTIONS -q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -sOutputFile="$outfile" $OPTIONS -c .setpdfwrite -
++exec dvips -Ppdf -q -f "$infile" | $GS_EXECUTABLE $OPTIONS -q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -sOutputFile="$outfile" $OPTIONS -c .setpdfwrite -
+diff -urN ghostscript-8.60.dfsg.1.orig/lib/pdf2ps ghostscript-8.60.dfsg.1/lib/pdf2ps
+--- ghostscript-8.60.dfsg.1.orig/lib/pdf2ps	2007-05-08 00:11:15.000000000 +0900
++++ ghostscript-8.60.dfsg.1/lib/pdf2ps	2007-05-08 00:12:00.000000000 +0900
+@@ -16,18 +16,24 @@
+ 	shift
+ done
+ 
+-if [ $# -eq 2 ] 
++if [ -t 1 ]
+ then
+-    outfile=$2
+-elif [ $# -eq 1 ]
+-then
+-    outfile=`basename "$1" \.pdf`.ps
++    if [ $# -eq 2 ]
++    then
++        outfile=$2
++    elif [ $# -eq 1 ]
++    then
++        outfile=`basename "$1" \.pdf`.ps
++    else
++        echo "Usage: `basename $0` [-dASCII85EncodePages=false] [-dLanguageLevel=1|2|3] input.pdf [output.ps]" 1>&2
++        exit 1
++    fi
++    OUTFILE="-sOutputFile=$outfile"
+ else
+-    echo "Usage: `basename $0` [-dASCII85EncodePages=false] [-dLanguageLevel=1|2|3] input.pdf [output.ps]" 1>&2
+-    exit 1
++OUTFILE="-sOutputFile=%stdout%"
+ fi
+ 
+ # Doing an initial 'save' helps keep fonts from being flushed between pages.
+ # We have to include the options twice because -I only takes effect if it
+ # appears before other options.
+-exec $GS_EXECUTABLE $OPTIONS -q -dNOPAUSE -dBATCH -dSAFER -sDEVICE=pswrite "-sOutputFile=$outfile" $OPTIONS -c save pop -f "$1"
++exec $GS_EXECUTABLE $OPTIONS -q -dNOPAUSE -dBATCH -dSAFER -sDEVICE=pswrite $OUTFILE $OPTIONS -c save pop -f "$1"
+diff -urN ghostscript-8.60.dfsg.1.orig/lib/ps2epsi ghostscript-8.60.dfsg.1/lib/ps2epsi
+--- ghostscript-8.60.dfsg.1.orig/lib/ps2epsi	2007-05-08 00:11:15.000000000 +0900
++++ ghostscript-8.60.dfsg.1/lib/ps2epsi	2007-05-08 00:11:29.000000000 +0900
+@@ -62,7 +62,7 @@
+ 		}
+ 	' U="$USERNAME$LOGNAME"  F=1 - F=2 "${infile}" >$tmpfile
+ 
+-$GS_EXECUTABLE -q -dNOPAUSE -dSAFER -dDELAYSAFER -r72 -sDEVICE=bit -sOutputFile=/dev/null $tmpfile ps2epsi.ps $tmpfile <"${infile}" 1>&2
++$GS_EXECUTABLE -q -sPAPERSIZE=a0 -dNOPAUSE -dSAFER -dDELAYSAFER -r72 -sDEVICE=bit -sOutputFile=/dev/null $tmpfile ps2epsi.ps $tmpfile <"${infile}" 1>&2
+ rm -f $tmpfile
+ rm -rf $tmpdir
+ 
+diff -urN ghostscript-8.60.dfsg.1.orig/lib/pv.sh ghostscript-8.60.dfsg.1/lib/pv.sh
+--- ghostscript-8.60.dfsg.1.orig/lib/pv.sh	2007-05-08 00:11:15.000000000 +0900
++++ ghostscript-8.60.dfsg.1/lib/pv.sh	2007-05-08 00:11:29.000000000 +0900
+@@ -30,13 +30,13 @@
+ # executable name set in the makefile
+ GS_EXECUTABLE=gs
+ 
+-TEMPDIR=.
++TEMPFILE=`mktemp ${FILE}XXXXXX` || exit 1
+ PAGE=$1
+ shift
+ FILE=$1
+ shift
+-trap "rm -rf $TEMPDIR/$FILE.$$.pv" 0 1 2 15
++trap "rm -rf $TEMPFILE" 0 1 2 15
+ #dvips -D$RESOLUTION -p $PAGE -n 1 $FILE $* -o $FILE.$$.pv
+-dvips -p $PAGE -n 1 $FILE $* -o $FILE.$$.pv
+-$GS_EXECUTABLE $FILE.$$.pv
++dvips -p $PAGE -n 1 $FILE $* -o $TEMPFILE
++$GS_EXECUTABLE $TEMPFILE
+ exit 0

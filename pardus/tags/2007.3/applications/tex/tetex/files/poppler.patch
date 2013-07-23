@@ -1,0 +1,383 @@
+diff -Nurp tetex-bin-3.0/configure tetex-bin-3.0.new/configure
+--- tetex-bin-3.0/configure	2005-02-06 19:27:03.000000000 +0100
++++ tetex-bin-3.0.new/configure	2006-03-09 16:49:28.000000000 +0100
+@@ -3292,9 +3292,9 @@ export needs_zlib
+ 
+ # we need libxpdf for pdf[ex]tex
+ test ! -d $srcdir/$LIBXPDFDIR && : ${needs_libxpdf=no}
+-test "$with_pdftex"  != no    && : ${needs_libxpdf=yes}
+-test "$with_pdfetex"  != no    && : ${needs_libxpdf=yes}
+-test "$with_pdfxtex"  != no    && : ${needs_libxpdf=yes}
++test "$with_pdftex"  != no    && : ${needs_libxpdf=no}
++test "$with_pdfetex"  != no    && : ${needs_libxpdf=no}
++test "$with_pdfxtex"  != no    && : ${needs_libxpdf=no}
+ : ${needs_libxpdf=no}
+ export needs_libxpdf
+ 
+diff -Nurp tetex-bin-3.0/configure.in tetex-bin-3.0.new/configure.in
+--- tetex-bin-3.0/configure.in	2005-02-01 22:59:46.000000000 +0100
++++ tetex-bin-3.0.new/configure.in	2006-03-09 16:49:28.000000000 +0100
+@@ -145,9 +145,9 @@ export needs_zlib
+ 
+ # we need libxpdf for pdf[ex]tex
+ test ! -d $srcdir/$LIBXPDFDIR && : ${needs_libxpdf=no}
+-test "$with_pdftex"  != no    && : ${needs_libxpdf=yes}
+-test "$with_pdfetex"  != no    && : ${needs_libxpdf=yes}
+-test "$with_pdfxtex"  != no    && : ${needs_libxpdf=yes}
++test "$with_pdftex"  != no    && : ${needs_libxpdf=no}
++test "$with_pdfetex"  != no    && : ${needs_libxpdf=no}
++test "$with_pdfxtex"  != no    && : ${needs_libxpdf=no}
+ : ${needs_libxpdf=no}
+ export needs_libxpdf
+ 
+diff -Nurp tetex-bin-3.0/texk/web2c/pdfetexdir/pdfetex.mk tetex-bin-3.0.new/texk/web2c/pdfetexdir/pdfetex.mk
+--- tetex-bin-3.0/texk/web2c/pdfetexdir/pdfetex.mk	2004-12-20 20:57:52.000000000 +0100
++++ tetex-bin-3.0.new/texk/web2c/pdfetexdir/pdfetex.mk	2006-03-09 16:49:28.000000000 +0100
+@@ -8,13 +8,16 @@ Makefile: $(srcdir)/pdfetexdir/pdfetex.m
+ pdfetex = @PETEX@ pdfetex
+ pdfetexdir = pdfetexdir
+ 
++# use libpoppler instead of included xpdf code
++ADDLDFLAGS = -lpoppler
++
+ # The C sources.
+ pdfetex_c = pdfetexini.c pdfetex0.c pdfetex1.c pdfetex2.c pdfetex3.c
+ pdfetex_o = pdfetexini.o pdfetex0.o pdfetex1.o pdfetex2.o pdfetex3.o pdfetexextra.o
+ 
+ # Making pdfetex
+ pdfetex: pdftexd.h $(pdfetex_o) $(pdfetexextra_o) $(pdftexlibsdep)
+-	@CXXHACKLINK@ $(pdfetex_o) $(pdfetexextra_o) $(pdftexlibs) $(socketlibs) @CXXHACKLDLIBS@ @CXXLDEXTRA@
++	@CXXHACKLINK@ $(pdfetex_o) $(pdfetexextra_o) $(pdftexlibs) $(socketlibs) @CXXHACKLDLIBS@ @CXXLDEXTRA@ $(ADDLDFLAGS)
+ 
+ # C file dependencies.
+ $(pdfetex_c) pdfetexcoerce.h pdfetexd.h: pdfetex.p $(web2c_texmf)
+diff -Nurp tetex-bin-3.0/texk/web2c/pdftexdir/depend.mk tetex-bin-3.0.new/texk/web2c/pdftexdir/depend.mk
+--- tetex-bin-3.0/texk/web2c/pdftexdir/depend.mk	2004-03-09 12:20:12.000000000 +0100
++++ tetex-bin-3.0.new/texk/web2c/pdftexdir/depend.mk	2006-03-09 16:49:28.000000000 +0100
+@@ -1,54 +1,4 @@
+-epdf.o: epdf.c ptexlib.h ../pdftexd.h ../texmfmp.h ../cpascal.h \
+- ../config.h ../help.h ../texmfmem.h ../pdftexcoerce.h ptexmac.h
+-mapfile.o: mapfile.c ptexlib.h ../pdftexd.h ../texmfmp.h ../cpascal.h \
+- ../config.h ../help.h ../texmfmem.h ../pdftexcoerce.h ptexmac.h
+-papersiz.o: papersiz.c ptexlib.h ../pdftexd.h ../texmfmp.h \
+- ../cpascal.h ../config.h ../help.h ../texmfmem.h ../pdftexcoerce.h \
+- ptexmac.h
+-utils.o: utils.c ptexlib.h ../pdftexd.h ../texmfmp.h ../cpascal.h \
+- ../config.h ../help.h ../texmfmem.h ../pdftexcoerce.h ptexmac.h \
+- ../../../libs/zlib/zlib.h ../../../libs/zlib/zconf.h \
+- ../../../libs/md5/md5.h pdftexextra.h
+-vfpacket.o: vfpacket.c ptexlib.h ../pdftexd.h ../texmfmp.h \
+- ../cpascal.h ../config.h ../help.h ../texmfmem.h ../pdftexcoerce.h \
+- ptexmac.h
+-pkin.o: pkin.c ptexlib.h ../pdftexd.h ../texmfmp.h ../cpascal.h \
+- ../config.h ../help.h ../texmfmem.h ../pdftexcoerce.h ptexmac.h
+-writefont.o: writefont.c ../../../libs/xpdf/goo/gmem.h ptexlib.h \
+- ../pdftexd.h ../texmfmp.h ../cpascal.h ../config.h ../help.h \
+- ../texmfmem.h ../pdftexcoerce.h ptexmac.h
+-writet1.o: writet1.c ptexlib.h ../pdftexd.h ../texmfmp.h ../cpascal.h \
+- ../config.h ../help.h ../texmfmem.h ../pdftexcoerce.h ptexmac.h
+-writet3.o: writet3.c ptexlib.h ../pdftexd.h ../texmfmp.h ../cpascal.h \
+- ../config.h ../help.h ../texmfmem.h ../pdftexcoerce.h ptexmac.h
+-writezip.o: writezip.c ptexlib.h ../pdftexd.h ../texmfmp.h \
+- ../cpascal.h ../config.h ../help.h ../texmfmem.h ../pdftexcoerce.h \
+- ptexmac.h ../../../libs/zlib/zlib.h ../../../libs/zlib/zconf.h
+-writeenc.o: writeenc.c ptexlib.h ../pdftexd.h ../texmfmp.h \
+- ../cpascal.h ../config.h ../help.h ../texmfmem.h ../pdftexcoerce.h \
+- ptexmac.h
+-writettf.o: writettf.c ptexlib.h ../pdftexd.h ../texmfmp.h \
+- ../cpascal.h ../config.h ../help.h ../texmfmem.h ../pdftexcoerce.h \
+- ptexmac.h macnames.c
+-writejpg.o: writejpg.c ptexlib.h ../pdftexd.h ../texmfmp.h \
+- ../cpascal.h ../config.h ../help.h ../texmfmem.h ../pdftexcoerce.h \
+- ptexmac.h image.h
+-writepng.o: writepng.c ptexlib.h ../pdftexd.h ../texmfmp.h \
+- ../cpascal.h ../config.h ../help.h ../texmfmem.h ../pdftexcoerce.h \
+- ptexmac.h image.h
+-writeimg.o: writeimg.c ptexlib.h ../pdftexd.h ../texmfmp.h \
+- ../cpascal.h ../config.h ../help.h ../texmfmem.h ../pdftexcoerce.h \
+- ptexmac.h image.h
+-pdftoepdf.o: pdftoepdf.cc ../../../libs/xpdf/xpdf/Object.h \
+- ../../../libs/xpdf/goo/gmem.h ../../../libs/xpdf/xpdf/Array.h \
+- ../../../libs/xpdf/xpdf/Dict.h ../../../libs/xpdf/xpdf/Stream.h \
+- ../../../libs/xpdf/xpdf/XRef.h ../../../libs/xpdf/xpdf/Catalog.h \
+- ../../../libs/xpdf/xpdf/Page.h ../../../libs/xpdf/xpdf/GfxFont.h \
+- ../../../libs/xpdf/xpdf/Error.h epdf.h
+-ttf2afm.o: ttf2afm.c macnames.c
+-pdftosrc.o: pdftosrc.cc ../../../libs/xpdf/xpdf/Object.h \
+- ../../../libs/xpdf/xpdf/Array.h ../../../libs/xpdf/xpdf/Dict.h \
+- ../../../libs/xpdf/xpdf/Stream.h ../../../libs/xpdf/xpdf/XRef.h \
+- ../../../libs/xpdf/xpdf/Catalog.h ../../../libs/xpdf/xpdf/Page.h \
+- ../../../libs/xpdf/xpdf/PDFDoc.h ../../../libs/xpdf/xpdf/Link.h \
+- ../../../libs/xpdf/xpdf/Error.h ../../../libs/xpdf/xpdf/config.h
++pdftoepdf.o: pdftoepdf.cc epdf.h ../../kpathsea/c-auto.h \
++  ../../kpathsea/c-proto.h ../../web2c/c-auto.h ../../web2c/config.h \
++  ../../kpathsea/c-fopen.h ../../web2c/pdftexdir/ptexmac.h
++pdftosrc.o: pdftosrc.cc
+diff -Nurp tetex-bin-3.0/texk/web2c/pdftexdir/Makefile.in tetex-bin-3.0.new/texk/web2c/pdftexdir/Makefile.in
+--- tetex-bin-3.0/texk/web2c/pdftexdir/Makefile.in	2004-08-06 21:41:57.000000000 +0200
++++ tetex-bin-3.0.new/texk/web2c/pdftexdir/Makefile.in	2006-03-09 16:49:28.000000000 +0100
+@@ -8,7 +8,7 @@ ac_include ../make/library.mk
+ kpathsea_srcdir_parent = $(srcdir)/../..
+ kpathsea_dir_parent = ../..
+ 
+-ALL_CXXFLAGS = @CXXFLAGS@ @DEFS@ $(XXCFLAGS) -I. -I$(srcdir) -I$(kpathsea_dir_parent) -I$(kpathsea_srcdir_parent) @LIBXPDFCPPFLAGS@
++ALL_CXXFLAGS = @CXXFLAGS@ @DEFS@ $(XXCFLAGS) -I. -I$(srcdir) -I$(kpathsea_dir_parent) -I$(kpathsea_srcdir_parent) -I/usr/include/poppler
+ CXX = @CXX@
+ 
+ .SUFFIXES: .cc .o
+diff -Nurp tetex-bin-3.0/texk/web2c/pdftexdir/pdftex.mk tetex-bin-3.0.new/texk/web2c/pdftexdir/pdftex.mk
+--- tetex-bin-3.0/texk/web2c/pdftexdir/pdftex.mk	2005-02-03 17:16:39.000000000 +0100
++++ tetex-bin-3.0.new/texk/web2c/pdftexdir/pdftex.mk	2006-03-09 16:49:28.000000000 +0100
+@@ -13,6 +13,9 @@ Makefile: pdftexdir/pdftex.mk
+ pdftex_bin = pdftex pdfetex pdfxtex ttf2afm pdftosrc
+ linux_build_dir = $(HOME)/pdftex/build/linux/texk/web2c
+ 
++# use libpoppler instead of included xpdf code
++ADDLDFLAGS = -lpoppler
++
+ # We build pdftex
+ pdftex = @PTEX@ pdftex
+ pdftexdir = pdftexdir
+@@ -29,7 +32,7 @@ pdftex_o = pdftexini.o pdftex0.o pdftex1
+ 
+ # Making pdftex
+ pdftex: $(pdftex_o) $(pdftexextra_o) $(pdftexlibsdep)
+-	@CXXHACKLINK@ $(pdftex_o) $(pdftexextra_o) $(pdftexlibs) $(socketlibs) @CXXHACKLDLIBS@ @CXXLDEXTRA@
++	@CXXHACKLINK@ $(pdftex_o) $(pdftexextra_o) $(pdftexlibs) $(socketlibs) @CXXHACKLDLIBS@ @CXXLDEXTRA@ $(ADDLDFLAGS)
+ 
+ # C file dependencies.
+ $(pdftex_c) pdftexcoerce.h pdftexd.h: pdftex.p $(web2c_texmf)
+@@ -153,7 +156,7 @@ ttf2afm-clean:
+ pdftosrc = pdftosrc
+ 
+ pdftosrc: pdftexdir/pdftosrc.o $(LIBXPDFDEP)
+-	@CXXHACKLINK@ pdftexdir/pdftosrc.o $(LDLIBXPDF) -lm @CXXLDEXTRA@
++	@CXXHACKLINK@ pdftexdir/pdftosrc.o $(LDLIBXPDF) -lm @CXXLDEXTRA@ $(ADDLDFLAGS)
+ pdftexdir/pdftosrc.o:$(srcdir)/pdftexdir/pdftosrc.cc
+ 	cd pdftexdir && $(MAKE) pdftosrc.o
+ check: pdftosrc-check
+diff -Nurp tetex-bin-3.0/texk/web2c/pdftexdir/pdftoepdf.cc tetex-bin-3.0.new/texk/web2c/pdftexdir/pdftoepdf.cc
+--- tetex-bin-3.0/texk/web2c/pdftexdir/pdftoepdf.cc	2005-02-03 17:16:39.000000000 +0100
++++ tetex-bin-3.0.new/texk/web2c/pdftexdir/pdftoepdf.cc	2006-03-09 16:49:28.000000000 +0100
+@@ -26,22 +26,24 @@ $Id: //depot/Build/source.development/Te
+ #include <stdio.h>
+ #include <string.h>
+ #include <ctype.h>
+-#include <aconf.h>
+-#include <GString.h>
+-#include <gmem.h>
+-#include <gfile.h>
+-#include <config.h>
+-#include "Object.h"
+-#include "Stream.h"
+-#include "Array.h"
+-#include "Dict.h"
+-#include "XRef.h"
+-#include "Catalog.h"
+-#include "Page.h"
+-#include "GfxFont.h"
+-#include "PDFDoc.h"
+-#include "GlobalParams.h"
+-#include "Error.h"
++#include <dirent.h>
++#include <poppler/poppler-config.h>
++#include <poppler/goo/GooString.h>
++#include <poppler/goo/gmem.h>
++#include <poppler/goo/gfile.h>
++#include "poppler/Object.h"
++#include "poppler/UGooString.h"
++#include "poppler/Stream.h"
++#include "poppler/Array.h"
++#include "poppler/Dict.h"
++#include "poppler/XRef.h"
++#include "poppler/Link.h"
++#include "poppler/Catalog.h"
++#include "poppler/Page.h"
++#include "poppler/GfxFont.h"
++#include "poppler/PDFDoc.h"
++#include "poppler/GlobalParams.h"
++#include "poppler/Error.h"
+ 
+ #include "epdf.h"
+ 
+@@ -189,7 +191,7 @@ static PdfDocument *find_add_document(ch
+ #ifdef DEBUG
+     fprintf(stderr, "\nCreating %s (%d)\n", p->file_name, p->occurences);
+ #endif
+-    GString *docName = new GString(p->file_name);
++    GooString *docName = new GooString(p->file_name);
+     p->doc = new PDFDoc(docName);  // takes ownership of docName
+     if (!p->doc->isOk() || !p->doc->okToPrint()) {
+         pdftex_fail("xpdf: reading PDF image failed");
+@@ -233,7 +235,7 @@ static void initDictFromDict (PdfObject 
+          i < l; 
+          i++) {
+         Object obj1;
+-        obj->dictAdd(copyString(dict->getKey(i)), dict->getValNF(i, &obj1));
++        obj->dictAdd(*(new UGooString (*dict->getKey(i))), dict->getValNF(i, &obj1));
+         }
+ }    
+ 
+@@ -306,7 +308,7 @@ static void copyName(char *s)
+ static void copyDictEntry(Object *obj, int i)
+ {
+     PdfObject obj1;
+-    copyName(obj->dictGetKey(i));
++    copyName(obj->dictGetKey(i)->getCString());
+     pdf_puts(" ");
+     obj->dictGetValNF(i, &obj1);
+     copyObject(&obj1);
+@@ -333,7 +335,7 @@ static void copyFontDict(Object *obj, In
+     pdf_puts("<<\n");
+     if (r->type == objFont) { // Font dict
+         for (i = 0, l = obj->dictGetLength(); i < l; ++i) {
+-            key = obj->dictGetKey(i);
++            key = obj->dictGetKey(i)->getCString();
+             if (strcmp("BaseFont", key) == 0 || 
+                 strcmp("Encoding", key) == 0)
+                 continue; // skip original values
+@@ -345,7 +347,7 @@ static void copyFontDict(Object *obj, In
+     }
+     else { // FontDescriptor dict
+         for (i = 0, l = obj->dictGetLength(); i < l; ++i) {
+-            key = obj->dictGetKey(i);
++            key = obj->dictGetKey(i)->getCString();
+             if (strcmp("FontName", key) == 0 ||
+                 strncmp("FontFile", key, strlen("FontFile")) == 0)
+                 continue; // ignore original FontFile/FontName
+@@ -454,7 +456,7 @@ static void copyFontResources(Object *ob
+     for (i = 0, l = obj->dictGetLength(); i < l; ++i) {
+         obj->dictGetValNF(i, &fontRef);
+         if (fontRef->isRef())
+-            copyFont(obj->dictGetKey(i), &fontRef);
++            copyFont(obj->dictGetKey(i)->getCString(), &fontRef);
+         else
+             pdftex_fail("pdf inclusion: invalid font in reference type <%s>", 
+                         fontRef->getTypeName());
+@@ -539,7 +541,7 @@ static void copyObject(Object *obj)
+     int  i, l, c;
+     Ref ref;
+     char *p;
+-    GString *s;
++    GooString *s;
+     if (obj->isBool()) {
+         pdf_printf("%s", obj->getBool() ? "true" : "false");
+     }
+@@ -686,7 +688,7 @@ read_pdf_info(char *image_name, char *pa
+     float pdf_version_found, pdf_version_wanted;
+     // initialize
+     if (!isInit) {
+-        globalParams = new GlobalParams();
++        globalParams = new GlobalParams(NULL);
+         globalParams->setErrQuiet(gFalse);
+         isInit = gTrue;
+     }
+@@ -713,7 +715,7 @@ read_pdf_info(char *image_name, char *pa
+     epdf_num_pages = pdf_doc->doc->getCatalog()->getNumPages();
+     if (page_name) {
+         // get page by name
+-        GString name(page_name);
++        UGooString name(page_name);
+         LinkDest *link = pdf_doc->doc->findDest(&name);
+         if (link == 0 || !link->isOk())
+             pdftex_fail("pdf inclusion: invalid destination <%s>",
+@@ -998,7 +1000,7 @@ write_epdf(void)
+         pdf_puts("/Resources <<\n");
+         for (i = 0, l = obj1->dictGetLength(); i < l; ++i) {
+             obj1->dictGetVal(i, &obj2);
+-            key = obj1->dictGetKey(i);
++            key = obj1->dictGetKey(i)->getCString();
+             if (strcmp("Font", key) == 0)
+                 copyFontResources(&obj2);
+             else if (strcmp("ProcSet", key) == 0)
+diff -Nurp tetex-bin-3.0/texk/web2c/pdftexdir/pdftosrc.cc tetex-bin-3.0.new/texk/web2c/pdftexdir/pdftosrc.cc
+--- tetex-bin-3.0/texk/web2c/pdftexdir/pdftosrc.cc	2004-03-22 21:39:54.000000000 +0100
++++ tetex-bin-3.0.new/texk/web2c/pdftexdir/pdftosrc.cc	2006-03-09 16:49:36.000000000 +0100
+@@ -25,21 +25,22 @@ $Id: //depot/Build/source.development/Te
+ #include <stdio.h>
+ #include <string.h>
+ #include <ctype.h>
+-#include <aconf.h>
+-#include <GString.h>
+-#include <gmem.h>
+-#include <gfile.h>
+-#include "Object.h"
+-#include "Stream.h"
+-#include "Array.h"
+-#include "Dict.h"
+-#include "XRef.h"
+-#include "Catalog.h"
+-#include "Page.h"
+-#include "GfxFont.h"
+-#include "PDFDoc.h"
+-#include "GlobalParams.h"
+-#include "Error.h"
++#include <dirent.h>
++#include <poppler/goo/GooString.h>
++#include <poppler/goo/gmem.h>
++#include <poppler/goo/gfile.h>
++#include "poppler/Object.h"
++#include "poppler/UGooString.h"
++#include "poppler/Stream.h"
++#include "poppler/Array.h"
++#include "poppler/Dict.h"
++#include "poppler/XRef.h"
++#include "poppler/Catalog.h"
++#include "poppler/Page.h"
++#include "poppler/GfxFont.h"
++#include "poppler/PDFDoc.h"
++#include "poppler/GlobalParams.h"
++#include "poppler/Error.h"
+ 
+ static XRef *xref = 0;
+ 
+@@ -47,7 +48,7 @@ int main(int argc, char *argv[])
+ {
+     char *p, buf[1024];
+     PDFDoc *doc;
+-    GString *fileName;
++    GooString *fileName;
+     Stream *s;
+     Object srcStream, srcName, catalogDict;
+     FILE *outfile;
+@@ -59,8 +60,8 @@ int main(int argc, char *argv[])
+         fprintf(stderr, "Usage: pdftosrc <PDF-file> [<stream-object-number>]\n");
+         exit(1);
+     }
+-    fileName = new GString(argv[1]);
+-    globalParams = new GlobalParams();
++    fileName = new GooString(argv[1]);
++    globalParams = new GlobalParams(NULL);
+     doc = new PDFDoc(fileName);
+     if (!doc->isOk()) {
+         fprintf(stderr, "Invalid PDF file\n");
+@@ -80,7 +81,7 @@ int main(int argc, char *argv[])
+     }
+     srcStream.initNull();
+     if (objnum == 0) {
+-        catalogDict.dictLookup("SourceObject", &srcStream);
++        catalogDict.dictLookup(UGooString("SourceObject"), &srcStream);
+         if (!srcStream.isStream("SourceFile")) {
+             fprintf(stderr, "No SourceObject found\n");
+             exit(1);
+diff -Nurp tetex-bin-3.0/texk/web2c/pdfxtexdir/pdfxtex.mk tetex-bin-3.0.new/texk/web2c/pdfxtexdir/pdfxtex.mk
+--- tetex-bin-3.0/texk/web2c/pdfxtexdir/pdfxtex.mk	2005-02-03 19:42:26.000000000 +0100
++++ tetex-bin-3.0.new/texk/web2c/pdfxtexdir/pdfxtex.mk	2006-03-09 16:49:28.000000000 +0100
+@@ -8,13 +8,16 @@ Makefile: $(srcdir)/pdfxtexdir/pdfxtex.m
+ pdfxtex = @PXTEX@ pdfxtex
+ pdfxtexdir = pdfxtexdir
+ 
++# use libpoppler instead of included xpdf code
++ADDLDFLAGS = -lpoppler
++
+ # The C sources.
+ pdfxtex_c = pdfxtexini.c pdfxtex0.c pdfxtex1.c pdfxtex2.c pdfxtex3.c
+ pdfxtex_o = pdfxtexini.o pdfxtex0.o pdfxtex1.o pdfxtex2.o pdfxtex3.o pdfxtexextra.o
+ 
+ # Making pdfxtex
+ pdfxtex: pdftexd.h $(pdfxtex_o) $(pdfxtexextra_o) $(pdftexlibsdep)
+-	@CXXHACKLINK@ $(pdfxtex_o) $(pdfxtexextra_o) $(pdftexlibs) $(socketlibs) @CXXHACKLDLIBS@ @CXXLDEXTRA@
++	@CXXHACKLINK@ $(pdfxtex_o) $(pdfxtexextra_o) $(pdftexlibs) $(socketlibs) @CXXHACKLDLIBS@ @CXXLDEXTRA@ $(ADDLDFLAGS)
+ 
+ # C file dependencies.
+ $(pdfxtex_c) pdfxtexcoerce.h pdfxtexd.h: pdfxtex.p $(web2c_texmf) pdfxtexdir/pdfxtex.defines

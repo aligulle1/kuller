@@ -1,0 +1,103 @@
+diff -Naur ming-0.4.2.orig/configure ming-0.4.2/configure
+--- ming-0.4.2.orig/configure	2009-08-08 22:32:33.724054870 +0300
++++ ming-0.4.2/configure	2009-08-08 22:37:05.698930091 +0300
+@@ -20546,13 +20546,13 @@
+   GIFLIB=""
+ fi
+ 
+-{ echo "$as_me:$LINENO: checking for DGifOpen in -lungif" >&5
+-echo $ECHO_N "checking for DGifOpen in -lungif... $ECHO_C" >&6; }
++{ echo "$as_me:$LINENO: checking for DGifOpen in -lgif" >&5
++echo $ECHO_N "checking for DGifOpen in -lgif... $ECHO_C" >&6; }
+ if test "${ac_cv_lib_ungif_DGifOpen+set}" = set; then
+   echo $ECHO_N "(cached) $ECHO_C" >&6
+ else
+   ac_check_lib_save_LIBS=$LIBS
+-LIBS="-lungif  $LIBS"
++LIBS="-lgif  $LIBS"
+ cat >conftest.$ac_ext <<_ACEOF
+ /* confdefs.h.  */
+ _ACEOF
+@@ -20608,16 +20608,16 @@
+ { echo "$as_me:$LINENO: result: $ac_cv_lib_ungif_DGifOpen" >&5
+ echo "${ECHO_T}$ac_cv_lib_ungif_DGifOpen" >&6; }
+ if test $ac_cv_lib_ungif_DGifOpen = yes; then
+-  GIFLIB="-lungif"
++  GIFLIB="-lgif"
+ fi
+ 
+-{ echo "$as_me:$LINENO: checking for PrintGifError in -lungif" >&5
+-echo $ECHO_N "checking for PrintGifError in -lungif... $ECHO_C" >&6; }
++{ echo "$as_me:$LINENO: checking for PrintGifError in -lgif" >&5
++echo $ECHO_N "checking for PrintGifError in -lgif... $ECHO_C" >&6; }
+ if test "${ac_cv_lib_ungif_PrintGifError+set}" = set; then
+   echo $ECHO_N "(cached) $ECHO_C" >&6
+ else
+   ac_check_lib_save_LIBS=$LIBS
+-LIBS="-lungif "-lX11" $LIBS"
++LIBS="-lgif "-lX11" $LIBS"
+ cat >conftest.$ac_ext <<_ACEOF
+ /* confdefs.h.  */
+ _ACEOF
+@@ -20673,7 +20673,7 @@
+ { echo "$as_me:$LINENO: result: $ac_cv_lib_ungif_PrintGifError" >&5
+ echo "${ECHO_T}$ac_cv_lib_ungif_PrintGifError" >&6; }
+ if test $ac_cv_lib_ungif_PrintGifError = yes; then
+-  GIFLIB="-lungif"
++  GIFLIB="-lgif"
+ fi
+ 
+ 
+diff -Naur ming-0.4.2.orig/configure.in ming-0.4.2/configure.in
+--- ming-0.4.2.orig/configure.in	2009-08-08 22:32:33.704963754 +0300
++++ ming-0.4.2/configure.in	2009-08-08 22:37:32.861932104 +0300
+@@ -277,9 +277,9 @@
+ dnl Check for the gif or ungif libraries
+ AC_CHECK_LIB(gif, PrintGifError, GIFLIB="-lgif", GIFLIB="")
+ dnl MinGW check for libungif
+-AC_CHECK_LIB(ungif, DGifOpen, GIFLIB="-lungif")
++AC_CHECK_LIB(ungif, DGifOpen, GIFLIB="-lgif")
+ dnl Solaris needs -lX11 on the linker line for ungif to work
+-AC_CHECK_LIB(ungif, PrintGifError, GIFLIB="-lungif",, "-lX11")
++AC_CHECK_LIB(ungif, PrintGifError, GIFLIB="-lgif",, "-lX11")
+ AC_CHECK_HEADERS([gif_lib.h], GIFINC="true", GIFINC="")
+ 
+ dnl Check for the png library
+diff -Naur ming-0.4.2.orig/perl_ext/Makefile.PL ming-0.4.2/perl_ext/Makefile.PL
+--- ming-0.4.2.orig/perl_ext/Makefile.PL	2009-08-08 22:32:33.724054870 +0300
++++ ming-0.4.2/perl_ext/Makefile.PL	2009-08-08 22:42:30.944929925 +0300
+@@ -251,7 +251,7 @@
+ 	 while(<FH>){
+       next unless /^#define/;
+ 			if (/USE_ZLIB/ and /1$/) { $lib.=" -lz"};
+-			if (/USE_GIF/ and /1$/) {$lib.=" -lungif"};
++			if (/USE_GIF/ and /1$/) {$lib.=" -lgif"};
+ 			if (/USE_PNG/ and /1$/) {$lib.=" -lpng"};
+ 			if (/USE_FREETYPE/ and /1$/) {$lib.=" -lfreetype"};
+ 	 }
+diff -Naur ming-0.4.2.orig/py_ext/setup.py ming-0.4.2/py_ext/setup.py
+--- ming-0.4.2.orig/py_ext/setup.py	2009-08-08 22:32:33.721055256 +0300
++++ ming-0.4.2/py_ext/setup.py	2009-08-08 23:08:09.716929758 +0300
+@@ -18,8 +18,8 @@
+ if "-lpng":
+ 	mylibs.append('png')
+ 
+-if "-lungif":
+-	mylibs.append("ungif")
++if "-lgif":
++	mylibs.append("gif")
+ 
+ 
+ setup(name = "mingc", version = "0.4.2",
+diff -Naur ming-0.4.2.orig/py_ext/setup.py.in ming-0.4.2/py_ext/setup.py.in
+--- ming-0.4.2.orig/py_ext/setup.py.in	2009-08-08 22:32:33.722054755 +0300
++++ ming-0.4.2/py_ext/setup.py.in	2009-08-08 23:13:33.691931963 +0300
+@@ -19,7 +19,7 @@
+ 	mylibs.append('png')
+ 
+ if "@GIFLIB@":
+-	mylibs.append("ungif")
++	mylibs.append("gif")
+ 
+ 
+ setup(name = "mingc", version = "@MING_VERSION@",

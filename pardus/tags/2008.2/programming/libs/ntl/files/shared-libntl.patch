@@ -1,0 +1,41 @@
+--- mfile.orig	2007-05-04 23:29:14.000000000 +0300
++++ mfile	2007-12-22 01:47:44.000000000 +0200
+@@ -61,7 +61,7 @@
+ LDLIBS_CXX=@{LDLIBS_CXX}
+ # libraries for linking C++ programs
+ 
+-CPPFLAGS=@{CPPFLAGS}
++CPPFLAGS=@{CPPFLAGS} -DPIC
+ # arguments for the C preprocessor
+ 
+ PREFIX=@{PREFIX}
+@@ -295,7 +295,7 @@
+ 	make setup2
+ 	make setup3
+ 	make setup4
+-	make ntl.a
++	make shared
+ 
+ 
+ # setup1 generates the file ../incluse/NTL/mach_desc.h
+@@ -329,9 +329,8 @@
+ 	sh Wizard $(WIZARD)
+ 
+ 
+-ntl.a:	$(OBJ) 
+-	$(AR) $(ARFLAGS) ntl.a $(OBJ)
+-	- $(RANLIB) ntl.a
++shared:	$(OBJ) 
++	$(CC) $(CFLAGS) -shared -Wl,-soname=libntl.so -o libntl.so $(OBJ) $(LDLIBS)
+ 
+ lip.o:	lip.c g_lip_impl.h c_lip_impl.h lip_gmp_aux_impl.h
+ 	$(COMPILE) $(GMP_INCDIR) lip.c
+@@ -348,7 +348,7 @@
+ 	$(COMPILE_CXX) $<
+ 
+ .c: 
+-	$(LINK_CXX) -o $@ $< ntl.a  $(GMP_LIBDIR) $(GMP_LIB) $(LDLIBS_CXX) 
++	$(LINK_CXX) -o $@ $< libntl.so  $(GMP_LIBDIR) $(GMP_LIB) $(LDLIBS_CXX) 
+ 
+ #################################################################
+ #

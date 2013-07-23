@@ -1,0 +1,159 @@
+diff -r 00742899409c fontgrid.c
+--- gbdfed-1.4/fontgrid.c	Thu Jun 12 10:15:04 2008 -0600
++++ gbdfed-1.4/fontgrid.c	Thu Jun 12 10:16:55 2008 -0600
+@@ -4675,10 +4675,10 @@ fontgrid_update_psf_mappings(Fontgrid *f
+ }
+ 
+ gboolean
+-fontgrid_select_next_glyph(Fontgrid *fw)
+-{
+-    bdf_glyph_t *gp;
+-    gint32 code, pageno;
++fontgrid_select_next_glyph(Fontgrid *fw, gint32 code)
++{
++    bdf_glyph_t *gp;
++    gint32 pageno;
+     guint32 count;
+     FontgridInternalPageInfo *pi;
+     FontgridSelectionInfo sinfo;
+@@ -4695,8 +4695,6 @@ fontgrid_select_next_glyph(Fontgrid *fw)
+         gp = (fw->font && fw->font->unencoded_used) ?
+             (fw->font->unencoded + (fw->font->unencoded_used - 1)) : 0;
+     }
+-
+-    code = pi->sel_start;
+ 
+     if ((count = fw->count) == 0)
+       count = 1;
+@@ -4766,10 +4764,10 @@ fontgrid_select_next_glyph(Fontgrid *fw)
+ }
+ 
+ gboolean
+-fontgrid_select_previous_glyph(Fontgrid *fw)
+-{
+-    bdf_glyph_t *gp;
+-    gint32 code, pageno;
++fontgrid_select_previous_glyph(Fontgrid *fw, gint32 code)
++{
++    bdf_glyph_t *gp;
++    gint32 pageno;
+     guint32 count;
+     FontgridInternalPageInfo *pi;
+     FontgridSelectionInfo sinfo;
+@@ -4786,8 +4784,6 @@ fontgrid_select_previous_glyph(Fontgrid 
+         gp = (fw->font && fw->font->unencoded_used) ?
+             (fw->font->unencoded + (fw->font->unencoded_used - 1)) : 0;
+     }
+-
+-    code = pi->sel_start;
+ 
+     if ((count = fw->count) == 0)
+       count = 1;
+diff -r 00742899409c fontgrid.h
+--- gbdfed-1.4/fontgrid.h	Thu Jun 12 10:15:04 2008 -0600
++++ gbdfed-1.4/fontgrid.h	Thu Jun 12 10:16:58 2008 -0600
+@@ -308,8 +308,8 @@ extern void fontgrid_goto_next_page(Font
+ extern void fontgrid_goto_next_page(Fontgrid *fw);
+ extern void fontgrid_goto_previous_page(Fontgrid *fw);
+ extern void fontgrid_get_page_info(Fontgrid *fw, FontgridPageInfo *pageinfo);
+-extern gboolean fontgrid_select_next_glyph(Fontgrid *fw);
+-extern gboolean fontgrid_select_previous_glyph(Fontgrid *fw);
++extern gboolean fontgrid_select_next_glyph(Fontgrid *fw, gint32 code);
++extern gboolean fontgrid_select_previous_glyph(Fontgrid *fw, gint32 code);
+ 
+ /*
+  * Font name functions.
+diff -r 00742899409c guigedit.c
+--- gbdfed-1.4/guigedit.c	Thu Jun 12 10:15:04 2008 -0600
++++ gbdfed-1.4/guigedit.c	Thu Jun 12 10:17:11 2008 -0600
+@@ -480,7 +480,7 @@ next_glyph(GtkWidget *w, gpointer data)
+ 
+     grid = glyphedit_get_grid(GLYPHEDIT(ge->gedit));
+ 
+-    if (fontgrid_select_next_glyph(FONTGRID(ed->fgrid)) == FALSE)
++    if (fontgrid_select_next_glyph(FONTGRID(ed->fgrid), grid->encoding) == FALSE)
+       return;
+ 
+     font = fontgrid_get_font(FONTGRID(ed->fgrid));
+@@ -514,7 +514,7 @@ previous_glyph(GtkWidget *w, gpointer da
+ 
+     grid = glyphedit_get_grid(GLYPHEDIT(ge->gedit));
+ 
+-    if (fontgrid_select_previous_glyph(FONTGRID(ed->fgrid)) == FALSE)
++    if (fontgrid_select_previous_glyph(FONTGRID(ed->fgrid), grid->encoding) == FALSE)
+       return;
+ 
+     font = fontgrid_get_font(FONTGRID(ed->fgrid));
+diff -r fbbe77860e7e -r 00742899409c htext.h
+--- gbdfed-1.4/htext.h	Thu May 01 13:23:21 2008 -0600
++++ gbdfed-1.4/htext.h	Thu Jun 12 10:15:04 2008 -0600
+@@ -90,7 +90,7 @@ static gchar *fgrid_text = "<help>"
+ "<center><b>Font Grid</b></center>\n"
+ "\n"
+ "The main window of each font editor is called the "
+-"Font Grid. All of the Font Grid's have a special "
++"Font Grid. All of the Font Grids have a special "
+ "clipboard used for passing glyphs around. This "
+ "clipboard is called <b>FONTGRID_CLIPBOARD</b>.\n"
+ "\n"
+@@ -184,7 +184,7 @@ static gchar *fgrid_text = "<help>"
+ "<margin3>During the export, an option menu will let you select whether you "
+ "want to:</margin3>\n"
+ "\n"
+-"<margin3>A. Export the font with it's Unicode mappings.</margin3> "
++"<margin3>A. Export the font with its Unicode mappings.</margin3> "
+ " "
+ "<margin3>B. Export just the glyphs.</margin3>\n"
+ "\n"
+@@ -355,19 +355,14 @@ static gchar *fgrid_text = "<help>"
+ "glyphs.</margin2>\n"
+ "\n"
+ "<margin2>To <bi>embolden</bi> means to make bold.</margin2> "
+-" "
++"\n\n"
+ "<b>Windows</b> "
+-"<margin1>New &lt;Ctrl+N&gt;</margin1>\n"
+-"<margin2>This will cause a new editor to be created with "
+-"the point size, resolution, and bits per pixel "
+-"set from the config file, command line, or from "
+-"the Setup dialog.</margin2>\n"
+ "\n"
+ "<margin1>[editor list]</margin1> "
+ "<margin2>The remaining menu items are all the Font "
+-"Grid's that have been created. Choosing one "
++"Grids that have been created. Choosing one "
+ "will force that window to be made visible and "
+-"also put that window on top.</margin2>\n"
++"moved to the top.</margin2>\n"
+ "\n"
+ "<bul>Font Grid Translations</bul>\n"
+ "<margin>0..9</margin> "
+@@ -895,8 +890,8 @@ static gchar *conf_text = "<help>"
+ "<margin>close_accelerator_text &lt;labelstring&gt; [default: \"Ctrl+F4\"]</margin>\n"
+ "\n"
+ "<margin1>The default close accelerator text shown on the "
+-"Close/Exit menu options of the FontGrid's and "
+-"GlyphEditor's is \"Ctrl+F4\". This option changes the "
++"Close/Exit menu options of the FontGrids and "
++"GlyphEditors is \"Ctrl+F4\". This option changes the "
+ "label string on those menu options. This option should "
+ "be used in conjunction with the next option.</margin1>\n"
+ "\n"
+@@ -906,7 +901,7 @@ static gchar *conf_text = "<help>"
+ "<margin>close_accelerator &lt;translation&gt; [default: \"&lt;Control&gt;F4\"]</margin>\n"
+ "\n"
+ "<margin1>The default accelerator for the Close/Exit menu options "
+-"in the FontGrid's and GlyphEditor's can sometimes be "
++"in the FontGrids and GlyphEditors can sometimes be "
+ "awkward for various reasons. This option allows that "
+ "accelerator to be changed. This option should be used "
+ "in conjunction with the previous option.</margin1>\n"
+@@ -1292,7 +1287,7 @@ static gchar *preferences_text = "<help>
+ "\n"
+ "<margin1>The EOL menu sets the end-of-line string used "
+ "when BDF fonts are saved. The three most common "
+-"options are provided: Unix, DOS, and Mac EOL's.</margin1>\n"
++"options are provided: Unix, DOS, and Mac EOLs.</margin1>\n"
+ "\n"
+ "<margin>Point Size, Horizontal and Vertical Resolution</margin>\n"
+ "\n"

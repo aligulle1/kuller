@@ -1,0 +1,237 @@
+Index: src/daemon/default.pa.in
+===================================================================
+--- src/daemon/default.pa.in	(revision 2115)
++++ src/daemon/default.pa.in	(working copy)
+@@ -70,6 +70,7 @@
+ 
+ ### Automatically move streams to the default sink if the sink they are
+ ### connected to dies, similar for sources
++load-module module-always-sink
+ load-module module-rescue-streams
+ 
+ ### Automatically suspend sinks/sources that become idle for too long
+Index: src/modules/module-always-sink.c
+===================================================================
+--- src/modules/module-always-sink.c	(revision 0)
++++ src/modules/module-always-sink.c	(revision 0)
+@@ -0,0 +1,177 @@
++/* $Id: module-always-sink.c 2043 2007-11-09 18:25:40Z lennart $ */
++
++/***
++  This file is part of PulseAudio.
++
++  Copyright 2008 Colin Guthrie
++
++  PulseAudio is free software; you can redistribute it and/or modify
++  it under the terms of the GNU Lesser General Public License as published
++  by the Free Software Foundation; either version 2 of the License,
++  or (at your option) any later version.
++
++  PulseAudio is distributed in the hope that it will be useful, but
++  WITHOUT ANY WARRANTY; without even the implied warranty of
++  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
++  General Public License for more details.
++
++  You should have received a copy of the GNU Lesser General Public License
++  along with PulseAudio; if not, write to the Free Software
++  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
++  USA.
++***/
++
++#ifdef HAVE_CONFIG_H
++#include <config.h>
++#endif
++
++#include <pulse/xmalloc.h>
++
++#include <pulsecore/core.h>
++#include <pulsecore/sink-input.h>
++#include <pulsecore/modargs.h>
++#include <pulsecore/log.h>
++#include <pulsecore/namereg.h>
++
++#include "module-always-sink-symdef.h"
++
++PA_MODULE_AUTHOR("Colin Guthrie");
++PA_MODULE_DESCRIPTION("Always keeps at least one sink loaded even if it's a null one");
++PA_MODULE_VERSION(PACKAGE_VERSION);
++PA_MODULE_LOAD_ONCE(TRUE);
++
++static const char* const valid_modargs[] = {
++    NULL,
++};
++
++struct userdata {
++    pa_hook_slot *new_slot, *unlink_slot;
++    pa_module* m;
++    pa_bool_t ignore;
++};
++
++void load_null_sink_if_needed(pa_core *c, pa_sink *sink, struct userdata* u) {
++    pa_sink *target;
++    uint32_t idx;
++    pa_bool_t have_a_sink = FALSE;
++    pa_module *m;
++
++    pa_assert(c);
++    pa_assert(u);
++
++    // Loop through all sinks and check to see if we have *any* sinks
++    // Ignore the sink passed in (if it's not null)
++    for (target = pa_idxset_first(c->sinks, &idx); target; target = pa_idxset_next(c->sinks, &idx)) {
++        if (sink && target == sink)
++            continue;
++        have_a_sink = TRUE;
++        break;
++    }
++
++    if (!have_a_sink) {
++        pa_log_debug("Autoloading null-sink as no other sinks detected.");
++
++        u->ignore = TRUE;
++        m = pa_module_load(c, "module-null-sink", "sink_name=AutoNullSink");
++        u->ignore = FALSE;
++
++        if (!m) {
++            pa_log_warn("Unable to auto-load module-null-sink");
++        } else {
++            u->m = m;
++        }
++    }
++
++}
++
++static pa_hook_result_t new_hook_callback(pa_core *c, pa_sink *sink, void* userdata) {
++    struct userdata *u = userdata;
++
++    pa_assert(c);
++    pa_assert(sink);
++    pa_assert(u);
++
++    // Is this mini-mutex thing the best way to do this?
++    if (u->ignore) {
++        // This is us detecting ourselves on load... just ignore this.
++        return PA_HOOK_OK;
++    }
++    if (!u->m) {
++        pa_log_debug("Auto-loaded null-sink not active, so ignoring newly detected sink.");
++        return PA_HOOK_OK;
++    }
++    if (sink->module == u->m) {
++        // This is us detecting ourselves on load in a different way... just ignore this too.
++        return PA_HOOK_OK;
++    }
++
++    pa_log_info("A new sink has been discovered. Unloading null-sink.");
++
++    pa_module_unload(c, u->m);
++    // Don't reset this here as the callback below will detect this and
++    // set it itself.
++    //u->m = NULL;
++
++    return PA_HOOK_OK;
++}
++
++static pa_hook_result_t unlink_hook_callback(pa_core *c, pa_sink *sink, void* userdata) {
++    struct userdata *u = userdata;
++
++    pa_assert(c);
++    pa_assert(sink);
++    pa_assert(u);
++
++    // First check to see if it's our own null-sink that's been removed...
++    if (sink->module && sink->module == u->m) {
++        pa_log_debug("Autoloaded null-sink removed");
++        u->m = NULL;
++        return PA_HOOK_OK;
++    }
++
++    load_null_sink_if_needed(c, sink, u);
++
++    return PA_HOOK_OK;
++}
++
++int pa__init(pa_module*m) {
++    pa_modargs *ma = NULL;
++    struct userdata *u;
++
++    pa_assert(m);
++
++    if (!(ma = pa_modargs_new(m->argument, valid_modargs))) {
++        pa_log("Failed to parse module arguments");
++        return -1;
++    }
++
++    m->userdata = u = pa_xnew(struct userdata, 1);
++    u->new_slot = pa_hook_connect(&m->core->hooks[PA_CORE_HOOK_SINK_NEW_POST], (pa_hook_cb_t) new_hook_callback, u);
++    u->unlink_slot = pa_hook_connect(&m->core->hooks[PA_CORE_HOOK_SINK_UNLINK], (pa_hook_cb_t) unlink_hook_callback, u);
++    u->m = NULL;
++    u->ignore = FALSE;
++
++    pa_modargs_free(ma);
++
++    load_null_sink_if_needed(m->core, NULL, u);
++    return 0;
++}
++
++void pa__done(pa_module*m) {
++    struct userdata *u;
++
++    pa_assert(m);
++
++    if (!m->userdata)
++        return;
++
++    u = m->userdata;
++    if (u->new_slot)
++        pa_hook_slot_free(u->new_slot);
++    if (u->unlink_slot)
++        pa_hook_slot_free(u->unlink_slot);
++    if (u->m)
++        pa_module_unload(m->core, u->m);
++
++    pa_xfree(u);
++}
+
+Property changes on: src/modules/module-always-sink.c
+___________________________________________________________________
+Name: svn:keywords
+   - Id
+Name: svn:mime-type
+   + text/plain
+Name: svn:eol-style
+   + native
+
+Index: src/Makefile.am
+===================================================================
+--- src/Makefile.am	(revision 2115)
++++ src/Makefile.am	(working copy)
+@@ -986,6 +986,7 @@
+ 		module-detect.la \
+ 		module-volume-restore.la \
+ 		module-default-device-restore.la \
++		module-always-sink.la \
+ 		module-rescue-streams.la \
+ 		module-suspend-on-idle.la \
+ 		module-http-protocol-tcp.la \
+@@ -1156,6 +1157,7 @@
+ 		modules/module-jack-source-symdef.h \
+ 		modules/module-volume-restore-symdef.h \
+ 		modules/module-default-device-restore-symdef.h \
++		modules/module-always-sink-symdef.h \
+ 		modules/module-rescue-streams-symdef.h \
+ 		modules/module-suspend-on-idle-symdef.h \
+ 		modules/module-hal-detect-symdef.h \
+@@ -1401,6 +1403,12 @@
+ module_default_device_restore_la_LIBADD = $(AM_LIBADD) libpulsecore.la
+ module_default_device_restore_la_CFLAGS = $(AM_CFLAGS)
+ 
++# Always Sink module
++module_always_sink_la_SOURCES = modules/module-always-sink.c
++module_always_sink_la_LDFLAGS = -module -avoid-version
++module_always_sink_la_LIBADD = $(AM_LIBADD) libpulsecore.la
++module_always_sink_la_CFLAGS = $(AM_CFLAGS)
++
+ # Rescue streams module
+ module_rescue_streams_la_SOURCES = modules/module-rescue-streams.c
+ module_rescue_streams_la_LDFLAGS = -module -avoid-version

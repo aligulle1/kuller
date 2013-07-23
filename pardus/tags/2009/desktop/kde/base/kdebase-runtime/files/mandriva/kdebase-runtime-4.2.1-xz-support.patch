@@ -1,0 +1,277 @@
+diff -p -up kdebase-runtime-4.2.1/cmake/modules/FindLibLZMA.cmake.liblzma kdebase-runtime-4.2.1/cmake/modules/FindLibLZMA.cmake
+--- kdebase-runtime-4.2.1/cmake/modules/FindLibLZMA.cmake.liblzma	2009-03-03 05:41:32.153598208 -0500
++++ kdebase-runtime-4.2.1/cmake/modules/FindLibLZMA.cmake	2009-03-03 05:41:32.153598208 -0500
+@@ -0,0 +1,39 @@
++# - Find LibLZMA
++# Find LibLZMA headers and library
++#
++#  LIBLZMA_FOUND             - True if liblzma is found.
++#  LIBLZMA_INCLUDE_DIR       - Directory where liblzma headers are located.
++#  LIBLZMA_LIBRARIES         - Lzma libraries to link against.
++#  LIBLZMA_HAS_AUTO_DECODER  - True if lzma_auto_decoder() is found (required).
++#  LIBLZMA_HAS_EASY_ENCODER  - True if lzma_easy_encoder() is found (required).
++#  LIBLZMA_HAS_LZMA_PRESET   - True if lzma_lzma_preset() is found (required).
++
++
++# Copyright (c) 2008, Per Øyvind Karlsen, <peroyvind@mandriva.org>
++
++
++IF (LIBLZMA_INCLUDE_DIRS AND LIBLZMA_LIBRARIES)
++    SET(LIBLZMA_FIND_QUIETLY TRUE)
++ENDIF (LIBLZMA_INCLUDE_DIRS AND LIBLZMA_LIBRARIES)
++
++IF (NOT WIN32)
++   INCLUDE(FindPkgConfig)
++   PKG_SEARCH_MODULE(LIBLZMA liblzma)
++   ELSE (NOT WIN32)
++       FIND_PATH(LIBLZMA_INCLUDE_DIRS lzma.h )
++       FIND_LIBRARY(LIBLZMA_LIBRARIES NAMES lzma )
++       INCLUDE(FindPackageHandleStandardArgs)
++       FIND_PACKAGE_HANDLE_STANDARD_ARGS(LIBLZMA DEFAULT_MSG LIBLZMA_INCLUDE_DIRS LIBLZMA_LIBRARIES)
++ENDIF (NOT WIN32)
++
++IF (LIBLZMA_FOUND)
++   INCLUDE(CheckLibraryExists)
++   CHECK_LIBRARY_EXISTS(${LIBLZMA_LIBRARIES} lzma_auto_decoder "" LIBLZMA_HAS_AUTO_DECODER)
++   CHECK_LIBRARY_EXISTS(${LIBLZMA_LIBRARIES} lzma_easy_encoder "" LIBLZMA_HAS_EASY_ENCODER)
++   CHECK_LIBRARY_EXISTS(${LIBLZMA_LIBRARIES} lzma_lzma_preset "" LIBLZMA_HAS_LZMA_PRESET)
++   IF (NOT LIBLZMA_HAS_AUTO_DECODER AND LIBLZMA_HAS_EASY_ENCODER AND LIBLZMA_HAS_LZMA_PRESET)
++      SET(LIBLZMA_FOUND FALSE)
++   ENDIF(NOT LIBLZMA_HAS_AUTO_DECODER AND LIBLZMA_HAS_EASY_ENCODER AND LIBLZMA_HAS_LZMA_PRESET)
++ENDIF (LIBLZMA_FOUND)
++
++MARK_AS_ADVANCED( LIBLZMA_INCLUDE_DIRS LIBLZMA_LIBRARIES )
+diff -p -up kdebase-runtime-4.2.1/doc/kioslave/CMakeLists.txt.liblzma kdebase-runtime-4.2.1/doc/kioslave/CMakeLists.txt
+--- kdebase-runtime-4.2.1/doc/kioslave/CMakeLists.txt.liblzma	2009-01-06 12:21:29.000000000 -0500
++++ kdebase-runtime-4.2.1/doc/kioslave/CMakeLists.txt	2009-03-03 05:41:32.155597765 -0500
+@@ -14,3 +14,4 @@ add_subdirectory(smb)
+ endif(NOT WIN32)
+ add_subdirectory(tar)
+ add_subdirectory(thumbnail)
++add_subdirectory(xz)
+diff -p -up kdebase-runtime-4.2.1/doc/kioslave/xz/CMakeLists.txt.liblzma kdebase-runtime-4.2.1/doc/kioslave/xz/CMakeLists.txt
+--- kdebase-runtime-4.2.1/doc/kioslave/xz/CMakeLists.txt.liblzma	2009-03-03 05:41:32.153598208 -0500
++++ kdebase-runtime-4.2.1/doc/kioslave/xz/CMakeLists.txt	2009-03-03 05:41:32.153598208 -0500
+@@ -0,0 +1,3 @@
++########### install files ###############
++kde4_create_handbook(index.docbook INSTALL_DESTINATION ${HTML_INSTALL_DIR}/en SUBDIR kioslave/xz)
++
+diff -p -up kdebase-runtime-4.2.1/doc/kioslave/xz/index.docbook.liblzma kdebase-runtime-4.2.1/doc/kioslave/xz/index.docbook
+--- kdebase-runtime-4.2.1/doc/kioslave/xz/index.docbook.liblzma	2009-03-03 05:41:32.153598208 -0500
++++ kdebase-runtime-4.2.1/doc/kioslave/xz/index.docbook	2009-03-03 05:41:32.153598208 -0500
+@@ -0,0 +1,37 @@
++<?xml version="1.0" ?>
++<!DOCTYPE article PUBLIC "-//KDE//DTD DocBook XML V4.2-Based Variant V1.1//EN"
++"dtd/kdex.dtd" [
++<!ENTITY % addindex "IGNORE">
++<!ENTITY % English "INCLUDE" > <!-- change language only here -->
++]>
++	
++<article lang="&language;" id="xz">
++<title>xz / lzma</title>
++<articleinfo>
++<authorgroup>
++<author>&Lauri.Watts; &Lauri.Watts.mail;</author>
++<!-- TRANS:ROLES_OF_TRANSLATORS -->
++</authorgroup>
++</articleinfo>
++
++<para>Xz is a compression program</para>
++
++<para>The xz kioslave is not directly usable, and is intended for use
++as a filter.  For example, the tar kioslave can filter a file through
++the xz kioslave, in order to display the contents of a <literal
++role="extension">tar.lzma</literal> or <literal role="extension">tar.xz
++</literal> file directly in a &konqueror; window.</para>
++
++<para>If you click on a file compressed with a <literal
++role="extension">.lzma</literal> or <literal role="extension">tar.xz
++</literal> in &konqueror;, this kioslave is used to
++uncompress it and display it as a normal (uncompressed) file.</para>
++
++<para>If you are a developer, and would like to use the xz filter,
++you can find documentation on using kioslaves at <ulink
++url="http://developer.kde.org">http://developer.kde.org</ulink></para>
++
++<para> See the manual: <ulink url="man:/xz">xz</ulink>.
++</para>
++
++</article>
+diff -p -up kdebase-runtime-4.2.1/kioslave/filter/CMakeLists.txt.liblzma kdebase-runtime-4.2.1/kioslave/filter/CMakeLists.txt
+--- kdebase-runtime-4.2.1/kioslave/filter/CMakeLists.txt.liblzma	2008-06-10 07:41:00.000000000 -0400
++++ kdebase-runtime-4.2.1/kioslave/filter/CMakeLists.txt	2009-03-03 05:41:32.153598208 -0500
+@@ -2,6 +2,9 @@
+ macro_optional_find_package(BZip2)
+ macro_log_feature(BZIP2_FOUND "BZip2" "A high-quality data compressor" "http://www.bzip.org" FALSE "" "Provides the ability to read and write bzip2 compressed data files in the filter kioslave.")
+ 
++macro_optional_find_package(LibLZMA)
++macro_log_feature(LIBLZMA_FOUND "LibLZMA" "A very high compression ratio data compressor" "http://tukaani.org/lzma/" FALSE "" "STRONGLY RECOMMENDED: Provides the ability to read and write xz compressed data files.")
++
+ ########### next target ###############
+ 
+ set(kio_filter_PART_SRCS filter.cc )
+@@ -21,4 +24,7 @@ install( FILES gzip.protocol  DESTINATIO
+ if(BZIP2_FOUND)
+ install( FILES bzip.protocol bzip2.protocol  DESTINATION  ${SERVICES_INSTALL_DIR} )
+ endif(BZIP2_FOUND)
++if(LIBLZMA_FOUND)
++install( FILES lzma.protocol xz.protocol  DESTINATION  ${SERVICES_INSTALL_DIR} )
++endif(LIBLZMA_FOUND)
+ 
+diff -p -up kdebase-runtime-4.2.1/kioslave/filter/lzma.protocol.liblzma kdebase-runtime-4.2.1/kioslave/filter/lzma.protocol
+--- kdebase-runtime-4.2.1/kioslave/filter/lzma.protocol.liblzma	2009-03-03 05:41:32.153598208 -0500
++++ kdebase-runtime-4.2.1/kioslave/filter/lzma.protocol	2009-03-03 05:47:32.058728704 -0500
+@@ -0,0 +1,11 @@
++[Protocol]
++exec=kio_filter
++protocol=lzma
++archiveMimetype=application/x-lzma
++determineMimetypeFromExtension=true
++input=stream
++output=stream
++reading=true
++source=false
++DocPath=kioslave/xz.html
++Icon=package-x-generic
+diff -p -up kdebase-runtime-4.2.1/kioslave/filter/xz.protocol.liblzma kdebase-runtime-4.2.1/kioslave/filter/xz.protocol
+--- kdebase-runtime-4.2.1/kioslave/filter/xz.protocol.liblzma	2009-03-03 05:41:32.153598208 -0500
++++ kdebase-runtime-4.2.1/kioslave/filter/xz.protocol	2009-03-03 05:41:32.153598208 -0500
+@@ -0,0 +1,11 @@
++[Protocol]
++exec=kio_filter
++protocol=xz
++archiveMimetype=application/x-xz
++determineMimetypeFromExtension=false
++input=stream
++output=stream
++reading=true
++source=false
++DocPath=kioslave/xz.html
++Icon=package-x-generic
+diff -p -up kdebase-runtime-4.2.1/kioslave/info/kde-info2html.liblzma kdebase-runtime-4.2.1/kioslave/info/kde-info2html
+--- kdebase-runtime-4.2.1/kioslave/info/kde-info2html.liblzma	2008-06-25 03:52:52.000000000 -0400
++++ kdebase-runtime-4.2.1/kioslave/info/kde-info2html	2009-03-03 05:41:32.154597986 -0500
+@@ -39,6 +39,10 @@
+ #   March 9 2003      Add support for browsing by file. by Luis Pedro Coelho
+ #   June  11 2003     Update the layout of the sides to the new infopageslayout.
+ #                     by Sven Leiber <s.leiber@web.de>
++#   July  22 2008     Add support for lzma.
++#                     by Per Øyvind Karlsen <peroyvind@mandriva.org>
++#   January 8 2009    Update lzma support for new xz tool and format.
++#                     by Per Øyvind Karlsen <peroyvind@mandriva.org>
+ #
+ #-------------------------------------------------------
+ 
+@@ -140,6 +144,10 @@ sub FileNotFound {
+ 	if ($DirFileName =~ m/.info.bz2$/ ) {
+ 		open DIR, "-|", "bzcat", $DirFileName;
+ 	}
++	elsif ($DirFileName =~ m/.info.(lzma|xz)$/ ) {
++		open DIR, "-|", "xzcat", $DirFileName;
++	}
++
+ 	elsif ($DirFileName =~ m/.info.gz$/ ) {
+ 		open DIR, "-|", "gzip", "-dc", $DirFileName;
+ 	}
+@@ -249,6 +257,9 @@ sub infocat {
+ 			if ($infofile =~ m/.info.bz2$/ ) {
+ 				open INFOFILE, "-|", "bzcat", "$dir/$infofile";
+ 			}
++			elsif ($infofile =~ m/.info.(lzma|xz)$/ ) {
++				open INFOFILE, "-|", "xzcat", "$dir/$infofile";
++			}
+ 			elsif ($infofile =~ m/.info.gz$/ ) {
+ 				open INFOFILE, "-|", "gzip", "-dc", "$dir/$infofile";
+ 			}
+@@ -427,6 +438,8 @@ sub ReadIndirectTable {
+     open FH1, "-|", "gunzip", "-q", "-d", "-c", $FileName || &DieFileNotFound($FileName);
+   } elsif ($FileName =~ /\.bz2$/) {
+     open FH1, "-|", "bunzip2", "-q", "-d", "-c", $FileName || &DieFileNotFound($FileName);
++  } elsif ($FileName =~ /\.(lzma|xz)$/) {
++    open FH1, "-|", "unxz", "-q", "-d", "-c", $FileName || &DieFileNotFound($FileName);
+   } else {
+     open(FH1, $FileName) || &DieFileNotFound($FileName);
+   }
+@@ -473,6 +486,8 @@ sub ReadTagTable {
+     open FH, "-|", "gunzip", "-q", "-d", "-c", $FileName || &DieFileNotFound($FileName);
+   } elsif ($FileName =~ /\.bz2$/) {
+     open FH, "-|", "bunzip2", "-q", "-d", "-c", $FileName || &DieFileNotFound($FileName);
++  } elsif ($FileName =~ /\.(lzma|xz)$/) {
++    open FH, "-|", "unxz", "-q", "-d", "-c", $FileName || &DieFileNotFound($FileName);
+   } else {
+     open FH, $FileName || &DieFileNotFound($FileName);
+   }
+@@ -756,6 +771,8 @@ sub InfoNode2HTML {
+     open FH2, "-|", "gunzip", "-q", "-d", "-c", $FileName || &DieFileNotFound($FileName);
+   } elsif ($FileName =~ /\.bz2$/) {
+     open FH2, "-|", "bunzip2", "-q", "-d", "-c", $FileName || &DieFileNotFound($FileName);
++  } elsif ($FileName =~ /\.(lzma|xz)$/) {
++    open FH2, "-|", "unxz", "-q", "-d", "-c", $FileName || &DieFileNotFound($FileName);
+   } else {
+     open FH2, $FileName || &DieFileNotFound($FileName);
+   }
+@@ -985,17 +1002,23 @@ sub FindFile {
+     foreach my $Name ($File, $Alt) {
+         my $gzName  = $Name . '.gz';
+         my $bz2Name = $Name . '.bz2';
++        my $lzmaName = $Name . '.lzma';
++        my $xzName = $Name . '.xz';
+ 
+         foreach (@info2html::config::INFODIR) {
+             return "$_/$Name"    if -e "$_/$Name";
+             return "$_/$gzName"  if -e "$_/$gzName";
+             return "$_/$bz2Name" if -e "$_/$bz2Name";
++            return "$_/$lzmaName" if -e "$_/$lzmaName";
++            return "$_/$xzName" if -e "$_/$xzName";
+         }
+         next unless $ENV{INFOPATH};
+         foreach my $i (split(/:/, $ENV{INFOPATH})) {
+             return "$i/$Name"    if -e "$i/$Name";
+             return "$i/$gzName"  if -e "$i/$gzName";
+             return "$i/$bz2Name" if -e "$i/$bz2Name";
++            return "$i/$lzmaName" if -e "$i/$lzmaName";
++            return "$i/$xzName" if -e "$i/$xzName";
+         }
+     }
+     return "";
+diff -p -up kdebase-runtime-4.2.1/kioslave/man/kio_man.cpp.liblzma kdebase-runtime-4.2.1/kioslave/man/kio_man.cpp
+--- kdebase-runtime-4.2.1/kioslave/man/kio_man.cpp.liblzma	2009-01-01 11:25:21.000000000 -0500
++++ kdebase-runtime-4.2.1/kioslave/man/kio_man.cpp	2009-03-03 05:41:32.154597986 -0500
+@@ -70,6 +70,11 @@ void stripExtension( QString *name )
+         pos -= 4;
+     else if ( name->indexOf(".bz", -3) != -1 )
+         pos -= 3;
++    else if ( name->indexOf(".lzma", -5) != -1 )
++        pos -= 5;
++    else if ( name->indexOf(".xz", -3) != -1 )
++        pos -= 3;
++
+ 
+     if ( pos > 0 )
+         pos = name->lastIndexOf('.', pos-1);
+@@ -1317,6 +1322,10 @@ void MANProtocol::showIndex(const QStrin
+ 	    end -= 2;
+ 	else if ( len >= 4 && strcmp( end-3, ".bz2" ) == 0 )
+ 	    end -= 4;
++	else if ( len >= 4 && strcmp( end-4, ".lzma" ) == 0 )
++	    end -= 5;
++	else if ( len >= 3 && strcmp( end-2, ".xz" ) == 0 )
++	    end -= 3;
+ 
+ 	while ( end >= begin && *end != '.' )
+ 	    end--;
+diff -p -up kdebase-runtime-4.2.1/nepomuk/strigibackend/sopranoindexwriter.cpp.liblzma kdebase-runtime-4.2.1/nepomuk/strigibackend/sopranoindexwriter.cpp
+--- kdebase-runtime-4.2.1/nepomuk/strigibackend/sopranoindexwriter.cpp.liblzma	2009-01-17 05:59:27.000000000 -0500
++++ kdebase-runtime-4.2.1/nepomuk/strigibackend/sopranoindexwriter.cpp	2009-03-03 05:46:24.100728750 -0500
+@@ -90,7 +90,10 @@ namespace {
+             if ( QFile::exists( archivePath ) ) {
+                 if ( archivePath.endsWith( QLatin1String( ".tar" ) ) ||
+                      archivePath.endsWith( QLatin1String( ".tar.gz" ) ) ||
+-                     archivePath.endsWith( QLatin1String( ".tar.bz2" ) ) ) {
++                     archivePath.endsWith( QLatin1String( ".tar.gz" ) ) ||
++                     archivePath.endsWith( QLatin1String( ".tar.bz2" ) ) ||
++                     archivePath.endsWith( QLatin1String( ".tar.lzma" ) ) ||
++                     archivePath.endsWith( QLatin1String( ".tar.xz" ) ) ) {
+                     uri.setScheme( "tar" );
+                 }
+                 else if ( archivePath.endsWith( QLatin1String( ".zip" ) ) ) {

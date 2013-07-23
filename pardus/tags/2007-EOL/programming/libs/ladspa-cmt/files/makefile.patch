@@ -1,0 +1,53 @@
+--- src/makefile.er	2002-12-19 22:52:51.000000000 +0200
++++ src/makefile	2006-08-01 01:01:26.000000000 +0300
+@@ -5,14 +5,14 @@
+ # Change this if you want to install somewhere else. In particularly
+ # you may wish to remove the middle "local/" part.
+ 
+-INSTALL_PLUGINS_DIR	=	/usr/local/lib/ladspa/
++INSTALL_PLUGINS_DIR	=	/usr/lib/ladspa/
+ 
+ ###############################################################################
+ #
+ # GENERAL
+ #
+ 
+-INCLUDES	=	-I/usr/local/include/
++INCLUDES	=	-I/usr/include/ladspa
+ CFLAGS		=	$(INCLUDES) -Wall -Werror -O3 -fPIC
+ CXXFLAGS	=	$(CFLAGS)
+ PLUGIN_LIB	=	../plugins/cmt.so
+@@ -72,33 +72,6 @@
+ 		-o $(PLUGIN_LIB)					\
+ 		$(PLUGIN_OBJECTS)					
+ 
+-install:	$(PLUGIN_LIB)
+-	-strip $(PLUGIN_LIB)
+-	cp $(PLUGIN_LIB) $(INSTALL_PLUGINS_DIR)
+-
+-test:	/tmp/test.wav ../../ladspa_sdk/snd/noise.wav always
+-	@echo ---------------------------------------------
+-	@echo First listen to the white noise input signal:
+-	@echo ---------------------------------------------
+-	play ../../ladspa_sdk/snd/noise.wav
+-	@echo -------------------------
+-	@echo Compare to plugin output.
+-	@echo -------------------------
+-	@echo Should be a noise band around 6000Hz, repeated quietly after 1s.
+-	play /tmp/test.wav
+-
+-/tmp/test.wav:	$(PLUGIN_LIB) ../../ladspa_sdk/snd/noise.wav
+-	analyseplugin $(PLUGIN_LIB)
+-	echo;analyseplugin -l $(PLUGIN_LIB);echo
+-	time applyplugin	-s 1					\
+-				../../ladspa_sdk/snd/noise.wav		\
+-				/tmp/test.wav				\
+-				$(PLUGIN_LIB) lpf 500			\
+-				$(PLUGIN_LIB) lpf 500			\
+-				$(PLUGIN_LIB) sine_fcaa 6000		\
+-				$(PLUGIN_LIB) delay_5s 1 0.1		\
+-				$(PLUGIN_LIB) amp_mono 4		\
+-
+ ###############################################################################
+ #
+ # UTILITIES

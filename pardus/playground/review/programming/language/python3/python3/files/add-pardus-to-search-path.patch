@@ -1,0 +1,32 @@
+diff -uNBwp Lib/site.py.orig Lib/site.py
+--- Lib/site.py.orig	2010-12-26 20:54:29.000000000 +0100
++++ Lib/site.py	2011-02-16 14:50:25.423000254 +0100
+@@ -289,6 +289,7 @@ def getsitepackages():
+                                         "python" + sys.version[:3],
+                                         "site-packages"))
+             sitepackages.append(os.path.join(prefix, "lib", "site-python"))
++            sitepackages.insert(0, os.path.join(prefix, "lib", "pardus"))
+         else:
+             sitepackages.append(prefix)
+             sitepackages.append(os.path.join(prefix, "lib", "site-packages"))
+diff -uNBwp Lib/test/test_site.py.orig Lib/test/test_site.py
+--- Lib/test/test_site.py.orig	2011-02-24 13:54:19.457662017 +0100
++++ Lib/test/test_site.py	2011-02-24 14:08:09.400352194 +0100
+@@ -222,12 +222,14 @@ class HelperFunctionsTests(unittest.Test
+             wanted = os.path.join('xoxo', 'Lib', 'site-packages')
+             self.assertEqual(dirs[0], wanted)
+         elif os.sep == '/':
+-            self.assertEqual(len(dirs), 2)
++            self.assertEqual(len(dirs), 3)
++            wanted = os.path.join('xoxo', 'lib', 'pardus')
++            self.assertEqual(dirs[0], wanted)
+             wanted = os.path.join('xoxo', 'lib', 'python' + sys.version[:3],
+                                   'site-packages')
+-            self.assertEqual(dirs[0], wanted)
+-            wanted = os.path.join('xoxo', 'lib', 'site-python')
+             self.assertEqual(dirs[1], wanted)
++            wanted = os.path.join('xoxo', 'lib', 'site-python')
++            self.assertEqual(dirs[2], wanted)
+         else:
+             self.assertEqual(len(dirs), 2)
+             self.assertEqual(dirs[0], 'xoxo')

@@ -1,0 +1,20 @@
+Avoid crashes with LessTif2 when the text editor window is closed after
+closing the file selection dialog window
+
+ -- Rafael Laboissiere <rafael@debian.org>  Wed, 21 Dec 2005 11:24:36 +0100
+
+--- praat-5.0.4.orig/sys/UiFile.c
++++ praat-5.0.4/sys/UiFile.c
+@@ -82,10 +82,11 @@
+ 		#if motif
+ 			XtUnrealizeWidget (XtParent (my dialog));
+ 		#endif
+-		GuiObject_destroy (my dialog);
++/*		GuiObject_destroy (my dialog); */
+ 	#endif
+ 	if (me == currentUiFile) currentUiFile = NULL;   /* Undangle. */
+ 	inherited (UiFile) destroy (me);
++        me = NULL;
+ }
+ 
+ #ifndef macintosh

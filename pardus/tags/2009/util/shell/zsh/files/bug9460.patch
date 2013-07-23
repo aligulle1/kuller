@@ -1,0 +1,53 @@
+
+--- zsh-4.3.9.orig/Src/hist.c
++++ zsh-4.3.9/Src/hist.c
+@@ -394,9 +394,10 @@
+     zlong ev;
+     static int marg = -1;
+     static zlong mev = -1;
+-    char buf[256], *ptr;
++    char *buf, *ptr;
+     char *sline;
+     Histent ehist;
++    size_t buflen;
+ 
+     /* look, no goto's */
+     if (isfirstch && c == hatchar) {
+@@ -445,7 +446,7 @@
+ 	    return bangchar;
+ 	}
+ 	cflag = 0;
+-	ptr = buf;
++	ptr = buf = zhalloc(buflen = 265);
+ 
+ 	/* get event number */
+ 
+@@ -455,8 +456,14 @@
+ 		c = ingetc();
+ 		if (c == '?' || c == '\n' || lexstop)
+ 		    break;
+-		else
++		else {
+ 		    *ptr++ = c;
++                    if (ptr == buf + buflen) {
++                        buf = hrealloc(buf, buflen, 2 * buflen);
++                        ptr = buf + buflen;
++                        buflen *= 2;
++                    }
++               }
+ 	    }
+ 	    if (c != '\n' && !lexstop)
+ 		c = ingetc();
+@@ -484,6 +491,11 @@
+ 			break;
+ 		}
+ 		*ptr++ = c;
++               if (ptr == buf + buflen) {
++                   buf = hrealloc(buf, buflen, 2 * buflen);
++                   ptr = buf + buflen;
++                   buflen *= 2;
++               }
+ 		if (c == '#' || c == bangchar) {
+ 		    c = ingetc();
+ 		    break;
+

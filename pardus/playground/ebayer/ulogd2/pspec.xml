@@ -1,0 +1,220 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>ulogd2</Name>
+        <Homepage>http://www.netfilter.org/projects/ulogd/index.html</Homepage>
+        <Packager>
+            <Name>Erdem Bayer</Name>
+            <Email>ebayer@bayer.gen.tr</Email>
+        </Packager>
+        <License>GPLv2</License>
+        <Summary>userspace logging daemon for netfilter/iptables related logging</Summary>
+        <Description>ulogd is a userspace logging daemon for netfilter/iptables related logging. This includes per-packet logging of security violations, per-packet logging for accounting purpose as well as per-flow logging. It has a plugin system allowing to get data from different log formats and output to different sources.</Description>
+        <Archive sha1sum="92f9bbd6dfd5b72673c392fa6ccd6cc7ff811f24" type="tarbz2">http://www.netfilter.org/projects/ulogd/files/ulogd-2.0.0beta4.tar.bz2</Archive>
+        <BuildDependencies>
+            <Dependency>libpcap</Dependency>
+            <Dependency>libnfnetlink</Dependency>
+            <Dependency>libnetfilter_log-devel</Dependency>
+            <Dependency>libnetfilter_conntrack</Dependency>
+            <Dependency>libdbi-devel</Dependency>
+            <Dependency>mysql-libs</Dependency>
+            <Dependency>postgresql-libs</Dependency>
+            <Dependency>sqlite-devel</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <Patch level="1">ulogd2.git-c14e78d68e7148892268b4eed2d6e1481095a5ea.patch</Patch>
+        </Patches>
+    </Source>
+    
+    <Package>
+        <Name>ulogd2</Name>
+        <Files>
+            <Path fileType="executable">/usr/sbin</Path>
+            <Path fileType="man">/usr/share/man/man8/</Path>
+            <Path fileType="doc">/usr/share/doc</Path>
+            <Path fileType="config">/etc/ulogd.conf</Path>
+            <Path fileType="config">/etc/logrotate.d</Path>
+        </Files>
+        <Provides>
+            <COMAR script="service.py" name="ulogd">System.Service</COMAR>
+        </Provides>
+    </Package>
+
+    <Package>
+        <Name>ulogd2-plugins-filter</Name>
+        <Summary>ulogd2 plugin for filtering inputs</Summary>
+        <RuntimeDependencies>
+            <Dependency release="current">ulogd2</Dependency>
+            <Dependency>libnfnetlink</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="library">/usr/lib/ulogd/ulogd_filter_*</Path>
+            <Path fileType="library">/usr/lib/ulogd/ulogd_raw2packet_BASE.so</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>ulogd2-plugins-input-nfct</Name>
+        <Summary>ulogd2 plugin for getting input from netfilter connection tracking log</Summary>
+        <RuntimeDependencies>
+            <Dependency release="current">ulogd2</Dependency>
+            <Dependency>libnfnetlink</Dependency>
+            <Dependency>libnetfilter_conntrack</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="library">/usr/lib/ulogd/ulogd_inpflow_NFCT.so</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>ulogd2-plugins-input-nflog</Name>
+        <Summary>ulogd2 plugin for getting input from netfilter packet log</Summary>
+        <RuntimeDependencies>
+            <Dependency release="current">ulogd2</Dependency>
+            <Dependency>libnfnetlink</Dependency>
+            <Dependency>libnetfilter_log</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="library">/usr/lib/ulogd/ulogd_inppkt_NFLOG.so</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>ulogd2-plugins-input-ulog</Name>
+        <Summary>ulogd2 plugin for getting input from iptables ulog target</Summary>
+        <RuntimeDependencies>
+            <Dependency release="current">ulogd2</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="library">/usr/lib/ulogd/ulogd_inppkt_ULOG.so</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>ulogd2-plugins-output-mysql</Name>
+        <Summary>ulogd2 plugin for output to MySQL database</Summary>
+        <RuntimeDependencies>
+            <Dependency release="current">ulogd2</Dependency>
+            <Dependency>mysql-libs</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="library">/usr/lib/ulogd/ulogd_output_MYSQL.so</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>ulogd2-plugins-output-pgsql</Name>
+        <Summary>ulogd2 plugin for output to PostgreSQL database</Summary>
+        <RuntimeDependencies>
+            <Dependency release="current">ulogd2</Dependency>
+            <Dependency>postgresql-libs</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="library">/usr/lib/ulogd/ulogd_output_PGSQL.so</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>ulogd2-plugins-output-sqlite</Name>
+        <Summary>ulogd2 plugin for output to Sqlite3 database</Summary>
+        <RuntimeDependencies>
+            <Dependency release="current">ulogd2</Dependency>
+            <Dependency>sqlite</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="library">/usr/lib/ulogd/ulogd_output_SQLITE3.so</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>ulogd2-plugins-output-dbi</Name>
+        <Summary>ulogd2 plugin for output to DBI interface</Summary>
+        <RuntimeDependencies>
+            <Dependency release="current">ulogd2</Dependency>
+            <Dependency>libdbi</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="library">/usr/lib/ulogd/ulogd_output_DBI.so</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>ulogd2-plugins-output-logemu</Name>
+        <Summary>ulogd2 plugin for output to file with LOGEMU format</Summary>
+        <RuntimeDependencies>
+            <Dependency release="current">ulogd2</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="library">/usr/lib/ulogd/ulogd_output_LOGEMU.so</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>ulogd2-plugins-output-nacct</Name>
+        <Summary>ulogd2 plugin for output to file with NACCT compatible format</Summary>
+        <RuntimeDependencies>
+            <Dependency release="current">ulogd2</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="library">/usr/lib/ulogd/ulogd_output_NACCT.so</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>ulogd2-plugins-output-oprint</Name>
+        <Summary>ulogd2 plugin for output to file with OPRINT format</Summary>
+        <RuntimeDependencies>
+            <Dependency release="current">ulogd2</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="library">/usr/lib/ulogd/ulogd_output_OPRINT.so</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>ulogd2-plugins-output-pcap</Name>
+        <Summary>ulogd2 plugin for output to file with PCAP format</Summary>
+        <RuntimeDependencies>
+            <Dependency release="current">ulogd2</Dependency>
+            <Dependency>libpcap</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="library">/usr/lib/ulogd/ulogd_output_PCAP.so</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>ulogd2-plugins-output-syslog</Name>
+        <Summary>ulogd2 plugin for output to syslog</Summary>
+        <RuntimeDependencies>
+            <Dependency release="current">ulogd2</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="library">/usr/lib/ulogd/ulogd_output_SYSLOG.so</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>ulogd2-plugins-output-xml</Name>
+        <Summary>ulogd2 plugin for output to file with XML format</Summary>
+        <RuntimeDependencies>
+            <Dependency release="current">ulogd2</Dependency>
+            <Dependency>libnetfilter_log</Dependency>
+            <Dependency>libnetfilter_conntrack</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="library">/usr/lib/ulogd/ulogd_output_XML.so</Path>
+        </Files>
+    </Package>
+
+    <History>
+        <Update release="1">
+            <Date>2010-10-28</Date>
+            <Version>2.0.0_beta4</Version>
+            <Comment>First Release</Comment>
+            <Name>Erdem Bayer</Name>
+            <Email>ebayer@bayer.gen.tr</Email>
+        </Update>
+    </History>
+</PISI>

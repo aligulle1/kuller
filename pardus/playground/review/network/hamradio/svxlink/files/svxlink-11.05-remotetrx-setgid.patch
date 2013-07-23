@@ -1,0 +1,35 @@
+--- svxlink/remotetrx/remotetrx.cpp.orig	2011-08-15 11:24:34.765000042 +0300
++++ svxlink/remotetrx/remotetrx.cpp	2011-08-15 11:29:29.119000037 +0300
+@@ -45,6 +45,7 @@
+ #include <sys/stat.h>
+ #include <fcntl.h>
+ #include <pwd.h>
++#include <grp.h>
+ 
+ #include <iostream>
+ #include <cstring>
+@@ -332,12 +333,24 @@
+ 
+   if (runasuser != NULL)
+   {
++      // Setup supplementary group IDs
++    if (initgroups(runasuser, getgid()))
++    {
++      perror("initgroups");
++      exit(1);
++    }
++
+     struct passwd *passwd = getpwnam(runasuser);
+     if (passwd == NULL)
+     {
+       perror("getpwnam");
+       exit(1);
+     }
++    if (setgid(passwd->pw_gid) == -1)
++    {
++      perror("setgid");
++      exit(1);
++    }
+     if (setuid(passwd->pw_uid) == -1)
+     {
+       perror("setuid");

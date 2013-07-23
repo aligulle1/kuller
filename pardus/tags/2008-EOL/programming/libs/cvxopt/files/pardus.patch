@@ -1,0 +1,227 @@
+--- src/setup.py.orig	2008-09-02 10:33:21.000000000 +0300
++++ src/setup.py	2008-09-02 10:38:16.000000000 +0300
+@@ -1,3 +1,4 @@
++###
+ from distutils.core import setup, Extension
+ from os import listdir
+ 
+@@ -6,55 +7,56 @@
+ 
+ # Set to 1 if you are using the random number generators in the GNU
+ # Scientific Library.
+-BUILD_GSL = 0
++BUILD_GSL = 1
+ 
+ # Directory containing libgsl (used only when BUILD_GSL = 1).
+-GSL_LIB_DIR = '/usr/lib'       
++GSL_LIB_DIR = '/usr/lib'
+ 
+ # Directory containing the GSL header files (used only when BUILD_GSL = 1).
+-GSL_INC_DIR = '/usr/include/gsl'  
++GSL_INC_DIR = '/usr/include/gsl'
+ 
+ # Set to 1 if you are installing the fftw module.
+-BUILD_FFTW = 0
++BUILD_FFTW = 1
+ 
+ # Directory containing libfftw3 (used only when BUILD_FFTW = 1).
+-FFTW_LIB_DIR = '/usr/lib'       
++FFTW_LIB_DIR = '/usr/lib'
+ 
+ # Directory containing fftw.h (used only when BUILD_FFTW = 1).
+-FFTW_INC_DIR = '/usr/include'  
++FFTW_INC_DIR = '/usr/include'
+ 
+ # Set to 1 if you are installing the glpk module.
+-BUILD_GLPK = 0
++BUILD_GLPK = 1
+ 
+ # Directory containing libglpk (used only when BUILD_GLPK = 1).
+-GLPK_LIB_DIR = '/usr/lib'       
++GLPK_LIB_DIR = '/usr/lib'
+ 
+ # Directory containing glpk.h (used only when BUILD_GLPK = 1).
+-GLPK_INC_DIR = '/usr/include'  
++GLPK_INC_DIR = '/usr/include'
+ 
+ # Set to 1 if you are installing the DSDP module.
+ BUILD_DSDP = 0
+ 
+ # Directory containing libdsdp (used only when BUILD_DSDP = 1).
+ DSDP_LIB_DIR = '/usr/lib'
+- 
++
+ # Directory containing dsdp5.h (used only when BUILD_DSDP = 1).
+ DSDP_INC_DIR = '/usr/include'
+ 
+-
+ extmods = []
+ 
+ # optional modules
+ 
+ if BUILD_GSL:
+-    gsl = Extension('gsl', libraries = ['m', 'gsl', 'blas'],
++    gsl = Extension('gsl',
++        libraries = ['m', 'gsl', 'f77blas','atlas','gfortran'],
+         include_dirs = [ GSL_INC_DIR ],
+-        library_dirs = [ GSL_LIB_DIR ],
++        library_dirs = [ GSL_LIB_DIR, ATLAS_LIB_DIR ],
+         sources = ['C/gsl.c'] )
+     extmods += [gsl];
+ 
+ if BUILD_FFTW:
+-    fftw = Extension('fftw', libraries = ['fftw3', 'blas'],
++    fftw = Extension('fftw',
++        libraries = ['fftw3', 'f77blas','atlas','gfortran'],
+         include_dirs = [ FFTW_INC_DIR ],
+         library_dirs = [ FFTW_LIB_DIR, ATLAS_LIB_DIR ],
+         sources = ['C/fftw.c'] )
+@@ -68,61 +70,65 @@
+     extmods += [glpk];
+ 
+ if BUILD_DSDP:
+-    dsdp = Extension('dsdp', libraries = ['dsdp', 'blas', 'lapack'],
++    dsdp = Extension('dsdp',
++        libraries =
++['dsdp','lapack','f77blas','cblas','atlas','gfortran'],
+         include_dirs = [ DSDP_INC_DIR ],
+         library_dirs = [ DSDP_LIB_DIR, ATLAS_LIB_DIR ],
+         sources = ['C/dsdp.c'] )
+     extmods += [dsdp];
+ 
+-
+ # required modules
+ 
+ # Modify this for compilation on Windows.
+-# Set to True if your BLAS/LAPACK do not use trailing underscores 
++# Set to True if your BLAS/LAPACK do not use trailing underscores
+ # (eg, on Windows).
+ BLAS_NOUNDERSCORES = False
+ if BLAS_NOUNDERSCORES:
+     MACROS = [('BLAS_NO_UNDERSCORE','')]
+-else:    
++else:
+     MACROS = []
+ 
+-base = Extension('base', libraries = ['m','lapack','blas'],
++base = Extension('base',
++    libraries = ['m','lapack','f77blas','cblas','atlas','gfortran'],
+     library_dirs = [ ATLAS_LIB_DIR ],
+     define_macros = MACROS,
+-    sources = ['C/base.c','C/dense.c','C/sparse.c']) 
++    sources = ['C/base.c','C/dense.c','C/sparse.c'])
+ 
+-blas = Extension('blas', libraries = ['blas'],
++blas = Extension('blas',
++    libraries = ['f77blas','atlas','gfortran'],
+     library_dirs = [ ATLAS_LIB_DIR ],
+     define_macros = MACROS,
+     sources = ['C/blas.c'] )
+ 
+-lapack = Extension('lapack', libraries = ['lapack','blas'],
++lapack = Extension('lapack',
++    libraries = ['lapack','f77blas','cblas','atlas','gfortran'],
+     library_dirs = [ ATLAS_LIB_DIR ],
+     define_macros = MACROS,
+     sources = ['C/lapack.c'] )
+ 
+-umfpack = Extension('umfpack', 
++umfpack = Extension('umfpack',
+     include_dirs = [ 'C/SuiteSparse/UMFPACK/Include',
+-        'C/SuiteSparse/AMD/Include', 'C/SuiteSparse/AMD/Source', 
++        'C/SuiteSparse/AMD/Include', 'C/SuiteSparse/AMD/Source',
+         'C/SuiteSparse/UFconfig' ],
+     library_dirs = [ ATLAS_LIB_DIR ],
+     define_macros = MACROS,
+-    libraries = [ 'blas', 'lapack'],
++    libraries = ['lapack','f77blas','cblas','atlas','gfortran'],
+     sources = [ 'C/umfpack.c',
+         'C/SuiteSparse/UMFPACK/Source/umfpack_global.c',
+         'C/SuiteSparse/UMFPACK/Source/umfpack_tictoc.c' ] +
+         ['C/SuiteSparse_cvxopt_extra/umfpack/' + s for s in
+             listdir('C/SuiteSparse_cvxopt_extra/umfpack')])
+ 
+-# Build for int or long? 
++# Build for int or long?
+ import sys
+ if sys.maxint > 2**31: MACROS += [('DLONG','')]
+ 
+ cholmod = Extension('cholmod',
+     library_dirs = [ ATLAS_LIB_DIR ],
+-    libraries = ['lapack', 'blas'],
+-    include_dirs = [ 'C/SuiteSparse/CHOLMOD/Include', 
+-        'C/SuiteSparse/COLAMD', 'C/SuiteSparse/AMD/Include', 
++    libraries = ['lapack','f77blas','cblas','atlas','gfortran'],
++    include_dirs = [ 'C/SuiteSparse/CHOLMOD/Include',
++        'C/SuiteSparse/COLAMD', 'C/SuiteSparse/AMD/Include',
+         'C/SuiteSparse/UFconfig', 'C/SuiteSparse/COLAMD/Include' ],
+     define_macros = MACROS + [('NPARTITION', '1')],
+     sources = [ 'C/cholmod.c' ] +
+@@ -131,47 +137,49 @@
+         ['C/SuiteSparse/COLAMD/Source/' + s for s in ['colamd.c',
+             'colamd_global.c']] +
+         ['C/SuiteSparse/CHOLMOD/Core/' + s for s in
+-            listdir('C/SuiteSparse/CHOLMOD/Core') if s[-2:] == '.c' and
+-            s[0] == 'c'] +
++            listdir('C/SuiteSparse/CHOLMOD/Core') if s[-2:] == '.c'
++            and  s[0] == 'c'] +
+         ['C/SuiteSparse/CHOLMOD/Cholesky/' + s for s in
+             listdir('C/SuiteSparse/CHOLMOD/Cholesky') if s[-2:] == '.c'
+             and s[0] == 'c'] +
+         ['C/SuiteSparse/CHOLMOD/Check/cholmod_check.c'] +
+         ['C/SuiteSparse/CHOLMOD/Supernodal/' + s for s in
+-            listdir('C/SuiteSparse/CHOLMOD/Supernodal') if 
++            listdir('C/SuiteSparse/CHOLMOD/Supernodal') if
+             s[-2:] == '.c' and s[0] == 'c'] )
+ 
+-amd = Extension('amd', 
+-    include_dirs = [ 'C/SuiteSparse/AMD/Include', 
++amd = Extension('amd',
++    include_dirs = [ 'C/SuiteSparse/AMD/Include',
+         'C/SuiteSparse/UFconfig' ],
+     define_macros = MACROS,
+     sources = [ 'C/amd.c' ] + [ 'C/SuiteSparse/AMD/Source/' + s for s in
+         listdir('C/SuiteSparse/AMD/Source') if s[-2:] == '.c' ])
+ 
+-misc_solvers = Extension('misc_solvers', libraries = ['lapack', 'blas'],
++misc_solvers = Extension('misc_solvers',
++    libraries = ['lapack','f77blas','cblas','atlas','gfortran'],
+     library_dirs = [ ATLAS_LIB_DIR ],
+     define_macros = MACROS,
+     sources = ['C/misc_solvers.c'] )
+ 
+-extmods += [base, blas, lapack, umfpack, cholmod, amd, misc_solvers] 
++extmods += [base, blas, lapack, umfpack, cholmod, amd]
+ 
+-setup (name = 'cvxopt', 
++setup (name = 'cvxopt',
+     description = 'Convex optimization package',
+-    version = '1.0', 
++    version = '1.0',
+     long_description = '''
+-CVXOPT is a free software package for convex optimization based on the 
+-Python programming language. It can be used with the interactive Python 
+-interpreter, on the command line by executing Python scripts, or 
+-integrated in other software via Python extension modules. Its main 
+-purpose is to make the development of software for convex optimization 
+-applications straightforward by building on Python's extensive standard 
+-library and on the strengths of Python as a high-level programming 
+-language.''', 
++CVXOPT is a free software package for convex optimization based on
++the Python programming language. It can be used with the interactive
++Python interpreter, on the command line by executing Python scripts, or
++integrated in other software via Python extension modules. Its main
++purpose is to make the development of software for convex
++optimization applications straightforward by building on Python's extensive
++standard library and on the strengths of Python as a high-level programming
++language.''',
+     author = 'J. Dahl and L. Vandenberghe',
+-    author_email = 'joachim@es.aau.dk, vandenbe@ee.ucla.edu',
++    author_email = 'joac...@es.aau.dk, vande...@ee.ucla.edu',
+     url = 'http://abel.ee.ucla.edu/cvxopt',
+     license = 'GNU GPL version 3',
+     ext_package = "cvxopt",
+     ext_modules = extmods,
+     package_dir = {"cvxopt": "python"},
+     packages = ["cvxopt"])
++

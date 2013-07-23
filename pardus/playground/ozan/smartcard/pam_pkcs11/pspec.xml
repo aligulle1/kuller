@@ -1,0 +1,164 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>pam_pkcs11</Name>
+        <Homepage>http://www.opensc-project.org/pam_pkcs11</Homepage>
+        <Packager>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Packager>
+        <License>LGPLv2</License>
+        <IsA>library</IsA>
+        <IsA>app:console</IsA>
+        <Summary>PAM login module for X.509 certificate based user login</Summary>
+        <Description>pam_pkcs11 is a pluggable authentication module(pam) which allows X.509 certificate based user login. The certificate and its dedicated private key are thereby accessed by means of an appropriate PKCS #11 module.</Description>
+        <Archive sha1sum="c3938e1e6e785eb5503ca359410ab85ff506f9fa" type="targz">http://www.opensc-project.org/files/pam_pkcs11/pam_pkcs11-0.6.6.tar.gz</Archive>
+        <AdditionalFiles>
+            <AdditionalFile target="po/tr.po">tr.po</AdditionalFile>
+        </AdditionalFiles>
+        <BuildDependencies>
+            <Dependency>nss</Dependency>
+            <Dependency>nspr</Dependency>
+            <Dependency>docbook-xsl</Dependency>
+            <Dependency>doxygen</Dependency>
+            <Dependency>openldap-client</Dependency>
+            <Dependency>pcsc-lite-devel</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <Patch level="1">conf-nss.patch</Patch>
+            <Patch level="1">skip-cert-polify-if-none-with-nss.patch</Patch>
+            <Patch level="1">pam_pkcs11-0.6.0-nss-autoconf.patch</Patch>
+            <Patch level="1">debug-nocolor.patch</Patch>
+            <Patch level="1">add-missing-cardonly-support.patch</Patch>
+            <Patch level="1">add-tr.patch</Patch>
+            <Patch level="1">suppress-unnecessary-messages.patch</Patch>
+            <Patch level="1">fix-typos.patch</Patch>
+            <Patch level="1">pkcs11-eventmgr-syslog.patch</Patch>
+
+            <Patch level="1">upstream/changeset_trunk_477.diff</Patch>
+            <Patch level="1">upstream/changeset_trunk_494.diff</Patch>
+            <Patch level="1">determine-cert-label-too.patch</Patch>
+            <Patch level="1">move-cert_object-definition.patch</Patch>
+            <Patch level="1">akis-logon-certificate.patch</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>pam_pkcs11</Name>
+        <RuntimeDependencies>
+            <Dependency>nss</Dependency>
+            <Dependency>nspr</Dependency>
+            <Dependency>xdotool</Dependency>
+            <Dependency>pcsc-lite</Dependency>
+            <Dependency>openldap-client</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="localedata">/usr/share/locale</Path>
+            <Path fileType="executable">/usr/bin</Path>
+            <Path fileType="library">/usr/lib</Path>
+            <Path fileType="library">/lib</Path>
+            <Path fileType="config">/etc/pam_pkcs11/*.conf</Path>
+            <Path fileType="data">/etc/pam_pkcs11</Path>
+            <Path fileType="data">/usr/share/pam_pkcs11</Path>
+            <Path fileType="doc">/usr/share/doc</Path>
+            <Path fileType="man">/usr/share/man</Path>
+        </Files>
+        <AdditionalFiles>
+            <!-- Out-of-the-box configuration file for AKIS -->
+            <AdditionalFile owner="root" permission="0644" target="/etc/pam_pkcs11/pam_pkcs11.conf">pam_pkcs11.conf</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/etc/pam_pkcs11/pkcs11_eventmgr.conf">pkcs11_eventmgr.conf</AdditionalFile>
+            <AdditionalFile owner="root" permission="0755" target="/usr/bin/smartcard-session-helper">smartcard-session-helper</AdditionalFile>
+        </AdditionalFiles>
+        <Provides>
+            <COMAR script="service.py" name="pkcs11_eventmgr">System.Service</COMAR>
+        </Provides>
+    </Package>
+
+    <History>
+        <Update release="11">
+            <Date>2011-07-12</Date>
+            <Version>0.6.6</Version>
+            <Comment>
+                - Improve services for AKIS,
+                - Add system service for event manager,
+                - Correctly lock/unlock the session.
+            </Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="10">
+            <Date>2011-07-05</Date>
+            <Version>0.6.6</Version>
+            <Comment>
+                - Add Turkish translations,
+                - Suppress useless messages,
+            </Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="9">
+            <Date>2011-06-13</Date>
+            <Version>0.6.6</Version>
+            <Comment>Version bump</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="8">
+            <Date>2010-11-08</Date>
+            <Version>0.6.3</Version>
+            <Comment>Version bump</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="7">
+            <Date>2010-10-27</Date>
+            <Version>0.6.2</Version>
+            <Comment>Mass rebuild for Pardus Corporate 2 Alpha 3</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="6">
+            <Date>2010-03-17</Date>
+            <Version>0.6.2</Version>
+            <Comment>Switch to nss</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="5">
+            <Date>2010-01-07</Date>
+            <Version>0.6.2</Version>
+            <Comment>Version bump.</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="4">
+            <Date>2009-06-30</Date>
+            <Version>0.6.1</Version>
+            <Comment>Add missing dependencies mit-kerberos and cyrus-sasl.</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="3">
+            <Date>2009-06-13</Date>
+            <Version>0.6.1</Version>
+            <Comment>Version bump.</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="2">
+            <Date>2008-08-11</Date>
+            <Version>0.6.0</Version>
+            <Comment>Version bump.</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="1">
+            <Date>2007-01-26</Date>
+            <Version>0.5.3</Version>
+            <Comment>First release.</Comment>
+            <Name>Gürer Özen</Name>
+            <Email>gurer@pardus.org.tr</Email>
+        </Update>
+    </History>
+</PISI>

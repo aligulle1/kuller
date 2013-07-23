@@ -1,0 +1,20 @@
+--- src/gdevbbox.c
++++ src/gdevbbox.c	2006-02-28 14:37:20.000000000 +0000
+@@ -1103,7 +1103,7 @@
+ bbox_image_end_image(gx_image_enum_common_t * info, bool draw_last)
+ {
+     bbox_image_enum *pbe = (bbox_image_enum *) info;
+-    int code = gx_image_end(pbe->target_info, draw_last);
++    int code = (pbe->target_info ? gx_image_end(pbe->target_info, draw_last) : 0);
+ 
+     gs_free_object(pbe->memory, pbe, "bbox_end_image");
+     return code;
+@@ -1124,7 +1124,7 @@
+     /* This is only used if target_info != 0. */
+     const bbox_image_enum *pbe = (const bbox_image_enum *)info;
+     
+-    return gx_image_planes_wanted(pbe->target_info, wanted);
++    return (pbe->target_info ? gx_image_planes_wanted(pbe->target_info, wanted) : 0);
+ }
+ 
+ /* Compositing */

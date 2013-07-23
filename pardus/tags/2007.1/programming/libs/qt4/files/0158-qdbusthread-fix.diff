@@ -1,0 +1,29 @@
+qt-bugs@ issue: none
+Trolltech task ID: none
+applied: yes
+author: Trolltech
+
+Merged from Qt 4.2 snapshot 20070127.
+
+Index: tools/qdbus/src/qdbusthread.cpp
+===================================================================
+--- tools/qdbus/src/qdbusthread.cpp	(revision 625240)
++++ tools/qdbus/src/qdbusthread.cpp	(working copy)
+@@ -95,7 +95,16 @@
+ bool qDBusInitThreads()
+ {
+     static DBusThreadFunctions fcn = {
+-        DBUS_THREAD_FUNCTIONS_ALL_MASK,
++        DBUS_THREAD_FUNCTIONS_MUTEX_NEW_MASK |
++        DBUS_THREAD_FUNCTIONS_MUTEX_FREE_MASK |
++        DBUS_THREAD_FUNCTIONS_MUTEX_LOCK_MASK |
++        DBUS_THREAD_FUNCTIONS_MUTEX_UNLOCK_MASK |
++        DBUS_THREAD_FUNCTIONS_CONDVAR_NEW_MASK |
++        DBUS_THREAD_FUNCTIONS_CONDVAR_FREE_MASK |
++        DBUS_THREAD_FUNCTIONS_CONDVAR_WAIT_MASK |
++        DBUS_THREAD_FUNCTIONS_CONDVAR_WAIT_TIMEOUT_MASK |
++        DBUS_THREAD_FUNCTIONS_CONDVAR_WAKE_ONE_MASK |
++        DBUS_THREAD_FUNCTIONS_CONDVAR_WAKE_ALL_MASK,
+         DBusMutex::mutex_new,
+         DBusMutex::mutex_free,
+         DBusMutex::mutex_lock,

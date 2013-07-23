@@ -1,0 +1,90 @@
+diff -Naur vegastrike-0.5.0.orig/src/gfxlib_struct.cpp vegastrike-0.5.0/src/gfxlib_struct.cpp
+--- vegastrike-0.5.0.orig/src/gfxlib_struct.cpp	2008-04-24 15:12:39.000000000 +0300
++++ vegastrike-0.5.0/src/gfxlib_struct.cpp	2008-05-12 21:55:08.000000000 +0300
+@@ -8,6 +8,8 @@
+ 
+ #include "options.h"
+ 
++#include "gldrv/gl_compat.h"
++
+ extern vs_options game_options;
+ 
+ 
+diff -Naur vegastrike-0.5.0.orig/src/gldrv/gl_compat.h vegastrike-0.5.0/src/gldrv/gl_compat.h
+--- vegastrike-0.5.0.orig/src/gldrv/gl_compat.h	1970-01-01 02:00:00.000000000 +0200
++++ vegastrike-0.5.0/src/gldrv/gl_compat.h	2008-05-12 21:57:02.000000000 +0300
+@@ -0,0 +1,63 @@
++
++#ifndef GL_COMPAT_H
++#define GL_COMPAT_H
++
++#include <GL/glext.h>
++
++#ifndef GLsizeiptrARB
++typedef ptrdiff_t GLsizeiptrARB;
++#endif
++
++#ifndef GL_ARRAY_BUFFER_ARB
++#define GL_ARRAY_BUFFER_ARB                             0x8892
++#endif
++
++#ifndef GL_ELEMENT_ARRAY_BUFFER_ARB
++#define GL_ELEMENT_ARRAY_BUFFER_ARB                     0x8893
++#endif
++
++#ifndef GL_DYNAMIC_DRAW_ARB
++#define GL_DYNAMIC_DRAW_ARB                             0x88E8
++#endif
++
++#ifndef GL_STATIC_DRAW_ARB
++#define GL_STATIC_DRAW_ARB                              0x88E4
++#endif
++
++#ifndef GL_READ_WRITE_ARB
++#define GL_READ_WRITE_ARB                               0x88BA
++#endif
++
++#ifndef GL_READ_ONLY_ARB
++#define GL_READ_ONLY_ARB                                0x88B8
++#endif
++
++#ifndef GL_WRITE_ONLY_ARB
++#define GL_WRITE_ONLY_ARB                               0x88B9
++#endif
++
++#ifndef PFNGLBINDBUFFERARBPROC
++typedef void (APIENTRY * PFNGLBINDBUFFERARBPROC)(GLenum target, GLuint buffer);
++#endif
++
++#ifndef PFNGLGENBUFFERSARBPROC
++typedef void (APIENTRY * PFNGLGENBUFFERSARBPROC)(GLsizei n, GLuint *buffers);
++#endif
++
++#ifndef PFNGLDELETEBUFFERSARBPROC
++typedef void (APIENTRY * PFNGLDELETEBUFFERSARBPROC)(GLsizei n, const GLuint *buffers);
++#endif
++
++#ifndef PFNGLBUFFERDATAARBPROC
++typedef void (APIENTRY * PFNGLBUFFERDATAARBPROC)(GLenum target, GLsizeiptrARB size, const GLvoid *data, GLenum usage);
++#endif
++
++#ifndef PFNGLMAPBUFFERARBPROC
++typedef void* (APIENTRY * PFNGLMAPBUFFERARBPROC)(GLenum target, GLenum access);
++#endif
++
++#ifndef PFNGLUNMAPBUFFERARBPROC
++typedef GLboolean (APIENTRY * PFNGLUNMAPBUFFERARBPROC)(GLenum target);
++#endif
++
++#endif
+diff -Naur vegastrike-0.5.0.orig/src/gldrv/gl_globals.h vegastrike-0.5.0/src/gldrv/gl_globals.h
+--- vegastrike-0.5.0.orig/src/gldrv/gl_globals.h	2008-04-24 15:11:51.000000000 +0300
++++ vegastrike-0.5.0/src/gldrv/gl_globals.h	2008-05-12 21:58:01.000000000 +0300
+@@ -91,6 +91,7 @@
+ #undef __glext_h_
+ 
+     #include <GL/glext.h>
++    #include "gl_compat.h"
+ #endif
+ #ifdef _WIN32
+ #define GL_TEXTURE0_ARB 0x84C0

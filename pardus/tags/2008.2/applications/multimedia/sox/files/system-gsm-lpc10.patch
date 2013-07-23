@@ -1,0 +1,82 @@
+diff -Naur sox-14.1.0.orig/configure.ac sox-14.1.0/configure.ac
+--- sox-14.1.0.orig/configure.ac	2008-07-21 06:42:24.000000000 +0300
++++ sox-14.1.0/configure.ac	2008-09-02 22:19:14.000000000 +0300
+@@ -472,7 +472,7 @@
+ 
+ dnl Generate output files.
+ AX_CREATE_STDINT_H(src/soxstdint.h)
+-AC_CONFIG_FILES(Makefile src/Makefile libgsm/Makefile lpc10/Makefile sox.pc)
++AC_CONFIG_FILES(Makefile src/Makefile sox.pc)
+ AC_OUTPUT
+ 
+ if test "$found_libgsm" = "yes"; then
+diff -Naur sox-14.1.0.orig/Makefile.am sox-14.1.0/Makefile.am
+--- sox-14.1.0.orig/Makefile.am	2008-07-29 20:05:09.000000000 +0300
++++ sox-14.1.0/Makefile.am	2008-09-02 22:19:45.000000000 +0300
+@@ -2,8 +2,8 @@
+ 
+ ACLOCAL_AMFLAGS = -I m4
+ 
+-SUBDIRS = lpc10 libgsm src
+-DIST_SUBDIRS = lpc10 libgsm src
++SUBDIRS = src
++DIST_SUBDIRS = src
+ 
+ RM = rm -f
+ 
+diff -Naur sox-14.1.0.orig/src/lpc10.c sox-14.1.0/src/lpc10.c
+--- sox-14.1.0.orig/src/lpc10.c	2008-06-26 21:24:40.000000000 +0300
++++ sox-14.1.0/src/lpc10.c	2008-09-02 22:20:56.000000000 +0300
+@@ -18,7 +18,7 @@
+  */
+ 
+ #include "sox_i.h"
+-#include "../lpc10/lpc10.h"
++#include <lpc10.h>
+ 
+ /* Private data */
+ typedef struct {
+diff -Naur sox-14.1.0.orig/src/Makefile.am sox-14.1.0/src/Makefile.am
+--- sox-14.1.0.orig/src/Makefile.am	2008-07-24 03:53:05.000000000 +0300
++++ sox-14.1.0/src/Makefile.am	2008-09-02 22:22:43.000000000 +0300
+@@ -102,13 +102,13 @@
+ libsox_fmt_dat_la_SOURCES = dat.c
+ libsox_fmt_dat_la_LIBADD = libsox.la
+ libsox_fmt_gsm_la_SOURCES = gsm.c
+-libsox_fmt_gsm_la_LIBADD = libsox.la @GSM_LIBS@ @LIBGSM_LIBADD@
++libsox_fmt_gsm_la_LIBADD = libsox.la @GSM_LIBS@ -lgsm
+ libsox_fmt_hcom_la_SOURCES = hcom.c
+ libsox_fmt_hcom_la_LIBADD = libsox.la
+ libsox_fmt_htk_la_SOURCES = htk.c
+ libsox_fmt_htk_la_LIBADD = libsox.la
+ libsox_fmt_lpc10_la_SOURCES = lpc10.c
+-libsox_fmt_lpc10_la_LIBADD = ../lpc10/liblpc10.la libsox.la
++libsox_fmt_lpc10_la_LIBADD = /usr/lib/liblpc10.la libsox.la -llpc10
+ libsox_fmt_maud_la_SOURCES = maud.c
+ libsox_fmt_maud_la_LIBADD = libsox.la
+ libsox_fmt_prc_la_SOURCES = prc.c
+@@ -132,7 +132,7 @@
+ libsox_fmt_ima_la_SOURCES = ima-fmt.c
+ libsox_fmt_ima_la_LIBADD = libsox.la
+ libsox_fmt_wav_la_SOURCES = adpcm.c adpcm.h ima_rw.c ima_rw.h wav.c
+-libsox_fmt_wav_la_LIBADD = libsox.la @GSM_LIBS@ @LIBGSM_LIBADD@
++libsox_fmt_wav_la_LIBADD = libsox.la @GSM_LIBS@ -lgsm
+ libsox_fmt_wve_la_SOURCES = wve.c
+ libsox_fmt_wve_la_LIBADD = libsox.la
+ libsox_fmt_xa_la_SOURCES = xa.c
+@@ -263,11 +263,11 @@
+     dvms-fmt.c dat.c gsm.c hcom.c htk.c lpc10.c maud.c prc.c sf.c smp.c \
+     sounder.c soundtool.c sphere.c tx16w.c voc.c vox-fmt.c ima-fmt.c adpcm.c adpcm.h \
+     ima_rw.c ima_rw.h wav.c wve.c xa.c nulfile.c f4-fmt.c f8-fmt.c
+-libsox_la_LIBADD = @GSM_LIBS@ @LIBGSM_LIBADD@
+-libsox_la_LIBADD += ../lpc10/liblpc10.la
++libsox_la_LIBADD = @GSM_LIBS@ -lgsm
++libsox_la_LIBADD += /usr/lib/liblpc10.la -llpc10
+ 
+-sox_LDADD += @GSM_LIBS@ @LIBGSM_LIBADD@
+-sox_LDADD += ../lpc10/liblpc10.la
++sox_LDADD += @GSM_LIBS@ -lgsm
++sox_LDADD += /usr/lib/liblpc10.la -llpc10
+ 
+ if HAVE_FLAC
+     libsox_la_SOURCES += flac.c

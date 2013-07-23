@@ -1,0 +1,88 @@
+--- Makefile.config	2009-06-25 13:40:36.000000000 +0300
++++ Makefile.config.new	2009-08-23 19:32:12.860638181 +0300
+@@ -32,7 +32,7 @@
+ # setting this to 1 enables setting window-transparency for e2
+ # (i.e. independent of window-manager settings)
+ # ignored unless built for gtk >= 2.12, so also need USE_LATEST=1
+-WITH_TRANSPARENCY ?= 0
++WITH_TRANSPARENCY ?= 1
+ 
+ # GLib and GTK+ by default assume that filenames are
+ # encoded in utf-8 (or ascii which is compatible with utf-8).
+@@ -47,7 +47,7 @@
+ # information on this.
+ # UPDATE
+ # this is deprecated. From 0.6.0, on-demand conversion always happens
+-FILES_UTF8ONLY ?= 0
++FILES_UTF8ONLY ?= 1
+ 
+ # setting this to 1 provides support for assistive-technologies, to facilitate
+ # operation by users with impaired sense(s). Not yet fully implemented
+@@ -63,7 +63,7 @@
+ # (volunteer needed to test and finalise)
+ # portevent-usage (on solaris) is a TODO
+ # (volunteer needed to work on that)
+-WITH_KERNELFAM ?= 0
++WITH_KERNELFAM ?= 1
+ 
+ # Enable NO MORE THAN ONE of these monitors.
+ 
+@@ -79,7 +79,7 @@
+ # setting this to 1 provides support (on linux) for file-change monitoring
+ # using dnotify if that's available, or normal polling if not available
+ # this setting is ignored for operating systems other than linux
+-USE_DNOTIFY ?= 0
++USE_DNOTIFY ?= 1
+ 
+ # setting this to 1 provides support for file-change monitoring
+ # using FAM if that's available, or normal polling if not available
+@@ -111,7 +111,7 @@
+ 
+ # setting this to 1 includes code (not much) that is applicable only
+ # to Gtk versions > 2.6, if the build-system has any such Gtk
+-USE_LATEST ?= 0
++USE_LATEST ?= 1
+ 
+ # setting this to 1 utilises replacement code for command execution. It's known
+ # to work reasonably for some (most ?) OS's, but needs further evaluation on linux 2.4
+@@ -138,12 +138,12 @@
+ # added and removed volumes.
+ # NOTE HAL is deprecated, to be superseded by devicekit-disks, see below.
+ # Requires HAL, dbus and dbus-glib
+-WITH_HAL ?= 0
++WITH_HAL ?= 1
+ 
+ # setting this to 1 enables DeviceKit and dbus code, for detecting and responding
+ # to added and removed volumes.
+ # Requires devicekit-disks, and dbus-glib
+-WITH_DEVKIT ?= 0
++WITH_DEVKIT ?= 1
+ 
+ # setting this to 1 enables a plugin to support different namespaces (a.k.a.
+ # VFS. It uses libgio capabilities, and so needs glib >= 2.16
+@@ -165,13 +165,13 @@
+ #as well as 'make' usage, all in-code uses of these paths assumes they're localised.
+ #path variable(s) can safely be altered for installation, e.g. to specify a path for
+ #packaging, like $BUILDROOT/usr/local ...
+-PREFIX ?= /usr/local
++PREFIX ?= /usr
+ BIN_DIR ?= $(PREFIX)/bin
+ LIB_DIR ?= $(PREFIX)/lib
+-PLUGINS_DIR ?= $(LIB_DIR)/$(TARGET)/plugins
++PLUGINS_DIR ?= $(PREFIX)/share/$(TARGET)/plugin
+ #FIXME by default, apps should look for icons in $XDG_DATA_DIRS/icons and in
+ # /usr/share/pixmaps (in that order).
+-ICON_DIR ?= $(PREFIX)/share/pixmaps/$(TARGET)
++ICON_DIR ?= $(PREFIX)/share/$(TARGET)/pixmaps
+ LOCALE_DIR ?= $(PREFIX)/share/locale
+ MAN_DIR ?= $(PREFIX)/share/man/man1
+ # version-number suffix is appended to doc-path in main Makefile, if appropriate
+@@ -192,7 +192,7 @@
+ #CFLAGS ?= -Wall -Wextra -Wno-unused -Winline
+ CFLAGS ?= -Wall -Winline
+ else
+-CFLAGS ?= -O2 -Wall
++CFLAGS ?= -O3 -mtune=generic -march=i686 -O2 -pipe -fomit-frame-pointer -fstack-protector -D_FORTIFY_SOURCE=2
+ #CFLAGS ?= -O3 -Wall -march=athlon-tbird -mtune=athlon-tbird
+ #CFLAGS ?= -O3 -Wall -march=pentium -mtune=pentium4
+ endif

@@ -1,0 +1,19 @@
+--- cdrdao-1.2.2.orig/dao/main.cc	2006-09-19 09:07:11.000000000 +0000
++++ cdrdao-1.2.2/dao/main.cc	2006-10-06 20:14:44.000000000 +0000
+@@ -2302,6 +2302,16 @@
+   const char *homeDir;
+   char *settingsPath = NULL;
+ 
++  if (geteuid() == 0 && getuid() != 0)
++    {
++      uid_t uid = getuid();
++      if (setuid(uid) == -1)
++        {
++          message(-2, "Failed to drop privileges; exiting.");
++          exit(1);
++        }
++    }
++
+   PRGNAME = *argv;
+ 
+   SETTINGS = new Settings;

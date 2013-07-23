@@ -1,0 +1,621 @@
+# http://lists.xensource.com/archives/html/xen-devel/2010-08/msg00002.html
+Linker command lines are order-sensitive.
+Move linker options -Lfoo -lfoo from LDFLAGS to LDLIBS and place this new
+variable after the objects to link. This resolves build errors in xenpagin
+and blktap with recent toolchains.
+
+rename SHLIB_CFLAGS to SHLIB_LDFLAGS
+rename LDFLAGS_* to LDLIBS_*
+move LDFLAGS usage after CFLAGS in CC calls
+remove stale comments in xenpaging Makefile
+
+Signed-off-by: Olaf Hering <olaf@xxxxxxxxx>
+
+---
+ config/StdGNU.mk                  |    2 +-
+ config/SunOS.mk                   |    2 +-
+ tools/Rules.mk                    |    8 ++++----
+ tools/blktap/drivers/Makefile     |   10 +++++-----
+ tools/blktap/lib/Makefile         |    6 +++---
+ tools/blktap2/Makefile            |    2 +-
+ tools/blktap2/drivers/Makefile    |   12 ++++++------
+ tools/blktap2/vhd/Makefile        |    4 ++--
+ tools/blktap2/vhd/lib/Makefile    |    2 +-
+ tools/console/Makefile            |   13 +++++++------
+ tools/debugger/xenitp/Makefile    |    4 ++--
+ tools/flask/libflask/Makefile     |    2 +-
+ tools/flask/utils/Makefile        |    4 ++--
+ tools/fs-back/Makefile            |    4 ++--
+ tools/libfsimage/Rules.mk         |    2 +-
+ tools/libfsimage/common/Makefile  |    2 +-
+ tools/libxc/Makefile              |    4 ++--
+ tools/libxen/Makefile             |    2 +-
+ tools/libxen/Makefile.dist        |    4 ++--
+ tools/libxl/Makefile              |    6 +++---
+ tools/misc/Makefile               |    2 +-
+ tools/security/Makefile           |    2 +-
+ tools/vnet/libxutil/Makefile      |    2 +-
+ tools/xcutils/Makefile            |    2 +-
+ tools/xenbackendd/Makefile        |    4 ++--
+ tools/xenmon/Makefile             |    6 +++---
+ tools/xenpaging/Makefile          |    7 ++-----
+ tools/xenpmd/Makefile             |    4 ++--
+ tools/xenstat/libxenstat/Makefile |    6 +++---
+ tools/xenstore/Makefile           |    4 ++--
+ tools/xentrace/Makefile           |    6 +++---
+ 31 files changed, 69 insertions(+), 71 deletions(-)
+
+--- xen-unstable.hg-4.1.21890.orig/config/StdGNU.mk
++++ xen-unstable.hg-4.1.21890/config/StdGNU.mk
+@@ -59,7 +59,7 @@ CURSES_LIBS = -lncurses
+ PTHREAD_LIBS = -lpthread
+ UTIL_LIBS = -lutil
+ SONAME_LDFLAG = -soname
+-SHLIB_CFLAGS = -shared
++SHLIB_LDFLAGS = -shared
+ 
+ ifneq ($(debug),y)
+ CFLAGS += -O2 -fomit-frame-pointer
+--- xen-unstable.hg-4.1.21890.orig/config/SunOS.mk
++++ xen-unstable.hg-4.1.21890/config/SunOS.mk
+@@ -51,7 +51,7 @@ CURSES_LIBS = -lcurses
+ PTHREAD_LIBS = -lpthread
+ UTIL_LIBS =
+ SONAME_LDFLAG = -h
+-SHLIB_CFLAGS = -R $(SunOS_LIBDIR) -shared
++SHLIB_LDFLAGS = -R $(SunOS_LIBDIR) -shared
+ 
+ ifneq ($(debug),y)
+ CFLAGS += -O2 -fno-omit-frame-pointer
+--- xen-unstable.hg-4.1.21890.orig/tools/Rules.mk
++++ xen-unstable.hg-4.1.21890/tools/Rules.mk
+@@ -18,16 +18,16 @@ XEN_BLKTAP2        = $(XEN_ROOT)/tools/b
+ CFLAGS_include = -I$(XEN_INCLUDE)
+ 
+ CFLAGS_libxenctrl = -I$(XEN_LIBXC) $(CFLAGS_include)
+-LDFLAGS_libxenctrl = -L$(XEN_LIBXC) -lxenctrl
++LDLIBS_libxenctrl = -L$(XEN_LIBXC) -lxenctrl
+ 
+ CFLAGS_libxenguest = -I$(XEN_LIBXC) $(CFLAGS_include)
+-LDFLAGS_libxenguest = -L$(XEN_LIBXC) -lxenguest
++LDLIBS_libxenguest = -L$(XEN_LIBXC) -lxenguest
+ 
+ CFLAGS_libxenstore = -I$(XEN_XENSTORE) $(CFLAGS_include)
+-LDFLAGS_libxenstore = -L$(XEN_XENSTORE) -lxenstore
++LDLIBS_libxenstore = -L$(XEN_XENSTORE) -lxenstore
+ 
+ CFLAGS_libblktapctl = -I$(XEN_BLKTAP2)/control -I$(XEN_BLKTAP2)/include $(CFLAGS_include)
+-LDFLAGS_libblktapctl = -L$(XEN_BLKTAP2)/control -lblktapctl
++LDLIBS_libblktapctl = -L$(XEN_BLKTAP2)/control -lblktapctl
+ 
+ X11_LDPATH = -L/usr/X11R6/$(LIBLEAFDIR)
+ 
+--- xen-unstable.hg-4.1.21890.orig/tools/blktap/drivers/Makefile
++++ xen-unstable.hg-4.1.21890/tools/blktap/drivers/Makefile
+@@ -29,8 +29,8 @@ CFLAGS += -DMEMSHR
+ MEMSHRLIBS += $(MEMSHR_DIR)/libmemshr.a
+ endif
+ 
+-LDFLAGS_blktapctrl := $(LDFLAGS_libxenctrl) $(LDFLAGS_libxenstore) $(MEMSHRLIBS) -L../lib -lblktap -lrt -lm -lpthread
+-LDFLAGS_img := $(LIBAIO_DIR)/libaio.a $(CRYPT_LIB) -lpthread -lz
++LDLIBS_blktapctrl := $(MEMSHRLIBS) $(LDLIBS_libxenctrl) $(LDLIBS_libxenstore) -L../lib -lblktap -lrt -lm -lpthread
++LDLIBS_img := $(LIBAIO_DIR)/libaio.a $(CRYPT_LIB) -lpthread -lz
+ 
+ BLK-OBJS-y  := block-aio.o
+ BLK-OBJS-y  += block-sync.o
+@@ -48,16 +48,16 @@ BLKTAB-OBJS-$(CONFIG_Linux) += blktapctr
+ all: $(IBIN) qcow-util
+ 
+ blktapctrl: $(BLKTAB-OBJS-y)
+-       $(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LDFLAGS_blktapctrl)
++       $(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS_blktapctrl)
+ 
+ tapdisk: tapdisk.o $(BLK-OBJS-y)
+-       $(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LDFLAGS_img)
++       $(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS_img)
+ 
+ .PHONY: qcow-util
+ qcow-util: img2qcow qcow2raw qcow-create
+ 
+ img2qcow qcow2raw qcow-create: %: %.o $(BLK-OBJS-y)
+-       $(CC) $(CFLAGS) -o $* $^ $(LDFLAGS) $(LDFLAGS_img)
++       $(CC) $(CFLAGS) $(LDFLAGS) -o $* $^ $(LDLIBS_img)
+ 
+ install: all
+        $(INSTALL_PROG) $(IBIN) $(QCOW_UTIL) $(VHD_UTIL) $(DESTDIR)$(SBINDIR)
+--- xen-unstable.hg-4.1.21890.orig/tools/blktap/lib/Makefile
++++ xen-unstable.hg-4.1.21890/tools/blktap/lib/Makefile
+@@ -8,7 +8,7 @@ SONAME   = libblktap.so.$(MAJOR)
+ CFLAGS   += -I.
+ CFLAGS   += $(CFLAGS_libxenctrl)
+ CFLAGS   += $(CFLAGS_libxenstore)
+-LDFLAGS  += $(LDFLAGS_libxenstore)
++LDLIBS   += $(LDLIBS_libxenstore)
+ 
+ SRCS     :=
+ SRCS     += xenbus.c blkif.c xs_api.c
+@@ -46,8 +46,8 @@ clean:
+        rm -rf *.a *.so* *.o *.opic *.rpm $(LIB) *~ $(DEPS) xen TAGS
+ 
+ libblktap.so.$(MAJOR).$(MINOR): $(OBJS_PIC) 
+-       $(CC) $(CFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,$(SONAME) $(SHLIB_CFLAGS) \
+-             $(LDFLAGS) -o $@ $^
++       $(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,$(SONAME) $(SHLIB_LDFLAGS) \
++             -o $@ $^ $(LDLIBS)
+        ln -sf libblktap.so.$(MAJOR).$(MINOR) libblktap.so.$(MAJOR)
+        ln -sf libblktap.so.$(MAJOR) libblktap.so
+ 
+--- xen-unstable.hg-4.1.21890.orig/tools/blktap2/Makefile
++++ xen-unstable.hg-4.1.21890/tools/blktap2/Makefile
+@@ -2,7 +2,7 @@ XEN_ROOT = ../..
+ include $(XEN_ROOT)/tools/Rules.mk
+ 
+ CFLAGS  += $(CFLAGS_libxenctrl)
+-LDFLAGS += $(LDFLAGS_libxenctrl)
++LDLIBS += $(LDLIBS_libxenctrl)
+ 
+ SUBDIRS-y :=
+ SUBDIRS-y += include
+--- xen-unstable.hg-4.1.21890.orig/tools/blktap2/drivers/Makefile
++++ xen-unstable.hg-4.1.21890/tools/blktap2/drivers/Makefile
+@@ -25,7 +25,7 @@ endif
+ 
+ LIBS      += -lrt -lz
+ 
+-LDFLAGS_img := $(LDFLAGS_libxenctrl) $(CRYPT_LIB) -lpthread -lz -lm
++LBLIBS_img := $(LDLIBS_libxenctrl) $(CRYPT_LIB) -lpthread -lz -lm
+ 
+ LIBS += -L$(LIBVHDDIR) -lvhd
+ 
+@@ -93,16 +93,16 @@ all: $(IBIN) lock-util qcow-util
+ 
+ 
+ tapdisk2: $(TAP-OBJS-y) $(BLK-OBJS-y) $(MISC-OBJS-y) tapdisk2.c
+-       $(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS) $(AIOLIBS) $(MEMSHRLIBS) $(LDFLAGS_img)
++       $(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS) $(AIOLIBS) $(MEMSHRLIBS) $(LBLIBS_img)
+ 
+ tapdisk-client: tapdisk-client.o
+-       $(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS)  $(LDFLAGS_img)
++       $(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS)  $(LBLIBS_img)
+ 
+ tapdisk-stream tapdisk-diff: %: %.o $(TAP-OBJS-y) $(BLK-OBJS-y)
+-       $(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS) $(AIOLIBS) $(MEMSHRLIBS) $(LDFLAGS_img)
++       $(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS) $(AIOLIBS) $(MEMSHRLIBS) $(LBLIBS_img)
+ 
+ td-util: td.o tapdisk-utils.o tapdisk-log.o $(PORTABLE-OBJS-y)
+-       $(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS)  $(LDFLAGS_img)
++       $(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS)  $(LBLIBS_img)
+ 
+ lock-util: lock.c
+        $(CC) $(CFLAGS) -DUTIL -o lock-util lock.c $(LDFLAGS) $(LIBS)
+@@ -111,7 +111,7 @@ lock-util: lock.c
+ qcow-util: img2qcow qcow2raw qcow-create
+ 
+ img2qcow qcow2raw qcow-create: %: %.o $(TAP-OBJS-y) $(BLK-OBJS-y)
+-       $(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS) $(AIOLIBS) $(MEMSHRLIBS) $(LDFLAGS_img)
++       $(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS) $(AIOLIBS) $(MEMSHRLIBS) $(LBLIBS_img)
+ 
+ install: all
+        $(INSTALL_DIR) -p $(DESTDIR)$(INST_DIR)
+--- xen-unstable.hg-4.1.21890.orig/tools/blktap2/vhd/Makefile
++++ xen-unstable.hg-4.1.21890/tools/blktap2/vhd/Makefile
+@@ -38,10 +38,10 @@ LIBS_DEPENDS          := lib/libvhd.so lib/vhd.
+ $(LIBS_DEPENDS):subdirs-all
+ 
+ vhd-util: vhd-util.o $(LIBS_DEPENDS)
+-       $(CC) $(CFLAGS) -o vhd-util vhd-util.o $(LDFLAGS) $(LIBS)
++       $(CC) $(CFLAGS) $(LDFLAGS) -o vhd-util vhd-util.o $(LIBS)
+ 
+ vhd-update: vhd-update.o $(LIBS_DEPENDS)
+-       $(CC) $(CFLAGS) -o vhd-update vhd-update.o $(LDFLAGS) $(LIBS)
++       $(CC) $(CFLAGS) $(LDFLAGS) -o vhd-update vhd-update.o $(LIBS)
+ 
+ install: all
+        $(MAKE) subdirs-install
+--- xen-unstable.hg-4.1.21890.orig/tools/blktap2/vhd/lib/Makefile
++++ xen-unstable.hg-4.1.21890/tools/blktap2/vhd/lib/Makefile
+@@ -55,7 +55,7 @@ all: build
+ build: $(LIBVHD-BUILD)
+ 
+ libvhd.a: $(LIB-OBJS)
+-       $(CC) $(CFLAGS) -Wl,$(SONAME_LDFLAG),$(LIBVHD-SONAME) $(SHLIB_CFLAGS) \
++       $(CC) $(CFLAGS) -Wl,$(SONAME_LDFLAG),$(LIBVHD-SONAME) $(SHLIB_LDFLAGS) \
+                $(LDFLAGS) -o libvhd.so.$(LIBVHD-MAJOR).$(LIBVHD-MINOR) $(LIBS) $^
+        ln -sf libvhd.so.$(LIBVHD-MAJOR).$(LIBVHD-MINOR) libvhd.so.$(LIBVHD-MAJOR)
+        ln -sf libvhd.so.$(LIBVHD-MAJOR) libvhd.so
+--- xen-unstable.hg-4.1.21890.orig/tools/console/Makefile
++++ xen-unstable.hg-4.1.21890/tools/console/Makefile
+@@ -6,8 +6,11 @@ CFLAGS  += -Werror
+ 
+ CFLAGS  += $(CFLAGS_libxenctrl)
+ CFLAGS  += $(CFLAGS_libxenstore)
+-LDFLAGS += $(LDFLAGS_libxenctrl)
+-LDFLAGS += $(LDFLAGS_libxenstore)
++LDLIBS += $(LDLIBS_libxenctrl)
++LDLIBS += $(LDLIBS_libxenstore)
++LDLIBS += $(UTIL_LIBS)
++LDLIBS += $(SOCKET_LIBS)
++LDLIBS += -lrt
+ 
+ BIN      = xenconsoled xenconsole
+ 
+@@ -20,12 +23,10 @@ clean:
+        $(RM) client/*.o daemon/*.o
+ 
+ xenconsoled: $(patsubst %.c,%.o,$(wildcard daemon/*.c))
+-       $(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) \
+-              $(UTIL_LIBS) $(SOCKET_LIBS) -lrt
++       $(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+ 
+ xenconsole: $(patsubst %.c,%.o,$(wildcard client/*.c))
+-       $(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) \
+-             $(UTIL_LIBS) $(SOCKET_LIBS)
++       $(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+ 
+ .PHONY: install
+ install: $(BIN)
+--- xen-unstable.hg-4.1.21890.orig/tools/debugger/xenitp/Makefile
++++ xen-unstable.hg-4.1.21890/tools/debugger/xenitp/Makefile
+@@ -46,8 +46,8 @@ clean:
+        $(RM) *.a *.so *.o *.rpm $(BIN) $(LIBBIN)
+ 
+ %: %.c $(HDRS) Makefile
+-       $(CC) $(CFLAGS) -o $@ $< $(LDFLAGS_libxenctrl)
++       $(CC) $(CFLAGS) -o $@ $< $(LDLIBS_libxenctrl)
+ 
+ XENITP_OBJS=xenitp.o ia64-dis.o ia64-opc.o cpu-ia64-opc.o
+ xenitp: $(XENITP_OBJS)
+-       $(CC) $(CFLAGS) -o $@ $(XENITP_OBJS) $(LDFLAGS_libxenctrl)
++       $(CC) $(CFLAGS) -o $@ $(XENITP_OBJS) $(LDLIBS_libxenctrl)
+--- xen-unstable.hg-4.1.21890.orig/tools/flask/libflask/Makefile
++++ xen-unstable.hg-4.1.21890/tools/flask/libflask/Makefile
+@@ -59,6 +59,6 @@ libflask.so.$(MAJOR): libflask.so.$(MAJO
+        ln -sf $< $@
+ 
+ libflask.so.$(MAJOR).$(MINOR): $(PIC_OBJS)
+-       $(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libflask.so.$(MAJOR) $(SHLIB_CFLAGS) -o $@ $^
++       $(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libflask.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $^
+ 
+ -include $(DEPS)
+--- xen-unstable.hg-4.1.21890.orig/tools/flask/utils/Makefile
++++ xen-unstable.hg-4.1.21890/tools/flask/utils/Makefile
+@@ -14,7 +14,7 @@ BASECFLAGS+= -I$(LIBFLASK_ROOT)/include
+ BASECFLAGS+= -I.
+ 
+ CFLAGS  += $(BASECFLAGS)
+-LDFLAGS += $(PROFILE) -L$(XEN_LIBXC) -L$(LIBFLASK_ROOT)
++LDLIBS += $(PROFILE) -L$(XEN_LIBXC) -L$(LIBFLASK_ROOT)
+ TESTDIR  = testsuite/tmp
+ TESTFLAGS= -DTESTING
+ TESTENV  = XENSTORED_ROOTDIR=$(TESTDIR) XENSTORED_RUNDIR=$(TESTDIR)
+@@ -27,7 +27,7 @@ CLIENTS_OBJS := $(patsubst flask-%,%.o,$
+ all: $(CLIENTS)
+ 
+ $(CLIENTS): flask-%: %.o
+-       $(CC) $(CFLAGS) $(LDFLAGS) $< $(LOADLIBES) $(LDLIBS) -L. -lflask $(LDFLAGS_libxenctrl) -o $@
++       $(CC) $(CFLAGS) $(LDFLAGS) $< $(LOADLIBES) $(LDLIBS) -L. -lflask $(LDLIBS_libxenctrl) -o $@
+ 
+ .PHONY: clean
+ clean: 
+--- xen-unstable.hg-4.1.21890.orig/tools/fs-back/Makefile
++++ xen-unstable.hg-4.1.21890/tools/fs-back/Makefile
+@@ -14,8 +14,8 @@ CFLAGS   += $(INCLUDES) -I.
+ CFLAGS   += -D_GNU_SOURCE
+ 
+ LIBS      := -L. -L.. -L../lib
+-LIBS      += $(LDFLAGS_libxenctrl)
+-LIBS      += $(LDFLAGS_libxenstore)
++LIBS      += $(LDLIBS_libxenctrl)
++LIBS      += $(LDLIBS_libxenstore)
+ LIBS      += -lrt -lpthread
+ 
+ OBJS     := fs-xenbus.o fs-ops.o
+--- xen-unstable.hg-4.1.21890.orig/tools/libfsimage/Rules.mk
++++ xen-unstable.hg-4.1.21890/tools/libfsimage/Rules.mk
+@@ -24,7 +24,7 @@ fs-install: fs-all
+        $(INSTALL_PROG) $(FSLIB) $(DESTDIR)$(FSDIR)
+ 
+ $(FSLIB): $(PIC_OBJS)
+-       $(CC) $(CFLAGS) $(LDFLAGS) $(SHLIB_CFLAGS) -o $@ $^ -lfsimage $(FS_LIBDEPS)
++       $(CC) $(CFLAGS) $(LDFLAGS) $(SHLIB_LDFLAGS) -o $@ $^ -lfsimage $(FS_LIBDEPS)
+ 
+ clean distclean:
+        rm -f $(PIC_OBJS) $(FSLIB) $(DEPS)
+--- xen-unstable.hg-4.1.21890.orig/tools/libfsimage/common/Makefile
++++ xen-unstable.hg-4.1.21890/tools/libfsimage/common/Makefile
+@@ -37,7 +37,7 @@ libfsimage.so.$(MAJOR): libfsimage.so.$(
+        ln -sf $< $@
+ 
+ libfsimage.so.$(MAJOR).$(MINOR): $(PIC_OBJS)
+-       $(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libfsimage.so.$(MAJOR) $(SHLIB_CFLAGS) -o $@ $^ -lpthread
++       $(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libfsimage.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $^ -lpthread
+ 
+ -include $(DEPS)
+ 
+--- xen-unstable.hg-4.1.21890.orig/tools/libxc/Makefile
++++ xen-unstable.hg-4.1.21890/tools/libxc/Makefile
+@@ -145,7 +145,7 @@ libxenctrl.so.$(MAJOR): libxenctrl.so.$(
+        ln -sf $< $@
+ 
+ libxenctrl.so.$(MAJOR).$(MINOR): $(CTRL_PIC_OBJS)
+-       $(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenctrl.so.$(MAJOR) $(SHLIB_CFLAGS) -o $@ $^ $(PTHREAD_LIBS)
++       $(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenctrl.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $^ $(PTHREAD_LIBS)
+ 
+ # libxenguest
+ 
+@@ -181,7 +181,7 @@ xc_dom_bzimageloader.opic: CFLAGS += $(c
+ 
+ libxenguest.so.$(MAJOR).$(MINOR): COMPRESSION_LIBS = $(call zlib-options,l)
+ libxenguest.so.$(MAJOR).$(MINOR): $(GUEST_PIC_OBJS) libxenctrl.so
+-       $(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenguest.so.$(MAJOR) $(SHLIB_CFLAGS) -o $@ $(GUEST_PIC_OBJS) $(COMPRESSION_LIBS) -lz -lxenctrl $(PTHREAD_LIBS)
++       $(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenguest.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $(GUEST_PIC_OBJS) $(COMPRESSION_LIBS) -lz -lxenctrl $(PTHREAD_LIBS)
+ 
+ -include $(DEPS)
+ 
+--- xen-unstable.hg-4.1.21890.orig/tools/libxen/Makefile
++++ xen-unstable.hg-4.1.21890/tools/libxen/Makefile
+@@ -44,7 +44,7 @@ libxenapi.so.$(MAJOR): libxenapi.so.$(MA
+        ln -sf $< $@
+ 
+ libxenapi.so.$(MAJOR).$(MINOR): $(LIBXENAPI_OBJS)
+-       $(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenapi.so.$(MAJOR) $(SHLIB_CFLAGS) -o $@ $^
++       $(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenapi.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $^
+ 
+ libxenapi.a: $(LIBXENAPI_OBJS)
+        $(AR) rcs libxenapi.a $^
+--- xen-unstable.hg-4.1.21890.orig/tools/libxen/Makefile.dist
++++ xen-unstable.hg-4.1.21890/tools/libxen/Makefile.dist
+@@ -30,7 +30,7 @@ LDFLAGS = $(shell xml2-config --libs) \
+ # -h for Solaris
+ SONAME_LDFLAG ?= -soname
+ # -R /usr/sfw/$(LIBDIR) -shared for Solaris
+-SHLIB_CFLAGS ?= -shared
++SHLIB_LDFLAGS ?= -shared
+ 
+ # ginstall for Solaris
+ INSTALL      = install
+@@ -54,7 +54,7 @@ libxenapi.so.$(MAJOR): libxenapi.so.$(MA
+        ln -sf $< $@
+ 
+ libxenapi.so.$(MAJOR).$(MINOR): $(LIBXENAPI_OBJS)
+-       $(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenapi.so.$(MAJOR) $(SHLIB_CFLAGS) -o $@ $^
++       $(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenapi.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $^
+ 
+ libxenapi.a: $(LIBXENAPI_OBJS)
+        $(AR) rcs libxenapi.a $^
+--- xen-unstable.hg-4.1.21890.orig/tools/libxl/Makefile
++++ xen-unstable.hg-4.1.21890/tools/libxl/Makefile
+@@ -15,7 +15,7 @@ CFLAGS += -Werror -Wno-format-zero-lengt
+ CFLAGS += -I. -fPIC
+ CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenguest) $(CFLAGS_libxenstore) $(CFLAGS_libblktapctl)
+ 
+-LIBS = $(LDFLAGS_libxenctrl) $(LDFLAGS_libxenguest) $(LDFLAGS_libxenstore) $(LDFLAGS_libblktapctl) $(UTIL_LIBS)
++LIBS = $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest) $(LDLIBS_libxenstore) $(LDLIBS_libblktapctl) $(UTIL_LIBS)
+ 
+ LIBXL_OBJS-y = osdeps.o libxl_paths.o libxl_bootloader.o
+ LIBXL_OBJS = flexarray.o libxl.o libxl_pci.o libxl_dom.o libxl_exec.o libxl_xshelp.o libxl_device.o libxl_internal.o xenguest.o libxl_utils.o $(LIBXL_OBJS-y)
+@@ -59,7 +59,7 @@ libxenlight.so.$(MAJOR): libxenlight.so.
+        ln -sf $< $@
+ 
+ libxenlight.so.$(MAJOR).$(MINOR): $(LIBXL_OBJS)
+-       $(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenlight.so.$(MAJOR) $(SHLIB_CFLAGS) -o $@ $^
++       $(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenlight.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $^
+ 
+ libxenlight.a: $(LIBXL_OBJS)
+        $(AR) rcs libxenlight.a $^
+@@ -71,7 +71,7 @@ libxlutil.so.$(XLUMAJOR): libxlutil.so.$
+        ln -sf $< $@
+ 
+ libxlutil.so.$(XLUMAJOR).$(XLUMINOR): $(LIBXLU_OBJS)
+-       $(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxlutil.so.$(XLUMAJOR) $(SHLIB_CFLAGS) -o $@ $^
++       $(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxlutil.so.$(XLUMAJOR) $(SHLIB_LDFLAGS) -o $@ $^
+ 
+ libxlutil.a: $(LIBXLU_OBJS)
+        $(AR) rcs libxlutil.a $^
+--- xen-unstable.hg-4.1.21890.orig/tools/misc/Makefile
++++ xen-unstable.hg-4.1.21890/tools/misc/Makefile
+@@ -52,7 +52,7 @@ clean:
+        $(CC) -c $(CFLAGS) -o $@ $<
+ 
+ xen-hvmctx xenperf xenpm gtracestat xenlockprof xen-hptool xenwatchdogd: %: %.o Makefile
+-       $(CC) $(CFLAGS) -o $@ $< $(LDFLAGS) $(LDFLAGS_libxenctrl) $(LDFLAGS_libxenguest) $(LDFLAGS_libxenstore)
++       $(CC) $(CFLAGS) -o $@ $< $(LDFLAGS) $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest) $(LDLIBS_libxenstore)
+ 
+ gtraceview: %: %.o Makefile
+        $(CC) $(CFLAGS) -o $@ $< $(LDFLAGS) $(CURSES_LIBS)
+--- xen-unstable.hg-4.1.21890.orig/tools/security/Makefile
++++ xen-unstable.hg-4.1.21890/tools/security/Makefile
+@@ -76,7 +76,7 @@ build: $(ACM_INST_TOOLS) $(ACM_NOINST_TO
+        chmod 700 $(ACM_SCRIPTS)
+ 
+ xensec_tool: $(OBJS_TOOL)
+-       $(CC) -g $(CFLAGS) $(LDFLAGS) -O0 -o $@ $^ $(LDFLAGS_libxenctrl)
++       $(CC) -g $(CFLAGS) $(LDFLAGS) -O0 -o $@ $^ $(LDLIBS_libxenctrl)
+ 
+ xensec_gen: xensec_gen.py
+        cp -f $^ $@
+--- xen-unstable.hg-4.1.21890.orig/tools/vnet/libxutil/Makefile
++++ xen-unstable.hg-4.1.21890/tools/vnet/libxutil/Makefile
+@@ -52,7 +52,7 @@ libxutil.so.$(MAJOR): libxutil.so.$(MAJO
+        ln -sf $^ $@
+ 
+ libxutil.so.$(MAJOR).$(MINOR): $(PIC_OBJS)
+-       $(CC) $(CFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxutil.so.$(MAJOR) $(SHLIB_CFLAGS) -o $@ $^
++       $(CC) $(CFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxutil.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $^
+ 
+ libxutil.a: $(LIB_OBJS)
+        $(AR) rc $@ $^
+--- xen-unstable.hg-4.1.21890.orig/tools/xcutils/Makefile
++++ xen-unstable.hg-4.1.21890/tools/xcutils/Makefile
+@@ -16,7 +16,7 @@ CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_
+ 
+ PROGRAMS = xc_restore xc_save readnotes lsevtchn
+ 
+-LDLIBS   = $(LDFLAGS_libxenctrl) $(LDFLAGS_libxenguest) $(LDFLAGS_libxenstore)
++LDLIBS   = $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest) $(LDLIBS_libxenstore)
+ 
+ .PHONY: all
+ all: build
+--- xen-unstable.hg-4.1.21890.orig/tools/xenbackendd/Makefile
++++ xen-unstable.hg-4.1.21890/tools/xenbackendd/Makefile
+@@ -15,7 +15,7 @@ include $(XEN_ROOT)/tools/Rules.mk
+ CFLAGS  += -Werror
+ CFLAGS  += $(CFLAGS_libxenstore)
+ CPPFLAGS += -DXEN_SCRIPT_DIR="\"$(XEN_SCRIPT_DIR)\""
+-LDFLAGS += $(LDFLAGS_libxenstore)
++LDLIBS  += $(LDLIBS_libxenstore)
+ 
+ SBIN = xenbackendd
+ 
+@@ -36,6 +36,6 @@ clean:
+ 
+ 
+ %: %.c Makefile
+-       $(CC) $(CFLAGS) $(CPPFLAGS) $< $(LDFLAGS) -o $@
++       $(CC) $(CFLAGS) $(CPPFLAGS) $(LDFLAGS) $< -o $@ $(LDLIBS)
+ 
+ -include $(DEPS)
+--- xen-unstable.hg-4.1.21890.orig/tools/xenmon/Makefile
++++ xen-unstable.hg-4.1.21890/tools/xenmon/Makefile
+@@ -16,7 +16,7 @@ include $(XEN_ROOT)/tools/Rules.mk
+ CFLAGS  += -Werror
+ CFLAGS  += -I $(XEN_XC)
+ CFLAGS  += $(CFLAGS_libxenctrl)
+-LDFLAGS += $(LDFLAGS_libxenctrl)
++LDLIBS  += $(LDLIBS_libxenctrl)
+ 
+ BIN = xentrace_setmask xenbaked
+ SCRIPTS = xenmon.py
+@@ -42,8 +42,8 @@ clean:
+ 
+ 
+ %: %.c Makefile
+-       $(CC) $(CFLAGS) $< $(LDFLAGS) -o $@
++       $(CC) $(CFLAGS) $(LDFLAGS) $< -o $@ $(LDLIBS)
+ xentrace_%: %.c Makefile
+-       $(CC) $(CFLAGS) $< $(LDFLAGS) -o $@
++       $(CC) $(CFLAGS) $(LDFLAGS) $< -o $@ $(LDLIBS)
+ 
+ -include $(DEPS)
+--- xen-unstable.hg-4.1.21890.orig/tools/xenpaging/Makefile
++++ xen-unstable.hg-4.1.21890/tools/xenpaging/Makefile
+@@ -4,7 +4,7 @@ include $(XEN_ROOT)/tools/Rules.mk
+ CFLAGS   += -I $(XEN_XC)
+ CFLAGS   += -I ./
+ CFLAGS   += $(CFLAGS_libxenctrl) $(CFLAGS_libxenstore)
+-LDFLAGS  += $(LDFLAGS_libxenctrl) $(LDFLAGS_libxenstore)
++LDLIBS  += $(LDLIBS_libxenctrl) $(LDLIBS_libxenstore)
+ 
+ POLICY    = default
+ 
+@@ -15,19 +15,16 @@ CFLAGS   += -Werror
+ CFLAGS   += -Wno-unused
+ CFLAGS   += -g
+ 
+-#CFLAGS   += -Wl,-rpath,..
+ CFLAGS   += -Wp,-MD,.$(@F).d
+ DEPS     = .*.d
+ 
+-#LDFLAGS  += $(LDFLAGS_libxenctrl) $(LDFLAGS_libxenguest)
+-
+ OBJS     = $(SRCS:.c=.o)
+ IBINS    = xenpaging
+ 
+ all: $(IBINS)
+ 
+ xenpaging: $(OBJS)
+-       $(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
++       $(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS)
+ 
+ install: all
+        $(INSTALL_DIR) $(DESTDIR)$(SBINDIR)
+--- xen-unstable.hg-4.1.21890.orig/tools/xenpmd/Makefile
++++ xen-unstable.hg-4.1.21890/tools/xenpmd/Makefile
+@@ -3,7 +3,7 @@ include $(XEN_ROOT)/tools/Rules.mk
+ 
+ CFLAGS  += -Werror
+ CFLAGS  += $(CFLAGS_libxenstore)
+-LDFLAGS += $(LDFLAGS_libxenstore)
++LDLIBS += $(LDLIBS_libxenstore)
+ 
+ BIN      = xenpmd
+ 
+@@ -20,6 +20,6 @@ clean:
+        $(RM) -f $(BIN) $(DEPS)
+ 
+ %: %.c Makefile
+-       $(CC) $(CFLAGS) $< $(LDFLAGS) -o $@
++       $(CC) $(CFLAGS) $(LDFLAGS) $< -o $@ $(LDLIBS)
+ 
+ -include $(DEPS)
+--- xen-unstable.hg-4.1.21890.orig/tools/xenstat/libxenstat/Makefile
++++ xen-unstable.hg-4.1.21890/tools/xenstat/libxenstat/Makefile
+@@ -53,7 +53,7 @@ $(LIB): $(OBJECTS-y)
+        $(RANLIB) $@
+ 
+ $(SHLIB): $(OBJECTS-y)
+-       $(CC) $(CFLAGS) $(LDFLAGS) $(SONAME_FLAGS) $(SHLIB_CFLAGS) -o $@ \
++       $(CC) $(CFLAGS) $(LDFLAGS) $(SONAME_FLAGS) $(SHLIB_LDFLAGS) -o $@ \
+            $(OBJECTS-y) $(LDLIBS-y)
+ 
+ src/xenstat.o: src/xenstat.c src/xenstat.h src/xenstat_priv.h
+@@ -112,7 +112,7 @@ $(PYSRC): bindings/swig/xenstat.i
+        swig -python $(SWIG_FLAGS) -outdir $(@D) -o $(PYSRC) $<
+ 
+ $(PYLIB): $(PYSRC)
+-       $(CC) $(CFLAGS) $(LDFLAGS) $(PYTHON_FLAGS) $(SHLIB_CFLAGS) -lxenstat -o $@ $<
++       $(CC) $(CFLAGS) $(LDFLAGS) $(PYTHON_FLAGS) $(SHLIB_LDFLAGS) -lxenstat -o $@ $<
+ 
+ python-bindings: $(PYLIB) $(PYMOD)
+ 
+@@ -134,7 +134,7 @@ $(PERLSRC): bindings/swig/xenstat.i
+        swig -perl $(SWIG_FLAGS) -outdir $(@D) -o $(PERLSRC) $<
+ 
+ $(PERLLIB): $(PERLSRC)
+-       $(CC) $(CFLAGS) $(LDFLAGS) $(PERL_FLAGS) $(SHLIB_CFLAGS) -lxenstat -o $@ $<
++       $(CC) $(CFLAGS) $(LDFLAGS) $(PERL_FLAGS) $(SHLIB_LDFLAGS) -lxenstat -o $@ $<
+ 
+ .PHONY: perl-bindings
+ perl-bindings: $(PERLLIB) $(PERLMOD)
+--- xen-unstable.hg-4.1.21890.orig/tools/xenstore/Makefile
++++ xen-unstable.hg-4.1.21890/tools/xenstore/Makefile
+@@ -47,7 +47,7 @@ CFLAGS += -DHAVE_DTRACE=1
+ endif
+  
+ xenstored: $(XENSTORED_OBJS)
+-       $(CC) $(CFLAGS) $(LDFLAGS) $^ $(LDFLAGS_libxenctrl) $(SOCKET_LIBS) -o $@
++       $(CC) $(CFLAGS) $(LDFLAGS) $^ $(LDLIBS_libxenctrl) $(SOCKET_LIBS) -o $@
+ 
+ $(CLIENTS): xenstore
+        ln -f xenstore $@
+@@ -69,7 +69,7 @@ libxenstore.so.$(MAJOR): libxenstore.so.
+ xs.opic: CFLAGS += -DUSE_PTHREAD
+ 
+ libxenstore.so.$(MAJOR).$(MINOR): xs.opic xs_lib.opic
+-       $(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenstore.so.$(MAJOR) $(SHLIB_CFLAGS) -o $@ $^ $(SOCKET_LIBS) -lpthread
++       $(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenstore.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $^ $(SOCKET_LIBS) -lpthread
+ 
+ libxenstore.a: xs.o xs_lib.o
+        $(AR) rcs $@ $^
+--- xen-unstable.hg-4.1.21890.orig/tools/xentrace/Makefile
++++ xen-unstable.hg-4.1.21890/tools/xentrace/Makefile
+@@ -4,7 +4,7 @@ include $(XEN_ROOT)/tools/Rules.mk
+ CFLAGS  += -Werror
+ 
+ CFLAGS  += $(CFLAGS_libxenctrl)
+-LDFLAGS += $(LDFLAGS_libxenctrl)
++LDLIBS += $(LDLIBS_libxenctrl)
+ 
+ HDRS     = $(wildcard *.h)
+ OBJS     = $(patsubst %.c,%.o,$(wildcard *.c))
+@@ -50,9 +50,9 @@ clean:
+        $(RM) *.a *.so *.o *.rpm $(BIN) $(LIBBIN) $(DEPS)
+ 
+ %: %.c $(HDRS) Makefile
+-       $(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
++       $(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< $(LDLIBS)
+ xentrace_%: %.c $(HDRS) Makefile
+-       $(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
++       $(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< $(LDLIBS)
+ 
+ -include $(DEPS)

@@ -1,0 +1,20 @@
+Index: linux-2.6.18/drivers/acpi/sleep/poweroff.c
+===================================================================
+--- linux-2.6.18.orig/drivers/acpi/sleep/poweroff.c
++++ linux-2.6.18/drivers/acpi/sleep/poweroff.c
+@@ -63,8 +63,15 @@ static int acpi_shutdown(struct sys_devi
+ 	}
+ }
+ 
++static int acpi_resume(struct sys_device *x)
++{
++	acpi_set_register(ACPI_BITREG_SCI_ENABLE, 1, ACPI_MTX_DO_NOT_LOCK);
++	return 0;
++}
++
+ static struct sysdev_class acpi_sysclass = {
+ 	set_kset_name("acpi"),
++	.resume = acpi_resume,
+ 	.shutdown = acpi_shutdown
+ };
+ 

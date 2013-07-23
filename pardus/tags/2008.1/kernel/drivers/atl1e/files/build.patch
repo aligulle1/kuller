@@ -1,0 +1,88 @@
+diff -Naur at_ethtool.c at_ethtool.c
+--- at_ethtool.c	2007-12-24 18:20:58.000000000 +0200
++++ at_ethtool.c	2008-06-09 15:01:41.000000000 +0300
+@@ -144,7 +144,7 @@
+ static u32
+ at_get_msglevel(struct net_device *netdev)
+ {
+-#if DBG
++#ifdef DBG
+     return 1;
+ #else
+     return 0;
+diff -Naur at.h at.h
+--- at.h	2007-12-24 18:20:58.000000000 +0200
++++ at.h	2008-06-09 15:01:41.000000000 +0300
+@@ -43,7 +43,7 @@
+ 
+ #include "at_hw.h"
+ 
+-#if DBG
++#ifdef DBG
+ #define AT_DBG(args...) printk(KERN_DEBUG "atheros: " args)
+ #else
+ #define AT_DBG(args...)
+diff -Naur at_osdep.h at_osdep.h
+--- at_osdep.h	2007-12-24 18:20:58.000000000 +0200
++++ at_osdep.h	2008-06-09 15:01:41.000000000 +0300
+@@ -64,7 +64,7 @@
+ 
+ 
+ 
+-#if DBG
++#ifdef DBG
+ #define DEBUGOUT(S)     printk(KERN_DEBUG S "\n")
+ #define DEBUGOUT1(S, A...)  printk(KERN_DEBUG S "\n", A)
+ #else
+diff -Naur Makefile Makefile
+--- Makefile	2007-12-24 18:20:58.000000000 +0200
++++ Makefile	2008-06-09 15:49:13.000000000 +0300
+@@ -30,9 +30,9 @@
+ CFILES = at_main.c at_hw.c at_param.c at_ethtool.c kcompat.c  
+ HFILES = at.h at_hw.h at_osdep.h kcompat.h
+ 
+-ifeq (,$(BUILD_KERNEL))
+-BUILD_KERNEL=$(shell uname -r)
+-endif
++# ifeq (,$(BUILD_KERNEL))
++# BUILD_KERNEL=$(shell uname -r)
++# endif
+ 
+ ###########################################################################
+ # Environment tests
+@@ -61,8 +61,8 @@
+ ifeq (,$(KSRC))
+   $(error Linux kernel source not found)
+ else
+-ifeq (/lib/modules/$(shell uname -r)/source, $(KSRC))
+-  KOBJ :=  /lib/modules/$(shell uname -r)/build
++ifeq (/lib/modules/$(BUILD_KERNEL)/source, $(KSRC))
++  KOBJ :=  /lib/modules/$(BUILD_KERNEL)/build
+ else
+   KOBJ :=  $(KSRC)
+ endif
+@@ -74,7 +74,7 @@
+   CONFIG_FILE  := /boot/vmlinuz.autoconf.h
+   KVER := $(shell $(CC) $(CFLAGS) -E -dM $(VERSION_FILE) | \
+           grep UTS_RELEASE | awk '{ print $$3 }' | sed 's/\"//g')
+-  ifeq ($(KVER),$(shell uname -r))
++  ifeq ($(KVER),$(BUILD_KERNEL))
+     # set up include path to override headers from kernel source
+     x:=$(shell rm -rf include)
+     x:=$(shell mkdir -p include/linux)
+@@ -299,15 +299,6 @@
+ 	find $(INSTALL_MOD_PATH)/lib/modules/$(KVER) -name $(TARGET) -exec rm -f {} \; || true
+ 	find $(INSTALL_MOD_PATH)/lib/modules/$(KVER) -name $(TARGET).gz -exec rm -f {} \; || true
+ 	install -D -m 644 $(TARGET) $(INSTALL_MOD_PATH)$(INSTDIR)/$(TARGET)
+-ifeq (,$(INSTALL_MOD_PATH))
+-	/sbin/depmod -a || true
+-else
+-  ifeq ($(DEPVER),1 )
+-	/sbin/depmod -r $(INSTALL_MOD_PATH) -a || true
+-  else
+-	/sbin/depmod -b $(INSTALL_MOD_PATH) -a -n $(KVERSION) > /dev/null || true
+-  endif
+-endif
+ 	install -D -m 644 $(MANFILE).gz $(INSTALL_MOD_PATH)$(MANDIR)/man$(MANSECTION)/$(MANFILE).gz
+ 	man -c -P'cat > /dev/null' $(MANFILE:.$(MANSECTION)=) || true
+ 

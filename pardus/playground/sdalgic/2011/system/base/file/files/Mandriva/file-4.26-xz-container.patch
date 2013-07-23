@@ -1,0 +1,23 @@
+diff -p -up file-4.26/magic/Magdir/compress.xz_container~ file-4.26/magic/Magdir/compress
+--- file-4.26/magic/Magdir/compress.xz_container~	2008-12-26 08:11:23.012681310 -0500
++++ file-4.26/magic/Magdir/compress	2008-12-26 08:17:35.306570209 -0500
+@@ -182,6 +182,19 @@
+ >6	byte		x			version %d
+ >7	byte		x			\b.%d
+ 
++# XZ (Lempel-Ziv-Markov chain-Algorithm) file format supported by:
++#   - 7-Zip <http://7-zip.org/>
++#   - LZMA SDK <http://7-zip.org/sdk.html>
++#   - LZMA Utils <http://tukaani.org/lzma/>
++#
++# Note that this is different format than the original format created
++# by LZMA_Alone from older versions of LZMA SDK. These files are
++# non-trivial to detect, because they have no magic bytes.
++#
++0	ustring		\xFD7zXZ\x00	xz compressed data,
++>6	ubyte&0x10	0x00		single-block stream
++>6	ubyte&0x10	0x10		multi-block stream
++
+ # Type: LZMA
+ # URL:  http://www.7-zip.org/sdk.html
+ # From: Robert Millan <rmh@aybabtu.com> and Reuben Thomas <rrt@sc3d.org>

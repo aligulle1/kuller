@@ -1,0 +1,95 @@
+diff -urN hcfpcimodem-1.14full/modules/Makefile hcfpcimodem-1.14full-extra_cflags/modules/Makefile
+--- hcfpcimodem-1.14full/modules/Makefile	2007-10-19 15:17:56.000000000 -0400
++++ hcfpcimodem-1.14full-extra_cflags/modules/Makefile	2007-10-24 17:29:39.000000000 -0400
+@@ -20,16 +20,16 @@
+ $(warning *** WARNING: Trying to compile kernel modules on a $(MACHINE_ARCH) system while the installed $(CNXTTARGET) driver package is for $(IMPORTED_ARCH), this is likely to fail... ***)
+ endif
+ 
+-CFLAGS += -I$(IMPORTED)/include -I$(TOP)/modules/include -I$(TOP)/modules/GPL
+-CFLAGS += $(IMPORTED_COMPILATION_FLAGS)
+-CFLAGS += $(IMPORTED_FRAMEWORK_DEFS) -imacros $(IMPORTED)/include/framewrk.h
+-CFLAGS += $(IMPORTED_GENERAL_DEFS)
+-CFLAGS += $(IMPORTED_DEBUG_DEFS)
++EXTRA_CFLAGS += -I$(IMPORTED)/include -I$(TOP)/modules/include -I$(TOP)/modules/GPL
++EXTRA_CFLAGS += $(IMPORTED_COMPILATION_FLAGS)
++EXTRA_CFLAGS += $(IMPORTED_FRAMEWORK_DEFS) -imacros $(IMPORTED)/include/framewrk.h
++EXTRA_CFLAGS += $(IMPORTED_GENERAL_DEFS)
++EXTRA_CFLAGS += $(IMPORTED_DEBUG_DEFS)
+ 
+-CFLAGS += $(OTHER_INCLUDES)
+-CFLAGS += $(DISTRO_CFLAGS)
++EXTRA_CFLAGS += $(OTHER_INCLUDES)
++EXTRA_CFLAGS += $(DISTRO_CFLAGS)
+ 
+-CFLAGS += -DOS_NOREDEFS
++EXTRA_CFLAGS += -DOS_NOREDEFS
+ 
+ ifeq ($(CNXT_MODS_DIR),)
+ ON_BUILD_SYSTEM := no
+@@ -92,7 +92,7 @@
+ FOUND_PCI_DEV_SLOT_NAME := $(shell grep -q 'slot_name' ${REAL_KERNELSRC}/include/linux/pci.h 2>/dev/null && echo -DFOUND_PCI_DEV_SLOT_NAME)
+ FOUND_DEVFS := $(shell [ -e "${REAL_KERNELSRC}/include/linux/devfs_fs_kernel.h" ] && echo -DFOUND_DEVFS)
+ 
+-CFLAGS+= $(FOUND_PCI_DEV_SLOT_NAME) $(FOUND_DEVFS)
++EXTRA_CFLAGS+= $(FOUND_PCI_DEV_SLOT_NAME) $(FOUND_DEVFS)
+ 
+ KBUILD_SUPPORTED := $(shell test -e ${CNXT_KERNELSRC}/scripts/kconfig && echo yes || echo no)
+ 
+@@ -121,7 +121,7 @@
+ FOUND_KTERMIOS := $(shell grep -q 'ktermios' ${REAL_KERNELSRC}/include/linux/serial_core.h 2>/dev/null && echo -DFOUND_KTERMIOS)
+ FOUND_PCI_GET_DEVICE := $(shell grep -q 'pci_get_device' ${REAL_KERNELSRC}/include/linux/pci.h 2>/dev/null && echo -DFOUND_PCI_GET_DEVICE)
+ 
+-CFLAGS+= $(FOUND_CLASS_SIMPLE) $(FOUND_UART_REGISTER_PORT) $(FOUND_TTY_START_STOP) $(FOUND_CLASS_DEVICE_PARENT) $(FOUND_MODULE_PARAM) $(FOUND_PM_MESSAGE_T) $(FOUND_PM_MESSAGE_STRUCT) $(FOUND_PCI_CHOOSE_STATE) $(FOUND_LINUX_SUSPEND) $(FOUND_USB_DRIVER_OWNER) $(FOUND_PCI_REGISTER_DRIVER) $(FOUND_TTY_NEW_API) $(FOUND_TOUCH_ATIME) $(FOUND_SEEK_MODES) $(FOUND_LINUX_CONFIG) $(FOUND_KERNEL_EXECVE) $(FOUND_IRQ_HANDLER_T) $(FOUND_USB_COMPLETE_PT_REGS) $(FOUND_KTERMIOS) $(FOUND_PCI_GET_DEVICE)
++EXTRA_CFLAGS+= $(FOUND_CLASS_SIMPLE) $(FOUND_UART_REGISTER_PORT) $(FOUND_TTY_START_STOP) $(FOUND_CLASS_DEVICE_PARENT) $(FOUND_MODULE_PARAM) $(FOUND_PM_MESSAGE_T) $(FOUND_PM_MESSAGE_STRUCT) $(FOUND_PCI_CHOOSE_STATE) $(FOUND_LINUX_SUSPEND) $(FOUND_USB_DRIVER_OWNER) $(FOUND_PCI_REGISTER_DRIVER) $(FOUND_TTY_NEW_API) $(FOUND_TOUCH_ATIME) $(FOUND_SEEK_MODES) $(FOUND_LINUX_CONFIG) $(FOUND_KERNEL_EXECVE) $(FOUND_IRQ_HANDLER_T) $(FOUND_USB_COMPLETE_PT_REGS) $(FOUND_KTERMIOS) $(FOUND_PCI_GET_DEVICE)
+ 
+ FOUND_KZALLOC := $(shell grep -q 'kzalloc' ${REAL_KERNELSRC}/include/linux/slab.h 2>/dev/null && echo -DFOUND_KZALLOC)
+ FOUND_OPEN_SUBSTREAM_NOFILE := $(shell grep -q 'snd_pcm_open_substream.*struct[ \t]*file' ${REAL_KERNELSRC}/include/sound/pcm.h 2>/dev/null || echo -DFOUND_OPEN_SUBSTREAM_NOFILE)
+@@ -144,10 +144,10 @@
+ KO= o
+ 
+ # Configure various machine specific CFLAGS for compiling kernel modules
+-#CFLAGS+= -mpreferred-stack-boundary=2
+-#CFLAGS+= -fomit-frame-pointer
+-CFLAGS += -Wall -Wstrict-prototypes -Werror-implicit-function-declaration -O2 -I$(CNXT_KERNELSRC)/include
+-CFLAGS += -D__KERNEL__ -DMODULE
++#EXTRA_CFLAGS+= -mpreferred-stack-boundary=2
++#EXTRA_CFLAGS+= -fomit-frame-pointer
++EXTRA_CFLAGS += -Wall -Wstrict-prototypes -Werror-implicit-function-declaration -O2 -I$(CNXT_KERNELSRC)/include
++EXTRA_CFLAGS += -D__KERNEL__ -DMODULE
+ 
+ CONFIG_MODVERSIONS= $(shell echo CONFIG_MODVERSIONS | gcc ${DISTRO_CFLAGS} -E -I${CNXT_KERNELSRC}/include -include ${CNXT_KERNELSRC}/include/linux/config.h - | grep -q 'CONFIG_MODVERSIONS' && echo n || echo y)
+ ifeq ($(CONFIG_MODVERSIONS),y)
+@@ -156,18 +156,18 @@
+ CONFIG_USB= $(shell echo 'CONFIG_USB CONFIG_USB_MODULE' | gcc ${DISTRO_CFLAGS} -E -I${CNXT_KERNELSRC}/include -include ${CNXT_KERNELSRC}/include/linux/config.h - | grep -q 'CONFIG_USB CONFIG_USB_MODULE' && echo n || echo y)
+ CONFIG_SND_HDA_INTEL=$(shell echo 'CONFIG_SND_HDA_INTEL CONFIG_SND_HDA_INTEL_MODULE' | gcc ${DISTRO_CFLAGS} -E -I${CNXT_KERNELSRC}/include -include ${CNXT_KERNELSRC}/include/linux/config.h - | grep -q 'CONFIG_SND_HDA_INTEL CONFIG_SND_HDA_INTEL_MODULE' && echo n || echo y)
+ 
+-CFLAGS+= -include $(CNXT_KERNELSRC)/include/linux/config.h
+-CFLAGS+= $(MODVERFLAGS)
+-CFLAGS+= -DFOUND_TTY_START_STOP
++EXTRA_CFLAGS+= -include $(CNXT_KERNELSRC)/include/linux/config.h
++EXTRA_CFLAGS+= $(MODVERFLAGS)
++EXTRA_CFLAGS+= -DFOUND_TTY_START_STOP
+ endif # KBUILD_SUPPORTED
+ 
+ ## END OF CONFIGURATION SECTION
+ ## no changes should be necessary beyond this point
+ #####################################################################
+ 
+-CFLAGS+= -DCNXTTARGET="\"$(CNXTTARGET)\""
+-CFLAGS+= -DCNXTDRIVER="\"$(CNXTDRIVER)\""
+-CFLAGS+= -DCNXTDRVDSC="\"$(CNXTDRVDSC)\""
++EXTRA_CFLAGS+= -DCNXTTARGET="\"$(CNXTTARGET)\""
++EXTRA_CFLAGS+= -DCNXTDRIVER="\"$(CNXTDRIVER)\""
++EXTRA_CFLAGS+= -DCNXTDRVDSC="\"$(CNXTDRVDSC)\""
+ 
+ ifneq ($(WITHIN_KBUILD),yes)
+ .PHONY: default
+@@ -190,7 +190,7 @@
+ 	$(COMPILE.c) $(CFLAGS_$(@F)) $(OUTPUT_OPTION) $<
+ else
+ 	@echo ""; echo $(CC_SHOW) $(CFLAGS_$(@F)) $(OUTPUT_OPTION) $<
+-	@$(COMPILE.c) $(CFLAGS_$(@F)) $(OUTPUT_OPTION) $<
++	@$(COMPILE.c) $(EXTRA_CFLAGS) $(CFLAGS_$(@F)) $(OUTPUT_OPTION) $<
+ endif
+ 
+ CLEAN= *.o GPL/*.o *.ko GPL/*.ko *.mod.c GPL/*.mod.c .*.cmd GPL/.*.cmd .tmp_versions

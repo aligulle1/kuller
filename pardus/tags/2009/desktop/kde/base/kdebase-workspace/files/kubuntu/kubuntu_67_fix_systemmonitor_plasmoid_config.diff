@@ -1,0 +1,172 @@
+Index: kdebase-workspace-4.2.1a/plasma/applets/system-monitor/applet.cpp
+===================================================================
+--- kdebase-workspace-4.2.1a.orig/plasma/applets/system-monitor/applet.cpp	2009-03-05 13:27:38.000000000 -0500
++++ kdebase-workspace-4.2.1a/plasma/applets/system-monitor/applet.cpp	2009-03-05 13:30:55.000000000 -0500
+@@ -27,8 +27,6 @@
+ 
+ namespace SM {
+ 
+-QHash< QString, QList<uint> > Applet::s_configIds;
+-
+ Applet::Applet(QObject *parent, const QVariantList &args)
+    : Plasma::Applet(parent, args),
+      m_interval(10000),
+@@ -42,8 +40,7 @@
+      m_mode(Desktop),
+      m_detail(Low),
+      m_minimumWidth(DEFAULT_MINIMUM_WIDTH),
+-     m_mainLayout(0),
+-     m_configId(0)
++     m_mainLayout(0)
+ {
+     if (args.count() > 0) {
+         if (args[0].toString() == "SM") {
+@@ -51,25 +48,13 @@
+         }
+     }
+     QString name = pluginName();
+-
+-    while (s_configIds[name].contains(m_configId)) {
+-        ++m_configId;
+-    }
+-    s_configIds[name] << m_configId;
+ }
+ 
+ Applet::~Applet()
+ {
+-    s_configIds[pluginName()].removeAll(m_configId);
+     deleteMeters();
+ }
+ 
+-KConfigGroup Applet::persistentConfig() const
+-{
+-    KConfigGroup cg = globalConfig();
+-    return KConfigGroup(cg.config(), QString("General_%1").arg(m_configId));
+-}
+-
+ void Applet::constraintsEvent(Plasma::Constraints constraints)
+ {
+     if (constraints & Plasma::FormFactorConstraint) {
+Index: kdebase-workspace-4.2.1a/plasma/applets/system-monitor/applet.h
+===================================================================
+--- kdebase-workspace-4.2.1a.orig/plasma/applets/system-monitor/applet.h	2009-03-05 13:27:45.000000000 -0500
++++ kdebase-workspace-4.2.1a/plasma/applets/system-monitor/applet.h	2009-03-05 13:32:09.000000000 -0500
+@@ -60,7 +60,6 @@
+         void checkGeometry();
+         QGraphicsLinearLayout* mainLayout();
+         void setTitle(const QString& title, bool spacer = false);
+-        KConfigGroup persistentConfig() const;
+         uint interval() { return m_interval; };
+         void setInterval(uint interval) { m_interval = interval; };
+         qreal preferredItemHeight() { return m_preferredItemHeight; };
+@@ -96,7 +95,6 @@
+         void displayNoAvailableSources();
+         virtual void deleteMeters(QGraphicsLinearLayout* layout = 0);
+         virtual void setDetail(Detail detail);
+-        //QSizeF sizeHint(Qt::SizeHint which, const QSizeF& constraint = QSizeF()) const;
+ 
+     private:
+         uint m_interval;
+@@ -121,9 +119,6 @@
+         QSizeF m_max;
+ 
+         QGraphicsLinearLayout *m_mainLayout;
+-
+-        static QHash< QString, QList<uint> > s_configIds;
+-        uint m_configId;
+ };
+ 
+ }
+Index: kdebase-workspace-4.2.1a/plasma/applets/system-monitor/hdd.cpp
+===================================================================
+--- kdebase-workspace-4.2.1a.orig/plasma/applets/system-monitor/hdd.cpp	2009-03-05 13:28:23.000000000 -0500
++++ kdebase-workspace-4.2.1a/plasma/applets/system-monitor/hdd.cpp	2009-03-05 13:34:43.000000000 -0500
+@@ -39,7 +39,7 @@
+ 
+ void Hdd::init()
+ {
+-    KConfigGroup cg = persistentConfig();
++    KConfigGroup cg = config();
+     QString predicateString("IS StorageVolume");
+     setEngine(dataEngine("soliddevice"));
+     setItems(cg.readEntry("uuids",
+@@ -87,15 +87,16 @@
+ 
+ void Hdd::configAccepted()
+ {
+-    KConfigGroup cg = persistentConfig();
++    KConfigGroup cg = config();
++    KConfigGroup cgGlobal = globalConfig();
+     QStandardItem *parentItem = m_hddModel.invisibleRootItem();
+ 
+     clearItems();
+     for (int i = 0; i < parentItem->rowCount(); ++i) {
+         QStandardItem *item = parentItem->child(i, 0);
+         if (item) {
+-            cg.writeEntry(item->data().toString(),
+-                          parentItem->child(i, 1)->text());
++            cgGlobal.writeEntry(item->data().toString(),
++                                parentItem->child(i, 1)->text());
+             if (item->checkState() == Qt::Checked) {
+                 appendItem(item->data().toString());
+             }
+@@ -114,7 +115,7 @@
+ 
+ QString Hdd::title(const QString& uuid, const Plasma::DataEngine::Data &data)
+ {
+-    KConfigGroup cg = persistentConfig();
++    KConfigGroup cg = globalConfig();
+     QString label = cg.readEntry(uuid, "");
+ 
+     if (label.isEmpty()) {
+Index: kdebase-workspace-4.2.1a/plasma/applets/system-monitor/temperature.cpp
+===================================================================
+--- kdebase-workspace-4.2.1a.orig/plasma/applets/system-monitor/temperature.cpp	2009-03-05 13:28:27.000000000 -0500
++++ kdebase-workspace-4.2.1a/plasma/applets/system-monitor/temperature.cpp	2009-03-05 13:36:58.000000000 -0500
+@@ -42,7 +42,7 @@
+ 
+ void Temperature::init()
+ {
+-    KConfigGroup cg = persistentConfig();
++    KConfigGroup cg = config();
+     setEngine(dataEngine("systemmonitor"));
+     m_showPlotters = cg.readEntry("showPlotters", true);
+     setInterval(cg.readEntry("interval", 2) * 1000);
+@@ -57,7 +57,7 @@
+ 
+ void Temperature::parseSources()
+ {
+-    KConfigGroup cg = persistentConfig();
++    KConfigGroup cg = config();
+     setItems(cg.readEntry("temps", engine()->sources().filter(QRegExp(".*temp.*", Qt::CaseInsensitive))));
+     connectToEngine();
+ }
+@@ -106,15 +106,16 @@
+ 
+ void Temperature::configAccepted()
+ {
+-    KConfigGroup cg = persistentConfig();
++    KConfigGroup cg = config();
++    KConfigGroup cgGlobal = globalConfig();
+     QStandardItem *parentItem = m_tempModel.invisibleRootItem();
+ 
+     clearItems();
+     for (int i = 0; i < parentItem->rowCount(); ++i) {
+         QStandardItem *item = parentItem->child(i, 0);
+         if (item) {
+-            cg.writeEntry(item->text(),
+-                        parentItem->child(i, 1)->text());
++            cgGlobal.writeEntry(item->text(),
++                                parentItem->child(i, 1)->text());
+             if (item->checkState() == Qt::Checked) {
+                 appendItem(item->text());
+             }
+@@ -135,7 +136,7 @@
+ 
+ QString Temperature::title(const QString& source)
+ {
+-    KConfigGroup cg = persistentConfig();
++    KConfigGroup cg = globalConfig();
+     return cg.readEntry(source, source.mid(source.lastIndexOf('/') + 1));
+ }
+ 

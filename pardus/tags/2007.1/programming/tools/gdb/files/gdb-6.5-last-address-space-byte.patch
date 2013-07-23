@@ -1,0 +1,44 @@
+--- gdb-6.5-orig/gdb/target.c	2006-10-14 17:01:30.000000000 -0400
++++ gdb-6.5/gdb/target.c	2006-10-14 17:06:37.000000000 -0400
+@@ -1230,7 +1230,11 @@ target_xfer_memory (CORE_ADDR memaddr, g
+ 
+   while (len > 0)
+     {
++      /* FIXME: `lookup_mem_region->hi == (CORE_ADDR) ~ 0' for the default
++	 region but in general case `->hi' is the `last + 1' address.  */
+       region = lookup_mem_region(memaddr);
++      /* FIXME: The left expression usually overflows resulting in a false
++         positive.  Use there `<=' as `region->hi' is the `last + 1'.  */
+       if (memaddr + len < region->hi)
+ 	reg_len = len;
+       else
+@@ -1244,6 +1248,7 @@ target_xfer_memory (CORE_ADDR memaddr, g
+ 	  break;
+ 	  
+ 	case MEM_WO:
++	  /* FIXME: Missing `if (!write) memset (myaddr, 0, len);'.  */
+ 	  if (!write)
+ 	    return EIO;
+ 	  break;
+@@ -1252,7 +1257,12 @@ target_xfer_memory (CORE_ADDR memaddr, g
+ 	  break;
+ 	}
+ 
+-      while (reg_len > 0)
++      /* Red Hat Bug 210614: reg_len == 0 for `x/4294967295xb 0xffffffff'
++         (for the case of 32-bit architecture) resulted in a deadlock.
++	 As it was not a real xfer request we can falsely deny the access.
++	 This particular deadlock fixed by Daniel Jacobowitz in GDB PR 1966.
++	 FIXME: Last byte of the address space is not accessible.  */
++      do
+ 	{
+ 	  if (region->attrib.cache)
+ 	    res = dcache_xfer_memory (target_dcache, memaddr, myaddr,
+@@ -1279,6 +1289,7 @@ target_xfer_memory (CORE_ADDR memaddr, g
+ 	  len     -= res;
+ 	  reg_len -= res;
+ 	}
++      while (reg_len > 0);
+     }
+   
+   return 0;			/* We managed to cover it all somehow. */

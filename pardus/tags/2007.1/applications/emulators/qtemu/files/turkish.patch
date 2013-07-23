@@ -1,0 +1,701 @@
+diff -Naur qtemu-orig/configwindow.cpp qtemu/configwindow.cpp
+--- qtemu-orig/configwindow.cpp	2007-01-20 23:25:03.000000000 +0200
++++ qtemu/configwindow.cpp	2007-01-20 23:35:23.000000000 +0200
+@@ -62,6 +62,7 @@
+     languagePosition = new QComboBox;
+     languagePosition->addItem("English"); //do not translate the language names!
+     languagePosition->addItem("Deutsch");
++    languagePosition->addItem("Turkish");
+ 
+     QSettings settings("QtEmu", "QtEmu");
+     QString language = settings.value("language", QString(QLocale::system().name())).toString();
+@@ -70,6 +71,8 @@
+         index = 0;
+     else if (language == "de")
+         index = 1;
++    else if (language == "tr")
++        index = 2;
+     else
+         index = 0;
+ 
+@@ -122,6 +125,8 @@
+            break;
+         case 1: languageString = "de";
+            break;
++        case 2: languageString = "tr";
++           break;
+         default: languageString = "en";
+     }
+     settings.setValue("language", languageString);
+diff -Naur qtemu-orig/translations/qtemu_tr.ts qtemu/translations/qtemu_tr.ts
+--- qtemu-orig/translations/qtemu_tr.ts	1970-01-01 02:00:00.000000000 +0200
++++ qtemu/translations/qtemu_tr.ts	2007-01-20 23:43:01.000000000 +0200
+@@ -0,0 +1,668 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!DOCTYPE TS><TS version="1.1" language="tr">
++<context>
++    <name>ChooseSystemPage</name>
++    <message>
++        <location filename="" line="0"/>
++        <source>ReactOS</source>
++        <translation>ReactOS</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Other</source>
++        <translation>Diğer</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Select the operating system you want to install</source>
++        <translation>Yüklemek istediğiniz işletim sistemini seçin</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Select a System...</source>
++        <translation>Bir Sistem Seçin...</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Linux</source>
++        <translation>Linux</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Windows 98</source>
++        <translation>Windows 98</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Windows 2000</source>
++        <translation>Windows 2000</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Windows XP</source>
++        <translation>Windows XP</translation>
++    </message>
++</context>
++<context>
++    <name>ConfigWindow</name>
++    <message>
++        <location filename="" line="0"/>
++        <source>QtEmu Config</source>
++        <translation>QtEmu Yapılandırma</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>General</source>
++        <translation>Genel</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Default &quot;MyMachines&quot; Path:</source>
++        <translation>Varsayılan &quot;Makinelerim&quot; Yolu:</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>OK</source>
++        <translation>Tamam</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Cancel</source>
++        <translation>İptal</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Select a folder for &quot;MyMachines&quot;</source>
++        <translation>&quot;Makinelerim&quot; için bir dizin seçin</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Tabbar position:</source>
++        <translation>Sekme çubuğu konumu:</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Top</source>
++        <translation>Üst</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Bottom</source>
++        <translation>Alt</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Left</source>
++        <translation>Sol</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Right</source>
++        <translation>Sağ</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Language:</source>
++        <translation>Dil:</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Language saved</source>
++        <translation>Dil kaydedildi</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>This change will take effect after the next restart of QtEmu.</source>
++        <translation>Bu değişiklik QtEmu tekrar başlatılınca etkin olacak.</translation>
++    </message>
++</context>
++<context>
++    <name>HelpWindow</name>
++    <message>
++        <location filename="" line="0"/>
++        <source>QtEmu Help</source>
++        <translation>QtEmu Yardım</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Close</source>
++        <translation>Kapat</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Help not found</source>
++        <translation>Yardım bulunamadı</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Help not found. It is probably not installed.</source>
++        <translation>Yardım bulunamadı. Büyük ihtimalle yüklü değil.</translation>
++    </message>
++</context>
++<context>
++    <name>ImagePage</name>
++    <message>
++        <location filename="" line="0"/>
++        <source>&amp;Disk image size:</source>
++        <translation>&amp;Disk görüntüsü boyutu:</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Specify disk image details</source>
++        <translation>Disk görüntüsü detaylarını belirtin</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>GB</source>
++        <translation>GB</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Error</source>
++        <translation>Hata</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Finished</source>
++        <translation>Tamamlandı</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Image created</source>
++        <translation>Görüntü oluşturuldu</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Image NOT created!</source>
++        <translation>Görüntü oluşturulMAdı!</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Click here to write down some notes about this machine.</source>
++        <translation>Bu makine hakkında ufak notlar tutmak için buraya tıklayın.</translation>
++    </message>
++</context>
++<context>
++    <name>LocationPage</name>
++    <message>
++        <location filename="" line="0"/>
++        <source>&amp;Name:</source>
++        <translation>&amp;Ad:</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>&amp;Path:</source>
++        <translation>&amp;Yol:</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Choose name and location for the new machine</source>
++        <translation>Yeni makine için ad ve konum belirtin</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Select a folder for saving the hard disk image</source>
++        <translation>Sabit disk görüntüsünü kaydetmek için bir dizin seçin</translation>
++    </message>
++</context>
++<context>
++    <name>MachineTab</name>
++    <message>
++        <location filename="" line="0"/>
++        <source>&amp;Start</source>
++        <translation>&amp;Başla</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Start this virtual machine</source>
++        <translation>Bu sanal makineyi başlat</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>&amp;Stop</source>
++        <translation>&amp;Durdur</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Stop this virtual machine</source>
++        <translation>Bu sanal makineyi durdur</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Snapshot mode</source>
++        <translation>Görüntü yakalama modu</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>&amp;Memory</source>
++        <translation>&amp;Hafıza</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>MB</source>
++        <translation>MB</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>&amp;Hard Disk</source>
++        <translation>&amp;Sabit disk</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Select a valid hard disk image for QtEmu. Do &lt;b&gt;not change&lt;/b&gt; the hard disk image unless you know what you are doing!&lt;br /&gt;&lt;br /&gt;Hard disk image for this virtual machine:</source>
++        <translation>QtEmu için geçerli bir sabit disk görüntüsü seçin. Ne yaptığınızı kesin olarak bilmiyorsanız sabit disk görüntüsünü &lt;b&gt;değiştirmeyin!&lt;/b&gt;.&lt;br /&gt;&lt;br /&gt; Bu sanal makine için sabit disk görüntüsü:</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>&amp;CD ROM</source>
++        <translation>&amp;CD ROM</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Select a valid CD ROM image or a physical device.&lt;br /&gt;&lt;br /&gt;Image or device for this virtual machine:</source>
++        <translation>Geçerli bir CD ROM görüntüsü veya fiziksel aygıt seçin.&lt;br /&gt;&lt;br /&gt;Bu sanal makine için görüntü veya aygıt:</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>&amp;Network</source>
++        <translation>&amp;Ağ</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>&amp;Enable network</source>
++        <translation>&amp;Ağı aç</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Close this machine</source>
++        <translation>Bu makineyi kapat</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>&lt;strong&gt;Devices&lt;/strong&gt;</source>
++        <translation>&lt;strong&gt;Aygıtlar&lt;/strong&gt;</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>&amp;Boot from CD ROM</source>
++        <translation>&amp;CD ROM&apos;dan aç</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>&amp;Other</source>
++        <translation>&amp;Diğer</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Enable &amp;seamless mouse</source>
++        <translation>&amp;Gecikmesiz fareyi aç</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>&lt;hr&gt;Choose the number of virtual CPUs.</source>
++        <translation>&lt;hr&gt;Sanal MİB (işlemci) sayısını seçin.</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Virtual CPU(s)</source>
++        <translation>Sanal MİB(leri)</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>&lt;hr&gt;Choose if the virtual machine should use the host machine clock.</source>
++        <translation>&lt;hr&gt;Sanal makinenin asıl makinenin saatini kullanıp kullanmayacağını seçin.</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Enable &amp;local time</source>
++        <translation>Yere&amp;l zamanı aç</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>&lt;strong&gt;Notes&lt;/strong&gt;</source>
++        <translation>&lt;strong&gt;Notlar&lt;/strong&gt;</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Select a CD ROM Drive</source>
++        <translation>Bir CD ROM sürücü seç</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Select a CD Image</source>
++        <translation>Bir CD görüntüsü seç</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Choose whether the network (and internet) connection should be available for this virtual machine.</source>
++        <translation>Bu sanal makine için ağ (ve internet) bağlantısının açık olup olmayacağını belirleyin.</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Select a QtEmu hard disk image</source>
++        <translation>Bir QtEmu sabit disk görüntüsü seçin</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>QtEmu hard disk images</source>
++        <translation>QtEmu sabit disk görüntüleri</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>CD ROM images</source>
++        <translation>CD ROM görüntüleri</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>QtEmu</source>
++        <translation>QtEmu</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Cannot read file %1:
++%2.</source>
++        <translation>%1 dosyası okunamıyor:
++%2.</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Parse error at line %1, column %2:
++%3</source>
++        <translation>Satır %1, sütun %2 noktasında ayrıştırma hatası:
++%3</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>The file is not a QtEmu file.</source>
++        <translation>Dosya bir QtEmu dosyası değil.</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>The file is not a QtEmu version 1.0 file.</source>
++        <translation>Dosya bir QtEmu sürüm 1.0 dosyası değil.</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Cannot write file %1:
++%2.</source>
++        <translation>%1 dosyası yazılamıyor:
++%2.</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Confirm stop</source>
++        <translation>Durdurmayı onaylayın</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>You are going to kill the current machine. Are you sure?&lt;br&gt;It would be better if you shut the virtual machine manually down. This way damage on the disk image may occur.</source>
++        <translation>Aktif makineyi öldüreceksiniz. Emin misiniz?&lt;br&gt;Sanal makineyi elle kapatmak daha iyi olacaktır. Öldürmek disk görüntüsüne zarar verebilir.</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Set the size of memory for this virtual machine. If you set a too high amount, there may occur memory swapping.&lt;br /&gt;&lt;br /&gt;Memory for this virtual machine:</source>
++        <translation>Bu sanal makine için hafıza boyutunu seçin. Eğer çok yüksek bir değer girerseniz, ek tampon hafıza kullanımı gerekli olabilir.&lt;br /&gt;&lt;br /&gt;Bu sanal makine için hafıza:</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Choose whether the mouse should switch seamlessly between host and virtual system. This option is depending on the virtual machine operating system. It is for example not supported by text based systems (e.g. setups).</source>
++        <translation>Farenin ana sisteminiz ile sanal sistem arasında hemen geçiş yapıp yapmayacağını seçin. Bu seçenek sanal makinenin işletim sistemiyle ilişkilidir. Metin tabanlı sistemler tarafından (örneğin kurulumlar) desteklenmez.</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>This function is not available under Windows due to the missing function of QEMU under Windows. It will probably be fixed in a later version.</source>
++        <translation>Bu fonksiyon Windows altında QEMU fonksiyonları olmadığı için Windows altında kapalıdır. Büyük ihtimalle daha sonra çıkacak bir sürümde düzeltilecektir.</translation>
++    </message>
++</context>
++<context>
++    <name>MachineWizard</name>
++    <message>
++        <location filename="" line="0"/>
++        <source>Create a new Machine</source>
++        <translation>Yeni Makine Oluştur</translation>
++    </message>
++</context>
++<context>
++    <name>MainWindow</name>
++    <message>
++        <location filename="" line="0"/>
++        <source>QtEmu</source>
++        <translation>QtEmu</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Choose a virtual machine</source>
++        <translation>Sanal makine seçin</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>QtEmu machines</source>
++        <translation>QtEmu makineleri</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>About QtEmu</source>
++        <translation>QtEmu hakkında</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>&amp;New Machine</source>
++        <translation>&amp;Yeni Makine</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Ctrl+N</source>
++        <translation>Ctrl+N</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Create a new machine</source>
++        <translation>Yeni makine oluştur</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>&amp;Open Machine...</source>
++        <translation>&amp;Makine Aç...</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Ctrl+O</source>
++        <translation>Ctrl+O</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Open an existing machine</source>
++        <translation>Varolan bir makineyi aç</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>E&amp;xit</source>
++        <translation>Çı&amp;k</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Ctrl+Q</source>
++        <translation>Ctrl+Q</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Exit the application</source>
++        <translation>Uygulamadan çık</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>&amp;Start</source>
++        <translation>&amp;Başla</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Start this virtual machine</source>
++        <translation>Bu sanal makineyi başlat</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>S&amp;top</source>
++        <translation>&amp;Durdur</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Kill this machine</source>
++        <translation>Bu makineyi öldür</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>&amp;Restart</source>
++        <translation>&amp;Yeniden başlat</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Restart this machine</source>
++        <translation>Bu makineyi yeniden başlat</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Show the About box</source>
++        <translation>Hakkında kutusunu göster</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>&amp;File</source>
++        <translation>&amp;Dosya</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>&amp;Power</source>
++        <translation>&amp;Güç</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>&amp;Help</source>
++        <translation>&amp;Yardım</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>File</source>
++        <translation>Dosya</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Power</source>
++        <translation>Güç</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Ready</source>
++        <translation>Hazır</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Main</source>
++        <translation>Ana</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Machine loaded</source>
++        <translation>Makine yüklendi</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>&lt;center&gt;&lt;h2&gt;QtEmu&lt;/h2&gt;Version %1&lt;/center&gt;&lt;br&gt;&lt;b&gt;&lt;i&gt;QtEmu&lt;/i&gt;&lt;/b&gt; is a graphical user interface for &lt;a href=http://qemu.org&gt;QEMU&lt;/a&gt;.&lt;br&gt;&lt;br&gt;Copyright &amp;copy; 2006 Urs Wolfer &lt;a href=mailto:uwolfer%2fwo.ch&gt;uwolfer%2fwo.ch&lt;/a&gt;. All rights reserved.&lt;br&gt;&lt;br&gt;The program is provided AS IS with NO WARRANTY OF ANY KIND.&lt;br&gt;&lt;br&gt;The icons have been taken from the KDE Crystal theme which is LGPL licensed.</source>
++        <translation>&lt;center&gt;&lt;h2&gt;QtEmu&lt;/h2&gt;Sürüm %1&lt;/center&gt;&lt;br&gt;&lt;b&gt;&lt;i&gt;QtEmu&lt;/i&gt;&lt;/b&gt; &lt;a href=http://qemu.org&gt;QEMU&lt;/a&gt; için bir grafik kullanıcı arabirimidir.&lt;br&gt;&lt;br&gt;Haklar/Copyright &amp;copy; 2006 Urs Wolfer &lt;a href=mailto:uwolfer%2fwo.ch&gt;uwolfer%2fwo.ch&lt;/a&gt;. Tüm hakları saklıdır.&lt;br&gt;&lt;br&gt;Program HİÇBİR GARANTİ içermeden, olduğu gibi dağıtılmaktadır.&lt;br&gt;&lt;br&gt;Simgeler LGPL lisanslı olan KDE Crystal temasından alınmıştır.</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Ctrl+S</source>
++        <translation>Ctrl+S</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Ctrl+T</source>
++        <translation>Ctrl+T</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Ctrl+R</source>
++        <translation>Ctrl+R</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>&amp;About QtEmu</source>
++        <translation>QtEmu &amp;Hakkında</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>QtEmu &amp;Help </source>
++        <translation>QtEmu &amp;Yardım </translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>F1</source>
++        <translation>F1</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Show Help</source>
++        <translation>Yardımı Göster</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>&lt;h1&gt;QtEmu&lt;/h1&gt;QtEmu is a graphical user interface for QEMU. It has the ability to run virtual operating systems on native systems.</source>
++        <translation>&lt;h1&gt;QtEmu&lt;/h1&gt;QtEmu QEMU için grafik bir arayüzdür. Yerel sistemlerde sanal işletim sistemleri çalıştırabilir.</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Create a new virtual machine. A wizard will help you 
++installing a new operating system</source>
++        <translation>Yeni bir sanal makine oluştur. Bir sihirbaz size yeni(sp)
++işletim sistemini kurmada yardımcı olacaktır</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Open an existing virtual machine</source>
++        <translation>Varolan bir sanal makineyi aç</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Confi&amp;gure</source>
++        <translation>&amp;Yapılandır</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Ctrl+G</source>
++        <translation>Ctrl+G</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Customize the application</source>
++        <translation>Uygulamayı kişiselleştir</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>MyMachines</source>
++        <translation>Makinelerim</translation>
++    </message>
++</context>
++<context>
++    <name>Wizard</name>
++    <message>
++        <location filename="" line="0"/>
++        <source>Cancel</source>
++        <translation>İptal</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>&lt; &amp;Back</source>
++        <translation>&lt; &amp;Geri</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>Next &gt;</source>
++        <translation>Sonraki &gt;</translation>
++    </message>
++    <message>
++        <location filename="" line="0"/>
++        <source>&amp;Finish</source>
++        <translation>&amp;Bitir</translation>
++    </message>
++</context>
++</TS>

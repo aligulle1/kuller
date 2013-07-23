@@ -1,0 +1,176 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>pulseaudio</Name>
+        <Homepage>http://pulseaudio.org/</Homepage>
+        <Packager>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Packager>
+        <License>LGPLv2</License>
+        <License>GPLv2</License>
+        <IsA>app:console</IsA>
+        <Summary>A networked sound server with an advanced plugin system</Summary>
+        <Archive sha1sum="90139debe73b6d26bc0240af3587fdb7fe4c2750" type="targz">http://0pointer.de/lennart/projects/pulseaudio/pulseaudio-0.9.10.tar.gz</Archive>
+        <BuildDependencies>
+            <Dependency>audiofile</Dependency>
+            <Dependency>avahi</Dependency>
+            <Dependency>bluez-libs</Dependency>
+            <Dependency>gconf</Dependency>
+            <Dependency>libcap</Dependency>
+            <Dependency>liboil</Dependency>
+            <Dependency>libsamplerate</Dependency>
+            <Dependency>xorg-server</Dependency>
+            <Dependency>lirc</Dependency>
+            <Dependency>jack-audio-connection-kit</Dependency>
+            <Dependency>libatomic_ops</Dependency>
+            <Dependency>libsndfile</Dependency>
+            <Dependency>hal</Dependency>
+            <Dependency>libtool</Dependency>
+            <Dependency>doxygen</Dependency>
+            <Dependency>pkgconfig</Dependency>
+            <!-- see http://www.pulseaudio.org/ticket/137 -->
+            <Dependency versionFrom="1.5.24">libtool</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <!-- change policy to allow high priority and refuse realtime -->
+            <Patch level="1">policy.patch</Patch>
+            <!-- Add a module that ensures there is always a sink loaded -->
+            <Patch>pulseaudio-0.9.9-always-sink.patch</Patch>
+            <Patch>pulseaudio-declarations.patch</Patch>
+
+            <!-- Upstream patch for CVE-2009-1894 -->
+            <Patch level="1">pulseaudio-0.9.9-CVE-2009-1894.patch</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>pulseaudio</Name>
+        <RuntimeDependencies>
+            <Dependency>alsa-utils</Dependency>
+            <Dependency>audiofile</Dependency>
+            <Dependency>avahi</Dependency>
+            <Dependency>gconf</Dependency>
+            <Dependency>libcap</Dependency>
+            <Dependency>liboil</Dependency>
+            <Dependency>libsamplerate</Dependency>
+            <Dependency>libsndfile</Dependency>
+            <Dependency>xorg-server</Dependency>
+            <Dependency>lirc</Dependency>
+            <Dependency>libatomic_ops</Dependency>
+            <Dependency>hal</Dependency>
+            <Dependency>libtool</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="executable">/usr/bin</Path>
+            <Path fileType="executable">/usr/lib/pm-utils/sleep.d</Path>
+            <Path fileType="library">/usr/lib</Path> 
+            <Path fileType="config">/etc</Path>
+            <Path fileType="header">/usr/include</Path>
+            <Path fileType="data">/usr/share/</Path>
+            <Path fileType="data">/var</Path>
+        </Files>
+        <AdditionalFiles>
+            <AdditionalFile owner="root" permission="0755" target="/usr/lib/pm-utils/sleep.d/02PulseAudio">02PulseAudio</AdditionalFile>
+        </AdditionalFiles>
+    </Package>
+
+    <Package>
+        <Name>pulseaudio-gconf</Name>
+        <Summary>GConf configuration backend for the PulseAudio sound server.</Summary>
+        <RuntimeDependencies>
+            <Dependency>pulseaudio</Dependency>
+            <Dependency>gconf</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="library">/usr/lib/pulse-0.9/modules/module-gconf.so</Path>
+            <Path fileType="executable">/usr/libexec/pulse/gconf-helper</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>pulseaudio-jack</Name>
+        <Summary>JACK sink and source modules for the PulseAudio sound server.</Summary>
+        <RuntimeDependencies>
+            <Dependency>pulseaudio</Dependency>
+            <Dependency>jack-audio-connection-kit</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="library">/usr/lib/pulse-0.9/modules/module-jack-sink.so</Path>
+            <Path fileType="library">/usr/lib/pulse-0.9/modules/module-jack-source.so</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>pulseaudio-bluetooth</Name>
+        <Summary>Contains a module that can be used to automatically turn down the volume if a bluetooth mobile phone leaves the proximity or turn it up again if it enters the proximity again</Summary>
+        <RuntimeDependencies>
+            <Dependency>pulseaudio</Dependency>
+            <Dependency>bluez-libs</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="library">/usr/lib/pulse-0.9/modules/module-bt-proximity.so</Path>
+            <Path fileType="executable">/usr/libexec/pulse/bt-proximity-helper</Path>
+        </Files>
+    </Package>
+
+    <History>
+        <Update release="8" type="security">
+            <Date>2009-07-22</Date>
+            <Version>0.9.10</Version>
+            <Comment>Remove exploitable LD_BIND_NOW hack (CVE-2009-1894) (#10490).</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="7">
+            <Date>2008-12-29</Date>
+            <Version>0.9.10</Version>
+            <Comment>Add pm-utils hook to suspend an active source/sink.</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="6">
+            <Date>2008-04-10</Date>
+            <Version>0.9.10</Version>
+            <Comment>Version bump</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="5">
+            <Date>2008-03-13</Date>
+            <Version>0.9.9</Version>
+            <Comment>Version bump</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="4">
+            <Date>2007-12-27</Date>
+            <Version>0.9.8</Version>
+            <Comment>Version bump</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="3">
+            <Date>2007-05-28</Date>
+            <Version>0.9.6</Version>
+            <Comment>Add avahi deps.</Comment>
+            <Name>Ertuğrul Erata</Name>
+            <Email>ertugrulerata@gmail.com</Email>
+        </Update>
+        <Update release="2">
+            <Date>2007-05-11</Date>
+            <Version>0.9.5</Version>
+            <Comment>Add avahi deps.</Comment>
+            <Name>Ertuğrul Erata</Name>
+            <Email>ertugrulerata@gmail.com</Email>
+        </Update>
+         <Update release="1">
+            <Date>2007-03-21</Date>
+            <Version>0.9.5</Version>
+            <Comment>First release.</Comment>
+            <Name>Ertuğrul Erata</Name>
+            <Email>ertugrulerata@gmail.com</Email>
+        </Update>
+    </History>
+</PISI>

@@ -1,0 +1,226 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>python3</Name>
+        <Homepage>http://www.python.org/</Homepage>
+        <Packager>
+            <Name>David Stegbauer</Name>
+            <Email>daaste@gmail.com</Email>
+        </Packager>
+        <License>PSF-2.2</License>
+        <IsA>app:console</IsA>
+        <Summary>An interpreted, interactive, object-orientated programming language</Summary>
+        <Description>Python is a dynamic object-oriented programming language that can be used for many kinds of software development. It offers strong support for integration with other languages and tools, comes with extensive standard libraries, and can be learned in a few days.</Description>
+        <Archive sha1sum="5e654dbd48476193ccdef4d604ed4f45b48c6769" type="tarxz">http://www.python.org/ftp/python/3.2.2/Python-3.2.2.tar.xz</Archive>
+        <BuildDependencies>
+            <Dependency>zlib-devel</Dependency>
+            <Dependency>ncurses-devel</Dependency>
+            <Dependency>readline-devel</Dependency>
+            <Dependency>db4-devel</Dependency>
+            <Dependency>gdbm-devel</Dependency>
+            <Dependency>openssl-devel</Dependency>
+            <Dependency>bzip2</Dependency>
+            <Dependency>sqlite-devel</Dependency>
+            <Dependency>expat-devel</Dependency>
+            <Dependency>libffi-devel</Dependency>
+            <!-- Bootstrap -->
+            <!-- Comment these deps when bootstrapping -->
+            <Dependency>tcl-devel</Dependency>
+            <Dependency>tcltk-devel</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <!-- Look into /usr/lib/pardus first -->
+            <!-- do not enable until python3 is system.base package
+            <Patch level="0">add-pardus-to-search-path.patch</Patch>
+            -->
+
+            <!-- Don't create pyc files on installation -->
+            <Patch level="0">no-pyc.patch</Patch>
+
+            <Patch level="0">pardus_platform.patch</Patch>
+
+            <!-- Fedora/Mandriva patches -->
+
+            <!-- Add missing constants to socket module -->
+            <Patch level="1">python-2.7rc1-socketmodule-constants.patch</Patch>
+            <Patch level="1">python-2.7rc1-socketmodule-constants2.patch</Patch>
+
+            <!-- If objdump is not found, don't fail and return the basename of the SO file -->
+            <Patch level="0">binutils-no-dep.patch</Patch>
+
+            <!-- Use -lpthread rather than -pthread -->
+            <Patch level="0">revised-linkage.patch</Patch>
+
+            <!-- https://bugzilla.redhat.com/show_bug.cgi?id=252136 -->
+            <Patch level="0">plural-fix.patch</Patch>
+
+            <!-- http://bugs.pardus.org.tr/show_bug.cgi?id=11666 -->
+            <Patch level="0">CVE-2009-3560.patch</Patch>
+
+            <!-- Add flags for statvfs.f_flag to the constant list in posixmodule (i.e. "os")
+            redhat bg:553020; partially upstream as http://bugs.python.org/issue7647 -->
+            <Patch level="0">statvfs-f_flag-constants.patch</Patch>
+
+            <!-- Add noexecstack to CFLAGS when building extension -->
+            <Patch level="0">noexecstack.patch</Patch>
+
+            <!-- use CXXFLAGS in distutils-->
+            <Patch level="0">distutils-cxxflags.patch</Patch>
+
+            <!-- Fedora patches from http://pkgs.fedoraproject.org/gitweb/?p=python3.git -->
+            <Patch level="1">fedora/python-3.2rc1-no-static-lib.patch</Patch>
+            <Patch level="1">fedora/python-3.2b2-fix-test-subprocess-with-nonreadable-path-dir.patch</Patch>
+
+            <!-- Debian patches from http://packages.debian.org/sid/python3.2 -->
+            <!-- suggest installation of the python3-devel package, if bdist_wininst cannot find the wininst-* files -->
+            <Patch level="1">debian/bdist-wininst-notfound.diff</Patch>
+            <!-- Don't try to download documentation tools -->
+            <Patch level="1">debian/doc-nodownload.diff</Patch>
+            <!-- Enable the build of the fpectl module. -->
+            <Patch level="1">debian/enable-fpectl.diff</Patch>
+            <!-- time operations and variables -->
+            <Patch level="1">debian/issue9012a.diff</Patch>
+            <!-- argparse.py: Make the gettext import conditional -->
+            <Patch level="1">debian/lib-argparse.diff</Patch>
+            <!-- Proper handling of packages in linecache.py -->
+            <Patch level="1">debian/linecache.diff</Patch>
+            <!-- Don't map 'utf8', 'utf-8' to 'utf', which is not a known encoding for glibc -->
+            <Patch level="1">debian/locale-module.diff</Patch>
+            <!-- Use /etc/lsb-release to identify the platform. -->
+            <Patch level="1">debian/platform-lsbrelease.diff</Patch>
+            <!-- Ignore errors in the profile task. -->
+            <Patch level="1">debian/profiled-build.diff</Patch>
+            <!-- Don't add standard library dirs to library_dirs and runtime_library_dirs.-->
+            <Patch level="1">debian/distutils-link.diff</Patch>
+            <!--Fix bashism in makesetup shell script -->
+            <Patch level="1">debian/makesetup-bashism.diff</Patch>
+            <!-- suggest installation of python-tk package on failing _tkinter import -->
+            <Patch level="1">debian/tkinter-import.diff</Patch>
+            <!-- Remove cthreads detection -->
+            <Patch level="1">debian/cthreads.diff</Patch>
+            <!-- Call the linker with -Bsymbolic-functions an pardus ldflags -->
+            <Patch level="1">debian/link-opt.diff</Patch>
+            <!-- Assume working semaphores, don't rely on running kernel for the check.-->
+            <Patch level="1">debian/disable-sem-check.diff</Patch>
+            <!-- Remove autoconf version check -->
+            <Patch level="1">debian/autoconf-version.diff</Patch>
+            <!-- Link with the system expat -->
+            <Patch level="1">debian/link-system-expat.diff</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>python3</Name>
+        <RuntimeDependencies>
+            <Dependency>zlib</Dependency>
+            <Dependency>ncurses</Dependency>
+            <Dependency>readline</Dependency>
+            <Dependency>db4</Dependency>
+            <Dependency>gdbm</Dependency>
+            <Dependency>openssl</Dependency>
+            <Dependency>bzip2</Dependency>
+            <Dependency>sqlite</Dependency>
+            <Dependency>expat</Dependency>
+            <Dependency>libffi</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="config">/etc</Path>
+            <Path fileType="executable">/usr/bin</Path>
+            <!-- "Makefile" and the config-32/64.h file are needed by
+            distutils/sysconfig.py:_init_posix(), so we include them in the core
+            package, along with their parent directories (https://bugzilla.redhat.com/show_bug.cgi?id=531901)
+            -->
+            <Path fileType="header">/usr/include/python3*/pyconfig.h</Path>
+            <Path fileType="library">/usr/lib</Path>
+            <Path fileType="library">/usr/lib/python*/tkinter/__init__.py</Path>
+            <Path fileType="doc">/usr/share/doc</Path>
+            <Path fileType="man">/usr/share/man</Path>
+        </Files>
+        <Provides>
+            <COMAR script="pakhandler.py">System.PackageHandler</COMAR>
+        </Provides>
+    </Package>
+
+    <Package>
+        <Name>python3-devel</Name>
+        <Summary>Development files for python3</Summary>
+        <RuntimeDependencies>
+            <Dependency release="current">python3</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="header">/usr/include</Path>
+            <Path fileType="data">/usr/lib/pkgconfig</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>python3-tests</Name>
+        <Summary>Python3 Library tests</Summary>
+        <RuntimeDependencies>
+            <Dependency release="current">python3</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="data">/usr/lib/python3*/test</Path>
+            <Path fileType="data">/usr/lib/python3*/ctypes/test</Path>
+            <Path fileType="data">/usr/lib/python3*/distutils/test</Path>
+            <Path fileType="data">/usr/lib/python3*/email/test</Path>
+            <Path fileType="data">/usr/lib/python3*/importlib/test</Path>
+            <Path fileType="data">/usr/lib/python3*/lib2to3/test</Path>
+            <Path fileType="data">/usr/lib/python3*/sqlite3/test</Path>
+            <Path fileType="data">/usr/lib/python3*/tkinter/test</Path>
+            <Path fileType="data">/usr/lib/python3*/unittest/test</Path>
+        </Files>
+    </Package>
+
+    <!-- Bootstrap -->
+    <!-- Comment these packages (python3-tk and idle3) when bootstrapping -->
+    <Package>
+        <Name>python3-tk</Name>
+        <IsA>library</IsA>
+        <Summary>Python3 modules for Tk</Summary>
+        <RuntimeDependencies>
+            <Dependency release="current">python3</Dependency>
+            <Dependency>tcl</Dependency>
+            <Dependency>tcltk</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="library">/usr/lib/python*/tkinter</Path>
+            <Path fileType="library">/usr/lib/python*/lib-dynload/_tkinter*</Path>
+            <Path fileType="data">/usr/lib/python*/turtle*</Path>
+        </Files>
+    </Package>
+
+    <!-- Bootstrap -->
+    <!-- Comment these packages (python3-tk and idle3) when bootstrapping -->
+    <Package>
+        <Name>python3-idle</Name>
+        <Icon>idle</Icon>
+        <IsA>app:gui</IsA>
+        <PartOf>programming.environment</PartOf>
+        <Summary>An Integrated Development Environment for Python</Summary>
+        <RuntimeDependencies>
+            <Dependency release="current">python3-tk</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="executable">/usr/bin/idle3*</Path>
+            <Path fileType="library">/usr/lib/python3*/idlelib</Path>
+            <Path fileType="data">/usr/share/applications</Path>
+            <Path fileType="data">/usr/share/pixmaps</Path>
+        </Files>
+        <AdditionalFiles>
+            <AdditionalFile permission="0644" target="/usr/share/pixmaps/idle3.png">python-logo-glassy.png</AdditionalFile>
+            <AdditionalFile permission="0644" target="/usr/share/applications/idle3.desktop">idle3.desktop</AdditionalFile>
+        </AdditionalFiles>
+    </Package>
+
+    <History>
+        <Update release="1">
+            <Date>2011-02-16</Date>
+            <Version>3.2.2</Version>
+            <Comment>New release - python 3.2</Comment>
+            <Name>David Stegbauer</Name>
+            <Email>daaste@gmail.com</Email>
+        </Update>
+    </History>
+</PISI>

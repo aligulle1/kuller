@@ -1,0 +1,30 @@
+--- ksudoku-0.3.orig/src/ksudoku.h	2005-09-29 18:30:35.000000000 +0200
++++ ksudoku-0.3/src/ksudoku.h	2005-12-03 03:21:58.916655230 +0100
+@@ -136,6 +136,7 @@
+     void setupActions();
+ public:
+ 	QTime t;
++    QTimer * timer;
+ private:
+     ksudokuView *m_view;
+ 	bool dub;
+--- ksudoku-0.3.orig/src/ksudoku.cpp	2005-09-29 17:22:52.000000000 +0200
++++ ksudoku-0.3/src/ksudoku.cpp	2005-12-03 03:21:59.028638830 +0100
+@@ -69,7 +69,7 @@
+ 	int secs = t.elapsed() / 1000;
+ 	int mins = secs / 60;
+ 	secs = secs % 60;
+-
++	timer->stop();
+ 	if(!donebyhimself)
+ 		mesg.sprintf("Congratulations! You made it in %d minutes and %d seconds. With some tricks.", mins,secs);
+ 	else
+@@ -268,7 +268,7 @@
+ 		this->load(path);
+ 	}
+ 
+-	QTimer *timer = new QTimer( this );
++	timer = new QTimer( this );
+     connect( timer, SIGNAL(timeout()), this, SLOT(updateStatusBar()) );
+     timer->start( 1000, false ); // 2 seconds single-shot timer
+     connect( m_view, SIGNAL(changedSelectedNum()), this, SLOT(updateStatusBar()) );

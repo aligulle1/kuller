@@ -1,0 +1,26 @@
+diff -Nur mplayer-20071230-old/mplayer.c mplayer-20071230/mplayer.c
+--- mplayer-20071230-old/mplayer.c	2008-01-14 04:11:39.000000000 +0200
++++ mplayer-20071230/mplayer.c	2008-01-14 04:13:56.000000000 +0200
+@@ -861,6 +861,8 @@
+ void load_per_extension_config (m_config_t* conf, const char *const file)
+ {
+     char *str;
++    char strtmp[8];
++    int i = 0;
+     char extension[strlen (PROFILE_CFG_EXTENSION) + 8];
+     m_profile_t *p;
+ 
+@@ -869,8 +871,12 @@
+     if (!str)
+         return;
+ 
++    strncpy(strtmp, str + 1, 7);
++    for(i = 0; i < 8; i++)
++        strtmp[i] = tolower(strtmp[i]);
++
+     sprintf (extension, PROFILE_CFG_EXTENSION);
+-    strncat (extension, ++str, 7);
++    strncat (extension, strtmp, 7);
+     p = m_config_get_profile (conf, extension);
+     if (p)
+     {

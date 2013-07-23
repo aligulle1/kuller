@@ -1,0 +1,28 @@
+--- SDL_ttf.c	2004-12-16 07:39:54.000000000 +0200
++++ SDL_ttf.c	2006-05-18 20:53:44.000000000 +0300
+@@ -43,16 +43,6 @@
+ #include FT_FREETYPE_H
+ #include FT_OUTLINE_H
+ #include FT_TRUETYPE_IDS_H
+-/*
+-#include <freetype/freetype.h>
+-#include <freetype/ftoutln.h>
+-#include <freetype/ttnameid.h>
+-*/
+-#include <freetype/internal/ftobjs.h>
+-
+-#ifndef FT_OPEN_STREAM
+-#define FT_OPEN_STREAM ft_open_stream
+-#endif
+ 
+ #include "SDL.h"
+ #include "SDL_endian.h"
+@@ -275,7 +265,7 @@
+ 	}
+ 	memset(stream, 0, sizeof(*stream));
+ 
+-	stream->memory = library->memory;
++	stream->memory = NULL;  /* set by FT_Open_Face */
+ 	stream->read = RWread;
+ 	stream->descriptor.pointer = src;
+ 	stream->pos = (unsigned long)position;

@@ -1,0 +1,253 @@
+Index: tetex-src-3.0/configure
+===================================================================
+--- tetex-src-3.0.orig/configure
++++ tetex-src-3.0/configure
+@@ -3292,9 +3292,9 @@ export needs_zlib
+ 
+ # we need libxpdf for pdf[ex]tex
+ test ! -d $srcdir/$LIBXPDFDIR && : ${needs_libxpdf=no}
+-test "$with_pdftex"  != no    && : ${needs_libxpdf=yes}
+-test "$with_pdfetex"  != no    && : ${needs_libxpdf=yes}
+-test "$with_pdfxtex"  != no    && : ${needs_libxpdf=yes}
++test "$with_pdftex"  != no    && : ${needs_libxpdf=no}
++test "$with_pdfetex"  != no    && : ${needs_libxpdf=no}
++test "$with_pdfxtex"  != no    && : ${needs_libxpdf=no}
+ : ${needs_libxpdf=no}
+ export needs_libxpdf
+ 
+Index: tetex-src-3.0/configure.in
+===================================================================
+--- tetex-src-3.0.orig/configure.in
++++ tetex-src-3.0/configure.in
+@@ -145,9 +145,9 @@ export needs_zlib
+ 
+ # we need libxpdf for pdf[ex]tex
+ test ! -d $srcdir/$LIBXPDFDIR && : ${needs_libxpdf=no}
+-test "$with_pdftex"  != no    && : ${needs_libxpdf=yes}
+-test "$with_pdfetex"  != no    && : ${needs_libxpdf=yes}
+-test "$with_pdfxtex"  != no    && : ${needs_libxpdf=yes}
++test "$with_pdftex"  != no    && : ${needs_libxpdf=no}
++test "$with_pdfetex"  != no    && : ${needs_libxpdf=no}
++test "$with_pdfxtex"  != no    && : ${needs_libxpdf=no}
+ : ${needs_libxpdf=no}
+ export needs_libxpdf
+ 
+Index: tetex-src-3.0/texk/web2c/pdfetexdir/pdfetex.mk
+===================================================================
+--- tetex-src-3.0.orig/texk/web2c/pdfetexdir/pdfetex.mk
++++ tetex-src-3.0/texk/web2c/pdfetexdir/pdfetex.mk
+@@ -8,13 +8,16 @@ Makefile: $(srcdir)/pdfetexdir/pdfetex.m
+ pdfetex = @PETEX@ pdfetex
+ pdfetexdir = pdfetexdir
+ 
++# use libpoppler instead of included xpdf code
++ADDLDFLAGS = -lpoppler
++
+ # The C sources.
+ pdfetex_c = pdfetexini.c pdfetex0.c pdfetex1.c pdfetex2.c pdfetex3.c
+ pdfetex_o = pdfetexini.o pdfetex0.o pdfetex1.o pdfetex2.o pdfetex3.o pdfetexextra.o
+ 
+ # Making pdfetex
+ pdfetex: pdftexd.h $(pdfetex_o) $(pdfetexextra_o) $(pdftexlibsdep)
+-	@CXXHACKLINK@ $(pdfetex_o) $(pdfetexextra_o) $(pdftexlibs) $(socketlibs) @CXXHACKLDLIBS@ @CXXLDEXTRA@
++	@CXXHACKLINK@ $(pdfetex_o) $(pdfetexextra_o) $(pdftexlibs) $(socketlibs) @CXXHACKLDLIBS@ @CXXLDEXTRA@ $(ADDLDFLAGS)
+ 
+ # C file dependencies.
+ $(pdfetex_c) pdfetexcoerce.h pdfetexd.h: pdfetex.p $(web2c_texmf)
+Index: tetex-src-3.0/texk/web2c/pdftexdir/Makefile.in
+===================================================================
+--- tetex-src-3.0.orig/texk/web2c/pdftexdir/Makefile.in
++++ tetex-src-3.0/texk/web2c/pdftexdir/Makefile.in
+@@ -8,7 +8,7 @@ ac_include ../make/library.mk
+ kpathsea_srcdir_parent = $(srcdir)/../..
+ kpathsea_dir_parent = ../..
+ 
+-ALL_CXXFLAGS = @CXXFLAGS@ @DEFS@ $(XXCFLAGS) -I. -I$(srcdir) -I$(kpathsea_dir_parent) -I$(kpathsea_srcdir_parent) @LIBXPDFCPPFLAGS@
++ALL_CXXFLAGS = @CXXFLAGS@ @DEFS@ $(XXCFLAGS) -I. -I$(srcdir) -I$(kpathsea_dir_parent) -I$(kpathsea_srcdir_parent) -I/usr/include/poppler
+ CXX = @CXX@
+ 
+ .SUFFIXES: .cc .o
+Index: tetex-src-3.0/texk/web2c/pdftexdir/pdftex.mk
+===================================================================
+--- tetex-src-3.0.orig/texk/web2c/pdftexdir/pdftex.mk
++++ tetex-src-3.0/texk/web2c/pdftexdir/pdftex.mk
+@@ -13,6 +13,9 @@ Makefile: pdftexdir/pdftex.mk
+ pdftex_bin = pdftex pdfetex pdfxtex ttf2afm pdftosrc
+ linux_build_dir = $(HOME)/pdftex/build/linux/texk/web2c
+ 
++# use libpoppler instead of included xpdf code
++ADDLDFLAGS = -lpoppler
++
+ # We build pdftex
+ pdftex = @PTEX@ pdftex
+ pdftexdir = pdftexdir
+@@ -29,7 +32,7 @@ pdftex_o = pdftexini.o pdftex0.o pdftex1
+ 
+ # Making pdftex
+ pdftex: $(pdftex_o) $(pdftexextra_o) $(pdftexlibsdep)
+-	@CXXHACKLINK@ $(pdftex_o) $(pdftexextra_o) $(pdftexlibs) $(socketlibs) @CXXHACKLDLIBS@ @CXXLDEXTRA@
++	@CXXHACKLINK@ $(pdftex_o) $(pdftexextra_o) $(pdftexlibs) $(socketlibs) @CXXHACKLDLIBS@ @CXXLDEXTRA@ $(ADDLDFLAGS)
+ 
+ # C file dependencies.
+ $(pdftex_c) pdftexcoerce.h pdftexd.h: pdftex.p $(web2c_texmf)
+@@ -153,7 +156,7 @@ ttf2afm-clean:
+ pdftosrc = pdftosrc
+ 
+ pdftosrc: pdftexdir/pdftosrc.o $(LIBXPDFDEP)
+-	@CXXHACKLINK@ pdftexdir/pdftosrc.o $(LDLIBXPDF) -lm @CXXLDEXTRA@
++	@CXXHACKLINK@ pdftexdir/pdftosrc.o $(LDLIBXPDF) -lm @CXXLDEXTRA@ $(ADDLDFLAGS)
+ pdftexdir/pdftosrc.o:$(srcdir)/pdftexdir/pdftosrc.cc
+ 	cd pdftexdir && $(MAKE) pdftosrc.o
+ check: pdftosrc-check
+Index: tetex-src-3.0/texk/web2c/pdftexdir/pdftoepdf.cc
+===================================================================
+--- tetex-src-3.0.orig/texk/web2c/pdftexdir/pdftoepdf.cc
++++ tetex-src-3.0/texk/web2c/pdftexdir/pdftoepdf.cc
+@@ -26,22 +26,23 @@ $Id: //depot/Build/source.development/Te
+ #include <stdio.h>
+ #include <string.h>
+ #include <ctype.h>
+-#include <aconf.h>
+-#include <GString.h>
+-#include <gmem.h>
+-#include <gfile.h>
+-#include <config.h>
+-#include "Object.h"
+-#include "Stream.h"
+-#include "Array.h"
+-#include "Dict.h"
+-#include "XRef.h"
+-#include "Catalog.h"
+-#include "Page.h"
+-#include "GfxFont.h"
+-#include "PDFDoc.h"
+-#include "GlobalParams.h"
+-#include "Error.h"
++#include <dirent.h>
++#include <poppler/poppler-config.h>
++#include <poppler/goo/GooString.h>
++#include <poppler/goo/gmem.h>
++#include <poppler/goo/gfile.h>
++#include "poppler/Object.h"
++#include "poppler/Stream.h"
++#include "poppler/Array.h"
++#include "poppler/Dict.h"
++#include "poppler/XRef.h"
++#include "poppler/Link.h"
++#include "poppler/Catalog.h"
++#include "poppler/Page.h"
++#include "poppler/GfxFont.h"
++#include "poppler/PDFDoc.h"
++#include "poppler/GlobalParams.h"
++#include "poppler/Error.h"
+ 
+ #include "epdf.h"
+ 
+@@ -189,7 +190,7 @@ static PdfDocument *find_add_document(ch
+ #ifdef DEBUG
+     fprintf(stderr, "\nCreating %s (%d)\n", p->file_name, p->occurences);
+ #endif
+-    GString *docName = new GString(p->file_name);
++    GooString *docName = new GooString(p->file_name);
+     p->doc = new PDFDoc(docName);  // takes ownership of docName
+     if (!p->doc->isOk() || !p->doc->okToPrint()) {
+         pdftex_fail("xpdf: reading PDF image failed");
+@@ -539,7 +540,7 @@ static void copyObject(Object *obj)
+     int  i, l, c;
+     Ref ref;
+     char *p;
+-    GString *s;
++    GooString *s;
+     if (obj->isBool()) {
+         pdf_printf("%s", obj->getBool() ? "true" : "false");
+     }
+@@ -713,7 +714,7 @@ read_pdf_info(char *image_name, char *pa
+     epdf_num_pages = pdf_doc->doc->getCatalog()->getNumPages();
+     if (page_name) {
+         // get page by name
+-        GString name(page_name);
++        GooString name(page_name);
+         LinkDest *link = pdf_doc->doc->findDest(&name);
+         if (link == 0 || !link->isOk())
+             pdftex_fail("pdf inclusion: invalid destination <%s>",
+Index: tetex-src-3.0/texk/web2c/pdftexdir/pdftosrc.cc
+===================================================================
+--- tetex-src-3.0.orig/texk/web2c/pdftexdir/pdftosrc.cc
++++ tetex-src-3.0/texk/web2c/pdftexdir/pdftosrc.cc
+@@ -25,21 +25,21 @@ $Id: //depot/Build/source.development/Te
+ #include <stdio.h>
+ #include <string.h>
+ #include <ctype.h>
+-#include <aconf.h>
+-#include <GString.h>
+-#include <gmem.h>
+-#include <gfile.h>
+-#include "Object.h"
+-#include "Stream.h"
+-#include "Array.h"
+-#include "Dict.h"
+-#include "XRef.h"
+-#include "Catalog.h"
+-#include "Page.h"
+-#include "GfxFont.h"
+-#include "PDFDoc.h"
+-#include "GlobalParams.h"
+-#include "Error.h"
++#include <dirent.h>
++#include <poppler/goo/GooString.h>
++#include <poppler/goo/gmem.h>
++#include <poppler/goo/gfile.h>
++#include "poppler/Object.h"
++#include "poppler/Stream.h"
++#include "poppler/Array.h"
++#include "poppler/Dict.h"
++#include "poppler/XRef.h"
++#include "poppler/Catalog.h"
++#include "poppler/Page.h"
++#include "poppler/GfxFont.h"
++#include "poppler/PDFDoc.h"
++#include "poppler/GlobalParams.h"
++#include "poppler/Error.h"
+ 
+ static XRef *xref = 0;
+ 
+@@ -47,7 +47,7 @@ int main(int argc, char *argv[])
+ {
+     char *p, buf[1024];
+     PDFDoc *doc;
+-    GString *fileName;
++    GooString *fileName;
+     Stream *s;
+     Object srcStream, srcName, catalogDict;
+     FILE *outfile;
+@@ -59,7 +59,7 @@ int main(int argc, char *argv[])
+         fprintf(stderr, "Usage: pdftosrc <PDF-file> [<stream-object-number>]\n");
+         exit(1);
+     }
+-    fileName = new GString(argv[1]);
++    fileName = new GooString(argv[1]);
+     globalParams = new GlobalParams();
+     doc = new PDFDoc(fileName);
+     if (!doc->isOk()) {
+Index: tetex-src-3.0/texk/web2c/pdfxtexdir/pdfxtex.mk
+===================================================================
+--- tetex-src-3.0.orig/texk/web2c/pdfxtexdir/pdfxtex.mk
++++ tetex-src-3.0/texk/web2c/pdfxtexdir/pdfxtex.mk
+@@ -8,13 +8,16 @@ Makefile: $(srcdir)/pdfxtexdir/pdfxtex.m
+ pdfxtex = @PXTEX@ pdfxtex
+ pdfxtexdir = pdfxtexdir
+ 
++# use libpoppler instead of included xpdf code
++ADDLDFLAGS = -lpoppler
++
+ # The C sources.
+ pdfxtex_c = pdfxtexini.c pdfxtex0.c pdfxtex1.c pdfxtex2.c pdfxtex3.c
+ pdfxtex_o = pdfxtexini.o pdfxtex0.o pdfxtex1.o pdfxtex2.o pdfxtex3.o pdfxtexextra.o
+ 
+ # Making pdfxtex
+ pdfxtex: pdftexd.h $(pdfxtex_o) $(pdfxtexextra_o) $(pdftexlibsdep)
+-	@CXXHACKLINK@ $(pdfxtex_o) $(pdfxtexextra_o) $(pdftexlibs) $(socketlibs) @CXXHACKLDLIBS@ @CXXLDEXTRA@
++	@CXXHACKLINK@ $(pdfxtex_o) $(pdfxtexextra_o) $(pdftexlibs) $(socketlibs) @CXXHACKLDLIBS@ @CXXLDEXTRA@ $(ADDLDFLAGS)
+ 
+ # C file dependencies.
+ $(pdfxtex_c) pdfxtexcoerce.h pdfxtexd.h: pdfxtex.p $(web2c_texmf) pdfxtexdir/pdfxtex.defines

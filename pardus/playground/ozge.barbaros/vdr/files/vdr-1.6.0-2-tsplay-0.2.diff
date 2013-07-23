@@ -1,0 +1,2254 @@
+diff -ur vdr-1.6.0/audio.c vdr-1.6.0-tsplay/audio.c
+--- vdr-1.6.0/audio.c	2006-05-28 17:03:24.000000000 +0200
++++ vdr-1.6.0-tsplay/audio.c	2010-06-03 17:35:19.000000000 +0200
+@@ -32,6 +32,12 @@
+       audio->Play(Data, Length, Id);
+ }
+ 
++void cAudios::PlayTsAudio(const uchar *Data, int Length)
++{
++  for (cAudio *audio = First(); audio; audio = Next(audio))
++      audio->PlayTs(Data, Length);
++}
++
+ void cAudios::MuteAudio(bool On)
+ {
+   for (cAudio *audio = First(); audio; audio = Next(audio))
+@@ -86,6 +92,29 @@
+      }
+ }
+ 
++void cExternalAudio::PlayTs(const uchar *Data, int Length)
++{
++  if (command && !mute) {
++     if (pipe || pipe.Open(command, "w")) {
++        int written = 0;
++        while (Length > 0) {
++              int w = fwrite(Data + written, 1, Length, pipe);
++              if (w < 0) {
++                 LOG_ERROR;
++                 break;
++                 }
++              Length -= w;
++              written += w;
++              }
++        }
++     else {
++        esyslog("ERROR: can't open pipe to audio command '%s'", command);
++        free(command);
++        command = NULL;
++        }
++     }
++}
++
+ void cExternalAudio::Mute(bool On)
+ {
+   mute = On;
+diff -ur vdr-1.6.0/audio.h vdr-1.6.0-tsplay/audio.h
+--- vdr-1.6.0/audio.h	2005-02-12 13:20:19.000000000 +0100
++++ vdr-1.6.0-tsplay/audio.h	2010-06-03 17:35:19.000000000 +0200
+@@ -24,6 +24,11 @@
+        ///< be copied and processed in a separate thread. The Data is always a
+        ///< complete PES audio packet. Id indicates the type of audio data this
+        ///< packet holds.
++  virtual void PlayTs(const uchar *Data, int Length) = 0;
++       ///< Plays the given block of audio Data. Must return as soon as possible.
++       ///< If the entire block of data can't be processed immediately, it must
++       ///< be copied and processed in a separate thread. The Data is always a
++       ///< complete TS audio packet.
+   virtual void Mute(bool On) = 0;
+        ///< Immediately sets the audio device to be silent (On==true) or to
+        ///< normal replay (On==false).
+@@ -34,6 +39,7 @@
+ class cAudios : public cList<cAudio> {
+ public:
+   void PlayAudio(const uchar *Data, int Length, uchar Id);
++  void PlayTsAudio(const uchar *Data, int Length);
+   void MuteAudio(bool On);
+   void ClearAudio(void);
+   };
+@@ -49,6 +55,7 @@
+   cExternalAudio(const char *Command);
+   virtual ~cExternalAudio();
+   virtual void Play(const uchar *Data, int Length, uchar Id);
++  virtual void PlayTs(const uchar *Data, int Length);
+   virtual void Mute(bool On);
+   virtual void Clear(void);
+   };
+diff -ur vdr-1.6.0/config.c vdr-1.6.0-tsplay/config.c
+--- vdr-1.6.0/config.c	2008-02-17 14:39:00.000000000 +0100
++++ vdr-1.6.0-tsplay/config.c	2010-06-03 17:35:19.000000000 +0200
+@@ -275,7 +275,7 @@
+   FontOsdSize = 22;
+   FontSmlSize = 18;
+   FontFixSize = 20;
+-  MaxVideoFileSize = MAXVIDEOFILESIZE;
++  MaxVideoFileSize = MAXVIDEOFILESIZEDEFAULT;
+   SplitEditedFiles = 0;
+   MinEventTimeout = 30;
+   MinUserInactivity = 300;
+diff -ur vdr-1.6.0/cutter.c vdr-1.6.0-tsplay/cutter.c
+--- vdr-1.6.0/cutter.c	2008-01-13 13:22:21.000000000 +0100
++++ vdr-1.6.0-tsplay/cutter.c	2010-06-03 17:35:19.000000000 +0200
+@@ -18,10 +18,12 @@
+ class cCuttingThread : public cThread {
+ private:
+   const char *error;
++  bool isPesRecording;
+   cUnbufferedFile *fromFile, *toFile;
+   cFileName *fromFileName, *toFileName;
+   cIndexFile *fromIndex, *toIndex;
+   cMarks fromMarks, toMarks;
++  off_t maxVideoFileSize;
+ protected:
+   virtual void Action(void);
+ public:
+@@ -37,12 +39,17 @@
+   fromFile = toFile = NULL;
+   fromFileName = toFileName = NULL;
+   fromIndex = toIndex = NULL;
+-  if (fromMarks.Load(FromFileName) && fromMarks.Count()) {
+-     fromFileName = new cFileName(FromFileName, false, true);
+-     toFileName = new cFileName(ToFileName, true, true);
+-     fromIndex = new cIndexFile(FromFileName, false);
+-     toIndex = new cIndexFile(ToFileName, true);
+-     toMarks.Load(ToFileName); // doesn't actually load marks, just sets the file name
++  cRecording Recording(FromFileName);
++  isPesRecording = Recording.IsPesRecording();
++  if (fromMarks.Load(FromFileName, isPesRecording) && fromMarks.Count()) {
++     fromFileName = new cFileName(FromFileName, false, true, isPesRecording);
++     toFileName = new cFileName(ToFileName, true, true, isPesRecording);
++     fromIndex = new cIndexFile(FromFileName, false, isPesRecording);
++     toIndex = new cIndexFile(ToFileName, true, isPesRecording);
++     toMarks.Load(ToFileName, isPesRecording); // doesn't actually load marks, just sets the file name
++     maxVideoFileSize = MEGABYTE(Setup.MaxVideoFileSize);
++     if (isPesRecording && maxVideoFileSize > MEGABYTE(MAXVIDEOFILESIZEPES))
++        maxVideoFileSize = MEGABYTE(MAXVIDEOFILESIZEPES);
+      Start();
+      }
+   else
+@@ -69,7 +76,7 @@
+      fromFile->SetReadAhead(MEGABYTE(20));
+      int Index = Mark->position;
+      Mark = fromMarks.Next(Mark);
+-     int FileSize = 0;
++     off_t FileSize = 0;
+      int CurrentFileNumber = 0;
+      int LastIFrame = 0;
+      toMarks.Add(0);
+@@ -78,8 +85,9 @@
+      bool LastMark = false;
+      bool cutIn = true;
+      while (Running()) {
+-           uchar FileNumber;
+-           int FileOffset, Length;
++           uint16_t FileNumber;
++           off_t FileOffset;
++           int Length;
+            uchar PictureType;
+ 
+            // Make sure there is enough disk space:
+@@ -122,7 +130,7 @@
+            if (PictureType == I_FRAME) { // every file shall start with an I_FRAME
+               if (LastMark) // edited version shall end before next I-frame
+                  break;
+-              if (FileSize > MEGABYTE(Setup.MaxVideoFileSize)) {
++              if (FileSize > maxVideoFileSize) {
+                  toFile = toFileName->NextFile();
+                  if (!toFile) {
+                     error = "toFile 1";
+@@ -133,7 +141,10 @@
+               LastIFrame = 0;
+ 
+               if (cutIn) {
+-                 cRemux::SetBrokenLink(buffer, Length);
++                 if (isPesRecording)
++                    cRemux::SetBrokenLink(buffer, Length);
++                 else
++                    TsSetTeiOnBrokenPackets(buffer, Length);
+                  cutIn = false;
+                  }
+               }
+diff -ur vdr-1.6.0/device.c vdr-1.6.0-tsplay/device.c
+--- vdr-1.6.0/device.c	2010-06-03 17:34:39.000000000 +0200
++++ vdr-1.6.0-tsplay/device.c	2010-06-03 18:14:03.000000000 +0200
+@@ -221,6 +221,7 @@
+ cDevice *cDevice::avoidDevice = NULL;
+ 
+ cDevice::cDevice(void)
++:patPmtParser(true)
+ {
+   cardIndex = nextCardIndex++;
+ 
+@@ -241,6 +242,7 @@
+   startScrambleDetection = 0;
+ 
+   player = NULL;
++  isPlayingVideo = false;
+   pesAssembler = new cPesAssembler;
+   ClrAvailableTracks();
+   currentAudioTrack = ttNone;
+@@ -1155,6 +1157,47 @@
+ 
+ void cDevice::StillPicture(const uchar *Data, int Length)
+ {
++  if (Data[0] == 0x47) {
++     // TS data
++     cTsToPes TsToPes;
++     uchar *buf = NULL;
++     int Size = 0;
++     while (Length >= TS_SIZE) {
++           int Pid = TsPid(Data);
++           if (Pid == 0)
++              patPmtParser.ParsePat(Data, TS_SIZE);
++           else if (Pid == patPmtParser.PmtPid())
++              patPmtParser.ParsePmt(Data, TS_SIZE);
++           else if (Pid == patPmtParser.Vpid()) {
++              if (TsPayloadStart(Data)) {
++                 int l;
++                 while (const uchar *p = TsToPes.GetPes(l)) {
++                       int Offset = Size;
++                       Size += l;
++                       buf = (uchar *)realloc(buf, Size);
++                       if (!buf)
++                          return;
++                       memcpy(buf + Offset, p, l);
++                       }
++                 TsToPes.Reset();
++                 }
++              TsToPes.PutTs(Data, TS_SIZE);
++              }
++           Length -= TS_SIZE;
++           Data += TS_SIZE;
++           }
++     int l;
++     while (const uchar *p = TsToPes.GetPes(l)) {
++           int Offset = Size;
++           Size += l;
++           buf = (uchar *)realloc(buf, Size);
++           if (!buf)
++              return;
++           memcpy(buf + Offset, p, l);
++           }
++     StillPicture(buf, Size);
++     free(buf);
++     }
+ }
+ 
+ bool cDevice::Replaying(void) const
+@@ -1175,6 +1218,7 @@
+      DELETENULL(liveSubtitle);
+      DELETENULL(dvbSubtitleConverter);
+      pesAssembler->Reset();
++     patPmtParser.Reset();
+      player = Player;
+      if (!Transferring())
+         ClrAvailableTracks(false, true);
+@@ -1198,7 +1242,10 @@
+      dvbSubtitleConverter = NULL;
+      SetPlayMode(pmNone);
+      SetVideoDisplayFormat(eVideoDisplayFormat(Setup.VideoDisplayFormat));
++     PlayTs(NULL, 0);
++     patPmtParser.Reset();
+      Audios.ClearAudio();
++     isPlayingVideo = false;
+      }
+ }
+ 
+@@ -1251,6 +1298,7 @@
+         switch (c) {
+           case 0xBE:          // padding stream, needed for MPEG1
+           case 0xE0 ... 0xEF: // video
++               isPlayingVideo = true;
+                w = PlayVideo(Start, d);
+                break;
+           case 0xC0 ... 0xDF: // audio
+@@ -1391,6 +1439,124 @@
+   return Length;
+ }
+ 
++int cDevice::PlayTsVideo(const uchar *Data, int Length)
++{
++  // Video PES has no explicit length, so we can only determine the end of
++  // a PES packet when the next TS packet that starts a payload comes in:
++  if (TsPayloadStart(Data)) {
++     int l;
++     while (const uchar *p = tsToPesVideo.GetPes(l)) {
++           int w = PlayVideo(p, l);
++           if (w <= 0) {
++              tsToPesVideo.SetRepeatLast();
++              return w;
++              }
++           }
++     tsToPesVideo.Reset();
++     }
++  tsToPesVideo.PutTs(Data, Length);
++  return Length;
++}
++
++int cDevice::PlayTsAudio(const uchar *Data, int Length)
++{
++  // Audio PES always has an explicit length and consists of single packets:
++  int l;
++  if (const uchar *p = tsToPesAudio.GetPes(l)) {
++     int w = PlayAudio(p, l, p[3]);
++     if (w <= 0) {
++        tsToPesAudio.SetRepeatLast();
++        return w;
++        }
++     tsToPesAudio.Reset();
++     }
++  tsToPesAudio.PutTs(Data, Length);
++  return Length;
++}
++
++int cDevice::PlayTsSubtitle(const uchar *Data, int Length)
++{
++  if (!dvbSubtitleConverter)
++     dvbSubtitleConverter = new cDvbSubtitleConverter;
++  tsToPesSubtitle.PutTs(Data, Length);
++  int l;
++  if (const uchar *p = tsToPesSubtitle.GetPes(l)) {
++     dvbSubtitleConverter->Convert(p, l);
++     tsToPesSubtitle.Reset();
++     }
++  return Length;
++}
++
++//TODO detect and report continuity errors?
++int cDevice::PlayTs(const uchar *Data, int Length, bool VideoOnly)
++{
++  int Played = 0;
++  if (Data == NULL) {
++     tsToPesVideo.Reset();
++     tsToPesAudio.Reset();
++     tsToPesSubtitle.Reset();
++     }
++  else if (Length < TS_SIZE) {
++     esyslog("ERROR: skipped %d bytes of TS fragment", Length);
++     return Length;
++     }
++  else {
++     cMutexLock MutexLock(&mutexCurrentAudioTrack);
++     while (Length >= TS_SIZE) {
++           if (Data[0] != TS_SYNC_BYTE) {
++              int Skipped = 1;
++              while (Skipped < Length && (Data[Skipped] != TS_SYNC_BYTE || Length - Skipped > TS_SIZE && Data[Skipped + TS_SIZE] != TS_SYNC_BYTE))
++                    Skipped++;
++              esyslog("ERROR: skipped %d bytes to sync on start of TS packet", Skipped);
++              return Played + Skipped;
++              }
++           int Pid = TsPid(Data);
++           if (TsHasPayload(Data)) { // silently ignore TS packets w/o payload
++              int PayloadOffset = TsPayloadOffset(Data);
++              if (PayloadOffset < TS_SIZE) {
++                 if (Pid == 0)
++                    patPmtParser.ParsePat(Data, TS_SIZE);
++                 else if (Pid == patPmtParser.PmtPid())
++                    patPmtParser.ParsePmt(Data, TS_SIZE);
++                 else if (Pid == patPmtParser.Vpid()) {
++                    isPlayingVideo = true;
++                    int w = PlayTsVideo(Data, TS_SIZE);
++                    if (w < 0)
++                       return Played ? Played : w;
++                    if (w == 0)
++                       break;
++                    }
++                 else if (Pid == availableTracks[currentAudioTrack].id) {
++                    if (!VideoOnly || HasIBPTrickSpeed()) {
++                       int w = PlayTsAudio(Data, TS_SIZE);
++                       if (w < 0)
++                          return Played ? Played : w;
++                       if (w == 0)
++                          break;
++                       Audios.PlayTsAudio(Data, TS_SIZE);
++                       }
++                    }
++                 else if (Pid == availableTracks[currentSubtitleTrack].id) {
++                    if (!VideoOnly || HasIBPTrickSpeed())
++                       PlayTsSubtitle(Data, TS_SIZE);
++                    }
++                 }
++              }
++           else if (Pid == patPmtParser.Ppid()) {
++              int w = PlayTsVideo(Data, TS_SIZE);
++              if (w < 0)
++                 return Played ? Played : w;
++              if (w == 0)
++                 break;
++              }
++           Played += TS_SIZE;
++           Length -= TS_SIZE;
++           Data += TS_SIZE;
++           }
++     }
++  return Played;
++}
++
+ int cDevice::Priority(void) const
+ {
+   int priority = IsPrimaryDevice() ? Setup.PrimaryLimit - 1 : DEFAULTPRIORITY;
+diff -ur vdr-1.6.0/device.h vdr-1.6.0-tsplay/device.h
+--- vdr-1.6.0/device.h	2008-02-23 14:13:04.000000000 +0100
++++ vdr-1.6.0-tsplay/device.h	2010-06-03 18:14:22.000000000 +0200
+@@ -17,6 +17,7 @@
+ #include "filter.h"
+ #include "nit.h"
+ #include "pat.h"
++#include "remux.h"
+ #include "ringbuffer.h"
+ #include "sdt.h"
+ #include "sections.h"
+@@ -34,6 +35,8 @@
+ #define TS_SYNC_BYTE     0x47
+ #define PID_MASK_HI      0x1F
+ 
++#define TSPLAY_PATCH_VERSION 2 // Presence detection of TSPlay-Patch
++
+ enum eSetChannelResult { scrOk, scrNotAvailable, scrNoTransfer, scrFailed };
+ 
+ enum ePlayMode { pmNone,           // audio/video from decoder
+@@ -472,7 +475,15 @@
+ private:
+   cPlayer *player;
+   cPesAssembler *pesAssembler;
++  cPatPmtParser patPmtParser;
++  cTsToPes tsToPesVideo;
++  cTsToPes tsToPesAudio;
++  cTsToPes tsToPesSubtitle;
++  bool isPlayingVideo;
+ protected:
++  const cPatPmtParser *PatPmtParser(void) const { return &patPmtParser; }
++       ///< Returns a pointer to the patPmtParser, so that a derived device
++       ///< can use the stream information from it.
+   virtual bool CanReplay(void) const;
+        ///< Returns true if this device can currently start a replay session.
+   virtual bool SetPlayMode(ePlayMode PlayMode);
+@@ -505,11 +516,38 @@
+        ///< If VideoOnly is true, only the video will be displayed,
+        ///< which is necessary for trick modes like 'fast forward'.
+        ///< Data must point to one single, complete PES packet.
++  virtual int PlayTsVideo(const uchar *Data, int Length);
++       ///< Plays the given data block as video.
++       ///< Data points to exactly one complete TS packet of the given Length
++       ///< (which is always TS_SIZE).
++       ///< PlayTsVideo() shall process the packet either as a whole (returning
++       ///< Length) or not at all (returning 0 or -1 and setting 'errno' accordingly).
++       ///< The default implementation collects all incoming TS payload belonging
++       ///< to one PES packet and calls PlayVideo() with the resulting packet.
++  virtual int PlayTsAudio(const uchar *Data, int Length);
++       ///< Plays the given data block as audio.
++       ///< Data points to exactly one complete TS packet of the given Length
++       ///< (which is always TS_SIZE).
++       ///< PlayTsAudio() shall process the packet either as a whole (returning
++       ///< Length) or not at all (returning 0 or -1 and setting 'errno' accordingly).
++       ///< The default implementation collects all incoming TS payload belonging
++       ///< to one PES packet and calls PlayAudio() with the resulting packet.
++  virtual int PlayTsSubtitle(const uchar *Data, int Length);
++       ///< Plays the given data block as a subtitle.
++       ///< Data points to exactly one complete TS packet of the given Length
++       ///< (which is always TS_SIZE).
++       ///< PlayTsSubtitle() shall process the packet either as a whole (returning
++       ///< Length) or not at all (returning 0 or -1 and setting 'errno' accordingly).
++       ///< The default implementation collects all incoming TS payload belonging
++       ///< to one PES packet and displays the resulting subtitle via the OSD.
+ public:
+   virtual int64_t GetSTC(void);
+        ///< Gets the current System Time Counter, which can be used to
+        ///< synchronize audio and video. If this device is unable to
+        ///< provide the STC, -1 will be returned.
++  virtual bool IsPlayingVideo(void) const { return isPlayingVideo; }
++       ///< \return Returns true if the currently attached player has delivered
++       ///< any video packets.
+   virtual bool HasIBPTrickSpeed(void) { return false; }
+        ///< Returns true if this device can handle all frames in 'fast forward'
+        ///< trick speeds.
+@@ -559,6 +597,22 @@
+        ///< to a complete packet with data from the next call to PlayPes().
+        ///< That way any functions called from within PlayPes() will be
+        ///< guaranteed to always receive complete PES packets.
++  virtual int PlayTs(const uchar *Data, int Length, bool VideoOnly = false);
++       ///< Plays the given TS packet.
++       ///< If VideoOnly is true, only the video will be displayed,
++       ///< which is necessary for trick modes like 'fast forward'.
++       ///< Data points to a single TS packet, Length is always TS_SIZE (the total
++       ///< size of a single TS packet).
++       ///< If Data is NULL any leftover data from a previous call will be
++       ///< discarded.
++       ///< A derived device can reimplement this function to handle the
++       ///< TS packets itself. Any packets the derived function can't handle
++       ///< must be sent to the base class function. This applies especially
++       ///< to the PAT/PMT packets.
++       ///< Returns -1 in case of error, otherwise the number of actually
++       ///< processed bytes is returned.
++       ///< PlayTs() shall process the TS packets either as a whole (returning
++       ///< n*TS_SIZE) or not at all, returning 0 or -1 and setting 'errno' accordingly).
+   bool Replaying(void) const;
+        ///< Returns true if we are currently replaying.
+   bool Transferring(void) const;
+diff -ur vdr-1.6.0/dvbdevice.c vdr-1.6.0-tsplay/dvbdevice.c
+--- vdr-1.6.0/dvbdevice.c	2008-02-09 17:11:44.000000000 +0100
++++ vdr-1.6.0-tsplay/dvbdevice.c	2010-06-03 17:35:19.000000000 +0200
+@@ -1085,7 +1085,13 @@
+ 
+ void cDvbDevice::StillPicture(const uchar *Data, int Length)
+ {
+-  if (Data[0] == 0x00 && Data[1] == 0x00 && Data[2] == 0x01 && (Data[3] & 0xF0) == 0xE0) {
++  if (!Data || Length < TS_SIZE)
++     return;
++  if (Data[0] == 0x47) {
++     // TS data
++     cDevice::StillPicture(Data, Length);
++     }
++  else if (Data[0] == 0x00 && Data[1] == 0x00 && Data[2] == 0x01 && (Data[3] & 0xF0) == 0xE0) {
+      // PES data
+      char *buf = MALLOC(char, Length);
+      if (!buf)
+diff -ur vdr-1.6.0/dvbplayer.c vdr-1.6.0-tsplay/dvbplayer.c
+--- vdr-1.6.0/dvbplayer.c	2008-02-09 16:10:54.000000000 +0100
++++ vdr-1.6.0-tsplay/dvbplayer.c	2010-06-03 18:14:22.000000000 +0200
+@@ -196,6 +196,7 @@
+   cFileName *fileName;
+   cIndexFile *index;
+   cUnbufferedFile *replayFile;
++  bool isPesRecording;
+   bool eof;
+   bool firstPacket;
+   ePlayModes playMode;
+@@ -206,7 +207,7 @@
+   cFrame *playFrame;
+   void TrickSpeed(int Increment);
+   void Empty(void);
+-  bool NextFile(uchar FileNumber = 0, int FileOffset = -1);
++  bool NextFile(uint16_t FileNumber = 0, off_t FileOffset = -1);
+   int Resume(void);
+   bool Save(void);
+ protected:
+@@ -240,6 +241,8 @@
+   ringBuffer = NULL;
+   backTrace = NULL;
+   index = NULL;
++  cRecording Recording(FileName);
++  isPesRecording = Recording.IsPesRecording();
+   eof = false;
+   firstPacket = true;
+   playMode = pmPlay;
+@@ -249,13 +252,13 @@
+   readFrame = NULL;
+   playFrame = NULL;
+   isyslog("replay %s", FileName);
+-  fileName = new cFileName(FileName, false);
++  fileName = new cFileName(FileName, false, false, isPesRecording);
+   replayFile = fileName->Open();
+   if (!replayFile)
+      return;
+   ringBuffer = new cRingBufferFrame(PLAYERBUFSIZE);
+   // Create the index file:
+-  index = new cIndexFile(FileName, false);
++  index = new cIndexFile(FileName, false, isPesRecording);
+   if (!index)
+      esyslog("ERROR: can't allocate index");
+   else if (!index->Ok()) {
+@@ -312,7 +315,7 @@
+   firstPacket = true;
+ }
+ 
+-bool cDvbPlayer::NextFile(uchar FileNumber, int FileOffset)
++bool cDvbPlayer::NextFile(uint16_t FileNumber, off_t FileOffset)
+ {
+   if (FileNumber > 0)
+      replayFile = fileName->SetOffset(FileNumber, FileOffset);
+@@ -327,8 +330,8 @@
+   if (index) {
+      int Index = index->GetResume();
+      if (Index >= 0) {
+-        uchar FileNumber;
+-        int FileOffset;
++        uint16_t FileNumber;
++        off_t FileOffset;
+         if (index->Get(Index, &FileNumber, &FileOffset) && NextFile(FileNumber, FileOffset))
+            return Index;
+         }
+@@ -397,8 +400,8 @@
+               if (!readFrame && (replayFile || readIndex >= 0)) {
+                  if (!nonBlockingFileReader->Reading()) {
+                     if (playMode == pmFast || (playMode == pmSlow && playDir == pdBackward)) {
+-                       uchar FileNumber;
+-                       int FileOffset;
++                       uint16_t FileNumber;
++                       off_t FileOffset;
+                        bool TimeShiftMode = index->IsStillRecording();
+                        int Index = -1;
+                        if (DeviceHasIBPTrickSpeed() && playDir == pdForward) {
+@@ -435,8 +438,8 @@
+                        readIndex = Index;
+                        }
+                     else if (index) {
+-                       uchar FileNumber;
+-                       int FileOffset;
++                       uint16_t FileNumber;
++                       off_t FileOffset;
+                        readIndex++;
+                        if (!(index->Get(readIndex, &FileNumber, &FileOffset, NULL, &Length) && NextFile(FileNumber, FileOffset))) {
+                           readIndex = -1;
+@@ -496,14 +499,22 @@
+                  pc = playFrame->Count();
+                  if (p) {
+                     if (firstPacket) {
+-                       PlayPes(NULL, 0);
+-                       cRemux::SetBrokenLink(p, pc);
++                       if (isPesRecording) {
++                          PlayPes(NULL, 0);
++                          cRemux::SetBrokenLink(p, pc);
++                          }
++                       else
++                          PlayTs(NULL, 0);
+                        firstPacket = false;
+                        }
+                     }
+                  }
+               if (p) {
+-                 int w = PlayPes(p, pc, playMode != pmPlay);
++                 int w;
++                 if (isPesRecording)
++                    w = PlayPes(p, pc, playMode != pmPlay);
++                 else
++                    w = PlayTs(p, pc, playMode != pmPlay);
+                  if (w > 0) {
+                     p += w;
+                     pc -= w;
+@@ -578,7 +589,8 @@
+             LOCK_THREAD;
+             if (!(DeviceHasIBPTrickSpeed() && playDir == pdForward))
+                Empty();
+-            DeviceMute();
++            if (DeviceIsPlayingVideo())
++               DeviceMute();
+             playMode = pmFast;
+             playDir = pdForward;
+             trickSpeed = NORMAL_SPEED;
+@@ -624,7 +636,8 @@
+        case pmPlay: {
+             LOCK_THREAD;
+             Empty();
+-            DeviceMute();
++            if (DeviceIsPlayingVideo())
++               DeviceMute();
+             playMode = pmFast;
+             playDir = pdBackward;
+             trickSpeed = NORMAL_SPEED;
+@@ -695,8 +708,9 @@
+      Empty();
+      if (++Index <= 0)
+         Index = 1; // not '0', to allow GetNextIFrame() below to work!
+-     uchar FileNumber;
+-     int FileOffset, Length;
++     uint16_t FileNumber;
++     off_t FileOffset;
++     int Length;
+      Index = index->GetNextIFrame(Index, false, &FileNumber, &FileOffset, &Length);
+      if (Index >= 0 && NextFile(FileNumber, FileOffset) && Still) {
+         uchar b[MAXFRAMESIZE + 4 + 5 + 4];
+@@ -706,6 +720,7 @@
+               DevicePlay();
+            // append sequence end code to get the image shown immediately with softdevices
+            if (r > 6 && (b[3] & 0xF0) == 0xE0) { // make sure to append it only to a video packet
++              // FIXME: Fails for TS frames
+               b[r++] = 0x00;
+               b[r++] = 0x00;
+               b[r++] = 0x01;
+diff -ur vdr-1.6.0/Makefile vdr-1.6.0-tsplay/Makefile
+--- vdr-1.6.0/Makefile	2008-02-29 22:43:03.000000000 +0100
++++ vdr-1.6.0-tsplay/Makefile	2010-06-03 17:35:19.000000000 +0200
+@@ -60,6 +60,8 @@
+ 
+ DEFINES += -D_GNU_SOURCE
+ 
++DEFINES += -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE
++
+ DEFINES += -DVIDEODIR=\"$(VIDEODIR)\"
+ DEFINES += -DCONFDIR=\"$(CONFDIR)\"
+ DEFINES += -DPLUGINDIR=\"$(PLUGINLIBDIR)\"
+diff -ur vdr-1.6.0/menu.c vdr-1.6.0-tsplay/menu.c
+--- vdr-1.6.0/menu.c	2008-03-16 12:15:28.000000000 +0100
++++ vdr-1.6.0-tsplay/menu.c	2010-06-03 17:35:19.000000000 +0200
+@@ -2051,10 +2051,13 @@
+      return osContinue;
+   cMenuRecordingItem *ri = (cMenuRecordingItem *)Get(Current());
+   if (ri && !ri->IsDirectory()) {
+-     cDevice::PrimaryDevice()->StopReplay(); // must do this first to be able to rewind the currently replayed recording
+-     cResumeFile ResumeFile(ri->FileName());
+-     ResumeFile.Delete();
+-     return Play();
++     cRecording *recording = GetRecording(ri);
++     if (recording) {
++        cDevice::PrimaryDevice()->StopReplay(); // must do this first to be able to rewind the currently replayed recording
++        cResumeFile ResumeFile(ri->FileName(), recording->IsPesRecording());
++        ResumeFile.Delete();
++        return Play();
++        }
+      }
+   return osContinue;
+ }
+@@ -2756,7 +2759,7 @@
+   Add(new cMenuEditBoolItem(tr("Setup.Recording$Mark instant recording"),    &data.MarkInstantRecord));
+   Add(new cMenuEditStrItem( tr("Setup.Recording$Name instant recording"),     data.NameInstantRecord, sizeof(data.NameInstantRecord)));
+   Add(new cMenuEditIntItem( tr("Setup.Recording$Instant rec. time (min)"),   &data.InstantRecordTime, 1, MAXINSTANTRECTIME));
+-  Add(new cMenuEditIntItem( tr("Setup.Recording$Max. video file size (MB)"), &data.MaxVideoFileSize, MINVIDEOFILESIZE, MAXVIDEOFILESIZE));
++  Add(new cMenuEditIntItem( tr("Setup.Recording$Max. video file size (MB)"), &data.MaxVideoFileSize, MINVIDEOFILESIZE, MAXVIDEOFILESIZETS));
+   Add(new cMenuEditBoolItem(tr("Setup.Recording$Split edited files"),        &data.SplitEditedFiles));
+ }
+ 
+@@ -4074,9 +4077,9 @@
+   lastSpeed = -2; // an invalid value
+   timeoutShow = 0;
+   timeSearchActive = false;
+-  marks.Load(fileName);
+   cRecording Recording(fileName);
+   cStatus::MsgReplaying(this, Recording.Name(), Recording.FileName(), true);
++  marks.Load(fileName, Recording.IsPesRecording());
+   SetTrackDescriptions(false);
+ }
+ 
+diff -ur vdr-1.6.0/player.h vdr-1.6.0-tsplay/player.h
+--- vdr-1.6.0/player.h	2008-02-16 14:50:11.000000000 +0100
++++ vdr-1.6.0-tsplay/player.h	2010-06-03 18:14:22.000000000 +0200
+@@ -26,6 +26,7 @@
+   bool DevicePoll(cPoller &Poller, int TimeoutMs = 0) { return device ? device->Poll(Poller, TimeoutMs) : false; }
+   bool DeviceFlush(int TimeoutMs = 0) { return device ? device->Flush(TimeoutMs) : true; }
+   bool DeviceHasIBPTrickSpeed(void) { return device ? device->HasIBPTrickSpeed() : false; }
++  bool DeviceIsPlayingVideo(void) { return device ? device->IsPlayingVideo() : false; }
+   void DeviceTrickSpeed(int Speed) { if (device) device->TrickSpeed(Speed); }
+   void DeviceClear(void) { if (device) device->Clear(); }
+   void DevicePlay(void) { if (device) device->Play(); }
+@@ -42,6 +43,10 @@
+        // Sends the given PES Data to the device and returns the number of
+        // bytes that have actually been accepted by the device (or a
+        // negative value in case of an error).
++  int PlayTs(const uchar *Data, int Length, bool VideoOnly = false) { return device ? device->PlayTs(Data, Length, VideoOnly) : -1; }
++       // Sends the given TS packet to the device and returns a positive number
++       // if the packet has been accepted by the device, or a negative value in
++       // case of an error.
+ public:
+   cPlayer(ePlayMode PlayMode = pmAudioVideo);
+   virtual ~cPlayer();
+diff -ur vdr-1.6.0/recorder.c vdr-1.6.0-tsplay/recorder.c
+--- vdr-1.6.0/recorder.c	2007-02-24 17:36:24.000000000 +0100
++++ vdr-1.6.0-tsplay/recorder.c	2010-06-03 17:35:19.000000000 +0200
+@@ -84,8 +84,11 @@
+ 
+ bool cFileWriter::NextFile(void)
+ {
++  off_t maxVideoFileSize = MEGABYTE(off_t(Setup.MaxVideoFileSize));
++  if (maxVideoFileSize > MEGABYTE(MAXVIDEOFILESIZEPES))
++     maxVideoFileSize = MEGABYTE(MAXVIDEOFILESIZEPES);
+   if (recordFile && pictureType == I_FRAME) { // every file shall start with an I_FRAME
+-     if (fileSize > MEGABYTE(Setup.MaxVideoFileSize) || RunningLowOnDiskSpace()) {
++     if (fileSize > maxVideoFileSize || RunningLowOnDiskSpace()) {
+         recordFile = fileName->NextFile();
+         fileSize = 0;
+         }
+diff -ur vdr-1.6.0/recording.c vdr-1.6.0-tsplay/recording.c
+--- vdr-1.6.0/recording.c	2008-02-24 11:28:53.000000000 +0100
++++ vdr-1.6.0-tsplay/recording.c	2010-06-03 17:35:19.000000000 +0200
+@@ -12,6 +12,7 @@
+ #include <dirent.h>
+ #include <errno.h>
+ #include <fcntl.h>
++#include <math.h>
+ #include <stdio.h>
+ #include <string.h>
+ #include <sys/stat.h>
+@@ -37,15 +38,17 @@
+ #define DATAFORMAT   "%4d-%02d-%02d.%02d:%02d.%02d.%02d" RECEXT
+ #define NAMEFORMAT   "%s/%s/" DATAFORMAT
+ */
+-#define DATAFORMAT   "%4d-%02d-%02d.%02d%*c%02d.%02d.%02d" RECEXT
+-#define NAMEFORMAT   "%s/%s/" "%4d-%02d-%02d.%02d.%02d.%02d.%02d" RECEXT
++#define DATAFORMATPES   "%4d-%02d-%02d.%02d%*c%02d.%02d.%02d" RECEXT
++#define NAMEFORMATPES   "%s/%s/" "%4d-%02d-%02d.%02d.%02d.%02d.%02d" RECEXT
++#define DATAFORMATTS    "%4d-%02d-%02d.%02d.%02d.%d-%d" RECEXT
++#define NAMEFORMATTS    "%s/%s/" DATAFORMATTS
+ 
+-#define RESUMEFILESUFFIX  "/resume%s%s.vdr"
++#define RESUMEFILESUFFIX  "/resume%s%s"
+ #ifdef SUMMARYFALLBACK
+ #define SUMMARYFILESUFFIX "/summary.vdr"
+ #endif
+-#define INFOFILESUFFIX    "/info.vdr"
+-#define MARKSFILESUFFIX   "/marks.vdr"
++#define INFOFILESUFFIX    "/info"
++#define MARKSFILESUFFIX   "/marks"
+ 
+ #define MINDISKSPACE 1024 // MB
+ 
+@@ -202,12 +205,14 @@
+ 
+ // --- cResumeFile -----------------------------------------------------------
+ 
+-cResumeFile::cResumeFile(const char *FileName)
++cResumeFile::cResumeFile(const char *FileName, bool IsPesRecording)
+ {
+-  fileName = MALLOC(char, strlen(FileName) + strlen(RESUMEFILESUFFIX) + 1);
++  isPesRecording = IsPesRecording;
++  const char *Suffix = isPesRecording ? RESUMEFILESUFFIX ".vdr" : RESUMEFILESUFFIX;
++  fileName = MALLOC(char, strlen(FileName) + strlen(Suffix) + 1);
+   if (fileName) {
+      strcpy(fileName, FileName);
+-     sprintf(fileName + strlen(fileName), RESUMEFILESUFFIX, Setup.ResumeID ? "." : "", Setup.ResumeID ? *itoa(Setup.ResumeID) : "");
++     sprintf(fileName + strlen(fileName), Suffix, Setup.ResumeID ? "." : "", Setup.ResumeID ? *itoa(Setup.ResumeID) : "");
+      }
+   else
+      esyslog("ERROR: can't allocate memory for resume file name");
+@@ -227,16 +232,37 @@
+         if ((st.st_mode & S_IWUSR) == 0) // no write access, assume no resume
+            return -1;
+         }
+-     int f = open(fileName, O_RDONLY);
+-     if (f >= 0) {
+-        if (safe_read(f, &resume, sizeof(resume)) != sizeof(resume)) {
+-           resume = -1;
++     if (isPesRecording) {
++        int f = open(fileName, O_RDONLY);
++        if (f >= 0) {
++           if (safe_read(f, &resume, sizeof(resume)) != sizeof(resume)) {
++              resume = -1;
++              LOG_ERROR_STR(fileName);
++              }
++           close(f);
++           }
++        else if (errno != ENOENT)
+            LOG_ERROR_STR(fileName);
++        }
++     else {
++        FILE *f = fopen(fileName, "r");
++        if (f) {
++           cReadLine ReadLine;
++           char *s;
++           int line = 0;
++           while ((s = ReadLine.Read(f)) != NULL) {
++                 ++line;
++                 char *t = skipspace(s + 1);
++                 switch (*s) {
++                   case 'I': resume = atoi(t);
++                             break;
++                   }
++                 }
++           fclose(f);
+            }
+-        close(f);
++        else if (errno != ENOENT)
++           LOG_ERROR_STR(fileName);
+         }
+-     else if (errno != ENOENT)
+-        LOG_ERROR_STR(fileName);
+      }
+   return resume;
+ }
+@@ -244,12 +270,25 @@
+ bool cResumeFile::Save(int Index)
+ {
+   if (fileName) {
+-     int f = open(fileName, O_WRONLY | O_CREAT | O_TRUNC, DEFFILEMODE);
+-     if (f >= 0) {
+-        if (safe_write(f, &Index, sizeof(Index)) < 0)
++     if (isPesRecording) {
++        int f = open(fileName, O_WRONLY | O_CREAT | O_TRUNC, DEFFILEMODE);
++        if (f >= 0) {
++           if (safe_write(f, &Index, sizeof(Index)) < 0)
++              LOG_ERROR_STR(fileName);
++           close(f);
++           Recordings.ResetResume(fileName);
++           return true;
++           }
++        }
++     else {
++        FILE *f = fopen(fileName, "w");
++        if (f) {
++           fprintf(f, "I %d\n", Index);
++           fclose(f);
++           Recordings.ResetResume(fileName);
++           }
++        else
+            LOG_ERROR_STR(fileName);
+-        close(f);
+-        Recordings.ResetResume(fileName);
+         return true;
+         }
+      }
+@@ -274,6 +313,9 @@
+   ownEvent = Event ? NULL : new cEvent(0);
+   event = ownEvent ? ownEvent : Event;
+   aux = NULL;
++  priority = MAXPRIORITY;
++  lifetime = MAXLIFETIME;
++  fileName = NULL;
+   if (Channel) {
+      // Since the EPG data's component records can carry only a single
+      // language code, let's see whether the channel's PID data has
+@@ -320,11 +362,24 @@
+      }
+ }
+ 
++cRecordingInfo::cRecordingInfo(const char *FileName)
++{
++  channelID = tChannelID::InvalidID;
++  channelName = NULL;
++  ownEvent = new cEvent(0);
++  event = ownEvent;
++  aux = NULL;
++  priority = MAXPRIORITY;
++  lifetime = MAXLIFETIME;
++  fileName = strdup(cString::sprintf("%s%s", FileName, INFOFILESUFFIX));
++}
++
+ cRecordingInfo::~cRecordingInfo()
+ {
+   delete ownEvent;
+   free(aux);
+   free(channelName);
++  free(fileName);
+ }
+ 
+ void cRecordingInfo::SetData(const char *Title, const char *ShortText, const char *Description)
+@@ -380,6 +435,11 @@
+                             }
+                        }
+                        break;
++             case 'F': break;
++             case 'L': lifetime = atoi(t);
++                       break;
++             case 'P': priority = atoi(t);
++                       break;
+              case '@': free(aux);
+                        aux = strdup(t);
+                        break;
+@@ -401,11 +461,48 @@
+   if (channelID.Valid())
+      fprintf(f, "%sC %s%s%s\n", Prefix, *channelID.ToString(), channelName ? " " : "", channelName ? channelName : "");
+   event->Dump(f, Prefix, true);
++  fprintf(f, "%sF %.10g\n", Prefix, double(FRAMESPERSEC));
++  fprintf(f, "%sP %d\n", Prefix, priority);
++  fprintf(f, "%sL %d\n", Prefix, lifetime);
+   if (aux)
+      fprintf(f, "%s@ %s\n", Prefix, aux);
+   return true;
+ }
+ 
++bool cRecordingInfo::Read(void)
++{
++  bool Result = false;
++  if (fileName) {
++     FILE *f = fopen(fileName, "r");
++     if (f) {
++        if (Read(f))
++           Result = true;
++        else
++           esyslog("ERROR: EPG data problem in file %s", fileName);
++        fclose(f);
++        }
++     else if (errno != ENOENT)
++        LOG_ERROR_STR(fileName);
++     }
++  return Result;
++}
++
++bool cRecordingInfo::Write(void) const
++{
++  bool Result = false;
++  if (fileName) {
++     cSafeFile f(fileName);
++     if (f.Open()) {
++        if (Write(f))
++           Result = true;
++        f.Close();
++        }
++     else
++        LOG_ERROR_STR(fileName);
++     }
++  return Result;
++}
++
+ // --- cRecording ------------------------------------------------------------
+ 
+ #define RESUME_NOT_INITIALIZED (-2)
+@@ -495,6 +592,9 @@
+   fileName = NULL;
+   name = NULL;
+   fileSizeMB = -1; // unknown
++  channel = Timer->Channel()->Number();
++  instanceId = 0;
++  isPesRecording = true;
+   deleted = 0;
+   // set up the actual name:
+   const char *Title = Event ? Event->Title() : NULL;
+@@ -540,12 +640,19 @@
+   // handle info:
+   info = new cRecordingInfo(Timer->Channel(), Event);
+   info->SetAux(Timer->Aux());
++  info->priority = priority;
++  info->lifetime = lifetime;
+ }
+ 
+ cRecording::cRecording(const char *FileName)
+ {
+   resume = RESUME_NOT_INITIALIZED;
+   fileSizeMB = -1; // unknown
++  channel = -1;
++  instanceId = -1;
++  priority = MAXPRIORITY; // assume maximum in case there is no info file
++  lifetime = MAXLIFETIME;
++  isPesRecording = true;
+   deleted = 0;
+   titleBuffer = NULL;
+   sortBuffer = NULL;
+@@ -560,7 +667,8 @@
+      struct tm tm_r;
+      struct tm t = *localtime_r(&now, &tm_r); // this initializes the time zone in 't'
+      t.tm_isdst = -1; // makes sure mktime() will determine the correct DST setting
+-     if (7 == sscanf(p + 1, DATAFORMAT, &t.tm_year, &t.tm_mon, &t.tm_mday, &t.tm_hour, &t.tm_min, &priority, &lifetime)) {
++     if (7 == sscanf(p + 1, DATAFORMATTS, &t.tm_year, &t.tm_mon, &t.tm_mday, &t.tm_hour, &t.tm_min, &channel, &instanceId)
++      || 7 == sscanf(p + 1, DATAFORMATPES, &t.tm_year, &t.tm_mon, &t.tm_mday, &t.tm_hour, &t.tm_min, &priority, &lifetime)) {
+         t.tm_year -= 1900;
+         t.tm_mon--;
+         t.tm_sec = 0;
+@@ -569,14 +677,21 @@
+         strncpy(name, FileName, p - FileName);
+         name[p - FileName] = 0;
+         name = ExchangeChars(name, false);
++        isPesRecording = instanceId < 0;
+         }
++     else
++        return;
+      GetResume();
+      // read an optional info file:
+-     cString InfoFileName = cString::sprintf("%s%s", fileName, INFOFILESUFFIX);
++     cString InfoFileName = cString::sprintf("%s%s", fileName, isPesRecording ? INFOFILESUFFIX ".vdr" : INFOFILESUFFIX);
+      FILE *f = fopen(InfoFileName, "r");
+      if (f) {
+         if (!info->Read(f))
+            esyslog("ERROR: EPG data problem in file %s", *InfoFileName);
++        else if (!isPesRecording) {
++           priority = info->priority;
++           lifetime = info->lifetime;
++           }
+         fclose(f);
+         }
+      else if (errno != ENOENT)
+@@ -681,7 +796,7 @@
+ int cRecording::GetResume(void) const
+ {
+   if (resume == RESUME_NOT_INITIALIZED) {
+-     cResumeFile ResumeFile(FileName());
++     cResumeFile ResumeFile(FileName(), isPesRecording);
+      resume = ResumeFile.Read();
+      }
+   return resume;
+@@ -698,8 +813,11 @@
+   if (!fileName) {
+      struct tm tm_r;
+      struct tm *t = localtime_r(&start, &tm_r);
++     const char *fmt = isPesRecording ? NAMEFORMATPES : NAMEFORMATTS;
++     int ch = isPesRecording ? priority : channel;
++     int ri = isPesRecording ? lifetime : instanceId;
+      name = ExchangeChars(name, true);
+-     fileName = strdup(cString::sprintf(NAMEFORMAT, VideoDirectory, name, t->tm_year + 1900, t->tm_mon + 1, t->tm_mday, t->tm_hour, t->tm_min, priority, lifetime));
++     fileName = strdup(cString::sprintf(fmt, VideoDirectory, name, t->tm_year + 1900, t->tm_mon + 1, t->tm_mday, t->tm_hour, t->tm_min, ch, ri));
+      name = ExchangeChars(name, false);
+      }
+   return fileName;
+@@ -787,7 +905,7 @@
+ 
+ bool cRecording::WriteInfo(void)
+ {
+-  cString InfoFileName = cString::sprintf("%s%s", fileName, INFOFILESUFFIX);
++  cString InfoFileName = cString::sprintf("%s%s", fileName, isPesRecording ? INFOFILESUFFIX ".vdr" : INFOFILESUFFIX);
+   FILE *f = fopen(InfoFileName, "w");
+   if (f) {
+      info->Write(f);
+@@ -1096,9 +1214,10 @@
+ 
+ // --- cMarks ----------------------------------------------------------------
+ 
+-bool cMarks::Load(const char *RecordingFileName)
++bool cMarks::Load(const char *RecordingFileName, bool IsPesRecording)
+ {
+-  if (cConfig<cMark>::Load(AddDirectory(RecordingFileName, MARKSFILESUFFIX))) {
++
++  if (cConfig<cMark>::Load(AddDirectory(RecordingFileName, IsPesRecording ? MARKSFILESUFFIX ".vdr" : MARKSFILESUFFIX))) {
+      Sort();
+      return true;
+      }
+@@ -1121,7 +1240,7 @@
+ {
+   cMark *m = Get(Position);
+   if (!m) {
+-     cConfig<cMark>::Add(m = new cMark(Position));
++     cConfig<cMark>::Add(m = new cMark(Position, NULL));
+      Sort();
+      }
+   return m;
+@@ -1167,12 +1286,9 @@
+      }
+ }
+ 
+-// --- XXX+
+-
+-//XXX+ somewhere else???
+ // --- cIndexFile ------------------------------------------------------------
+ 
+-#define INDEXFILESUFFIX     "/index.vdr"
++#define INDEXFILESUFFIX     "/index"
+ 
+ // The number of frames to stay off the end in case of time shift:
+ #define INDEXSAFETYLIMIT 150 // frames
+@@ -1183,20 +1299,60 @@
+ // The minimum age of an index file for considering it no longer to be written:
+ #define MININDEXAGE    3600 // seconds
+ 
+-cIndexFile::cIndexFile(const char *FileName, bool Record)
+-:resumeFile(FileName)
++struct tIndexPes {
++  uint32_t offset;
++  uchar type;
++  uchar number;
++  uint16_t reserved;
++  };
++
++struct tIndexTs {
++  uint64_t offset:40; // up to 1TB per file (not using off_t here - must definitely be exactly 64 bit!)
++  int reserved:7;     // reserved for future use
++  int independent:1;  // marks frames that can be displayed by themselves (for trick modes)
++  uint16_t number:16; // up to 64K files per recording
++  };
++
++union cIndexFile::tIndex {
++  tIndexTs ts;
++  tIndexPes pes;
++  void Set(bool IsPesRecording, uint64_t Offset, uchar Type, uint16_t Number)
++  {
++    if (IsPesRecording) {
++  	   pes.offset = Offset;
++  	   pes.type = Type;
++  	   pes.number = Number;
++  	   pes.reserved = 0;
++  	   }
++  	else {
++  	   ts.offset = Offset;
++  	   ts.independent = (Type == 1);
++  	   ts.number = Number;
++  	   ts.reserved = 0;
++  	   }
++  }
++  uint64_t Offset(bool IsPesRecording) { return IsPesRecording ? pes.offset : ts.offset; }
++  uchar Type(bool IsPesRecording) { return IsPesRecording ? pes.type : (ts.independent ? 1 : 2); }
++  uint16_t Number(bool IsPesRecording) { return IsPesRecording ? pes.number : ts.number; }
++  };
++
++
++cIndexFile::cIndexFile(const char *FileName, bool Record, bool IsPesRecording)
++:resumeFile(FileName, IsPesRecording)
+ {
+   f = -1;
+   fileName = NULL;
+   size = 0;
+   last = -1;
+   index = NULL;
++  isPesRecording = IsPesRecording;
+   if (FileName) {
+-     fileName = MALLOC(char, strlen(FileName) + strlen(INDEXFILESUFFIX) + 1);
++     const char *Suffix = isPesRecording ? INDEXFILESUFFIX ".vdr" : INDEXFILESUFFIX;
++     fileName = MALLOC(char, strlen(FileName) + strlen(Suffix) + 1);
+      if (fileName) {
+         strcpy(fileName, FileName);
+         char *pFileExt = fileName + strlen(fileName);
+-        strcpy(pFileExt, INDEXFILESUFFIX);
++        strcpy(pFileExt, Suffix);
+         int delta = 0;
+         if (access(fileName, R_OK) == 0) {
+            struct stat buf;
+@@ -1204,7 +1360,7 @@
+               delta = buf.st_size % sizeof(tIndex);
+               if (delta) {
+                  delta = sizeof(tIndex) - delta;
+-                 esyslog("ERROR: invalid file size (%ld) in '%s'", buf.st_size, fileName);
++                 esyslog("ERROR: invalid file size (%lld) in '%s'", buf.st_size, fileName);
+                  }
+               last = (buf.st_size + delta) / sizeof(tIndex) - 1;
+               if (!Record && last >= 0) {
+@@ -1312,10 +1468,11 @@
+   return index != NULL;
+ }
+ 
+-bool cIndexFile::Write(uchar PictureType, uchar FileNumber, int FileOffset)
++bool cIndexFile::Write(uchar PictureType, uint16_t FileNumber, off_t FileOffset)
+ {
+   if (f >= 0) {
+-     tIndex i = { FileOffset, PictureType, FileNumber, 0 };
++     tIndex i;
++     i.Set(isPesRecording, FileOffset, PictureType, FileNumber);
+      if (safe_write(f, &i, sizeof(i)) < 0) {
+         LOG_ERROR_STR(fileName);
+         close(f);
+@@ -1327,17 +1484,17 @@
+   return f >= 0;
+ }
+ 
+-bool cIndexFile::Get(int Index, uchar *FileNumber, int *FileOffset, uchar *PictureType, int *Length)
++bool cIndexFile::Get(int Index, uint16_t *FileNumber, off_t *FileOffset, uchar *PictureType, int *Length)
+ {
+   if (CatchUp(Index)) {
+      if (Index >= 0 && Index < last) {
+-        *FileNumber = index[Index].number;
+-        *FileOffset = index[Index].offset;
++        *FileNumber = index[Index].Number(isPesRecording);
++        *FileOffset = index[Index].Offset(isPesRecording);
+         if (PictureType)
+-           *PictureType = index[Index].type;
++           *PictureType = index[Index].Type(isPesRecording);
+         if (Length) {
+-           int fn = index[Index + 1].number;
+-           int fo = index[Index + 1].offset;
++           uint16_t fn = index[Index + 1].Number(isPesRecording);
++           off_t fo = index[Index + 1].Offset(isPesRecording);
+            if (fn == *FileNumber)
+               *Length = fo - *FileOffset;
+            else
+@@ -1349,26 +1506,26 @@
+   return false;
+ }
+ 
+-int cIndexFile::GetNextIFrame(int Index, bool Forward, uchar *FileNumber, int *FileOffset, int *Length, bool StayOffEnd)
++int cIndexFile::GetNextIFrame(int Index, bool Forward, uint16_t *FileNumber, off_t *FileOffset, int *Length, bool StayOffEnd)
+ {
+   if (CatchUp()) {
+      int d = Forward ? 1 : -1;
+      for (;;) {
+          Index += d;
+          if (Index >= 0 && Index < last - ((Forward && StayOffEnd) ? INDEXSAFETYLIMIT : 0)) {
+-            if (index[Index].type == I_FRAME) {
+-               if (FileNumber)
+-                  *FileNumber = index[Index].number;
+-               else
+-                  FileNumber = &index[Index].number;
+-               if (FileOffset)
+-                  *FileOffset = index[Index].offset;
+-               else
+-                  FileOffset = &index[Index].offset;
++            if (index[Index].Type(isPesRecording) == I_FRAME) {
++               uint16_t fn;
++               if (!FileNumber)
++                  FileNumber = &fn;
++               off_t fo;
++               if (!FileOffset)
++                  FileOffset = &fo;
++               *FileNumber = index[Index].Number(isPesRecording);
++               *FileOffset = index[Index].Offset(isPesRecording);
+                if (Length) {
+                   // all recordings end with a non-I_FRAME, so the following should be safe:
+-                  int fn = index[Index + 1].number;
+-                  int fo = index[Index + 1].offset;
++                  uint16_t fn = index[Index + 1].Number(isPesRecording);
++                  off_t fo = index[Index + 1].Offset(isPesRecording);
+                   if (fn == *FileNumber)
+                      *Length = fo - *FileOffset;
+                   else {
+@@ -1386,13 +1543,13 @@
+   return -1;
+ }
+ 
+-int cIndexFile::Get(uchar FileNumber, int FileOffset)
++int cIndexFile::Get(uint16_t FileNumber, off_t FileOffset)
+ {
+   if (CatchUp()) {
+      //TODO implement binary search!
+      int i;
+      for (i = 0; i < last; i++) {
+-         if (index[i].number > FileNumber || (index[i].number == FileNumber) && index[i].offset >= FileOffset)
++         if (index[i].Number(isPesRecording) > FileNumber || (index[i].Number(isPesRecording) == FileNumber) && off_t(index[i].Offset(isPesRecording)) >= FileOffset)
+             break;
+          }
+      return i;
+@@ -1407,16 +1564,19 @@
+ 
+ // --- cFileName -------------------------------------------------------------
+ 
+-#define MAXFILESPERRECORDING 255
+-#define RECORDFILESUFFIX    "/%03d.vdr"
++#define MAXFILESPERRECORDINGPES 255
++#define RECORDFILESUFFIXPES     "/%03d.vdr"
++#define MAXFILESPERRECORDINGTS  65535
++#define RECORDFILESUFFIXTS      "/%05d.ts"
+ #define RECORDFILESUFFIXLEN 20 // some additional bytes for safety...
+ 
+-cFileName::cFileName(const char *FileName, bool Record, bool Blocking)
++cFileName::cFileName(const char *FileName, bool Record, bool Blocking, bool IsPesRecording)
+ {
+   file = NULL;
+   fileNumber = 0;
+   record = Record;
+   blocking = Blocking;
++  isPesRecording = IsPesRecording;
+   // Prepare the file name:
+   fileName = MALLOC(char, strlen(FileName) + RECORDFILESUFFIXLEN);
+   if (!fileName) {
+@@ -1434,20 +1594,71 @@
+   free(fileName);
+ }
+ 
++bool cFileName::GetLastPatPmtVersions(int &PatVersion, int &PmtVersion)
++{
++  if (fileName && !isPesRecording) {
++     // Find the last recording file:
++     int Number = 1;
++     for (; Number <= MAXFILESPERRECORDINGTS + 1; Number++) { // +1 to correctly set Number in case there actually are that many files
++         sprintf(pFileNumber, RECORDFILESUFFIXTS, Number);
++         if (access(fileName, F_OK) != 0) { // file doesn't exist
++            Number--;
++            break;
++            }
++         }
++     for (; Number > 0; Number--) {
++         // Search for a PAT packet from the end of the file:
++         cPatPmtParser PatPmtParser;
++         sprintf(pFileNumber, RECORDFILESUFFIXTS, Number);
++         int fd = open(fileName, O_RDONLY | O_LARGEFILE, DEFFILEMODE);
++         if (fd >= 0) {
++            off_t pos = lseek(fd, -TS_SIZE, SEEK_END);
++            while (pos >= 0) {
++                  // Read and parse the PAT/PMT:
++                  uchar buf[TS_SIZE];
++                  while (read(fd, buf, sizeof(buf)) == sizeof(buf)) {
++                        if (buf[0] == TS_SYNC_BYTE) {
++                           int Pid = TsPid(buf);
++                           if (Pid == 0)
++                              PatPmtParser.ParsePat(buf, sizeof(buf));
++                           else if (Pid == PatPmtParser.PmtPid()) {
++                              PatPmtParser.ParsePmt(buf, sizeof(buf));
++                              if (PatPmtParser.GetVersions(PatVersion, PmtVersion)) {
++                                 close(fd);
++                                 return true;
++                                 }
++                              }
++                           else
++                              break; // PAT/PMT is always in one sequence
++                           }
++                        else
++                           return false;
++                        }
++                  pos = lseek(fd, pos - TS_SIZE, SEEK_SET);
++                  }
++            close(fd);
++            }
++         else
++            break;
++         }
++     }
++  return false;
++}
++
+ cUnbufferedFile *cFileName::Open(void)
+ {
+   if (!file) {
+      int BlockingFlag = blocking ? 0 : O_NONBLOCK;
+      if (record) {
+         dsyslog("recording to '%s'", fileName);
+-        file = OpenVideoFile(fileName, O_RDWR | O_CREAT | BlockingFlag);
++        file = OpenVideoFile(fileName, O_RDWR | O_CREAT | O_LARGEFILE | BlockingFlag);
+         if (!file)
+            LOG_ERROR_STR(fileName);
+         }
+      else {
+         if (access(fileName, R_OK) == 0) {
+            dsyslog("playing '%s'", fileName);
+-           file = cUnbufferedFile::Create(fileName, O_RDONLY | BlockingFlag);
++           file = cUnbufferedFile::Create(fileName, O_RDONLY | O_LARGEFILE | BlockingFlag);
+            if (!file)
+               LOG_ERROR_STR(fileName);
+            }
+@@ -1467,13 +1678,14 @@
+      }
+ }
+ 
+-cUnbufferedFile *cFileName::SetOffset(int Number, int Offset)
++cUnbufferedFile *cFileName::SetOffset(int Number, off_t Offset)
+ {
+   if (fileNumber != Number)
+      Close();
+-  if (0 < Number && Number <= MAXFILESPERRECORDING) {
++  int MaxFilesPerRecording = isPesRecording ? MAXFILESPERRECORDINGPES : MAXFILESPERRECORDINGTS;
++  if (0 < Number && Number <= MaxFilesPerRecording) {
+      fileNumber = Number;
+-     sprintf(pFileNumber, RECORDFILESUFFIX, fileNumber);
++     sprintf(pFileNumber, isPesRecording ? RECORDFILESUFFIXPES : RECORDFILESUFFIXTS, fileNumber);
+      if (record) {
+         if (access(fileName, F_OK) == 0) {
+            // files exists, check if it has non-zero size
+@@ -1483,8 +1695,8 @@
+                  return SetOffset(Number + 1); // file exists and has non zero size, let's try next suffix
+               else {
+                  // zero size file, remove it
+-                 dsyslog ("cFileName::SetOffset: removing zero-sized file %s", fileName);
+-                 unlink (fileName);
++                 dsyslog("cFileName::SetOffset: removing zero-sized file %s", fileName);
++                 unlink(fileName);
+                  }
+               }
+            else
+@@ -1504,7 +1716,7 @@
+         }
+      return file;
+      }
+-  esyslog("ERROR: max number of files (%d) exceeded", MAXFILESPERRECORDING);
++  esyslog("ERROR: max number of files (%d) exceeded", MaxFilesPerRecording);
+   return NULL;
+ }
+ 
+diff -ur vdr-1.6.0/recording.h vdr-1.6.0-tsplay/recording.h
+--- vdr-1.6.0/recording.h	2007-10-14 12:11:34.000000000 +0200
++++ vdr-1.6.0-tsplay/recording.h	2010-06-03 17:35:19.000000000 +0200
+@@ -30,8 +30,9 @@
+ class cResumeFile {
+ private:
+   char *fileName;
++  bool isPesRecording;
+ public:
+-  cResumeFile(const char *FileName);
++  cResumeFile(const char *FileName, bool IsPesRecording);
+   ~cResumeFile();
+   int Read(void);
+   bool Save(int Index);
+@@ -46,10 +47,14 @@
+   const cEvent *event;
+   cEvent *ownEvent;
+   char *aux;
++  int priority;
++  int lifetime;
++  char *fileName;
+   cRecordingInfo(const cChannel *Channel = NULL, const cEvent *Event = NULL);
+   void SetData(const char *Title, const char *ShortText, const char *Description);
+   void SetAux(const char *Aux);
+ public:
++  cRecordingInfo(const char *FileName);
+   ~cRecordingInfo();
+   tChannelID ChannelID(void) const { return channelID; }
+   const char *ChannelName(void) const { return channelName; }
+@@ -60,6 +65,8 @@
+   const char *Aux(void) const { return aux; }
+   bool Read(FILE *f);
+   bool Write(FILE *f, const char *Prefix = "") const;
++  bool Read(void);
++  bool Write(void) const;
+   };
+ 
+ class cRecording : public cListObject {
+@@ -71,6 +78,9 @@
+   mutable char *fileName;
+   mutable char *name;
+   mutable int fileSizeMB;
++  int channel;
++  int instanceId;
++  bool isPesRecording;
+   cRecordingInfo *info;
+   cRecording(const cRecording&); // can't copy cRecording
+   cRecording &operator=(const cRecording &); // can't assign cRecording
+@@ -95,6 +105,7 @@
+   void ResetResume(void) const;
+   bool IsNew(void) const { return GetResume() <= 0; }
+   bool IsEdited(void) const;
++  bool IsPesRecording(void) const { return isPesRecording; }
+   bool WriteInfo(void);
+   bool Delete(void);
+        // Changes the file name so that it will no longer be visible in the "Recordings" menu
+@@ -162,7 +173,7 @@
+ 
+ class cMarks : public cConfig<cMark> {
+ public:
+-  bool Load(const char *RecordingFileName);
++  bool Load(const char *RecordingFileName, bool IsPesRecording = true);
+   void Sort(void);
+   cMark *Add(int Position);
+   cMark *Get(int Position);
+@@ -189,32 +200,35 @@
+ #define MAXFRAMESIZE  KILOBYTE(512)
+ 
+ // The maximum file size is limited by the range that can be covered
+-// with 'int'. 4GB might be possible (if the range is considered
+-// 'unsigned'), 2GB should be possible (even if the range is considered
+-// 'signed'), so let's use 2000MB for absolute safety (the actual file size
+-// may be slightly higher because we stop recording only before the next
+-// 'I' frame, to have a complete Group Of Pictures):
+-#define MAXVIDEOFILESIZE 2000 // MB
+-#define MINVIDEOFILESIZE  100 // MB
++// with a 40 bit 'unsigned int', which is 1TB. The actual maximum value
++// used is 6MB below the theoretical maximum, to have some safety (the
++// actual file size may be slightly higher because we stop recording only
++// before the next independent frame, to have a complete Group Of Pictures):
++#define MAXVIDEOFILESIZETS  1048570 // MB
++#define MAXVIDEOFILESIZEPES    2000 // MB
++#define MINVIDEOFILESIZE        100 // MB
++#define MAXVIDEOFILESIZEDEFAULT MAXVIDEOFILESIZEPES
+ 
+ class cIndexFile {
+ private:
+-  struct tIndex { int offset; uchar type; uchar number; short reserved; };
++  union tIndex;
++
+   int f;
+   char *fileName;
+   int size, last;
+   tIndex *index;
++  bool isPesRecording;
+   cResumeFile resumeFile;
+   cMutex mutex;
+   bool CatchUp(int Index = -1);
+ public:
+-  cIndexFile(const char *FileName, bool Record);
++  cIndexFile(const char *FileName, bool Record, bool IsPesRecording = true);
+   ~cIndexFile();
+   bool Ok(void) { return index != NULL; }
+-  bool Write(uchar PictureType, uchar FileNumber, int FileOffset);
+-  bool Get(int Index, uchar *FileNumber, int *FileOffset, uchar *PictureType = NULL, int *Length = NULL);
+-  int GetNextIFrame(int Index, bool Forward, uchar *FileNumber = NULL, int *FileOffset = NULL, int *Length = NULL, bool StayOffEnd = false);
+-  int Get(uchar FileNumber, int FileOffset);
++  bool Write(uchar PictureType, uint16_t FileNumber, off_t FileOffset);
++  bool Get(int Index, uint16_t *FileNumber, off_t *FileOffset, uchar *PictureType = NULL, int *Length = NULL);
++  int GetNextIFrame(int Index, bool Forward, uint16_t *FileNumber = NULL, off_t *FileOffset = NULL, int *Length = NULL, bool StayOffEnd = false);
++  int Get(uint16_t FileNumber, off_t FileOffset);
+   int Last(void) { CatchUp(); return last; }
+   int GetResume(void) { return resumeFile.Read(); }
+   bool StoreResume(int Index) { return resumeFile.Save(Index); }
+@@ -228,14 +242,16 @@
+   char *fileName, *pFileNumber;
+   bool record;
+   bool blocking;
++  bool isPesRecording;
+ public:
+-  cFileName(const char *FileName, bool Record, bool Blocking = false);
++  cFileName(const char *FileName, bool Record, bool Blocking = false, bool IsPesRecording = true);
+   ~cFileName();
+   const char *Name(void) { return fileName; }
+   int Number(void) { return fileNumber; }
++  bool GetLastPatPmtVersions(int &PatVersion, int &PmtVersion);
+   cUnbufferedFile *Open(void);
+   void Close(void);
+-  cUnbufferedFile *SetOffset(int Number, int Offset = 0);
++  cUnbufferedFile *SetOffset(int Number, off_t Offset = 0);
+   cUnbufferedFile *NextFile(void);
+   };
+ 
+diff -ur vdr-1.6.0/remux.c vdr-1.6.0-tsplay/remux.c
+--- vdr-1.6.0/remux.c	2007-11-25 14:56:03.000000000 +0100
++++ vdr-1.6.0-tsplay/remux.c	2010-06-03 17:35:29.000000000 +0200
+@@ -17,9 +17,18 @@
+ #include "remux.h"
+ #include <stdlib.h>
+ #include "channels.h"
++#include "device.h"
++#include "libsi/si.h"
++#include "libsi/section.h"
++#include "libsi/descriptor.h"
+ #include "shutdown.h"
+ #include "tools.h"
+ 
++// Set these to 'true' for debug output:
++static bool DebugPatPmt = false;
++
++#define dbgpatpmt(a...) if (DebugPatPmt) fprintf(stderr, a)
++
+ ePesHeader AnalyzePesHeader(const uchar *Data, int Count, int &PesPayloadOffset, bool *ContinuationHeader)
+ {
+   if (Count < 7)
+@@ -2182,3 +2191,371 @@
+   else
+      dsyslog("SetBrokenLink: no video packet in frame");
+ }
++
++// --- Some TS handling tools ------------------------------------------------
++
++int64_t TsGetPts(const uchar *p, int l)
++{
++  // Find the first packet with a PTS and use it:
++  while (l > 0) {
++        const uchar *d = p;
++        if (TsPayloadStart(d) && TsGetPayload(&d) && PesHasPts(d))
++           return PesGetPts(d);
++        p += TS_SIZE;
++        l -= TS_SIZE;
++        }
++  return -1;
++}
++
++void TsSetTeiOnBrokenPackets(uchar *p, int l)
++{
++  bool Processed[MAXPID] = { false };
++  while (l >= TS_SIZE) {
++        if (*p != TS_SYNC_BYTE)
++           break;
++        int Pid = TsPid(p);
++        if (!Processed[Pid]) {
++           if (!TsPayloadStart(p))
++              p[1] |= TS_ERROR;
++           else
++              Processed[Pid] = true;
++           }
++        l -= TS_SIZE;
++        p += TS_SIZE;
++        }
++}
++
++// --- cPatPmtParser ---------------------------------------------------------
++
++cPatPmtParser::cPatPmtParser(bool UpdatePrimaryDevice)
++{
++  updatePrimaryDevice = UpdatePrimaryDevice;
++  Reset();
++}
++
++void cPatPmtParser::Reset(void)
++{
++  pmtSize = 0;
++  patVersion = pmtVersion = -1;
++  pmtPid = -1;
++  vpid = vtype = 0;
++  ppid = 0;
++}
++
++void cPatPmtParser::ParsePat(const uchar *Data, int Length)
++{
++  // Unpack the TS packet:
++  int PayloadOffset = TsPayloadOffset(Data);
++  Data += PayloadOffset;
++  Length -= PayloadOffset;
++  // The PAT is always assumed to fit into a single TS packet
++  if ((Length -= Data[0] + 1) <= 0)
++     return;
++  Data += Data[0] + 1; // process pointer_field
++  SI::PAT Pat(Data, false);
++  if (Pat.CheckCRCAndParse()) {
++     dbgpatpmt("PAT: TSid = %d, c/n = %d, v = %d, s = %d, ls = %d\n", Pat.getTransportStreamId(), Pat.getCurrentNextIndicator(), Pat.getVersionNumber(), Pat.getSectionNumber(), Pat.getLastSectionNumber());
++     if (patVersion == Pat.getVersionNumber())
++        return;
++     SI::PAT::Association assoc;
++     for (SI::Loop::Iterator it; Pat.associationLoop.getNext(assoc, it); ) {
++         dbgpatpmt("     isNITPid = %d\n", assoc.isNITPid());
++         if (!assoc.isNITPid()) {
++            pmtPid = assoc.getPid();
++            dbgpatpmt("     service id = %d, pid = %d\n", assoc.getServiceId(), assoc.getPid());
++            }
++         }
++     patVersion = Pat.getVersionNumber();
++     }
++  else
++     esyslog("ERROR: can't parse PAT");
++}
++
++void cPatPmtParser::ParsePmt(const uchar *Data, int Length)
++{
++  // Unpack the TS packet:
++  bool PayloadStart = TsPayloadStart(Data);
++  int PayloadOffset = TsPayloadOffset(Data);
++  Data += PayloadOffset;
++  Length -= PayloadOffset;
++  // The PMT may extend over several TS packets, so we need to assemble them
++  if (PayloadStart) {
++     pmtSize = 0;
++     if ((Length -= Data[0] + 1) <= 0)
++        return;
++     Data += Data[0] + 1; // this is the first packet
++     if (SectionLength(Data, Length) > Length) {
++        if (Length <= int(sizeof(pmt))) {
++           memcpy(pmt, Data, Length);
++           pmtSize = Length;
++           }
++        else
++           esyslog("ERROR: PMT packet length too big (%d byte)!", Length);
++        return;
++        }
++     // the packet contains the entire PMT section, so we run into the actual parsing
++     }
++  else if (pmtSize > 0) {
++     // this is a following packet, so we add it to the pmt storage
++     if (Length <= int(sizeof(pmt)) - pmtSize) {
++        memcpy(pmt + pmtSize, Data, Length);
++        pmtSize += Length;
++        }
++     else {
++        esyslog("ERROR: PMT section length too big (%d byte)!", pmtSize + Length);
++        pmtSize = 0;
++        }
++     if (SectionLength(pmt, pmtSize) > pmtSize)
++        return; // more packets to come
++     // the PMT section is now complete, so we run into the actual parsing
++     Data = pmt;
++     }
++  else
++     return; // fragment of broken packet - ignore
++  SI::PMT Pmt(Data, false);
++  if (Pmt.CheckCRCAndParse()) {
++     dbgpatpmt("PMT: sid = %d, c/n = %d, v = %d, s = %d, ls = %d\n", Pmt.getServiceId(), Pmt.getCurrentNextIndicator(), Pmt.getVersionNumber(), Pmt.getSectionNumber(), Pmt.getLastSectionNumber());
++     dbgpatpmt("     pcr = %d\n", Pmt.getPCRPid());
++     if (pmtVersion == Pmt.getVersionNumber())
++        return;
++     if (updatePrimaryDevice)
++        cDevice::PrimaryDevice()->ClrAvailableTracks(false, true);
++     int NumApids = 0;
++     int NumDpids = 0;
++     int NumSpids = 0;
++     vpid = vtype = 0;
++     ppid = 0;
++     apids[0] = 0;
++     dpids[0] = 0;
++     spids[0] = 0;
++     atypes[0] = 0;
++     dtypes[0] = 0;
++     SI::PMT::Stream stream;
++     for (SI::Loop::Iterator it; Pmt.streamLoop.getNext(stream, it); ) {
++         dbgpatpmt("     stream type = %02X, pid = %d", stream.getStreamType(), stream.getPid());
++         switch (stream.getStreamType()) {
++           case 0x01: // STREAMTYPE_11172_VIDEO
++           case 0x02: // STREAMTYPE_13818_VIDEO
++           case 0x1B: // MPEG4
++                      vpid = stream.getPid();
++                      vtype = stream.getStreamType();
++                      ppid = Pmt.getPCRPid();
++                      break;
++           case 0x03: // STREAMTYPE_11172_AUDIO
++           case 0x04: // STREAMTYPE_13818_AUDIO
++                      {
++                      if (NumApids < MAXAPIDS) {
++                         apids[NumApids] = stream.getPid();
++                         atypes[NumApids] = stream.getStreamType();
++                         *alangs[NumApids] = 0;
++                         SI::Descriptor *d;
++                         for (SI::Loop::Iterator it; (d = stream.streamDescriptors.getNext(it)); ) {
++                             switch (d->getDescriptorTag()) {
++                               case SI::ISO639LanguageDescriptorTag: {
++                                    SI::ISO639LanguageDescriptor *ld = (SI::ISO639LanguageDescriptor *)d;
++                                    SI::ISO639LanguageDescriptor::Language l;
++                                    char *s = alangs[NumApids];
++                                    int n = 0;
++                                    for (SI::Loop::Iterator it; ld->languageLoop.getNext(l, it); ) {
++                                        if (*ld->languageCode != '-') { // some use "---" to indicate "none"
++                                           dbgpatpmt(" '%s'", l.languageCode);
++                                           if (n > 0)
++                                              *s++ = '+';
++                                           strn0cpy(s, I18nNormalizeLanguageCode(l.languageCode), MAXLANGCODE1);
++                                           s += strlen(s);
++                                           if (n++ > 1)
++                                              break;
++                                           }
++                                        }
++                                    }
++                                    break;
++                               default: ;
++                               }
++                             delete d;
++                             }
++                         if (updatePrimaryDevice)
++                            cDevice::PrimaryDevice()->SetAvailableTrack(ttAudio, NumApids, apids[NumApids], alangs[NumApids]);
++                         NumApids++;
++                         apids[NumApids]= 0;
++                         }
++                      }
++                      break;
++           case 0x06: // STREAMTYPE_13818_PES_PRIVATE
++                      {
++                      int dpid = 0;
++                      char lang[MAXLANGCODE1] = "";
++                      SI::Descriptor *d;
++                      for (SI::Loop::Iterator it; (d = stream.streamDescriptors.getNext(it)); ) {
++                          switch (d->getDescriptorTag()) {
++                            case SI::AC3DescriptorTag:
++                                 dbgpatpmt(" AC3");
++                                 dpid = stream.getPid();
++                                 break;
++                            case SI::SubtitlingDescriptorTag:
++                                 dbgpatpmt(" subtitling");
++                                 if (NumSpids < MAXSPIDS) {
++                                    spids[NumSpids] = stream.getPid();
++                                    *slangs[NumSpids] = 0;
++                                    subtitlingTypes[NumSpids] = 0;
++                                    compositionPageIds[NumSpids] = 0;
++                                    ancillaryPageIds[NumSpids] = 0;
++                                    SI::SubtitlingDescriptor *sd = (SI::SubtitlingDescriptor *)d;
++                                    SI::SubtitlingDescriptor::Subtitling sub;
++                                    char *s = slangs[NumSpids];
++                                    int n = 0;
++                                    for (SI::Loop::Iterator it; sd->subtitlingLoop.getNext(sub, it); ) {
++                                        if (sub.languageCode[0]) {
++                                           dbgpatpmt(" '%s'", sub.languageCode);
++                                           subtitlingTypes[NumSpids] = sub.getSubtitlingType();
++                                           compositionPageIds[NumSpids] = sub.getCompositionPageId();
++                                           ancillaryPageIds[NumSpids] = sub.getAncillaryPageId();
++                                           if (n > 0)
++                                              *s++ = '+';
++                                           strn0cpy(s, I18nNormalizeLanguageCode(sub.languageCode), MAXLANGCODE1);
++                                           s += strlen(s);
++                                           if (n++ > 1)
++                                              break;
++                                           }
++                                        }
++                                    if (updatePrimaryDevice)
++                                       cDevice::PrimaryDevice()->SetAvailableTrack(ttSubtitle, NumSpids, spids[NumSpids], slangs[NumSpids]);
++                                    NumSpids++;
++                                    spids[NumSpids]= 0;
++                                    }
++                                 break;
++                            case SI::ISO639LanguageDescriptorTag: {
++                                 SI::ISO639LanguageDescriptor *ld = (SI::ISO639LanguageDescriptor *)d;
++                                 dbgpatpmt(" '%s'", ld->languageCode);
++                                 strn0cpy(lang, I18nNormalizeLanguageCode(ld->languageCode), MAXLANGCODE1);
++                                 }
++                                 break;
++                            default: ;
++                            }
++                          delete d;
++                          }
++                      if (dpid) {
++                         if (NumDpids < MAXDPIDS) {
++                            dpids[NumDpids] = dpid;
++                            dtypes[NumDpids] = stream.getStreamType();
++                            strn0cpy(dlangs[NumDpids], lang, sizeof(dlangs[NumDpids]));
++                            if (updatePrimaryDevice && Setup.UseDolbyDigital)
++                               cDevice::PrimaryDevice()->SetAvailableTrack(ttDolby, NumDpids, dpid, lang);
++                            NumDpids++;
++                            dpids[NumDpids]= 0;
++                            }
++                         }
++                      }
++                      break;
++           default: ;
++           }
++         dbgpatpmt("\n");
++         if (updatePrimaryDevice) {
++            cDevice::PrimaryDevice()->EnsureAudioTrack(true);
++            cDevice::PrimaryDevice()->EnsureSubtitleTrack();
++            }
++         }
++     pmtVersion = Pmt.getVersionNumber();
++     }
++  else
++     esyslog("ERROR: can't parse PMT");
++  pmtSize = 0;
++}
++
++bool cPatPmtParser::GetVersions(int &PatVersion, int &PmtVersion) const
++{
++  PatVersion = patVersion;
++  PmtVersion = pmtVersion;
++  return patVersion >= 0 && pmtVersion >= 0;
++}
++
++// --- cTsToPes --------------------------------------------------------------
++
++cTsToPes::cTsToPes(void)
++{
++  data = NULL;
++  size = 0;
++  Reset();
++}
++
++cTsToPes::~cTsToPes()
++{
++  free(data);
++}
++
++void cTsToPes::PutTs(const uchar *Data, int Length)
++{
++  if (TsError(Data)) {
++     Reset();
++     return; // ignore packets with TEI set, and drop any PES data collected so far
++     }
++  if (TsPayloadStart(Data))
++     Reset();
++  else if (!size)
++     return; // skip everything before the first payload start
++  Length = TsGetPayload(&Data);
++  if (length + Length > size) {
++     size = max(KILOBYTE(2), length + Length);
++     data = (uchar *)realloc(data, size);
++     }
++  memcpy(data + length, Data, Length);
++  length += Length;
++}
++
++#define MAXPESLENGTH 0xFFF0
++
++const uchar *cTsToPes::GetPes(int &Length)
++{
++  if (repeatLast) {
++     repeatLast = false;
++     Length = lastLength;
++     return lastData;
++     }
++  if (offset < length && PesLongEnough(length)) {
++     if (!PesHasLength(data)) // this is a video PES packet with undefined length
++        offset = 6; // trigger setting PES length for initial slice
++     if (offset) {
++        uchar *p = data + offset - 6;
++        if (p != data) {
++           p -= 3;
++           memmove(p, data, 4);
++           }
++        int l = min(length - offset, MAXPESLENGTH);
++        offset += l;
++        if (p != data) {
++           l += 3;
++           p[6]  = 0x80;
++           p[7]  = 0x00;
++           p[8]  = 0x00;
++           }
++        p[4] = l / 256;
++        p[5] = l & 0xFF;
++        Length = l + 6;
++        lastLength = Length;
++        lastData = p;
++        return p;
++        }
++     else {
++        Length = PesLength(data);
++        if (Length <= length) {
++           offset = Length; // to make sure we break out in case of garbage data
++           lastLength = Length;
++           lastData = data;
++           return data;
++           }
++        }
++     }
++  return NULL;
++}
++
++void cTsToPes::SetRepeatLast(void)
++{
++  repeatLast = true;
++}
++
++void cTsToPes::Reset(void)
++{
++  length = offset = 0;
++  lastData = NULL;
++  lastLength = 0;
++  repeatLast = false;
++}
+diff -ur vdr-1.6.0/remux.h vdr-1.6.0-tsplay/remux.h
+--- vdr-1.6.0/remux.h	2010-06-03 17:34:41.000000000 +0200
++++ vdr-1.6.0-tsplay/remux.h	2010-06-03 17:35:29.000000000 +0200
+@@ -10,6 +10,7 @@
+ #ifndef __REMUX_H
+ #define __REMUX_H
+ 
++#include "channels.h"
+ #include "ringbuffer.h"
+ #include "tools.h"
+ 
+@@ -22,6 +23,8 @@
+ 
+ ePesHeader AnalyzePesHeader(const uchar *Data, int Count, int &PesPayloadOffset, bool *ContinuationHeader = NULL);
+ 
++
++
+ // Picture types:
+ #define NO_PICTURE 0
+ #define I_FRAME    1
+@@ -79,4 +82,246 @@
+   static int ScanVideoPacket(const uchar *Data, int Count, int Offset, uchar &PictureType);
+   };
+ 
++// Some TS handling tools.
++// The following functions all take a pointer to one complete TS packet.
++
++#define TS_SYNC_BYTE          0x47
++#define TS_SIZE               188
++#define TS_ERROR              0x80
++#define TS_PAYLOAD_START      0x40
++#define TS_TRANSPORT_PRIORITY 0x20
++#define TS_PID_MASK_HI        0x1F
++#define TS_SCRAMBLING_CONTROL 0xC0
++#define TS_ADAPT_FIELD_EXISTS 0x20
++#define TS_PAYLOAD_EXISTS     0x10
++#define TS_CONT_CNT_MASK      0x0F
++#define TS_ADAPT_DISCONT      0x80
++#define TS_ADAPT_RANDOM_ACC   0x40 // would be perfect for detecting independent frames, but unfortunately not used by all broadcasters
++#define TS_ADAPT_ELEM_PRIO    0x20
++#define TS_ADAPT_PCR          0x10
++#define TS_ADAPT_OPCR         0x08
++#define TS_ADAPT_SPLICING     0x04
++#define TS_ADAPT_TP_PRIVATE   0x02
++#define TS_ADAPT_EXTENSION    0x01
++
++#define MAXPID 0x2000 // for arrays that use a PID as the index
++
++inline bool TsHasPayload(const uchar *p)
++{
++  return p[3] & TS_PAYLOAD_EXISTS;
++}
++
++inline bool TsHasAdaptationField(const uchar *p)
++{
++  return p[3] & TS_ADAPT_FIELD_EXISTS;
++}
++
++inline bool TsPayloadStart(const uchar *p)
++{
++  return p[1] & TS_PAYLOAD_START;
++}
++
++inline bool TsError(const uchar *p)
++{
++  return p[1] & TS_ERROR;
++}
++
++inline int TsPid(const uchar *p)
++{
++  return (p[1] & TS_PID_MASK_HI) * 256 + p[2];
++}
++
++inline bool TsIsScrambled(const uchar *p)
++{
++  return p[3] & TS_SCRAMBLING_CONTROL;
++}
++
++inline int TsPayloadOffset(const uchar *p)
++{
++  return (p[3] & TS_ADAPT_FIELD_EXISTS) ? p[4] + 5 : 4;
++}
++
++inline int TsGetPayload(const uchar **p)
++{
++  int o = TsPayloadOffset(*p);
++  *p += o;
++  return TS_SIZE - o;
++}
++
++inline int TsContinuityCounter(const uchar *p)
++{
++  return p[3] & TS_CONT_CNT_MASK;
++}
++
++inline int TsGetAdaptationField(const uchar *p)
++{
++  return TsHasAdaptationField(p) ? p[5] : 0x00;
++}
++
++// The following functions all take a pointer to a sequence of complete TS packets.
++
++int64_t TsGetPts(const uchar *p, int l);
++void TsSetTeiOnBrokenPackets(uchar *p, int l);
++
++// Some PES handling tools:
++// The following functions that take a pointer to PES data all assume that
++// there is enough data so that PesLongEnough() returns true.
++
++inline bool PesLongEnough(int Length)
++{
++  return Length >= 6;
++}
++
++inline bool PesHasLength(const uchar *p)
++{
++  return p[4] | p[5];
++}
++
++inline int PesLength(const uchar *p)
++{
++  return 6 + p[4] * 256 + p[5];
++}
++
++inline int PesPayloadOffset(const uchar *p)
++{
++  return 9 + p[8];
++}
++
++inline bool PesHasPts(const uchar *p)
++{
++  return (p[7] & 0x80) && p[8] >= 5;
++}
++
++inline int64_t PesGetPts(const uchar *p)
++{
++  return ((((int64_t)p[ 9]) & 0x0E) << 29) |
++         (( (int64_t)p[10])         << 22) |
++         ((((int64_t)p[11]) & 0xFE) << 14) |
++         (( (int64_t)p[12])         <<  7) |
++         ((((int64_t)p[13]) & 0xFE) >>  1);
++}
++
++#define MAX_SECTION_SIZE 4096 // maximum size of an SI section
++
++// PAT/PMT Parser:
++
++class cPatPmtParser {
++private:
++  uchar pmt[MAX_SECTION_SIZE];
++  int pmtSize;
++  int patVersion;
++  int pmtVersion;
++  int pmtPid;
++  int vpid;
++  int ppid;
++  int vtype;
++  int apids[MAXAPIDS + 1]; // list is zero-terminated
++  int atypes[MAXAPIDS + 1]; // list is zero-terminated
++  char alangs[MAXAPIDS][MAXLANGCODE2];
++  int dpids[MAXDPIDS + 1]; // list is zero-terminated
++  int dtypes[MAXDPIDS + 1]; // list is zero-terminated
++  char dlangs[MAXDPIDS][MAXLANGCODE2];
++  int spids[MAXSPIDS + 1]; // list is zero-terminated
++  char slangs[MAXSPIDS][MAXLANGCODE2];
++  uchar subtitlingTypes[MAXSPIDS];
++  uint16_t compositionPageIds[MAXSPIDS];
++  uint16_t ancillaryPageIds[MAXSPIDS];
++  bool updatePrimaryDevice;
++protected:
++  int SectionLength(const uchar *Data, int Length) { return (Length >= 3) ? ((int(Data[1]) & 0x0F) << 8)| Data[2] : 0; }
++public:
++  cPatPmtParser(bool UpdatePrimaryDevice = false);
++  void Reset(void);
++       ///< Resets the parser. This function must be called whenever a new
++       ///< stream is parsed.
++  void ParsePat(const uchar *Data, int Length);
++       ///< Parses the PAT data from the single TS packet in Data.
++       ///< Length is always TS_SIZE.
++  void ParsePmt(const uchar *Data, int Length);
++       ///< Parses the PMT data from the single TS packet in Data.
++       ///< Length is always TS_SIZE.
++       ///< The PMT may consist of several TS packets, which
++       ///< are delivered to the parser through several subsequent calls to
++       ///< ParsePmt(). The whole PMT data will be processed once the last packet
++       ///< has been received.
++  bool GetVersions(int &PatVersion, int &PmtVersion) const;
++       ///< Returns true if a valid PAT/PMT has been parsed and stores
++       ///< the current version numbers in the given variables.
++  int PmtPid(void) const { return pmtPid; }
++       ///< Returns the PMT pid as defined by the current PAT.
++       ///< If no PAT has been received yet, -1 will be returned.
++  int Vpid(void) const { return vpid; }
++       ///< Returns the video pid as defined by the current PMT, or 0 if no video
++       ///< pid has been detected, yet.
++  int Ppid(void) const { return ppid; }
++       ///< Returns the PCR pid as defined by the current PMT, or 0 if no PCR
++       ///< pid has been detected, yet.
++  int Vtype(void) const { return vtype; }
++       ///< Returns the video stream type as defined by the current PMT, or 0 if no video
++       ///< stream type has been detected, yet.
++  const int *Apids(void) const { return apids; }
++  const int *Dpids(void) const { return dpids; }
++  const int *Spids(void) const { return spids; }
++  int Apid(int i) const { return (0 <= i && i < MAXAPIDS) ? apids[i] : 0; }
++  int Dpid(int i) const { return (0 <= i && i < MAXDPIDS) ? dpids[i] : 0; }
++  int Spid(int i) const { return (0 <= i && i < MAXSPIDS) ? spids[i] : 0; }
++  int Atype(int i) const { return (0 <= i && i < MAXAPIDS) ? atypes[i] : 0; }
++  int Dtype(int i) const { return (0 <= i && i < MAXDPIDS) ? dtypes[i] : 0; }
++  const char *Alang(int i) const { return (0 <= i && i < MAXAPIDS) ? alangs[i] : ""; }
++  const char *Dlang(int i) const { return (0 <= i && i < MAXDPIDS) ? dlangs[i] : ""; }
++  const char *Slang(int i) const { return (0 <= i && i < MAXSPIDS) ? slangs[i] : ""; }
++  uchar SubtitlingType(int i) const { return (0 <= i && i < MAXSPIDS) ? subtitlingTypes[i] : uchar(0); }
++  uint16_t CompositionPageId(int i) const { return (0 <= i && i < MAXSPIDS) ? compositionPageIds[i] : uint16_t(0); }
++  uint16_t AncillaryPageId(int i) const { return (0 <= i && i < MAXSPIDS) ? ancillaryPageIds[i] : uint16_t(0); }
++  };
++
++// TS to PES converter:
++// Puts together the payload of several TS packets that form one PES
++// packet.
++
++class cTsToPes {
++private:
++  uchar *data;
++  int size;
++  int length;
++  int offset;
++  uchar *lastData;
++  int lastLength;
++  bool repeatLast;
++public:
++  cTsToPes(void);
++  ~cTsToPes();
++  void PutTs(const uchar *Data, int Length);
++       ///< Puts the payload data of the single TS packet at Data into the converter.
++       ///< Length is always 188.
++       ///< If the given TS packet starts a new PES payload packet, the converter
++       ///< will be automatically reset. Any packets before the first one that starts
++       ///< a new PES payload packet will be ignored.
++       ///< Once a TS packet has been put into a cTsToPes converter, all subsequent
++       ///< packets until the next call to Reset() must belong to the same PID as
++       ///< the first packet. There is no check whether this actually is the case, so
++       ///< the caller is responsible for making sure this condition is met.
++  const uchar *GetPes(int &Length);
++       ///< Gets a pointer to the complete PES packet, or NULL if the packet
++       ///< is not complete yet. If the packet is complete, Length will contain
++       ///< the total packet length. The returned pointer is only valid until
++       ///< the next call to PutTs() or Reset(), or until this object is destroyed.
++       ///< Once GetPes() has returned a non-NULL value, it must be called
++       ///< repeatedly, and the data processed, until it returns NULL. This
++       ///< is because video packets may be larger than the data a single
++       ///< PES packet with an actual length field can hold, and are therefore
++       ///< split into several PES packets with smaller sizes.
++       ///< Note that for video data GetPes() may only be called if the next
++       ///< TS packet that will be given to PutTs() has the "payload start" flag
++       ///< set, because this is the only way to determine the end of a video PES
++       ///< packet.
++  void SetRepeatLast(void);
++       ///< Makes the next call to GetPes() return exactly the same data as the
++       ///< last one (provided there was no call to Reset() in the meantime).
++  void Reset(void);
++       ///< Resets the converter. This needs to be called after a PES packet has
++       ///< been fetched by a call to GetPes(), and before the next call to
++       ///< PutTs().
++  };
++
+ #endif // __REMUX_H
+diff -ur vdr-1.6.0/svdrp.c vdr-1.6.0-tsplay/svdrp.c
+--- vdr-1.6.0/svdrp.c	2010-06-03 17:34:41.000000000 +0200
++++ vdr-1.6.0-tsplay/svdrp.c	2010-06-03 17:35:19.000000000 +0200
+@@ -701,7 +701,7 @@
+         cRecording *recording = Recordings.Get(strtol(Option, NULL, 10) - 1);
+         if (recording) {
+            cMarks Marks;
+-           if (Marks.Load(recording->FileName()) && Marks.Count()) {
++           if (Marks.Load(recording->FileName(), recording->IsPesRecording()) && Marks.Count()) {
+               if (!cCutter::Active()) {
+                  if (cCutter::Start(recording->FileName()))
+                     Reply(250, "Editing recording \"%s\" [%s]", Option, recording->Title());
+@@ -1346,7 +1346,7 @@
+                  else if (x >= 3)
+                     pos = (h * 3600 + m * 60 + s) * FRAMESPERSEC + f - 1;
+                  }
+-              cResumeFile resume(recording->FileName());
++              cResumeFile resume(recording->FileName(), recording->IsPesRecording());
+               if (pos <= 0)
+                  resume.Delete();
+               else
+diff -ur vdr-1.6.0/tools.c vdr-1.6.0-tsplay/tools.c
+--- vdr-1.6.0/tools.c	2008-03-05 18:23:47.000000000 +0100
++++ vdr-1.6.0-tsplay/tools.c	2010-06-03 17:35:19.000000000 +0200
+@@ -1589,7 +1589,7 @@
+               //    last (partial) page might be skipped, writeback will start only after
+               //    second call; the third call will still include this page and finally
+               //    drop it from cache.
+-              off_t headdrop = min(begin, WRITE_BUFFER * 2L);
++              off_t headdrop = min(begin, off_t(WRITE_BUFFER * 2));
+               posix_fadvise(fd, begin - headdrop, lastpos - begin + headdrop, POSIX_FADV_DONTNEED);
+               }
+            begin = lastpos = curpos;
+@@ -1608,7 +1608,7 @@
+               // kind of write gathering enabled), but the syncs cause (io) load..
+               // Uncomment the next line if you think you need them.
+               //fdatasync(fd);
+-              off_t headdrop = min(curpos - totwritten, totwritten * 2L);
++              off_t headdrop = min(off_t(curpos - totwritten), off_t(totwritten * 2));
+               posix_fadvise(fd, curpos - totwritten - headdrop, totwritten + headdrop, POSIX_FADV_DONTNEED);
+               totwritten = 0;
+               }
+diff -ur vdr-1.6.0/tools.h vdr-1.6.0-tsplay/tools.h
+--- vdr-1.6.0/tools.h	2008-02-17 14:41:27.000000000 +0100
++++ vdr-1.6.0-tsplay/tools.h	2010-06-03 17:35:19.000000000 +0200
+@@ -38,7 +38,7 @@
+ #define SECSINDAY  86400
+ 
+ #define KILOBYTE(n) ((n) * 1024)
+-#define MEGABYTE(n) ((n) * 1024 * 1024)
++#define MEGABYTE(n) ((n) * 1024LL * 1024LL)
+ 
+ #define MALLOC(type, size)  (type *)malloc(sizeof(type) * (size))
+ 

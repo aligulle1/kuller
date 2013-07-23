@@ -1,0 +1,165 @@
+Index: kdebase/kioslave/media/libmediacommon/medium.cpp
+===================================================================
+--- kdebase.orig/kioslave/media/libmediacommon/medium.cpp
++++ kdebase/kioslave/media/libmediacommon/medium.cpp
+@@ -44,6 +44,7 @@ Medium::Medium(const TQString &id, const
+ 	loadUserLabel();
+ 
+ 	m_halmounted = false;
++    m_isHotplug = false;
+ }
+ 
+ Medium::Medium()
+@@ -65,6 +66,7 @@ Medium::Medium()
+ 	m_properties+= TQString::null; /* CLEAR_DEVICE_UDI */
+ 	
+ 	m_halmounted = false;
++    m_isHotplug = false;
+ }
+ 
+ const Medium Medium::create(const TQStringList &properties)
+Index: kdebase/kioslave/media/libmediacommon/medium.h
+===================================================================
+--- kdebase.orig/kioslave/media/libmediacommon/medium.h
++++ kdebase/kioslave/media/libmediacommon/medium.h
+@@ -91,6 +91,8 @@ public:
+ 	void setIconName(const TQString &iconName);
+ 	void setHalMounted(bool flag) const { m_halmounted = flag; }
+ 	bool halMounted() const { return m_halmounted; }
++    void setIsHotplug( bool state ) { m_isHotplug = state; }
++    bool isHotplug() const { return m_isHotplug; }
+ 
+ private:
+ 	Medium();
+@@ -98,12 +100,14 @@ private:
+ 
+ 	TQStringList m_properties;
+ 	mutable bool m_halmounted;
++
++    bool m_isHotplug;
+ 	
+ friend class TQValueListNode<const Medium>;
+ };
+ 
+ namespace MediaManagerUtils {
+-  static inline TQMap<TQString,TQString> splitOptions(const TQStringList & options) 
++  static inline TQMap<TQString,TQString> splitOptions(const TQStringList & options)
+     {
+       TQMap<TQString,TQString> valids;
+ 
+Index: kdebase/kioslave/media/mediamanager/halbackend.cpp
+===================================================================
+--- kdebase.orig/kioslave/media/mediamanager/halbackend.cpp
++++ kdebase/kioslave/media/mediamanager/halbackend.cpp
+@@ -541,6 +541,7 @@ void HALBackend::setVolumeProperties(Med
+             libhal_volume_is_mounted(halVolume) );		/* Mounted ? */
+     }
+ 
++    medium->setIsHotplug( libhal_drive_is_hotpluggable(halDrive) );
+ 
+     char* name = libhal_volume_policy_compute_display_name(halDrive, halVolume, m_halStoragePolicy);
+     TQString volume_name = TQString::fromUtf8(name);
+Index: kdebase/kioslave/media/mediamanager/halbackend.h
+===================================================================
+--- kdebase.orig/kioslave/media/mediamanager/halbackend.h
++++ kdebase/kioslave/media/mediamanager/halbackend.h
+@@ -87,6 +87,7 @@ public:
+ 	TQString unmount(const TQString &id);
+ 	TQString decrypt(const TQString &id, const TQString &password);
+ 	TQString undecrypt(const TQString &id);
++    static bool isHotplug( const QString & id );
+ 
+ private:
+ 	/**
+Index: kdebase/kioslave/media/mediamanager/mediamanager.cpp
+===================================================================
+--- kdebase.orig/kioslave/media/mediamanager/mediamanager.cpp
++++ kdebase/kioslave/media/mediamanager/mediamanager.cpp
+@@ -352,6 +352,54 @@ void MediaManager::slotMediumChanged(con
+     emit mediumChanged(name);
+ }
+ 
++TQString MediaManager::unmountAllSuspend()
++{
++    TQPtrList<Medium> list = m_mediaList.list();
++
++    TQPtrList<Medium>::const_iterator it = list.begin();
++    TQPtrList<Medium>::const_iterator end = list.end();
++
++    TQString result;
++
++    for (; it!=end; ++it)
++    {
++        if ( (*it)->isMounted() && (*it)->isHotplug() )
++        {
++            TQString tmp = unmount( (*it)->id() );
++            if ( !tmp.isEmpty() ) // umount failed
++                result = tmp;
++            else
++                m_suspendResumeMountList.append( *it );
++        }
++    }
++
++    // return last error
++    return result;
++}
++
++TQString MediaManager::remountAllResume()
++{
++    TQPtrList<Medium>::const_iterator it = m_suspendResumeMountList.begin();
++    TQPtrList<Medium>::const_iterator end = m_suspendResumeMountList.end();
++
++    TQString result;
++
++    for (; it!=end; ++it)
++    {
++        if ( (*it)->needMounting() )
++        {
++            TQString tmp = mount( (*it)->id() );
++            if ( !tmp.isEmpty() ) // mount failed
++                result = tmp;
++            else
++                m_suspendResumeMountList.remove(); // remove the media from the list when remount succeeds
++        }
++    }
++
++    // return last error
++    return result;
++}
++
+ 
+ extern "C" {
+     KDE_EXPORT KDEDModule *create_mediamanager(const TQCString &obj)
+Index: kdebase/kioslave/media/mediamanager/mediamanager.h
+===================================================================
+--- kdebase.orig/kioslave/media/mediamanager/mediamanager.h
++++ kdebase/kioslave/media/mediamanager/mediamanager.h
+@@ -60,6 +60,20 @@ k_dcop:
+ 	bool removableUnplug(const TQString &devNode);
+ 	bool removableCamera(const TQString &devNode);
+ 
++    /**
++     * Unmount manually all partitions when going to suspend
++     *
++     * @return last error if any
++     */
++    TQString unmountAllSuspend();
++
++    /**
++     * Remount previously unmounted partitions in unmountAllSuspend()
++     *
++     * @return last error if any
++     */
++    TQString remountAllResume();
++
+ k_dcop_signals:
+ 	void mediumAdded(const TQString &name, bool allowNotification);
+ 	void mediumRemoved(const TQString &name, bool allowNotification);
+@@ -87,6 +101,7 @@ private:
+ 	HALBackend *m_halbackend;
+ 	MediaDirNotify m_dirNotify;
+ 	FstabBackend *m_fstabbackend;
++    TQPtrList<Medium> m_suspendResumeMountList;
+ };
+ 
+ #endif

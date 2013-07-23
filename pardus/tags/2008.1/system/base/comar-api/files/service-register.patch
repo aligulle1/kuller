@@ -1,0 +1,15 @@
+Index: comar/service.py
+===================================================================
+--- comar/service.py	(revision 18869)
++++ comar/service.py	(revision 18881)
+@@ -456,6 +456,8 @@
+         pass
+     
+     if state == "on":
+-        touch(os.path.join("/etc/mudur/services/enabled", script()))
++        if script() not in os.listdir("/etc/mudur/services/disabled"):
++            touch(os.path.join("/etc/mudur/services/enabled", script()))
+     elif state == "conditional":
+-        touch(os.path.join("/etc/mudur/services/conditional", script()))
++        if script() not in os.listdir("/etc/mudur/services/disabled"):
++            touch(os.path.join("/etc/mudur/services/conditional", script()))

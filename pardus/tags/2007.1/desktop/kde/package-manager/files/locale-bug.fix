@@ -1,0 +1,34 @@
+Index: package-manager/src/LocaleData.py
+===================================================================
+--- package-manager/src/LocaleData.py	(revision 11691)
++++ package-manager/src/LocaleData.py	(working copy)
+@@ -23,14 +23,13 @@
+     }
+ 
+ def getKDELocale():
+-    KGlobal.config().setGroup("Locale")
+-    return KGlobal.config().readEntry("Language", "tr")
++    return str(KGlobal.locale().language())
+ 
+ # package-manager uses KDE locale info, pisi.api uses system locale info. We need 
+ # to map KDE locale info to system locale info to make dynamic KDE system language 
+ # changes from Tasma visible to package-manager.
+ def setSystemLocale():
+-    kdeLocale = str(getKDELocale()).split(":")[0]
++    kdeLocale = getKDELocale()
+ 
+     if locales.has_key(kdeLocale):
+         systemlocale = locales[kdeLocale]
+Index: package-manager/src/HelpDialog.py
+===================================================================
+--- package-manager/src/HelpDialog.py	(revision 11691)
++++ package-manager/src/HelpDialog.py	(working copy)
+@@ -31,7 +31,7 @@
+         self.resize(500,600)
+         self.layout.addWidget(self.htmlPart.view(),1,1)
+ 
+-        if str(getKDELocale()).split(":")[0] == "tr":
++        if getKDELocale() == "tr":
+             self.htmlPart.openURL(KURL(locate("data","package-manager/help/tr/%s" % help_files[help])))
+         else:
+             self.htmlPart.openURL(KURL(locate("data","package-manager/help/en/%s" % help_files[help])))

@@ -1,0 +1,232 @@
+Index: foo2zjs-0.0_20071128/hplj.usermap
+===================================================================
+--- /dev/null
++++ foo2zjs-0.0_20071128/hplj.usermap
+@@ -0,0 +1,4 @@
++hplj1000 0x0003 0x03f0 0x0517 0x0000 0x0000 0x00 0x00 0x00 0x00 0x00 0x00 0x00000000
++hplj1005 0x0003 0x03f0 0x1317 0x0000 0x0000 0x00 0x00 0x00 0x00 0x00 0x00 0x00000000
++hplj1018 0x0003 0x03f0 0x4117 0x0000 0x0000 0x00 0x00 0x00 0x00 0x00 0x00 0x00000000
++hplj1020 0x0003 0x03f0 0x2b17 0x0000 0x0000 0x00 0x00 0x00 0x00 0x00 0x00 0x00000000
+Index: foo2zjs-0.0_20071128/icc2ps/Makefile
+===================================================================
+--- foo2zjs-0.0_20071128.orig/icc2ps/Makefile
++++ foo2zjs-0.0_20071128/icc2ps/Makefile
+@@ -1,11 +1,11 @@
+ UNAME := $(shell uname)
+-PREFIX=	/usr
++PREFIX=	$(DESTDIR)/usr
+ BIN=	$(PREFIX)/bin
+ SRC=	icc2ps.c xgetopt.c
+ LIB=	cmscam97.c cmscnvrt.c cmserr.c cmsgamma.c cmsgmt.c cmsintrp.c cmsio1.c \
+ 	cmslut.c cmsmatsh.c cmsmtrx.c cmsnamed.c cmspack.c cmspcs.c cmsps2.c \
+ 	cmssamp.c cmswtpnt.c cmsxform.c cmsio0.c cmsvirt.c
+-CFLAGS=	-O3
++CFLAGS?=	-O3
+ INSTALL=install
+ ifeq ($(UNAME),SunOS)
+     INSTALL=/usr/ucb/install
+Index: foo2zjs-0.0_20071128/Makefile
+===================================================================
+--- foo2zjs-0.0_20071128.orig/Makefile
++++ foo2zjs-0.0_20071128/Makefile
+@@ -14,7 +14,7 @@ VERSION=0.0
+ 
+ # Installation prefix...
+ PREFIX=/usr/local
+-PREFIX=/usr
++PREFIX=$(DESTDIR)/usr
+ 
+ # Pathnames for this package...
+ BIN=$(PREFIX)/bin
+@@ -30,7 +30,7 @@ DOCDIR=$(PREFIX)/share/doc/foo2zjs/
+ INSTALL=install
+ 
+ # Pathnames for referenced packages...
+-FOODB=/usr/share/foomatic/db/source
++FOODB=$(PREFIX)/share/foomatic/db/source
+ 
+ # User ID's
+ LPuid=-olp
+@@ -102,7 +102,7 @@ WEBFILES=	\
+ 		archslx.fig \
+ 		c500n.png \
+ 		$(NULL)
+-	
++
+ FILES	=	\
+ 		README \
+ 		README.in \
+@@ -229,7 +229,7 @@ ifeq ($(UNAME),Linux)
+ endif
+ 
+ # Compiler flags
+-CFLAGS +=	-O2 -Wall
++CFLAGS ?=	-O2 -Wall
+ #CFLAGS +=	-g
+ 
+ #
+@@ -504,12 +504,14 @@ install-test:
+ UDEVBIN=/bin/
+ 
+ install-prog:
++	[ -d $(BIN) ] || install -d -m 755 $(BIN)/
++	[ -d $(DESTDIR)/bin/ ] || install -d -m 755 $(DESTDIR)/bin/
+ 	#
+ 	# Install driver, wrapper, and development tools
+ 	#
+ 	$(INSTALL) -c $(PROGS) $(SHELLS) $(BIN)/
+ 	if [ "$(BINPROGS)" != "" ]; then \
+-	    $(INSTALL) -c $(BINPROGS) $(UDEVBIN); \
++	    $(INSTALL) -c $(BINPROGS) $(DESTDIR)$(UDEVBIN); \
+ 	fi
+ 	#
+ 	# Install gamma correction files.  These are just templates,
+@@ -537,6 +539,7 @@ install-foo:
+ 	#
+ 	@if [ -d $(FOODB) ]; then \
+ 	    for dir in driver printer opt; do \
++		[ -d $(FOODB)/$$dir/ ] || install -d -m 755 $(FOODB)/$$dir/; \
+ 		echo install -m 644 foomatic-db/$$dir/*.xml $(FOODB)/$$dir/; \
+ 		$(INSTALL) -c -m 644 foomatic-db/$$dir/*.xml $(FOODB)/$$dir/; \
+ 	    done \
+@@ -554,10 +557,10 @@ install-foo:
+ 	#
+ 	# Clear foomatic cache and rebuild database if needed
+ 	#
+-	rm -rf /var/cache/foomatic/*/*
+-	rm -f /var/cache/foomatic/printconf.pickle
+-	if [ -d /var/cache/foomatic/compiled ]; then \
+-	    cd /var/cache/foomatic/compiled; \
++	rm -rf $(DESTDIR)/var/cache/foomatic/*/*
++	rm -f $(DESTDIR)/var/cache/foomatic/printconf.pickle
++	if [ -d $(DESTDIR)/var/cache/foomatic/compiled ]; then \
++	    cd $(DESTDIR)/var/cache/foomatic/compiled; \
+ 	    foomatic-combo-xml -O >overview.xml; \
+ 	fi
+ 
+@@ -664,46 +667,16 @@ install-extra:
+ 	    fi; \
+ 	done
+ 
+-MODEL=/usr/share/cups/model
+-LOCALMODEL=/usr/local/share/cups/model
+-PPD=/usr/share/ppd
+-VARPPD=/var/lp/ppd
++MODEL=$(DESTDIR)/usr/share/cups/model/foo2zjs
+ install-ppd:
+ 	#
+ 	# Install PPD files for CUPS
+ 	#
+-	if [ -x /usr/sbin/ppdmgr -a -s $(VARPPD)/ppdcache ]; then \
+-	    $(INSTALL) $(LPgid) -d $(VARPPD)/user; \
+-	    cd PPD; \
+-	    for ppd in *.ppd; do \
+-		manuf=`echo "$$ppd" | sed 's/-.*//'`; \
+-		$(INSTALL) $(LPgid) -d $(VARPPD)/user/$$manuf; \
+-		gzip < $$ppd > $(VARPPD)/user/$$manuf/$$ppd.gz; \
+-	    done; \
+-	    ppdmgr -u; \
+-	elif [ -d $(PPD) ]; then \
+-	    find $(PPD) -name '*foo2zjs*' | xargs rm -rf; \
+-	    find $(PPD) -name '*foo2hp*' | xargs rm -rf; \
+-	    find $(PPD) -name '*foo2xqx*' | xargs rm -rf; \
+-	    find $(PPD) -name '*foo2lava*' | xargs rm -rf; \
+-	    find $(PPD) -name '*foo2qpdl*' | xargs rm -rf; \
+-	    find $(PPD) -name '*foo2slx*' | xargs rm -rf; \
+-            [ -d $(PPD)/foo2zjs ] || mkdir $(PPD)/foo2zjs; \
+-	    cd PPD; \
+-	    for ppd in *.ppd; do \
+-		gzip < $$ppd > $(PPD)/foo2zjs/$$ppd.gz; \
+-	    done; \
+-	fi
+ 	if [ -d $(MODEL) ]; then \
+ 	    cd PPD; \
+ 	    for ppd in *.ppd; do \
+ 		gzip < $$ppd > $(MODEL)/$$ppd.gz; \
+ 	    done; \
+-	elif [ -d $(LOCALMODEL) ]; then \
+-	    cd PPD; \
+-	    for ppd in *.ppd; do \
+-		gzip < $$ppd > $(LOCALMODEL)/$$ppd.gz; \
+-	    done; \
+ 	fi
+ 
+ APPL=/usr/share/applications
+@@ -714,13 +687,13 @@ install-desktop:
+ 	# Install GNOME desktop
+ 	#
+ 	if [ -d $(APPL) ]; then \
+-	    $(INSTALL) -c -m 644 hplj1020.desktop $(APPL); \
++	    $(INSTALL) -c -m 644 hplj1020.desktop $(DESTDIR)$(APPL); \
+ 	fi
+ 	if [ -d $(OLDAPPL) ]; then \
+-	    $(INSTALL) -c -m 644 hplj1020.desktop $(OLDAPPL); \
++	    $(INSTALL) -c -m 644 hplj1020.desktop $(DESTDIR)$(OLDAPPL); \
+ 	fi
+ 	if [ -d $(PIXMAPS) ]; then \
+-	    $(INSTALL) -c -m 644 hplj1020_icon.png $(PIXMAPS); \
++	    $(INSTALL) -c -m 644 hplj1020_icon.png $(DESTDIR)$(PIXMAPS); \
+ 	fi
+ 
+ install-gui:
+@@ -731,10 +704,8 @@ install-gui:
+ 	$(INSTALL) -c -m 755 hplj10xx_gui.tcl $(SHAREZJS)
+ 	
+ 
+-USBDIR=/etc/hotplug/usb
+-UDEVDIR=/etc/udev/rules.d
+-RULES=hplj10xx.rules
+-install-hotplug: install-hotplug-test install-hotplug-prog
++USBDIR=$(DESTDIR)/etc/hotplug/usb
++install-hotplug: install-hotplug-test install-udev
+ 
+ install-hotplug-test:
+ 	#
+@@ -752,9 +723,6 @@ install-hotplug-test:
+ 	#
+ 
+ install-hotplug-prog:
+-	if [ -d $(UDEVDIR) ]; then \
+-	    $(INSTALL) -c -m 644 $(RULES) $(UDEVDIR)/11-$(RULES); \
+-	fi
+ 	[ -d $(USBDIR) ] || $(INSTALL) -d -m 755 $(USBDIR)/
+ 	$(INSTALL) -c -m 755 hplj1000 $(USBDIR)/
+ 	ln -sf $(USBDIR)/hplj1000 $(USBDIR)/hplj1005
+@@ -763,13 +731,13 @@ install-hotplug-prog:
+ 	ln -sf $(USBDIR)/hplj1000 $(USBDIR)/hpljP1005
+ 	ln -sf $(USBDIR)/hplj1000 $(USBDIR)/hpljP1006
+ 	ln -sf $(USBDIR)/hplj1000 $(USBDIR)/hpljP1505
+-	$(USBDIR)/hplj1000 install-usermap
+-	$(USBDIR)/hplj1005 install-usermap
+-	$(USBDIR)/hplj1018 install-usermap
+-	$(USBDIR)/hplj1020 install-usermap
+-	$(USBDIR)/hpljP1005 install-usermap
+-	$(USBDIR)/hpljP1006 install-usermap
+-	$(USBDIR)/hpljP1505 install-usermap
++	install -c -m 644 hplj.usermap $(USBDIR)/
++
++UDEVDIR=$(DESTDIR)/etc/udev/rules.d
++RULES=hplj10xx.rules
++install-udev:
++	[ -d $(UDEVDIR) ] || install -d -m 755 $(UDEVDIR)/
++	install -c -m 644 $(RULES) $(UDEVDIR)/11-$(RULES)
+ 
+ cups:	FRC
+ 	if [ -x /etc/init.d/cups ]; then \
+@@ -1120,7 +1088,6 @@ install-doc: doc
+ 	$(INSTALL) -c -m 644 README $(DOCDIR)
+ 	$(INSTALL) -c -m 644 ChangeLog $(DOCDIR)
+ 
+-GROFF=/usr/local/test/bin/groff
+ GROFF=groff
+ manual.pdf: $(MANPAGES)
+ 	-$(GROFF) -t -man $(MANPAGES) | ps2pdf - $@
+@@ -1170,7 +1137,7 @@ maildb:
+ #
+ # Create tarball
+ #
+-tar:	
++tar:
+ 	HERE=`basename $$PWD`; \
+ 	/bin/ls $(FILES) | \
+ 	sed -e "s?^?$$HERE/?" | \

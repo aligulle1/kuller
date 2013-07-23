@@ -1,0 +1,88 @@
+Index: banshee/src/Extensions/Banshee.MeeGo/Makefile.am
+===================================================================
+--- banshee.orig/src/Extensions/Banshee.MeeGo/Makefile.am	2010-09-18 14:13:50.000000000 +0800
++++ banshee/src/Extensions/Banshee.MeeGo/Makefile.am	2010-09-18 14:13:55.420497653 +0800
+@@ -37,7 +37,8 @@
+ com.meego.UX.Shell.Panels.banshee.service: com.meego.UX.Shell.Panels.banshee.service.in $(top_builddir)/config.log
+ 	sed -e "s|\@libexecdir\@|$(libexecdir)|" $< > $@
+ 
+-desktopfiles_in_files = meego-panel-banshee.desktop.in
++desktopfiles_in_files = meego-panel-banshee.desktop.in \
++						banshee-1.desktop.in
+ desktopfiles_files = $(desktopfiles_in_files:.desktop.in=.desktop)
+ desktopfilesdir = $(datadir)/mutter-meego/panels
+ desktopfiles_DATA = $(desktopfiles_files)
+@@ -48,7 +49,9 @@
+ clean-local:
+ 	rm -f com.meego.UX.Shell.Panels.banshee.service \
+ 		meego-panel-banshee.desktop \
+-		meego-panel-banshee.desktop.in
++		meego-panel-banshee.desktop.in \
++		banshee-1.desktop \
++		banshee-1.desktop.in
+ 
+ else
+ EXTRA_DIST = $(SOURCES) $(RESOURCES)
+@@ -59,3 +62,4 @@
+ 	meego-panel-banshee \
+ 	com.meego.UX.Shell.Panels.banshee.service.in \
+ 	meego-panel-banshee.desktop.in.in
++	banshee-1.desktop.in.in
+Index: banshee/src/Extensions/Banshee.MeeGo/Makefile.in
+===================================================================
+--- banshee.orig/src/Extensions/Banshee.MeeGo/Makefile.in	2010-09-18 14:13:50.000000000 +0800
++++ banshee/src/Extensions/Banshee.MeeGo/Makefile.in	2010-09-18 14:14:32.482118523 +0800
+@@ -627,12 +627,14 @@
+ @HAVE_MEEGO_FALSE@EXTRA_DIST = $(SOURCES) $(RESOURCES) \
+ @HAVE_MEEGO_FALSE@	Banshee.MeeGo.dll.config meego-panel-banshee \
+ @HAVE_MEEGO_FALSE@	com.meego.UX.Shell.Panels.banshee.service.in \
+-@HAVE_MEEGO_FALSE@	meego-panel-banshee.desktop.in.in
++@HAVE_MEEGO_FALSE@	meego-panel-banshee.desktop.in.in \
++@HAVE_MEEGO_FALSE@	banshee-1.desktop.in.in
+ @HAVE_MEEGO_TRUE@EXTRA_DIST = $(SOURCES_BUILD) $(RESOURCES_EXPANDED) \
+ @HAVE_MEEGO_TRUE@	$(THEME_ICONS_SOURCE) \
+ @HAVE_MEEGO_TRUE@	Banshee.MeeGo.dll.config meego-panel-banshee \
+ @HAVE_MEEGO_TRUE@	com.meego.UX.Shell.Panels.banshee.service.in \
+-@HAVE_MEEGO_TRUE@	meego-panel-banshee.desktop.in.in
++@HAVE_MEEGO_TRUE@	meego-panel-banshee.desktop.in.in \
++@HAVE_MEEGO_TRUE@	banshee-1.desktop.in.in
+ @HAVE_MEEGO_TRUE@CLEANFILES = $(OUTPUT_FILES)
+ @HAVE_MEEGO_TRUE@DISTCLEANFILES = *.pidb
+ @HAVE_MEEGO_TRUE@MAINTAINERCLEANFILES = Makefile.in
+@@ -640,7 +642,7 @@
+ @HAVE_MEEGO_TRUE@panel_SCRIPTS = meego-panel-banshee
+ @HAVE_MEEGO_TRUE@servicedir = $(datadir)/dbus-1/services
+ @HAVE_MEEGO_TRUE@service_DATA = com.meego.UX.Shell.Panels.banshee.service
+-@HAVE_MEEGO_TRUE@desktopfiles_in_files = meego-panel-banshee.desktop.in
++@HAVE_MEEGO_TRUE@desktopfiles_in_files = meego-panel-banshee.desktop.in banshee-1.desktop.in
+ @HAVE_MEEGO_TRUE@desktopfiles_files = $(desktopfiles_in_files:.desktop.in=.desktop)
+ @HAVE_MEEGO_TRUE@desktopfilesdir = $(datadir)/mutter-meego/panels
+ @HAVE_MEEGO_TRUE@desktopfiles_DATA = $(desktopfiles_files)
+@@ -963,7 +965,10 @@
+ @HAVE_MEEGO_TRUE@clean-local:
+ @HAVE_MEEGO_TRUE@	rm -f com.meego.UX.Shell.Panels.banshee.service \
+ @HAVE_MEEGO_TRUE@		meego-panel-banshee.desktop \
+-@HAVE_MEEGO_TRUE@		meego-panel-banshee.desktop.in
++@HAVE_MEEGO_TRUE@		meego-panel-banshee.desktop.in \
++@HAVE_MEEGO_TRUE@		banshee-1.desktop \
++@HAVE_MEEGO_TRUE@		banshee-1.desktop.in
++
+ # Tell versions [3.59,3.63) of GNU make to not export all variables.
+ # Otherwise a system limit (for SysV at least) may be exceeded.
+ .NOEXPORT:
+Index: banshee/src/Extensions/Banshee.MeeGo/banshee-1.desktop.in.in
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ banshee/src/Extensions/Banshee.MeeGo/banshee-1.desktop.in.in	2010-09-18 14:13:55.430498112 +0800
+@@ -0,0 +1,11 @@
++[Desktop Entry]
++_Name=Banshee Netbook
++_GenericName=Netbook Media Player
++_X-GNOME-FullName=Netbook Banshee Media Player
++_Comment=Play and organize your media collection
++Exec=banshee --client=MeeGo
++Terminal=false
++Type=Application
++Icon=media-player-banshee
++Categories=GNOME;Audio;Music;Player;AudioVideo;
++StartupNotify=true

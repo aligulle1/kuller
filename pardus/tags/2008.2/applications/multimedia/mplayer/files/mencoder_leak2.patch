@@ -1,0 +1,18 @@
+--- libmpdemux/muxer.c	2008-05-03 07:28:45.489981000 -0700
++++ libmpdemux/muxer.c	2008-05-03 07:28:45.490985000 -0700
+@@ -123,6 +123,7 @@
+           s->timer = buf->dts;
+           s->buffer = buf->buffer;
+           s->muxer->cont_write_chunk(s, buf->len, buf->flags, buf->dts, buf->pts);
++          free(buf->buffer);
+           
+           /* 3. restore saved timer and buffer */
+           s->timer = tmp_buf.dts;
+@@ -131,6 +132,7 @@
+         
+         free(s->muxer->muxbuf);
+         s->muxer->muxbuf_num = 0;
++        s->muxer->muxbuf = NULL;
+       }
+     }
+     

@@ -1,0 +1,85 @@
+Index: kcm/nepomukserverkcm.cpp
+===================================================================
+--- kcm/nepomukserverkcm.cpp	(revision 924689)
++++ nepomuk/kcm/nepomukserverkcm.cpp	(revision 924690)
+@@ -57,6 +57,7 @@
+ Nepomuk::ServerConfigModule::ServerConfigModule( QWidget* parent, const QVariantList& args )
+     : KCModule( NepomukConfigModuleFactory::componentData(), parent, args ),
+       m_serverInterface( "org.kde.NepomukServer", "/nepomukserver", QDBusConnection::sessionBus() ),
++      m_serviceManagerInterface( "org.kde.NepomukServer", "/servicemanager", QDBusConnection::sessionBus() ),
+       m_strigiInterface( 0 )
+ {
+     KAboutData *about = new KAboutData(
+@@ -187,21 +188,26 @@
+ 
+ void Nepomuk::ServerConfigModule::slotUpdateStrigiStatus()
+ {
+-    if ( m_strigiInterface->isValid() ) {
+-        bool indexing = m_strigiInterface->isIndexing();
+-        bool suspended = m_strigiInterface->isSuspended();
+-        QString folder = m_strigiInterface->currentFolder();
++    if ( m_serviceManagerInterface.runningServices().value().contains( "nepomukstrigiservice") ) {
++        if ( m_serviceManagerInterface.isServiceInitialized( "nepomukstrigiservice") ) {
++            bool indexing = m_strigiInterface->isIndexing();
++            bool suspended = m_strigiInterface->isSuspended();
++            QString folder = m_strigiInterface->currentFolder();
+ 
+-        if ( m_strigiInterface->lastError().isValid() )
+-            m_labelStrigiStatus->setText( i18nc( "@info:status %1 is an error message returned by a dbus interface.",
+-                                                 "Failed to contact Strigi indexer (%1)",
+-                                                 m_strigiInterface->lastError().message() ) );
+-        else if ( suspended )
+-            m_labelStrigiStatus->setText( i18nc( "@info_status", "File indexer is suspended" ) );
+-        else if ( indexing )
+-            m_labelStrigiStatus->setText( i18nc( "@info_status", "Strigi is currently indexing files in folder %1", folder ) );
+-        else
+-            m_labelStrigiStatus->setText( i18nc( "@info_status", "File indexer is idle" ) );
++            if ( m_strigiInterface->lastError().isValid() )
++                m_labelStrigiStatus->setText( i18nc( "@info:status %1 is an error message returned by a dbus interface.",
++                                                     "Failed to contact Strigi indexer (%1)",
++                                                     m_strigiInterface->lastError().message() ) );
++            else if ( suspended )
++                m_labelStrigiStatus->setText( i18nc( "@info_status", "File indexer is suspended" ) );
++            else if ( indexing )
++                m_labelStrigiStatus->setText( i18nc( "@info_status", "Strigi is currently indexing files in folder %1", folder ) );
++            else
++                m_labelStrigiStatus->setText( i18nc( "@info_status", "File indexer is idle" ) );
++        }
++        else {
++            m_labelStrigiStatus->setText( i18nc( "@info_status", "Strigi service failed to initialize, most likely due to an installation problem." ) );
++        }
+     }
+     else {
+         m_labelStrigiStatus->setText( i18nc( "@info_status", "Strigi service not running." ) );
+Index: kcm/nepomukserverkcm.h
+===================================================================
+--- kcm/nepomukserverkcm.h	(revision 924689)
++++ nepomuk/kcm/nepomukserverkcm.h	(revision 924690)
+@@ -23,6 +23,7 @@
+ #include "ui_nepomukconfigwidget.h"
+ #include "nepomukserverinterface.h"
+ #include "strigiserviceinterface.h"
++#include "nepomukservicemanagerinterface.h"
+ 
+ class FolderSelectionModel;
+ 
+@@ -46,6 +47,7 @@
+ 
+     private:
+         org::kde::NepomukServer m_serverInterface;
++        org::kde::nepomuk::ServiceManager m_serviceManagerInterface;
+         org::kde::nepomuk::Strigi* m_strigiInterface;
+ 
+         FolderSelectionModel* m_folderModel;
+Index: kcm/CMakeLists.txt
+===================================================================
+--- kcm/CMakeLists.txt	(revision 924689)
++++ nepomuk/kcm/CMakeLists.txt	(revision 924690)
+@@ -14,6 +14,7 @@
+   )
+ 
+ qt4_add_dbus_interface(kcmnepomuk_SRCS ../interfaces/org.kde.NepomukServer.xml nepomukserverinterface)
++qt4_add_dbus_interface(kcmnepomuk_SRCS ../interfaces/org.kde.nepomuk.ServiceManager.xml nepomukservicemanagerinterface)
+ qt4_add_dbus_interface(kcmnepomuk_SRCS ../interfaces/org.kde.nepomuk.Strigi.xml strigiserviceinterface)
+ 
+ kde4_add_ui_files(kcmnepomuk_SRCS

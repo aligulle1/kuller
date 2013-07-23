@@ -1,0 +1,21 @@
+# Shell functions to cut down on useless shell instances.
+start() {
+	echo -n $"Starting $prog: "
+	daemon ${krb5kdc} ${KRB5REALM:+-r ${KRB5REALM}} -P $pidfile $KRB5KDC_ARGS
+	RETVAL=$?
+}
+
+stop() {
+	echo -n $"Stopping $prog: "
+	killproc ${krb5kdc}
+	RETVAL=$?
+	echo
+	[ $RETVAL = 0 ] && rm -f /var/lock/subsys/krb5kdc
+}
+
+reload() {
+	echo -n $"Reopening $prog log file: "
+	killproc ${krb5kdc} -HUP
+        RETVAL=$?
+	echo
+}

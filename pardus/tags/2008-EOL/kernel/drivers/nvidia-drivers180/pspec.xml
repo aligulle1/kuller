@@ -1,0 +1,150 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>nvidia-drivers180</Name>
+        <Homepage>http://www.nvidia.com/</Homepage>
+        <Packager>
+            <Name>Fatih Aşıcı</Name>
+            <Email>fatih@pardus.org.tr</Email>
+        </Packager>
+        <License>NVIDIA</License>
+        <IsA>driver</IsA>
+        <Summary>NVIDIA kernel and glx drivers for GeForce 6xxx and newer NVIDIA cards</Summary>
+        <Description>This package contains NVIDIA kernel and glx drivers giving optimized 2d/3d performance on Linux for GeForce 6xxx and newer NVIDIA cards.</Description>
+        <Archive sha1sum="a05521e99d522c4f2db9988f63f3f51439c742f4" type="tarbz2">http://cekirdek.pardus.org.tr/~fatih/dist/nvidia/NVIDIA-Linux-x86-180.51.tar.bz2</Archive>
+        <BuildDependencies>
+            <Dependency release="114">kernel-source</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <Patch level="1">rt.patch</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>nvidia-drivers180</Name>
+        <RuntimeDependencies>
+            <Dependency release="114">kernel</Dependency>
+            <Dependency versionFrom="1.3.2">zorg</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="config">/etc</Path>
+            <Path fileType="executable">/usr/bin</Path>
+            <Path fileType="library" permanent="true">/lib/modules</Path>
+            <Path fileType="library">/usr/lib/xorg/nvidia-*/drivers</Path>
+            <Path fileType="library">/usr/lib/xorg/nvidia-*/extensions</Path>
+            <Path fileType="library">/usr/lib/xorg/nvidia-*/lib*</Path>
+            <Path fileType="header">/usr/lib/xorg/nvidia-*/include</Path>
+            <Path fileType="doc">/usr/share/doc</Path>
+            <Path fileType="man">/usr/share/man</Path>
+        </Files>
+        <AdditionalFiles>
+            <AdditionalFile owner="root" permission="0644" target="/etc/modprobe.d/nvidia-180">modprobe.conf</AdditionalFile>
+        </AdditionalFiles>
+        <Provides>
+            <COMAR script="package.py">System.Package</COMAR>
+            <COMAR script="xorg.driver.py">Xorg.Driver</COMAR>
+        </Provides>
+    </Package>
+
+    <History>
+        <Update release="6">
+            <Date>2009-04-21</Date>
+            <Version>180.51</Version>
+            <Comment>
+                Bump to new stable release. Release Highlights:
+                * Added support for the following GPUs:
+                  o GeForce 9600 GSO 512
+                  o GeForce 9400 GT
+                  o GeForce GTS 250
+                  o GeForce GT 130
+                  o GeForce GT 140
+                * Updated nvidia-bug-report.sh to compress its log file; running `nvidia-bug-report.sh` now produces "nvidia-bug-report.log.gz".
+                * Addressed a problem that could lead to intermittent hangs and system crashes on some GeForce 9 and later GPUs.
+                * Fixed an X server crash when viewing the website www.tim.it.
+                * Fixed a DisplayPort interaction problem with power management suspend/resume events.
+                * Fixed rendering corruption in the OpenGL 16-bit RGB Workstation Overlay.
+                * Fixed a recent VDPAU regression that caused aborted playback and hangs when decoding some H.264 clips on G84, G86, G92, G94, G96, and GT200 GPUs.
+                * Fixed an interaction problem that could corrupt the EDID of the Fujitsu Technology Solutions Celsius H270 notebook's internal flatpanel.
+                * Fixed occasional X driver memory management performance problems when a composite manager is running.
+                * Fixed a bug that could interfere with the detection of display devices attached to secondary GPUs when first starting X after cold boots.
+                * Fixed a problem that could result in temporary stalls when moving OpenGL application windows on GeForce 8 and later GPUs.
+                * Fixed a bug that prevented VGA fonts from being saved/restored correctly on GeForce 8 and later GPUs.
+                * Improved compatibility with recent Linux kernels.
+                * Reduced CPU usage of nvidia-smi utility for reporting Quadro Plex information.
+                * Fixed compatibility problem with LandMark GeoProbe.
+            </Comment>
+            <Name>Fatih Aşıcı</Name>
+            <Email>fatih@pardus.org.tr</Email>
+        </Update>
+        <Update release="5">
+            <Date>2009-04-01</Date>
+            <Version>180.44</Version>
+            <Comment>
+                Bump to new stable release. Beside the bug fixes,
+                this release also adds support for:
+                * Quadro FX 3800
+                * Quadro FX 3700M
+                * Quadro FX 1800
+                * Quadro FX 580
+                * Quadro FX 380
+                * Quadro NVS 295
+                * GeForce GT 120
+                * GeForce G100
+            </Comment>
+            <Name>Fatih Aşıcı</Name>
+            <Email>fatih@pardus.org.tr</Email>
+        </Update>
+        <Update release="4">
+            <Date>2009-03-05</Date>
+            <Version>180.29</Version>
+            <Comment>Back to the previous release since 180.35 is not stable</Comment>
+            <Name>Fatih Aşıcı</Name>
+            <Email>fatih@pardus.org.tr</Email>
+        </Update>
+        <Update release="3">
+            <Date>2009-02-26</Date>
+            <Version>180.35</Version>
+            <Comment>
+                Bump to new stable release. Changes:
+
+                * Added support for the following GPUs:
+                  - GeForce GT 120
+                  - GeForce G100
+                  - Quadro FX 3700M
+                * Fixed a bug that caused Maya to freeze when overlays are enabled.
+                * Fixed an interaction problem with some applications that use memory tracking libraries.
+                * Added support for RG renderbuffers in OpenGL 3.0.
+                * Added support for OpenGL 3.0 floating-point depth buffers.
+                * Fixed a problem that caused Valgrind to crash when tracing a program that uses OpenGL.
+                * A bunch of VDPAU updates.
+            </Comment>
+            <Name>Fatih Aşıcı</Name>
+            <Email>fatih@pardus.org.tr</Email>
+        </Update>
+        <Update release="2">
+            <Date>2009-02-16</Date>
+            <Version>180.29</Version>
+            <Comment>
+                Bump to new stable release. Changes:
+
+                * Added support for the following GPUs:
+                  - GeForce GTX 295
+                  - GeForce GTX 285
+                  - GeForce 9300 GE
+                  - Quadro NVS 420
+                * Added support for OpenGL 3.0 for GeForce 8 series and newer GPUs.
+                * Various bug fixes.
+            </Comment>
+            <Name>Fatih Aşıcı</Name>
+            <Email>fatih@pardus.org.tr</Email>
+        </Update>
+        <Update release="1">
+            <Date>2009-01-13</Date>
+            <Version>180.22</Version>
+            <Comment>Initial release for 180.x series drivers</Comment>
+            <Name>Fatih Aşıcı</Name>
+            <Email>fatih@pardus.org.tr</Email>
+        </Update>
+    </History>
+</PISI>

@@ -1,0 +1,197 @@
+Index: kdelibs-4.1.85/solid/solid/backends/hal/halstorageaccess.cpp
+===================================================================
+--- kdelibs-4.1.85.orig/solid/solid/backends/hal/halstorageaccess.cpp	2008-12-10 17:12:28.000000000 +0100
++++ kdelibs-4.1.85/solid/solid/backends/hal/halstorageaccess.cpp	2008-12-11 18:20:59.000000000 +0100
+@@ -23,15 +23,18 @@
+ 
+ #include <QtCore/QLocale>
+ #include <QtCore/QDebug>
++#include <QtCore/QTextStream>
+ #include <QtCore/QProcess>
+ #include <QtDBus/QDBusConnection>
+ #include <QtDBus/QDBusInterface>
+ #include <QtDBus/QDBusReply>
+ #include <QtGui/QApplication>
+ #include <QtGui/QWidget>
++#include <localization/klocalizedstring.h>
+ 
+ #include <unistd.h>
+ #include <stdlib.h>
++#include <locale.h>
+ 
+ #ifdef Q_OS_FREEBSD
+ #include <langinfo.h>
+@@ -172,11 +175,21 @@
+ {
+     // TODO: Better error reporting here
+     if (m_setupInProgress) {
++        if (error.name() == "org.freedesktop.Hal.Device.PermissionDeniedByPolicy") {
++            callHalPrivilegedVolumeMount();
++            return;
++        }
++
+         m_setupInProgress = false;
+         emit setupDone(Solid::UnauthorizedOperation,
+                        error.name()+": "+error.message(),
+                        m_device->udi());
+     } else if (m_teardownInProgress) {
++        if (error.name() == "org.freedesktop.Hal.Device.PermissionDeniedByPolicy") {
++            callHalPrivilegedVolumeUnmount();
++            return;
++        }
++
+         m_teardownInProgress = false;
+         emit teardownDone(Solid::UnauthorizedOperation,
+                           error.name()+": "+error.message(),
+@@ -294,10 +307,16 @@
+ #else
+     QString uid="uid=";
+ #endif
+-    if (halOptions.contains(uid)) {
++    QString fsType = m_device->property("volume.fstype").toString();
++ 
++    if (halOptions.contains("uid=") && !fsType.contains("ntfs")) {
+         options << uid+QString::number(::getuid());
+     }
+ 
++    if (fsType.contains("ntfs")) {
++        options << "locale=" + QString(setlocale(LC_ALL, ""));
++    }
++
+ #ifdef Q_OS_FREEBSD
+     char *cType;
+     if ( fstype=="vfat" && halOptions.contains("-L=")) {
+@@ -348,6 +367,85 @@
+                               SLOT(slotDBusError(const QDBusError &)));
+ }
+ 
++QString sudoCommandName()
++{
++    return "/usr/kde/4/lib/kde4/libexec/kdesu";
++}
++
++QString dbusSendCommandName()
++{
++    return "dbus-send";
++}
++
++QProcess* callPrivilegedCommand(const QString& command,
++                                QObject* obj, const char* slot,
++                                const QString& comment)
++{
++    QProcess* process = new QProcess(obj);
++
++    QObject::connect(process, SIGNAL(finished(int, QProcess::ExitStatus)),
++                     obj, slot);
++
++    QStringList commandArgs;
++    commandArgs << "-d" << "--noignorebutton";
++    if(!comment.isEmpty())
++        commandArgs << "--comment" << comment;
++    commandArgs << "-c" << command;
++
++    process->start(sudoCommandName(), commandArgs);
++
++    if (process->waitForStarted()) {
++        return process;
++    } else {
++        delete process;
++        return 0;
++    }
++}
++
++bool Solid::Backends::Hal::StorageAccess::callHalPrivilegedVolumeMount()
++{
++    QStringList options;
++    QStringList halOptions = m_device->property("volume.mount.valid_options").toStringList();
++
++    QString fsType = m_device->property("volume.fstype").toString();
++
++    if (halOptions.contains("uid=") && !fsType.contains("ntfs")) {
++        options << "uid="+QString::number(::getuid());
++    }
++
++    if (fsType.contains("ntfs")) {
++        options << "locale=" + QString(setlocale(LC_ALL, ""));
++    }
++
++    QString command;
++    QTextStream(&command) << dbusSendCommandName()
++            << " --system --print-reply --dest=org.freedesktop.Hal " << m_device->udi()
++            << " org.freedesktop.Hal.Device.Volume.Mount string:" << filePath()
++            << " string: array:string:" << options.join(",");
++
++    m_process = callPrivilegedCommand(command,
++                                      this,
++                                      SLOT(slotProcessFinished(int, QProcess::ExitStatus)),
++                                      i18n("Please enter your password to use this device"));
++
++    return (m_process != 0);
++}
++
++bool Solid::Backends::Hal::StorageAccess::callHalPrivilegedVolumeUnmount()
++{
++    QString command;
++    QTextStream(&command) << dbusSendCommandName()
++            << " --system --print-reply --dest=org.freedesktop.Hal " << m_device->udi()
++            << " org.freedesktop.Hal.Device.Volume.Unmount array:string:force";
++
++    m_process = callPrivilegedCommand(command,
++                                      this,
++                                      SLOT(slotProcessFinished(int, QProcess::ExitStatus)),
++                                      i18n("Please enter your password to safely remove this device"));
++
++    return m_process != 0;
++}
++
+ bool Solid::Backends::Hal::StorageAccess::callSystemMount()
+ {
+     const QString device = m_device->property("block.device").toString();
+Index: kdelibs-4.1.85/solid/solid/backends/hal/halstorageaccess.h
+===================================================================
+--- kdelibs-4.1.85.orig/solid/solid/backends/hal/halstorageaccess.h	2008-05-21 13:07:38.000000000 +0200
++++ kdelibs-4.1.85/solid/solid/backends/hal/halstorageaccess.h	2008-12-11 18:20:59.000000000 +0100
+@@ -66,6 +66,9 @@
+     bool callHalVolumeMount();
+     bool callHalVolumeUnmount();
+ 
++    bool callHalPrivilegedVolumeMount();
++    bool callHalPrivilegedVolumeUnmount();
++
+     bool callSystemMount();
+     bool callSystemUnmount();
+ 
+Index: kdelibs-4.1.85/solid/solid/CMakeLists.txt
+===================================================================
+--- kdelibs-4.1.85.orig/solid/solid/CMakeLists.txt	2008-11-19 11:20:13.000000000 +0100
++++ kdelibs-4.1.85/solid/solid/CMakeLists.txt	2008-12-11 18:20:59.000000000 +0100
+@@ -1,7 +1,7 @@
+ set( EXECUTABLE_OUTPUT_PATH ${CMAKE_CURRENT_BINARY_DIR} )
+ add_subdirectory( ifaces )
+ add_subdirectory( backends )
+-include_directories( ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} )
++include_directories( ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} ${PROJECT_SOURCE_DIR}/kdecore )
+ 
+ if(WIN32)
+    include_directories( ${KDEWIN32_INCLUDES} )
+@@ -178,9 +178,12 @@
+    set(solid_OPTIONAL_LIBS ${solid_OPTIONAL_LIBS} ${KDEWIN32_LIBRARY})
+ endif(WIN32)
+ 
++set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I${PROJECT_SOURCE_DIR}/kdecore")
++set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -L${PROJECT_BINARY_DIR}/lib")
++
+ kde4_add_library(solid SHARED ${solid_LIB_SRCS})
+ 
+-target_link_libraries(solid ${QT_QTCORE_LIBRARY} ${QT_QTDBUS_LIBRARY} ${QT_QTXML_LIBRARY} ${QT_QTGUI_LIBRARY} ${solid_OPTIONAL_LIBS})
++target_link_libraries(solid ${QT_QTCORE_LIBRARY} ${QT_QTDBUS_LIBRARY} ${QT_QTXML_LIBRARY} ${QT_QTGUI_LIBRARY} ${solid_OPTIONAL_LIBS} ${KDE4_KDECORE_LIBS})
+ target_link_libraries(solid LINK_INTERFACE_LIBRARIES ${QT_CORE_LIBRARY} )
+ 
+ set_target_properties(solid PROPERTIES
+Index: kdelibs-4.1.85/solid/solid/backends/hal/Messages.sh
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ kdelibs-4.1.85/solid/solid/backends/hal/Messages.sh	2008-12-11 18:20:59.000000000 +0100
+@@ -0,0 +1,2 @@
++#! /usr/bin/env bash
++$XGETTEXT `find . -name "*.cpp" -o -name "*.cc" -o -name "*.h" | grep -v "/tests"` -o $podir/solid4.pot

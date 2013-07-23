@@ -1,0 +1,39 @@
+From eed8b4e5f7635f67ac68be426ade7964086e8fa0 Mon Sep 17 00:00:00 2001
+From: Christophe Dumez <christophe.dumez@intel.com>
+Date: Sun, 29 May 2011 17:23:53 +0300
+Subject: [PATCH] Do not update mtab if it is a symlink
+
+mount.ecryptfs_private: Do not attempt to update
+mtab if it is a symbolic link.
+---
+ src/utils/mount.ecryptfs_private.c |   11 ++++++++++-
+ 1 files changed, 10 insertions(+), 1 deletions(-)
+
+diff --git a/src/utils/mount.ecryptfs_private.c b/src/utils/mount.ecryptfs_private.c
+index c19fa84..0fa02e6 100644
+--- a/src/utils/mount.ecryptfs_private.c
++++ b/src/utils/mount.ecryptfs_private.c
+@@ -264,9 +264,18 @@ int is_mounted(char *dev, char *mnt, char *sig, int mounting) {
+ 
+ 
+ int update_mtab(char *dev, char *mnt, char *opt) {
+-/* Update /etc/mtab with new mount entry.
++/* Update /etc/mtab with new mount entry unless it is a symbolic link
+  * Return 0 on success, 1 on failure.
+  */
++	char dummy;
++	int useMtab;
++	/* Check if mtab is a symlink */
++	useMtab = (readlink("/etc/mtab", &dummy, 1) < 0);
++	if (!useMtab) {
++		/* No need updating mtab */
++		return 0;
++	}
++
+ 	FILE *fh;
+ 	struct mntent m;
+ 	fh = setmntent("/etc/mtab", "a");
+-- 
+1.7.5.2
+
+

@@ -1,0 +1,36 @@
+From 3c00715c8e90c57953ec4a8716110f6954e524e4 Mon Sep 17 00:00:00 2001
+From: Oswald Buddenhagen <oswald.buddenhagen@nokia.com>
+Date: Wed, 22 Sep 2010 20:05:03 +0200
+Subject: [PATCH] fix security hole: don't add an empty element to LD_LIBRARY_PATH
+
+if LD_LIBRARY_PATH was empty, the wrapper script would add the empty
+element to the path.
+
+> The trailing colon is treated by ld.so as another item on the list,
+> and empty items are treated as '.' (CWD). Therefore, if a user
+> executes qtcreator from a directory where there's a library that would
+> have normally been loaded from the standard library paths the local
+> library would be loaded instead.
+> This has the potential effect of arbitrary code execution.
+
+Reviewed-by: thiago
+Task-number: CVE-2010-3374
+---
+ bin/qtcreator |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/bin/qtcreator b/bin/qtcreator
+index dc154aa..6da961a 100755
+--- a/bin/qtcreator
++++ b/bin/qtcreator
+@@ -31,6 +31,6 @@ fi
+ 
+ bindir=`dirname "$me"`
+ libdir=`cd "${bindir}/../lib" ; pwd`
+-LD_LIBRARY_PATH="${libdir}/qtcreator:${LD_LIBRARY_PATH}"
++LD_LIBRARY_PATH="${libdir}/qtcreator${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+ export LD_LIBRARY_PATH
+ exec "${bindir}/qtcreator.bin" ${1+"$@"}
+-- 
+1.6.1
+

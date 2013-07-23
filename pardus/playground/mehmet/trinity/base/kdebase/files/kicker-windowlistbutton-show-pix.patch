@@ -1,0 +1,103 @@
+Index: kdebase/kicker/kicker/buttons/windowlistbutton.cpp
+===================================================================
+--- kdebase.orig/kicker/kicker/buttons/windowlistbutton.cpp
++++ kdebase/kicker/kicker/buttons/windowlistbutton.cpp
+@@ -25,6 +25,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE
+ 
+ #include <kwindowlistmenu.h>
+ #include <klocale.h>
++#include <kwinmodule.h>
+ 
+ #include "windowlistbutton.h"
+ #include "windowlistbutton.moc"
+@@ -39,9 +40,25 @@ WindowListButton::WindowListButton( TQWi
+     setTitle(i18n("Window List"));
+     TQToolTip::add(this, i18n("Window list"));
+     setIcon("window_list");
++
++    m_winModule = new KWinModule();
++
++    connect( m_winModule, TQT_SIGNAL(activeWindowChanged(WId)),
++        this, TQT_SLOT(activeWindowChanged(WId)) );
++
+ }
+ 
+ void WindowListButton::initPopup()
+ {
+     topMenu->init();
+ }
++
++void WindowListButton::activeWindowChanged( WId win )
++{
++    int size = preferredIconSize();
++    TQImage img (KWin::icon( win ).convertToImage());
++    img = img.smoothScale( size, size );
++
++    TQPixmap pix( img );
++    setIcon( pix );
++}
+Index: kdebase/kicker/kicker/buttons/windowlistbutton.h
+===================================================================
+--- kdebase.orig/kicker/kicker/buttons/windowlistbutton.h
++++ kdebase/kicker/kicker/buttons/windowlistbutton.h
+@@ -25,8 +25,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE
+ #define __windowlistbutton_h__
+ 
+ #include "panelbutton.h"
++#include "kwin.h"
+ 
+ class KWindowListMenu;
++class KWinModule;
+ 
+ /**
+  * Button that contains a windowlist menu
+@@ -38,11 +40,18 @@ class WindowListButton : public PanelPop
+ public:
+     WindowListButton( TQWidget* parent );
+ 
++protected slots:
++    void activeWindowChanged( WId win );
++
+ protected:
+     virtual TQString tileName() { return "WindowList"; }
+     virtual void initPopup();
+ 
+     KWindowListMenu* topMenu;
++
++private:
++    KWinModule* m_winModule;
++
+ };
+ 
+ #endif
+Index: kdebase/kicker/libkicker/panelbutton.cpp
+===================================================================
+--- kdebase.orig/kicker/libkicker/panelbutton.cpp
++++ kdebase/kicker/libkicker/panelbutton.cpp
+@@ -349,6 +349,14 @@ void PanelButton::setIcon(const TQString
+     emit iconChanged();
+ }
+ 
++void PanelButton::setIcon(const TQPixmap& pix)
++{
++    m_icon = pix;
++    m_iconh = pix;
++    m_iconz = pix;
++    update();
++}
++
+ TQString PanelButton::icon() const
+ {
+     return m_iconName;
+Index: kdebase/kicker/libkicker/panelbutton.h
+===================================================================
+--- kdebase.orig/kicker/libkicker/panelbutton.h
++++ kdebase/kicker/libkicker/panelbutton.h
+@@ -131,6 +131,7 @@ public:
+      * @param icon the path to the button's icon
+      */
+     void setIcon(const TQString& icon);
++    void setIcon(const TQPixmap&);
+ 
+     /**
+      * @return the button's icon

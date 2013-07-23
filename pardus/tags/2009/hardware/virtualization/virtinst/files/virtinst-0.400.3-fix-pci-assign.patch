@@ -1,0 +1,15 @@
+diff -rup virtinst-0.400.3/virtinst/VirtualHostDevice.py new/virtinst/VirtualHostDevice.py
+--- virtinst-0.400.3/virtinst/VirtualHostDevice.py	2009-05-06 11:58:57.000000000 -0400
++++ new/virtinst/VirtualHostDevice.py	2009-05-06 11:59:20.000000000 -0400
+@@ -201,8 +201,9 @@ class VirtualHostDevicePCI(VirtualHostDe
+         try:
+             # Do this as a sanity check, so that we don't fail at domain
+             # start time
+-            self._nodedev.dettach()
+-            self._nodedev.reset()
++            node = conn.nodeDeviceLookupByName(self._nodedev.name)
++            node.dettach()
++            node.reset()
+         except Exception, e:
+             raise RuntimeError(_("Could not detach PCI device: %s" % str(e)))
+ 

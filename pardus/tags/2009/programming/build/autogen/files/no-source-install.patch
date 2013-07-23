@@ -1,0 +1,44 @@
+Index: autoopts/Makefile.in
+===================================================================
+--- autoopts/Makefile.in.orig
++++ autoopts/Makefile.in
+@@ -339,7 +339,6 @@ EXTRA_DIST = $(SRC) $(pkgdata_DATA) $(ma
+ 
+ INST_MANS = autoopts-config.1 $(GENMAN)
+ INST_M4DATA = autoopts.m4
+-INST_ND_PKGDATA = $(libsrc)
+ INST_PKGCFG = autoopts.pc
+ INST_PKGDATA = autoopts.m4 $(TPL_FILES)
+ INST_LIBS = libopts.la libguileopts.la
+Index: autoopts/autoopts-config.in
+===================================================================
+--- autoopts/autoopts-config.in.orig
++++ autoopts/autoopts-config.in
+@@ -26,8 +26,6 @@
+      autogen="${bindir}/autogen${exeext}"
+      ldflags="-L${libdir} -lopts"
+         libs="${ldflags}"
+-      libsrc="${pkgdatadir}/libopts-${dotver}.tar.gz"
+- static_libs="${libdir}/libopts.a"
+       cflags="-I${includedir}"
+ test -n "${ldopts}" && {
+     ldflags="${ldopts}${libdir} ${ldflags}"
+@@ -37,8 +35,7 @@ test "${includedir}" = "/usr/include" &&
+ optlist="\
+     autogen     bindir      cflags      datadir     datarootdir dotver
+     everything  exec_prefix exeext      includedir  ldflags     ldopts
+-    libdir      libs        libsrc      package     pkgdatadir  prefix
+-    static_libs version"
++    libdir      libs        package     pkgdatadir  prefix      version"
+ 
+ usage()
+ {
+@@ -84,8 +81,6 @@ for o in "$@" ; do
+   autogen     ) val="${val} ${autogen}"      ;;
+   ldflags     ) val="${val} ${ldflags}"      ;;
+   libs        ) val="${val} ${libs}"         ;;
+-  libsrc      ) val="${val} ${libsrc}"       ;;
+-  static_libs ) val="${val} ${static_libs}"  ;;
+   cflags      ) val="${val} ${cflags}"       ;;
+   everything  )
+      for o in ${optlist}

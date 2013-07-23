@@ -1,0 +1,41 @@
+Index: plasma/containments/desktop/iconloader.cpp
+===================================================================
+--- plasma/containments/desktop/iconloader.cpp	(revision 764726)
++++ plasma/containments/desktop/iconloader.cpp	(working copy)
+@@ -65,6 +65,9 @@
+         if (applet->name() == i18n("Icon")) {
+             addIcon(applet);
+         }
++        else if (applet->name() == i18n("Trashcan")) {
++             m_iconMap["trash"] = applet;
++        }
+     }
+ 
+     //list ~/Desktop and add new applets
+@@ -183,12 +186,25 @@
+         return;
+     }
+ 
++    QStringList blacklist;
++    blacklist << "Printer.desktop" << "myComputer.desktop" << "trash.desktop" << "System.desktop" << "Home.desktop";
++    bool new_added = false;
+ 
+     foreach (KFileItem item, items) {
+-        if (!m_iconMap.contains(item.url().path())) {
++        if (item.url().fileName()=="trash.desktop" && !m_iconMap.contains("trash")) {
++           Plasma::Applet *newApplet = m_desktop->addApplet("trash", QVariantList(), 0);
++           if (newApplet) {
++              m_iconMap["trash"] = newApplet;
++              new_added = true;
++           }
++        }
++       if (!blacklist.contains(item.url().fileName()) && !m_iconMap.contains(item.url().path())) {
+             addIcon(item.url());
++            new_added = true;
+         }
+     }
++    if (new_added)
++         slotAlignHorizontal();
+ }
+ 
+ void IconLoader::deleteItem(const KFileItem item)

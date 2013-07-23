@@ -1,0 +1,9 @@
+#!/bin/sh
+
+test -f /proc/xen/capabilities || exit 0
+grep -q "control_d" /proc/xen/capabilities || exit 0
+
+for m in blkbk netbk blktap xenblktap
+do
+  modprobe $m >/dev/null 2>&1
+done

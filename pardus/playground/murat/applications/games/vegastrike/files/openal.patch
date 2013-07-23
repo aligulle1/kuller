@@ -1,0 +1,28 @@
+diff -Naur vegastrike-0.4.3_20070720.orig/m4scripts/VS_CHECK_OPENAL.m4 vegastrike-0.4.3_20070720/m4scripts/VS_CHECK_OPENAL.m4
+--- vegastrike-0.4.3_20070720.orig/m4scripts/VS_CHECK_OPENAL.m4	2005-10-05 01:17:32.000000000 +0300
++++ vegastrike-0.4.3_20070720/m4scripts/VS_CHECK_OPENAL.m4	2007-07-20 23:29:15.000000000 +0300
+@@ -43,7 +43,7 @@
+     for OPENAL_LIB_NAME in $OPENAL_LIB_LIST ; do
+ 
+     if test "x$is_macosx" = "xyes" ; then
+-      MACORPCLIBS="$OPENAL_LDOPTS -framework OpenAL"
++      MACORPCLIBS="$OPENAL_LDOPTS -framework OpenAL -lalut"
+       CHECK_FOR_OPENAL_LIB
+     fi
+     if test "x$have_openal_lib" = "xyes" ; then
+diff -Naur vegastrike-0.4.3_20070720.orig/src/aldrv/al_init.cpp vegastrike-0.4.3_20070720/src/aldrv/al_init.cpp
+--- vegastrike-0.4.3_20070720.orig/src/aldrv/al_init.cpp	2006-05-09 13:41:55.000000000 +0300
++++ vegastrike-0.4.3_20070720/src/aldrv/al_init.cpp	2007-07-20 23:27:33.000000000 +0300
+@@ -119,12 +119,8 @@
+ ///I don't think we'll need to switch contexts or devices in vegastrike
+ static ALCdevice *dev=NULL;
+ 
+-#ifndef _WIN32
+-static ALvoid *context_id=NULL;
+-#else
+ static ALCcontext * context_id=NULL;
+ #endif
+-#endif
+ bool AUDInit () {
+   g_game.sound_enabled = false;
+ #ifdef HAVE_AL

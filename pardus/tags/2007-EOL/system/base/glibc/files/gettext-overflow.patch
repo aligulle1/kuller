@@ -1,0 +1,160 @@
+2007-11-15  Bruno Haible  <bruno@clisp.org>
+
+	[BZ #5346]
+	* intl/dcigettext.c (struct known_translation_t): Turn msgid into a
+	union.
+	(transcmp): Use the appropriate part of s1->msgid and s2->msgid.
+	(DCIGETTEXT): Change the allocation of the 'search' variable so that
+	it needs only fixed stack space. Delay the initialization of
+	msgid_len until it is needed.
+
+*** intl/dcigettext.c.bak	2004-09-26 06:44:38.000000000 +0200
+--- intl/dcigettext.c	2007-11-16 04:02:50.000000000 +0100
+***************
+*** 193,199 ****
+    size_t translation_length;
+  
+    /* Pointer to the string in question.  */
+!   char msgid[ZERO];
+  };
+  
+  /* Root of the search tree with known translations.  We can use this
+--- 193,204 ----
+    size_t translation_length;
+  
+    /* Pointer to the string in question.  */
+!   union
+!     {
+!       char appended[ZERO];  /* used if domain != NULL */
+!       const char *ptr;      /* used if domain == NULL */
+!     }
+!   msgid;
+  };
+  
+  /* Root of the search tree with known translations.  We can use this
+***************
+*** 221,227 ****
+    s1 = (const struct known_translation_t *) p1;
+    s2 = (const struct known_translation_t *) p2;
+  
+!   result = strcmp (s1->msgid, s2->msgid);
+    if (result == 0)
+      {
+        result = strcmp (s1->domainname, s2->domainname);
+--- 226,233 ----
+    s1 = (const struct known_translation_t *) p1;
+    s2 = (const struct known_translation_t *) p2;
+  
+!   result = strcmp (s1->domain != NULL ? s1->msgid.appended : s1->msgid.ptr,
+! 		   s2->domain != NULL ? s2->msgid.appended : s2->msgid.ptr);
+    if (result == 0)
+      {
+        result = strcmp (s1->domainname, s2->domainname);
+***************
+*** 401,409 ****
+    size_t retlen;
+    int saved_errno;
+  #if defined HAVE_TSEARCH || defined _LIBC
+!   struct known_translation_t *search;
+    struct known_translation_t **foundp = NULL;
+-   size_t msgid_len;
+  #endif
+    size_t domainname_len;
+  
+--- 407,414 ----
+    size_t retlen;
+    int saved_errno;
+  #if defined HAVE_TSEARCH || defined _LIBC
+!   struct known_translation_t search;
+    struct known_translation_t **foundp = NULL;
+  #endif
+    size_t domainname_len;
+  
+***************
+*** 429,454 ****
+      domainname = _nl_current_default_domain;
+  
+  #if defined HAVE_TSEARCH || defined _LIBC
+-   msgid_len = strlen (msgid1) + 1;
+- 
+    /* Try to find the translation among those which we found at
+       some time.  */
+!   search = (struct known_translation_t *)
+! 	   alloca (offsetof (struct known_translation_t, msgid) + msgid_len);
+!   memcpy (search->msgid, msgid1, msgid_len);
+!   search->domainname = (char *) domainname;
+!   search->category = category;
+  
+    /* Since tfind/tsearch manage a balanced tree, concurrent tfind and
+       tsearch calls can be fatal.  */
+    __libc_rwlock_define_initialized (static, tree_lock);
+    __libc_rwlock_rdlock (tree_lock);
+  
+!   foundp = (struct known_translation_t **) tfind (search, &root, transcmp);
+  
+    __libc_rwlock_unlock (tree_lock);
+  
+-   freea (search);
+    if (foundp != NULL && (*foundp)->counter == _nl_msg_cat_cntr)
+      {
+        /* Now deal with plural.  */
+--- 434,455 ----
+      domainname = _nl_current_default_domain;
+  
+  #if defined HAVE_TSEARCH || defined _LIBC
+    /* Try to find the translation among those which we found at
+       some time.  */
+!   search.domain = NULL;
+!   search.msgid.ptr = msgid1;
+!   search.domainname = domainname;
+!   search.category = category;
+  
+    /* Since tfind/tsearch manage a balanced tree, concurrent tfind and
+       tsearch calls can be fatal.  */
+    __libc_rwlock_define_initialized (static, tree_lock);
+    __libc_rwlock_rdlock (tree_lock);
+  
+!   foundp = (struct known_translation_t **) tfind (&search, &root, transcmp);
+  
+    __libc_rwlock_unlock (tree_lock);
+  
+    if (foundp != NULL && (*foundp)->counter == _nl_msg_cat_cntr)
+      {
+        /* Now deal with plural.  */
+***************
+*** 625,639 ****
+  	      if (foundp == NULL)
+  		{
+  		  /* Create a new entry and add it to the search tree.  */
+  		  struct known_translation_t *newp;
+  
+  		  newp = (struct known_translation_t *)
+  		    malloc (offsetof (struct known_translation_t, msgid)
+  			    + msgid_len + domainname_len + 1);
+  		  if (newp != NULL)
+  		    {
+  		      newp->domainname =
+! 			mempcpy (newp->msgid, msgid1, msgid_len);
+  		      memcpy (newp->domainname, domainname, domainname_len + 1);
+  		      newp->category = category;
+  		      newp->counter = _nl_msg_cat_cntr;
+--- 626,642 ----
+  	      if (foundp == NULL)
+  		{
+  		  /* Create a new entry and add it to the search tree.  */
++ 		  size_t msgid_len;
+  		  struct known_translation_t *newp;
+  
++ 		  msgid_len = strlen (msgid1) + 1;
+  		  newp = (struct known_translation_t *)
+  		    malloc (offsetof (struct known_translation_t, msgid)
+  			    + msgid_len + domainname_len + 1);
+  		  if (newp != NULL)
+  		    {
+  		      newp->domainname =
+! 			mempcpy (newp->msgid.appended, msgid1, msgid_len);
+  		      memcpy (newp->domainname, domainname, domainname_len + 1);
+  		      newp->category = category;
+  		      newp->counter = _nl_msg_cat_cntr;
+
+

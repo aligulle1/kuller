@@ -1,0 +1,26 @@
+diff -Naur applets-orig/comic/comic.cpp applets/comic/comic.cpp
+--- applets-orig/comic/comic.cpp	2009-12-30 11:02:31.488529086 +0200
++++ applets/comic/comic.cpp	2009-12-30 11:04:50.120529853 +0200
+@@ -507,8 +507,13 @@
+ void ComicApplet::loadConfig()
+ {
+     KConfigGroup cg = config();
++    mUseTabs = cg.readEntry( "useTabs", false );
+     mTabIdentifier = cg.readEntry( "tabIdentifier", QStringList( QString() ) );
+-    mComicIdentifier = mTabIdentifier.count() ? mTabIdentifier.at( 0 ) : QString();
++    if (!mUseTabs)
++        mComicIdentifier = cg.readEntry( "comic", "" );
++    else
++        mComicIdentifier = mTabIdentifier.count() ? mTabIdentifier.at( 0 ) : QString();
++
+     mShowComicUrl = cg.readEntry( "showComicUrl", false );
+     mShowComicAuthor = cg.readEntry( "showComicAuthor", false );
+     mShowComicTitle = cg.readEntry( "showComicTitle", false );
+@@ -524,7 +529,6 @@
+     mShowTabBar = cg.readEntry( "showTabBar", true );
+     mTabText = cg.readEntry( "tabText", QStringList( QString() ) );
+     mComicTitle = mTabText.count() ? mTabText.at( 0 ) : QString();
+-    mUseTabs = cg.readEntry( "useTabs", false );
+     mSwitchTabs = cg.readEntry( "switchTabs", false );
+ 
+     buttonBar();

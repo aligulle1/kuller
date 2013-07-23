@@ -1,0 +1,15 @@
+--- Makefile.orig
++++ Makefile
+@@ -295,12 +295,8 @@ $(MANFILE).gz: ../$(MANFILE)
+ 	gzip -c $< > $@
+ 
+ install: default $(MANFILE).gz
+-	# remove all old versions of the driver
+-	find $(INSTALL_MOD_PATH)/lib/modules/$(KVER) -name $(TARGET) -exec rm -f {} \; || true
+-	find $(INSTALL_MOD_PATH)/lib/modules/$(KVER) -name $(TARGET).gz -exec rm -f {} \; || true
+ 	install -D -m 644 $(TARGET) $(INSTALL_MOD_PATH)$(INSTDIR)/$(TARGET)
+ 	install -D -m 644 $(MANFILE).gz $(INSTALL_MOD_PATH)$(MANDIR)/man$(MANSECTION)/$(MANFILE).gz
+-	man -c -P'cat > /dev/null' $(MANFILE:.$(MANSECTION)=) || true
+ 
+ uninstall:
+ 	if [ -e $(INSTDIR)/$(TARGET) ] ; then \

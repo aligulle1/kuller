@@ -1,0 +1,36 @@
+diff -Naurp strace-4.5.18/bjm.c strace-4.5.18.oden/bjm.c
+--- strace-4.5.18/bjm.c	2005-08-03 13:27:30.000000000 +0200
++++ strace-4.5.18.oden/bjm.c	2008-12-22 16:47:56.000000000 +0100
+@@ -142,7 +142,7 @@ struct tcb *tcp;
+ 					for (idx=0; idx<ret; idx++) {
+ 						if (idx!=0)
+ 							tprintf(",");
+-						tprintf(mod);
++						tprintf("%s", mod);
+ 						mod+=strlen(mod)+1;
+ 					}
+ 					free(data);
+diff -Naurp strace-4.5.18/process.c strace-4.5.18.oden/process.c
+--- strace-4.5.18/process.c	2008-07-18 04:16:47.000000000 +0200
++++ strace-4.5.18.oden/process.c	2008-12-22 16:47:36.000000000 +0100
+@@ -1731,7 +1731,7 @@ long addr;
+ 			cp.p64 = cp.p32;
+ 		if (cp.p64 == 0)
+ 			break;
+-		tprintf(sep);
++		tprintf("%s", sep);
+ 		printstr(tcp, cp.p64, -1);
+ 		addr += personality_wordsize[current_personality];
+ 	}
+diff -Naurp strace-4.5.18/signal.c strace-4.5.18.oden/signal.c
+--- strace-4.5.18/signal.c	2008-08-20 03:59:40.000000000 +0200
++++ strace-4.5.18.oden/signal.c	2008-12-22 16:48:20.000000000 +0100
+@@ -401,7 +401,7 @@ void
+ printsignal(nr)
+ int nr;
+ {
+-	tprintf(signame(nr));
++	tprintf("%s", signame(nr));
+ }
+ 
+ void

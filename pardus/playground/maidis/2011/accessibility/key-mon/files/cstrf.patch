@@ -1,0 +1,79 @@
+diff -r f2894eeff5d5 src/keymon/key_mon.py
+--- a/src/keymon/key_mon.py	Mon May 14 22:28:25 2012 +0800
++++ b/src/keymon/key_mon.py	Tue May 15 19:31:23 2012 +0800
+@@ -22,6 +22,7 @@
+ __author__ = 'Scott Kirkwood (scott+keymon@forusers.com)'
+ __version__ = '1.10'
+ 
++import locale
+ import logging
+ import pygtk
+ pygtk.require('2.0')
+@@ -71,6 +72,15 @@
+   return fix_svg_key
+ 
+ 
++def cstrf(func):
++  """Change locale before using str function"""
++  OLD_CTYPE = locale.getlocale(locale.LC_CTYPE)
++  locale.setlocale(locale.LC_CTYPE, 'C')
++  s = func()
++  locale.setlocale(locale.LC_CTYPE, OLD_CTYPE)
++  return s
++
++
+ class KeyMon:
+   """main KeyMon window class."""
+ 
+@@ -107,10 +117,11 @@
+     self.shape_mask_current = None
+     self.shape_mask_cache = {}
+ 
+-    self.MODS = [u'SHIFT', u'CTRL', u'META', u'ALT']
+-    self.IMAGES = [u'MOUSE'] + self.MODS
+-    self.images = dict([(img, None) for img in self.IMAGES])
+-    self.enabled = dict((img, self.get_option(str(unicode(img).lower()))) for img in self.IMAGES)
++    self.MODS = ['SHIFT', 'CTRL', 'META', 'ALT']
++    self.IMAGES = ['MOUSE'] + self.MODS
++    self.images = dict((img, None) for img in self.IMAGES)
++    self.enabled = dict((img, self.get_option(cstrf(img.lower))) for img in self.IMAGES)
++
+ 
+     self.options.kbd_files = settings.get_kbd_files()
+     self.modmap = mod_mapper.safely_read_mod_map(self.options.kbd_file, self.options.kbd_files)
+@@ -744,7 +755,7 @@
+   def settings_changed(self, unused_dlg):
+     """Event received from the settings dialog."""
+     for img in self.IMAGES:
+-      self._toggle_a_key(self.images[img], img, self.get_option(str(unicode(img).lower())))
++      self._toggle_a_key(self.images[img], img, self.get_option(cstrf(img.lower)))
+     self.create_buttons()
+     self.layout_boxes()
+     self.mouse_indicator_win.hide()
+diff -r f2894eeff5d5 src/keymon/xlib.py
+--- a/src/keymon/xlib.py	Mon May 14 22:28:25 2012 +0800
++++ b/src/keymon/xlib.py	Tue May 15 19:31:23 2012 +0800
+@@ -27,6 +27,7 @@
+ from Xlib import XK
+ from Xlib.ext import record
+ from Xlib.protocol import rq
++import locale
+ import sys
+ import time
+ import threading
+@@ -89,10 +90,14 @@
+ 
+   def _setup_lookup(self):
+     """Setup the key lookups."""
++    # set locale to default C locale, see Issue 77.
++    OLD_CTYPE = locale.getlocale(locale.LC_CTYPE)
++    locale.setlocale(locale.LC_CTYPE, 'C')
+     for name in dir(XK):
+       if name[:3] == "XK_":
+         code = getattr(XK, name)
+-        self.keycode_to_symbol[code] = 'KEY_' + str(unicode(name[3:]).upper())
++        self.keycode_to_symbol[code] = 'KEY_' + name[3:].upper()
++    locale.setlocale(locale.LC_CTYPE, OLD_CTYPE)
+     self.keycode_to_symbol[65027] = 'KEY_ISO_LEVEL3_SHIFT'
+     self.keycode_to_symbol[269025062] = 'KEY_BACK'
+     self.keycode_to_symbol[269025063] = 'KEY_FORWARD'

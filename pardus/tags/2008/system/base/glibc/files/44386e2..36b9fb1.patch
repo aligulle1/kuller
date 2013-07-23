@@ -1,0 +1,1656 @@
+diff --git a/ChangeLog b/ChangeLog
+index 49c916a..bf841f7 100644
+--- a/ChangeLog
++++ b/ChangeLog
+@@ -1,3 +1,84 @@
++2008-04-11  Ulrich Drepper  <drepper@redhat.com>
++
++	* sysdeps/unix/sysv/linux/powerpc/bits/mathinline.h (__signbitl):
++	Also use for 32-bit.
++	* sysdeps/ieee754/ldbl-128ibm/s_nearbyintl.c (__nearbyintl): Use
++	__nextafter instead of nextafter to avoid local PLT.
++	* sysdeps/powerpc/fpu/e_sqrt.c: Avoid call to fetestexcept.
++	* sysdeps/powerpc/fpu/e_sqrtf.c: Likewise.
++
++	* scripts/data/localplt-powerpc64-linux-gnu.data: New file.
++
++	* sysdeps/powerpc/fpu/fenv_libc.h: Add libm_hidden_proto for
++	__fe_nomask_env.
++	* sysdeps/powerpc/fpu/fe_nomask.c: Add libm_hidden_def.  Include
++	<fenv_libc.h> instead of <fenv.h>.
++	* sysdeps/unix/sysv/linux/powerpc/powerpc32/fpu/fe_nomask.c: Likewise.
++	* sysdeps/unix/sysv/linux/powerpc/powerpc64/fpu/fe_nomask.c: Likewise.
++
++	* sysdeps/powerpc/bits/fenv.h: Make safe for C++.
++
++	* sysdeps/unix/sysv/linux/powerpc/bits/mathinline.h: New file.
++	* sysdeps/powerpc/fpu/fegetexcept.c (__fegetexcept): Rename
++	function from fegetexcept and make old name weak alias.
++	* include/fenv.h: Declare __fegetexcept.
++	* sysdeps/powerpc/fpu/fedisblxcpt.c: Use __fegetexcept instead of
++	fegetexcept.
++	* sysdeps/powerpc/fpu/feenablxcpt.c: Likewise.
++	* sysdeps/powerpc/fpu/fraiseexcpt.c (__feraiseexcept): Avoid call
++	to fetestexcept.
++	* sysdeps/ieee754/ldbl-128ibm/s_log1pl.c (__log1pl): Use __frexpl
++	instead of frexpl to avoid local PLT.
++	* math/s_significandl.c (__significandl): Use __ilogbl instead of
++	ilogbl to avoid local PLT.
++	* sysdeps/ieee754/ldbl-128ibm/s_expm1l.c (__expm1l): Use __ldexpl
++	instead of ldexpl to avoid local PLT.
++	* sysdeps/ieee754/ldbl-128ibm/e_expl.c (__ieee754_expl): Use
++	__roundl not roundl to avoid local PLT.
++	* sysdeps/ieee754/ldbl-128/e_j0l.c: Use function names which avoid
++	local PLTs.  Use __sincosl instead of separate sinl and cosl
++	calls.
++	* sysdeps/ieee754/ldbl-128/e_j1l.c: Likewise.
++
++	* sysdeps/unix/sysv/linux/configure.in: Bump minimal kernel
++	version for ppc64 to 2.4.21 since without it makecontext will fail.
++
++	* elf/tls-macros.h [__powerpc64__] (__TLS_GET_ADDR): Define according
++	to the ABI in use.
++	[__powerpc64__] (TLS_LD): Use __TLS_GET_ADDR instead of
++	.__tls_get_addr.
++	[__powerpc64__] (TLS_GD): Likewise.
++
++2007-11-20  Ryan S. Arnold  <rsa@us.ibm.com>
++
++	[BZ #4997]
++	* sysdeps/powerpc/powerpc32/fpu/s_lround.S (__lround): Fixed erroneous
++	result when x is +/-nextafter(+/-0.5,-/+1) i.e. all 1's in the
++	mantissa.
++	* sysdeps/powerpc/powerpc32/power4/fpu/s_llround.S (__llround):
++	Likewise.  Also account for when x is an odd number between 2^52
++	and 2^53-1.
++	* sysdeps/powerpc/powerpc64/fpu/s_llround.S (__llround): Likewise.
++	* sysdeps/powerpc/powerpc64/fpu/s_llroundf.S (__llroundf): Likewise.
++	* math/libm-test.inc (lround_test, llround_test): Added test cases to
++	detect aforementioned erroneous conditions.
++
++2008-04-11  Jakub Jelinek  <jakub@redhat.com>
++
++	* configure.in: Check for -fno-section-anchors in addition to
++	-fno-toplevel-reorder.
++
++2008-04-11  Ulrich Drepper  <drepper@redhat.com>
++
++	* include/features.h (__GLIBC_MINOR__): Bump to 8.
++
++	* sysdeps/powerpc/powerpc32/fpu/s_lroundf.S: Remove duplicate comment.
++	* sysdeps/powerpc/powerpc32/power5+/fpu/s_llroundf.S: Likewise.
++	* sysdeps/powerpc/powerpc32/power6/fpu/s_llroundf.S: Likewise.
++	* sysdeps/powerpc/powerpc64/fpu/s_lrint.S: Likewise.
++	* sysdeps/powerpc/powerpc64/fpu/s_lround.S: Likewise.
++	* sysdeps/powerpc/powerpc64/fpu/s_lroundf.S: Likewise.
++
+ 2008-04-11  Jakub Jelinek  <jakub@redhat.com>
+ 
+ 	[BZ #5443]
+diff --git a/configure b/configure
+index 4b96978..3330d53 100755
+--- a/configure
++++ b/configure
+@@ -5067,7 +5067,7 @@ echo "$as_me: WARNING:
+ if test -n "$sysheaders"; then
+   SYSINCLUDES=-nostdinc
+   for d in include include-fixed; do
+-    i=`$CC -print-file-name="$d"` && test "x$i" != "x$d" &&
++    i=`$CC -print-file-name="$d"` && test "x$i" != x && test "x$i" != "x$d" &&
+     SYSINCLUDES="$SYSINCLUDES -isystem $i"
+   done
+   SYSINCLUDES="$SYSINCLUDES \
+@@ -6411,15 +6411,15 @@ echo "${ECHO_T}$libc_cv_hashstyle" >&6; }
+ 
+ fi
+ 
+-{ echo "$as_me:$LINENO: checking for -fno-toplevel-reorder" >&5
+-echo $ECHO_N "checking for -fno-toplevel-reorder... $ECHO_C" >&6; }
++{ echo "$as_me:$LINENO: checking for -fno-toplevel-reorder -fno-section-anchors" >&5
++echo $ECHO_N "checking for -fno-toplevel-reorder -fno-section-anchors... $ECHO_C" >&6; }
+ if test "${libc_cv_fno_toplevel_reorder+set}" = set; then
+   echo $ECHO_N "(cached) $ECHO_C" >&6
+ else
+   cat > conftest.c <<EOF
+ int foo;
+ EOF
+-if { ac_try='${CC-cc} $CFLAGS $CPPFLAGS -S -fno-toplevel-reorder
++if { ac_try='${CC-cc} $CFLAGS $CPPFLAGS -S -fno-toplevel-reorder -fno-section-anchors
+ 			    conftest.c 1>&5'
+   { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+   (eval $ac_try) 2>&5
+@@ -6436,7 +6436,7 @@ fi
+ { echo "$as_me:$LINENO: result: $libc_cv_fno_toplevel_reorder" >&5
+ echo "${ECHO_T}$libc_cv_fno_toplevel_reorder" >&6; }
+ if test $libc_cv_fno_toplevel_reorder = yes; then
+-  fno_unit_at_a_time=-fno-toplevel-reorder
++  fno_unit_at_a_time="-fno-toplevel-reorder -fno-section-anchors"
+ else
+   fno_unit_at_a_time=-fno-unit-at-a-time
+ fi
+diff --git a/configure.in b/configure.in
+index 3098ebf..e6a5abb 100644
+--- a/configure.in
++++ b/configure.in
+@@ -1614,11 +1614,11 @@ EOF
+   AC_SUBST(libc_cv_hashstyle)
+ fi
+ 
+-AC_CACHE_CHECK(for -fno-toplevel-reorder, libc_cv_fno_toplevel_reorder, [dnl
++AC_CACHE_CHECK(for -fno-toplevel-reorder -fno-section-anchors, libc_cv_fno_toplevel_reorder, [dnl
+ cat > conftest.c <<EOF
+ int foo;
+ EOF
+-if AC_TRY_COMMAND([${CC-cc} $CFLAGS $CPPFLAGS -S -fno-toplevel-reorder
++if AC_TRY_COMMAND([${CC-cc} $CFLAGS $CPPFLAGS -S -fno-toplevel-reorder -fno-section-anchors
+ 			    conftest.c 1>&AS_MESSAGE_LOG_FD])
+ then
+   libc_cv_fno_toplevel_reorder=yes
+@@ -1627,7 +1627,7 @@ else
+ fi
+ rm -f conftest*])
+ if test $libc_cv_fno_toplevel_reorder = yes; then
+-  fno_unit_at_a_time=-fno-toplevel-reorder
++  fno_unit_at_a_time="-fno-toplevel-reorder -fno-section-anchors"
+ else
+   fno_unit_at_a_time=-fno-unit-at-a-time
+ fi
+diff --git a/elf/tls-macros.h b/elf/tls-macros.h
+index 37cbe75..6463a6c 100644
+--- a/elf/tls-macros.h
++++ b/elf/tls-macros.h
+@@ -813,12 +813,17 @@ register void *__gp __asm__("$29");
+         : "=b" (__result) );  \
+       __result;  \
+   })
++# ifdef HAVE_ASM_GLOBAL_DOT_NAME
++#  define __TLS_GET_ADDR ".__tls_get_addr"
++# else
++#  define __TLS_GET_ADDR "__tls_get_addr"
++# endif
+ /* PowerPC64 Local Dynamic TLS access.  */
+ #  define TLS_LD(x) \
+   ({  int * __result;  \
+       asm (  \
+         "  addi  3,2," #x "@got@tlsld\n"  \
+-        "  bl    .__tls_get_addr\n"  \
++        "  bl    " __TLS_GET_ADDR "\n"  \
+         "  nop   \n"  \
+         "  addis %0,3," #x "@dtprel@ha\n"  \
+         "  addi  %0,%0," #x "@dtprel@l\n"  \
+@@ -834,7 +839,7 @@ register void *__gp __asm__("$29");
+   ({  int * __result;  \
+       asm (  \
+         "  addi  3,2," #x "@got@tlsgd\n"  \
+-        "  bl    .__tls_get_addr\n"  \
++        "  bl    " __TLS_GET_ADDR "\n"  \
+         "  nop   \n"  \
+         "  mr    %0,3\n"  \
+         : "=b" (__result) :  \
+diff --git a/include/features.h b/include/features.h
+index 08ee426..76c2ae3 100644
+--- a/include/features.h
++++ b/include/features.h
+@@ -311,7 +311,7 @@
+ /* Major and minor version number of the GNU C library package.  Use
+    these macros to test for features in specific releases.  */
+ #define	__GLIBC__	2
+-#define	__GLIBC_MINOR__	7
++#define	__GLIBC_MINOR__	8
+ 
+ #define __GLIBC_PREREQ(maj, min) \
+ 	((__GLIBC__ << 16) + __GLIBC_MINOR__ >= ((maj) << 16) + (min))
+diff --git a/include/fenv.h b/include/fenv.h
+index 673eb4b..3aec7e5 100644
+--- a/include/fenv.h
++++ b/include/fenv.h
+@@ -4,6 +4,7 @@
+ /* Now define the internal interfaces.  */
+ 
+ extern int __feclearexcept (int __excepts);
++extern int __fegetexcept (void);
+ extern int __fegetexceptflag (fexcept_t *__flagp, int __excepts);
+ extern int __feraiseexcept (int __excepts);
+ extern int __fesetexceptflag (__const fexcept_t *__flagp, int __excepts);
+diff --git a/math/libm-test.inc b/math/libm-test.inc
+index a33a182..b8a73ae 100644
+--- a/math/libm-test.inc
++++ b/math/libm-test.inc
+@@ -4300,6 +4300,17 @@ lround_test (void)
+ # endif
+   TEST_f_l (lround, 2097152.5, 2097153);
+   TEST_f_l (lround, -2097152.5, -2097153);
++  /* nextafter(0.5,-1)  */
++  TEST_f_l (lround, 0x1.fffffffffffffp-2, 0);
++  /* nextafter(-0.5,1)  */
++  TEST_f_l (lround, -0x1.fffffffffffffp-2, 0);
++#else
++  /* nextafter(0.5,-1)  */
++  TEST_f_l (lround, 0x1.fffffp-2, 0);
++  /* nextafter(-0.5,1)  */
++  TEST_f_l (lround, -0x1.fffffp-2, 0);
++  TEST_f_l (lround, 0x1.fffffep+23, 16777215);
++  TEST_f_l (lround, -0x1.fffffep+23, -16777215);
+ #endif
+   END (lround);
+ }
+@@ -4359,8 +4370,40 @@ llround_test (void)
+   TEST_f_L (llround, 4294967295.5, 4294967296LL);
+   /* 0x200000000 */
+   TEST_f_L (llround, 8589934591.5, 8589934592LL);
++
++  /* nextafter(0.5,-1)  */
++  TEST_f_L (llround, 0x1.fffffffffffffp-2, 0);
++  /* nextafter(-0.5,1)  */
++  TEST_f_L (llround, -0x1.fffffffffffffp-2, 0);
++  /* On PowerPC an exponent of '52' is the largest incrementally
++   * representable sequence of whole-numbers in the 'double' range.  We test
++   * lround to make sure that a guard bit set during the lround operation
++   * hasn't forced an erroneous shift giving us an incorrect result.  The odd
++   * numbers between +-(2^52+1 and 2^53-1) are affected since they have the
++   * rightmost bit set.  */
++  /* +-(2^52+1)  */
++  TEST_f_L (llround, 0x1.0000000000001p+52,4503599627370497LL);
++  TEST_f_L (llround, -0x1.0000000000001p+52,-4503599627370497LL);
++  /* +-(2^53-1): Input is the last (positive and negative) incrementally
++   * representable whole-number in the 'double' range that might round
++   * erroneously.  */
++  TEST_f_L (llround, 0x1.fffffffffffffp+52, 9007199254740991LL);
++  TEST_f_L (llround, -0x1.fffffffffffffp+52, -9007199254740991LL);
++#else
++  /* nextafter(0.5,-1)  */
++  TEST_f_L (llround, 0x1.fffffep-2, 0);
++  /* nextafter(-0.5,1)  */
++  TEST_f_L (llround, -0x1.fffffep-2, 0);
++  /* As above, on PowerPC an exponent of '23' is the largest incrementally
++   * representable sequence of whole-numbers in the 'float' range.
++   * Likewise, numbers between +-(2^23+1 and 2^24-1) are affected.  */
++  TEST_f_L (llround, 0x1.000002p+23,8388609);
++  TEST_f_L (llround, -0x1.000002p+23,-8388609);
++  TEST_f_L (llround, 0x1.fffffep+23, 16777215);
++  TEST_f_L (llround, -0x1.fffffep+23, -16777215);
+ #endif
+ 
++
+ #ifdef TEST_LDOUBLE
+   /* The input can only be represented in long double.  */
+   TEST_f_L (llround, 4503599627370495.5L, 4503599627370496LL);
+diff --git a/math/s_significandl.c b/math/s_significandl.c
+index 9fa0e4f..238b79a 100644
+--- a/math/s_significandl.c
++++ b/math/s_significandl.c
+@@ -34,6 +34,6 @@ static char rcsid[] = "$NetBSD: $";
+ 	long double x;
+ #endif
+ {
+-	return __ieee754_scalbl(x,(long double) -ilogbl(x));
++	return __ieee754_scalbl(x,(long double) -__ilogbl(x));
+ }
+ weak_alias (__significandl, significandl)
+diff --git a/scripts/data/localplt-powerpc64-linux-gnu.data b/scripts/data/localplt-powerpc64-linux-gnu.data
+new file mode 100644
+index 0000000..2219aa9
+--- /dev/null
++++ b/scripts/data/localplt-powerpc64-linux-gnu.data
+@@ -0,0 +1,6 @@
++libc.so: calloc
++libc.so: free
++libc.so: malloc
++libc.so: memalign
++libc.so: realloc
++libm.so: matherr
+diff --git a/sysdeps/i386/i686/memcpy.S b/sysdeps/i386/i686/memcpy.S
+index ff5c66e..0b2da1e 100644
+--- a/sysdeps/i386/i686/memcpy.S
++++ b/sysdeps/i386/i686/memcpy.S
+@@ -71,10 +71,10 @@ ENTRY (BP_SYM (memcpy))
+ 1:	pushl	%eax
+ 	movl	%ecx, %eax
+ 	shrl	$2, %ecx
++	andl	$3, %eax
+ 	rep
+ 	movsl
+ 	movl	%eax, %ecx
+-	andl	$3, %ecx
+ 	rep
+ 	movsb
+ 	popl	%eax
+diff --git a/sysdeps/ieee754/ldbl-128/e_j0l.c b/sysdeps/ieee754/ldbl-128/e_j0l.c
+index 67ef371..f235372 100644
+--- a/sysdeps/ieee754/ldbl-128/e_j0l.c
++++ b/sysdeps/ieee754/ldbl-128/e_j0l.c
+@@ -768,16 +768,15 @@ __ieee754_j0l (long double x)
+      = 1/sqrt(2) * (sin(x) - cos(x))
+      sin(x) +- cos(x) = -cos(2x)/(sin(x) -+ cos(x))
+      cf. Fdlibm.  */
+-  c = cosl (xx);
+-  s = sinl (xx);
++  __sincosl (xx, &s, &c);
+   ss = s - c;
+   cc = s + c;
+-  z = -cosl (xx + xx);
++  z = -__cosl (xx + xx);
+   if ((s * c) < 0)
+     cc = z / ss;
+   else
+     ss = z / cc;
+-  z = ONEOSQPI * (p * cc - q * ss) / sqrtl (xx);
++  z = ONEOSQPI * (p * cc - q * ss) / __ieee754_sqrtl (xx);
+   return z;
+ }
+ 
+@@ -836,7 +835,7 @@ long double
+       /* 0 <= x <= 2 */
+       z = xx * xx;
+       p = neval (z, Y0_2N, NY0_2N) / deval (z, Y0_2D, NY0_2D);
+-      p = TWOOPI * logl(x) * __ieee754_j0l(x) + p;
++      p = TWOOPI * __ieee754_logl (x) * __ieee754_j0l (x) + p;
+       return p;
+     }
+ 
+@@ -908,15 +907,14 @@ long double
+      = 1/sqrt(2) * (sin(x) - cos(x))
+      sin(x) +- cos(x) = -cos(2x)/(sin(x) -+ cos(x))
+      cf. Fdlibm.  */
+-  c = cosl (x);
+-  s = sinl (x);
++  __sincosl (x, &s, &c);
+   ss = s - c;
+   cc = s + c;
+-  z = -cosl (x + x);
++  z = -__cosl (x + x);
+   if ((s * c) < 0)
+     cc = z / ss;
+   else
+     ss = z / cc;
+-  z = ONEOSQPI * (p * ss + q * cc) / sqrtl (x);
++  z = ONEOSQPI * (p * ss + q * cc) / __ieee754_sqrtl (x);
+   return z;
+ }
+diff --git a/sysdeps/ieee754/ldbl-128/e_j1l.c b/sysdeps/ieee754/ldbl-128/e_j1l.c
+index 3a977c2..7ec073d 100644
+--- a/sysdeps/ieee754/ldbl-128/e_j1l.c
++++ b/sysdeps/ieee754/ldbl-128/e_j1l.c
+@@ -773,16 +773,15 @@ __ieee754_j1l (long double x)
+      sin(X) = sin(x) cos(3 pi/4) - cos(x) sin(3 pi/4)
+      = -1/sqrt(2) * (sin(x) + cos(x))
+      cf. Fdlibm.  */
+-  c = cosl (xx);
+-  s = sinl (xx);
++  __sincosl (xx, &s, &c);
+   ss = -s - c;
+   cc = s - c;
+-  z = cosl (xx + xx);
++  z = __cosl (xx + xx);
+   if ((s * c) > 0)
+     cc = z / ss;
+   else
+     ss = z / cc;
+-  z = ONEOSQPI * (p * cc - q * ss) / sqrtl (xx);
++  z = ONEOSQPI * (p * cc - q * ss) / __ieee754_sqrtl (xx);
+   if (x < 0)
+     z = -z;
+   return z;
+@@ -844,7 +843,7 @@ __ieee754_y1l (long double x)
+       z = xx * xx;
+       p = xx * neval (z, Y0_2N, NY0_2N) / deval (z, Y0_2D, NY0_2D);
+       p = -TWOOPI / xx + p;
+-      p = TWOOPI * logl(x) * __ieee754_j1l (x) + p;
++      p = TWOOPI * __ieee754_logl (x) * __ieee754_j1l (x) + p;
+       return p;
+     }
+ 
+@@ -915,15 +914,14 @@ __ieee754_y1l (long double x)
+      sin(X) = sin(x) cos(3 pi/4) - cos(x) sin(3 pi/4)
+      = -1/sqrt(2) * (sin(x) + cos(x))
+      cf. Fdlibm.  */
+-  c = cosl (xx);
+-  s = sinl (xx);
++  __sincosl (xx, &s, &c);
+   ss = -s - c;
+   cc = s - c;
+-  z = cosl (xx + xx);
++  z = __cosl (xx + xx);
+   if ((s * c) > 0)
+     cc = z / ss;
+   else
+     ss = z / cc;
+-  z = ONEOSQPI * (p * ss + q * cc) / sqrtl (xx);
++  z = ONEOSQPI * (p * ss + q * cc) / __ieee754_sqrtl (xx);
+   return z;
+ }
+diff --git a/sysdeps/ieee754/ldbl-128ibm/e_expl.c b/sysdeps/ieee754/ldbl-128ibm/e_expl.c
+index 3c4088f..daf2cba 100644
+--- a/sysdeps/ieee754/ldbl-128ibm/e_expl.c
++++ b/sysdeps/ieee754/ldbl-128ibm/e_expl.c
+@@ -1,5 +1,5 @@
+ /* Quad-precision floating point e^x.
+-   Copyright (C) 1999,2004,2006 Free Software Foundation, Inc.
++   Copyright (C) 1999,2004,2006, 2008 Free Software Foundation, Inc.
+    This file is part of the GNU C Library.
+    Contributed by Jakub Jelinek <jj@ultra.linux.cz>
+    Partly based on double-precision code
+@@ -148,15 +148,15 @@ __ieee754_expl (long double x)
+       fesetround (FE_TONEAREST);
+ #endif
+ 
+-      n = roundl(x*M_1_LN2);
++      n = __roundl (x*M_1_LN2);
+       x = x-n*M_LN2_0;
+       xl = n*M_LN2_1;
+ 
+-      tval1 = roundl(x*TWO8);
++      tval1 = __roundl (x*TWO8);
+       x -= __expl_table[T_EXPL_ARG1+2*tval1];
+       xl -= __expl_table[T_EXPL_ARG1+2*tval1+1];
+ 
+-      tval2 = roundl(x*TWO15);
++      tval2 = __roundl (x*TWO15);
+       x -= __expl_table[T_EXPL_ARG2+2*tval2];
+       xl -= __expl_table[T_EXPL_ARG2+2*tval2+1];
+ 
+diff --git a/sysdeps/ieee754/ldbl-128ibm/s_expm1l.c b/sysdeps/ieee754/ldbl-128ibm/s_expm1l.c
+index 4908d4e..7350065 100644
+--- a/sysdeps/ieee754/ldbl-128ibm/s_expm1l.c
++++ b/sysdeps/ieee754/ldbl-128ibm/s_expm1l.c
+@@ -152,7 +152,7 @@ __expm1l (long double x)
+   exp(x) - 1 = 2^k (qx + 1) - 1
+              = 2^k qx + 2^k - 1.  */
+ 
+-  px = ldexpl (1.0L, k);
++  px = __ldexpl (1.0L, k);
+   x = px * qx + (px - 1.0);
+   return x;
+ }
+diff --git a/sysdeps/ieee754/ldbl-128ibm/s_log1pl.c b/sysdeps/ieee754/ldbl-128ibm/s_log1pl.c
+index f1863fb..5ccf541 100644
+--- a/sysdeps/ieee754/ldbl-128ibm/s_log1pl.c
++++ b/sysdeps/ieee754/ldbl-128ibm/s_log1pl.c
+@@ -121,12 +121,6 @@ static const long double maxlog = 1.1356523406294143949491931077970764891253E4L;
+ static const long double big = 2e300L;
+ static const long double zero = 0.0L;
+ 
+-#if 1
+-/* Make sure these are prototyped.  */
+-long double frexpl (long double, int *);
+-long double ldexpl (long double, int);
+-#endif
+-
+ 
+ long double
+ __log1pl (long double xm1)
+@@ -161,7 +155,7 @@ __log1pl (long double xm1)
+   /* Separate mantissa from exponent.  */
+ 
+   /* Use frexp used so that denormal numbers will be handled properly.  */
+-  x = frexpl (x, &e);
++  x = __frexpl (x, &e);
+ 
+   /* Logarithm using log(x) = z + z^3 P(z^2)/Q(z^2),
+      where z = 2(x-1)/x+1).  */
+diff --git a/sysdeps/ieee754/ldbl-128ibm/s_nearbyintl.c b/sysdeps/ieee754/ldbl-128ibm/s_nearbyintl.c
+index 2561fda..36c5a16 100644
+--- a/sysdeps/ieee754/ldbl-128ibm/s_nearbyintl.c
++++ b/sysdeps/ieee754/ldbl-128ibm/s_nearbyintl.c
+@@ -1,6 +1,6 @@
+ /* Round to int long double floating-point values without raising inexact.
+    IBM extended format long double version.
+-   Copyright (C) 2006 Free Software Foundation, Inc.
++   Copyright (C) 2006, 2008 Free Software Foundation, Inc.
+    This file is part of the GNU C Library.
+ 
+    The GNU C Library is free software; you can redistribute it and/or
+@@ -84,8 +84,8 @@ __nearbyintl (x)
+ 	    {
+ 	      /* Else the high double is pre rounded and we need to
+ 	         adjust for that.  */
+-	      
+-	      tau = nextafter (u.dd[0], 0.0);
++
++	      tau = __nextafter (u.dd[0], 0.0);
+ 	      tau = (u.dd[0] - tau) * 2.0;
+ 	      high = u.dd[0] - tau;
+ 	      low = u.dd[1] + tau;
+@@ -106,7 +106,7 @@ __nearbyintl (x)
+ 	    {
+ 	      /* Else the high double is pre rounded and we need to
+ 	         adjust for that.  */
+-	      tau = nextafter (u.dd[0], 0.0);
++	      tau = __nextafter (u.dd[0], 0.0);
+ 	      tau = (u.dd[0] - tau) * 2.0;
+ 	      high = u.dd[0] - tau;
+ 	      low = u.dd[1] + tau;
+diff --git a/sysdeps/powerpc/bits/fenv.h b/sysdeps/powerpc/bits/fenv.h
+index 10582a6..1a5720a 100644
+--- a/sysdeps/powerpc/bits/fenv.h
++++ b/sysdeps/powerpc/bits/fenv.h
+@@ -1,4 +1,4 @@
+-/* Copyright (C) 1997, 1998, 1999 Free Software Foundation, Inc.
++/* Copyright (C) 1997, 1998, 1999, 2008 Free Software Foundation, Inc.
+    This file is part of the GNU C Library.
+ 
+    The GNU C Library is free software; you can redistribute it and/or
+@@ -136,6 +136,8 @@ extern const fenv_t __fe_enabled_env;
+ extern const fenv_t __fe_nonieee_env;
+ # define FE_NONIEEE_ENV	(&__fe_nonieee_env)
+ 
++__BEGIN_DECLS
++
+ /* Floating-point environment with all exceptions enabled.  Note that
+    just evaluating this value does not change the processor exception mode.
+    Passing this mask to fesetenv will result in a prctl syscall to change
+@@ -152,4 +154,7 @@ extern const fenv_t *__fe_nomask_env (void);
+    this allows the fastest possible floating point execution.*/
+ extern const fenv_t *__fe_mask_env (void);
+ # define FE_MASK_ENV	FE_DFL_ENV
++
++__END_DECLS
++
+ #endif
+diff --git a/sysdeps/powerpc/fpu/e_sqrt.c b/sysdeps/powerpc/fpu/e_sqrt.c
+index 540b924..24e0dd3 100644
+--- a/sysdeps/powerpc/fpu/e_sqrt.c
++++ b/sysdeps/powerpc/fpu/e_sqrt.c
+@@ -1,5 +1,5 @@
+ /* Double-precision floating point square root.
+-   Copyright (C) 1997, 2002, 2003, 2004 Free Software Foundation, Inc.
++   Copyright (C) 1997, 2002, 2003, 2004, 2008 Free Software Foundation, Inc.
+    This file is part of the GNU C Library.
+ 
+    The GNU C Library is free software; you can redistribute it and/or
+@@ -150,7 +150,9 @@ __slow_ieee754_sqrt (x)
+          FE_INVALID_SQRT.  */
+ #ifdef FE_INVALID_SQRT
+       feraiseexcept (FE_INVALID_SQRT);
+-      if (!fetestexcept (FE_INVALID))
++
++      fenv_union_t u = { .fenv = fegetenv_register () };
++      if ((u.l[1] & FE_INVALID) == 0)
+ #endif
+ 	feraiseexcept (FE_INVALID);
+       x = a_nan.value;
+@@ -172,7 +174,7 @@ __ieee754_sqrt (x)
+   /* If the CPU is 64-bit we can use the optional FP instructions.  */
+   if (__CPU_HAS_FSQRT)
+     {
+-      /* Volatile is required to prevent the compiler from moving the 
++      /* Volatile is required to prevent the compiler from moving the
+          fsqrt instruction above the branch.  */
+       __asm __volatile ("	fsqrt	%0,%1\n"
+ 				:"=f" (z):"f" (x));
+diff --git a/sysdeps/powerpc/fpu/e_sqrtf.c b/sysdeps/powerpc/fpu/e_sqrtf.c
+index b63d314..8e8138a 100644
+--- a/sysdeps/powerpc/fpu/e_sqrtf.c
++++ b/sysdeps/powerpc/fpu/e_sqrtf.c
+@@ -1,5 +1,5 @@
+ /* Single-precision floating point square root.
+-   Copyright (C) 1997, 2003, 2004 Free Software Foundation, Inc.
++   Copyright (C) 1997, 2003, 2004, 2008 Free Software Foundation, Inc.
+    This file is part of the GNU C Library.
+ 
+    The GNU C Library is free software; you can redistribute it and/or
+@@ -126,7 +126,9 @@ __slow_ieee754_sqrtf (x)
+          FE_INVALID_SQRT.  */
+ #ifdef FE_INVALID_SQRT
+       feraiseexcept (FE_INVALID_SQRT);
+-      if (!fetestexcept (FE_INVALID))
++
++      fenv_union_t u = { .fenv = fegetenv_register () };
++      if ((u.l[1] & FE_INVALID) == 0)
+ #endif
+ 	feraiseexcept (FE_INVALID);
+       x = a_nan.value;
+@@ -149,7 +151,7 @@ __ieee754_sqrtf (x)
+   /* If the CPU is 64-bit we can use the optional FP instructions.  */
+   if (__CPU_HAS_FSQRT)
+     {
+-      /* Volatile is required to prevent the compiler from moving the 
++      /* Volatile is required to prevent the compiler from moving the
+          fsqrt instruction above the branch.  */
+       __asm __volatile ("	fsqrts	%0,%1\n"
+ 				:"=f" (z):"f" (x));
+diff --git a/sysdeps/powerpc/fpu/fe_nomask.c b/sysdeps/powerpc/fpu/fe_nomask.c
+index 3cccee1..bc18bb8 100644
+--- a/sysdeps/powerpc/fpu/fe_nomask.c
++++ b/sysdeps/powerpc/fpu/fe_nomask.c
+@@ -1,5 +1,5 @@
+ /* Procedure definition for FE_NOMASK_ENV.
+-   Copyright (C) 1997 Free Software Foundation, Inc.
++   Copyright (C) 1997, 2008 Free Software Foundation, Inc.
+    This file is part of the GNU C Library.
+ 
+    The GNU C Library is free software; you can redistribute it and/or
+@@ -17,7 +17,7 @@
+    Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
+    02111-1307 USA.  */
+ 
+-#include <fenv.h>
++#include <fenv_libc.h>
+ #include <errno.h>
+ 
+ /* This is a generic stub. An OS specific override is required to set
+@@ -30,4 +30,5 @@ __fe_nomask_env(void)
+   __set_errno (ENOSYS);
+   return FE_ENABLED_ENV;
+ }
++libm_hidden_def (__fe_nomask_env)
+ stub_warning (__fe_nomask_env)
+diff --git a/sysdeps/powerpc/fpu/fedisblxcpt.c b/sysdeps/powerpc/fpu/fedisblxcpt.c
+index 3002b1b..9df4bbc 100644
+--- a/sysdeps/powerpc/fpu/fedisblxcpt.c
++++ b/sysdeps/powerpc/fpu/fedisblxcpt.c
+@@ -1,5 +1,5 @@
+ /* Disable floating-point exceptions.
+-   Copyright (C) 2000 Free Software Foundation, Inc.
++   Copyright (C) 2000, 2008 Free Software Foundation, Inc.
+    This file is part of the GNU C Library.
+    Contributed by Geoffrey Keating <geoffk@geoffk.org>, 2000.
+ 
+@@ -26,7 +26,7 @@ fedisableexcept (int excepts)
+   fenv_union_t fe;
+   int result, new;
+ 
+-  result = fegetexcept ();
++  result = __fegetexcept ();
+ 
+   if ((excepts & FE_ALL_INVALID) == FE_ALL_INVALID)
+     excepts = (excepts | FE_INVALID) & ~ FE_ALL_INVALID;
+@@ -44,7 +44,7 @@ fedisableexcept (int excepts)
+     fe.l[1] &= ~(1 << (31 - FPSCR_VE));
+   fesetenv_register (fe.fenv);
+ 
+-  new = fegetexcept ();
++  new = __fegetexcept ();
+   if (new == 0 && result != 0)
+     (void)__fe_mask_env ();
+ 
+diff --git a/sysdeps/powerpc/fpu/feenablxcpt.c b/sysdeps/powerpc/fpu/feenablxcpt.c
+index 7bff18b..4875e95 100644
+--- a/sysdeps/powerpc/fpu/feenablxcpt.c
++++ b/sysdeps/powerpc/fpu/feenablxcpt.c
+@@ -1,5 +1,5 @@
+ /* Enable floating-point exceptions.
+-   Copyright (C) 2000 Free Software Foundation, Inc.
++   Copyright (C) 2000, 2008 Free Software Foundation, Inc.
+    This file is part of the GNU C Library.
+    Contributed by Geoffrey Keating <geoffk@geoffk.org>, 2000.
+ 
+@@ -26,7 +26,7 @@ feenableexcept (int excepts)
+   fenv_union_t fe;
+   int result, new;
+ 
+-  result = fegetexcept ();
++  result = __fegetexcept ();
+ 
+   if ((excepts & FE_ALL_INVALID) == FE_ALL_INVALID)
+     excepts = (excepts | FE_INVALID) & ~ FE_ALL_INVALID;
+@@ -44,7 +44,7 @@ feenableexcept (int excepts)
+     fe.l[1] |= (1 << (31 - FPSCR_VE));
+   fesetenv_register (fe.fenv);
+ 
+-  new = fegetexcept ();
++  new = __fegetexcept ();
+   if (new != 0 && result == 0)
+     (void)__fe_nomask_env ();
+ 
+diff --git a/sysdeps/powerpc/fpu/fegetexcept.c b/sysdeps/powerpc/fpu/fegetexcept.c
+index 0b5cebb..c85cb1b 100644
+--- a/sysdeps/powerpc/fpu/fegetexcept.c
++++ b/sysdeps/powerpc/fpu/fegetexcept.c
+@@ -1,5 +1,5 @@
+ /* Get floating-point exceptions.
+-   Copyright (C) 2000 Free Software Foundation, Inc.
++   Copyright (C) 2000, 2008 Free Software Foundation, Inc.
+    This file is part of the GNU C Library.
+    Contributed by Geoffrey Keating <geoffk@geoffk.org>, 2000.
+ 
+@@ -21,13 +21,13 @@
+ #include <fenv_libc.h>
+ 
+ int
+-fegetexcept (void)
++__fegetexcept (void)
+ {
+   fenv_union_t fe;
+   int result = 0;
+ 
+   fe.fenv = fegetenv_register ();
+- 
++
+   if (fe.l[1] & (1 << (31 - FPSCR_XE)))
+       result |= FE_INEXACT;
+   if (fe.l[1] & (1 << (31 - FPSCR_ZE)))
+@@ -41,3 +41,4 @@ fegetexcept (void)
+ 
+   return result;
+ }
++weak_alias (__fegetexcept, fegetexcept)
+diff --git a/sysdeps/powerpc/fpu/fenv_libc.h b/sysdeps/powerpc/fpu/fenv_libc.h
+index fd5fc0c..6f116b6 100644
+--- a/sysdeps/powerpc/fpu/fenv_libc.h
++++ b/sysdeps/powerpc/fpu/fenv_libc.h
+@@ -1,5 +1,5 @@
+ /* Internal libc stuff for floating point environment routines.
+-   Copyright (C) 1997, 2006 Free Software Foundation, Inc.
++   Copyright (C) 1997, 2006, 2008 Free Software Foundation, Inc.
+    This file is part of the GNU C Library.
+ 
+    The GNU C Library is free software; you can redistribute it and/or
+@@ -22,6 +22,8 @@
+ 
+ #include <fenv.h>
+ 
++libm_hidden_proto (__fe_nomask_env)
++
+ /* The sticky bits in the FPSCR indicating exceptions have occurred.  */
+ #define FPSCR_STICKY_BITS ((FE_ALL_EXCEPT | FE_ALL_INVALID) & ~FE_INVALID)
+ 
+@@ -137,5 +139,5 @@ enum {
+    ({ float f; asm volatile ("fmuls %0,%1,%2" \
+ 			     : "=f"(f) \
+ 			     : "f" (x), "f"((float)1.0)); f; })
+- 
++
+ #endif /* fenv_libc.h */
+diff --git a/sysdeps/powerpc/fpu/fraiseexcpt.c b/sysdeps/powerpc/fpu/fraiseexcpt.c
+index dbe36c3..2d983d9 100644
+--- a/sysdeps/powerpc/fpu/fraiseexcpt.c
++++ b/sysdeps/powerpc/fpu/fraiseexcpt.c
+@@ -1,5 +1,5 @@
+ /* Raise given exceptions.
+-   Copyright (C) 1997,99,2000,01,02 Free Software Foundation, Inc.
++   Copyright (C) 1997,1999-2002, 2008 Free Software Foundation, Inc.
+    This file is part of the GNU C Library.
+ 
+    The GNU C Library is free software; you can redistribute it and/or
+@@ -45,12 +45,15 @@ __feraiseexcept (int excepts)
+      triggering any appropriate exceptions.  */
+   fesetenv_register (u.fenv);
+ 
+-  if ((excepts & FE_INVALID)
++  if ((excepts & FE_INVALID))
++    {
+       /* For some reason, some PowerPC chips (the 601, in particular)
+ 	 don't have FE_INVALID_SOFTWARE implemented.  Detect this
+ 	 case and raise FE_INVALID_SNAN instead.  */
+-      && !fetestexcept (FE_INVALID))
+-    set_fpscr_bit (FPSCR_VXSNAN);
++      u.fenv = fegetenv_register ();
++      if ((u.l[1] & FE_INVALID) == 0)
++	set_fpscr_bit (FPSCR_VXSNAN);
++    }
+ 
+   /* Success.  */
+   return 0;
+diff --git a/sysdeps/powerpc/powerpc32/fpu/s_lround.S b/sysdeps/powerpc/powerpc32/fpu/s_lround.S
+index 9c534ec..ebacccc 100644
+--- a/sysdeps/powerpc/powerpc32/fpu/s_lround.S
++++ b/sysdeps/powerpc/powerpc32/fpu/s_lround.S
+@@ -1,5 +1,5 @@
+ /* lround function.  PowerPC32 version.
+-   Copyright (C) 2004, 2006 Free Software Foundation, Inc.
++   Copyright (C) 2004, 2006, 2007 Free Software Foundation, Inc.
+    This file is part of the GNU C Library.
+ 
+    The GNU C Library is free software; you can redistribute it and/or
+@@ -20,13 +20,10 @@
+ #include <sysdep.h>
+ #include <math_ldbl_opt.h>
+ 
+-	.section	.rodata.cst8,"aM",@progbits,8
++	.section	.rodata.cst4,"aM",@progbits,4
+ 	.align	2
+-.LC0:	/* 0.0 */
+-	.long 0x00000000
+-.LC1:	/* 0.5 */
++.LC0:	/* 0.5 */
+ 	.long 0x3f000000
+-
+ 	.section	".text"
+ 	
+ /* long [r3] lround (float x [fp1])
+@@ -37,7 +34,10 @@
+    tie, choose the one that is even (least significant bit o).". 
+    So we can't use the PowerPC "round to Nearest" mode. Instead we set
+    "round toward Zero" mode and round by adding +-0.5 before rounding
+-   to the integer value.  */
++   to the integer value.  It is necessary to detect when x is
++   (+-)0x1.fffffffffffffp-2 because adding +-0.5 in this case will
++   cause an erroneous shift, carry and round.  We simply return 0 if
++   0.5 > x > -0.5.  */
+ 
+ ENTRY (__lround)
+ 	stwu    r1,-16(r1)
+@@ -49,40 +49,40 @@ ENTRY (__lround)
+ 	bcl	20,31,1f
+ 1:	mflr	r9
+ 	addis	r9,r9,.LC0-1b@ha
+-	addi	r9,r9,.LC0-1b@l
++	lfs	fp10,.LC0-1b@l(r9)
+ # else
+ 	bl	_GLOBAL_OFFSET_TABLE_@local-4
+ 	mflr	r10
+ 	lwz	r9,.LC0@got(10)
++	lfs	fp10,0(r9)
+ # endif
+ 	mtlr	r11
+ 	cfi_same_value (lr)
+-	lfs	fp12,0(r9)
+ #else
+ 	lis	r9,.LC0@ha
+-	lfs	fp12,.LC0@l(r9)
+-#endif
+-#ifdef SHARED
+-	lfs	fp10,.LC1-.LC0(r9)
+-#else
+-	lis	r9,.LC1@ha
+-	lfs	fp10,.LC1@l(r9)
++	lfs	fp10,.LC0@l(r9)
+ #endif
+-	fcmpu	cr6,fp1,fp12	/* if (x > 0.0)  */
+-	ble-	cr6,.L4
+-	fadd	fp1,fp1,fp10	/* x+= 0.5;  */
+-.L9:
+-	fctiwz	fp2,fp1		/* Convert To Integer DW lround toward 0.  */
+-	stfd	fp2,8(r1)
++	fabs	fp2, fp1	/* Get the absolute value of x.  */
++	fsub	fp12,fp10,fp10	/* Compute 0.0.  */
++	fcmpu	cr6, fp2, fp10	/* if |x| < 0.5  */
++	fcmpu	cr3, fp1, fp12	/* x is negative? x < 0.0  */
++	blt-	cr6,.Lretzero
++	fadd	fp3,fp2,fp10	/* |x|+=0.5 bias to prepare to round.  */
++	bge	cr3,.Lconvert	/* x is positive so don't negate x.  */
++	fnabs	fp3,fp3		/* -(|x|+=0.5)  */ 
++.Lconvert:
++	fctiwz	fp4,fp3		/* Convert to Integer word lround toward 0.  */
++	stfd	fp4,8(r1)
+ 	nop	/* Ensure the following load is in a different dispatch  */
+ 	nop	/* group to avoid pipe stall on POWER4&5.  */
+ 	nop
+-	lwz	r3,12(r1)
++	lwz	r3,12(r1)	/* Load return as integer.  */
++.Lout:
+ 	addi	r1,r1,16
+ 	blr
+-.L4:
+-	fsub	fp1,fp1,fp10	/* x-= 0.5;  */
+-	b	.L9
++.Lretzero:			/* when 0.5 > x > -0.5  */
++	li	r3,0		/* return 0.  */
++	b	.Lout
+ 	END (__lround)
+ 
+ weak_alias (__lround, lround)
+diff --git a/sysdeps/powerpc/powerpc32/fpu/s_lroundf.S b/sysdeps/powerpc/powerpc32/fpu/s_lroundf.S
+index e3c992d..6289e0b 100644
+--- a/sysdeps/powerpc/powerpc32/fpu/s_lroundf.S
++++ b/sysdeps/powerpc/powerpc32/fpu/s_lroundf.S
+@@ -1,2 +1 @@
+ /* __lroundf is in s_lround.S */
+-/* __lroundf is in s_lround.S */
+diff --git a/sysdeps/powerpc/powerpc32/power4/fpu/s_llround.S b/sysdeps/powerpc/powerpc32/power4/fpu/s_llround.S
+index 952d2aa..4b1691e 100644
+--- a/sysdeps/powerpc/powerpc32/power4/fpu/s_llround.S
++++ b/sysdeps/powerpc/powerpc32/power4/fpu/s_llround.S
+@@ -1,5 +1,5 @@
+ /* llround function.  PowerPC32 on PowerPC64 version.
+-   Copyright (C) 2004, 2006 Free Software Foundation, Inc.
++   Copyright (C) 2004, 2006, 2007 Free Software Foundation, Inc.
+    This file is part of the GNU C Library.
+ 
+    The GNU C Library is free software; you can redistribute it and/or
+@@ -20,15 +20,15 @@
+ #include <sysdep.h>
+ #include <math_ldbl_opt.h>
+ 
+-	.section	.rodata.cst8,"aM",@progbits,8
+-	.align	2
+-.LC0:	/* 0.0 */
++ .section .rodata.cst12,"aM",@progbits,12
++ .align 3
++ .LC0:   /* 0x1.0000000000000p+52 == 2^52 */
++	.long 0x43300000
+ 	.long 0x00000000
+-.LC1:	/* 0.5 */
+-	.long 0x3f000000
++	.long 0x3f000000 /* Use this for 0.5  */
+ 
+ 	.section	".text"
+-	
++
+ /* long [r3] lround (float x [fp1])
+    IEEE 1003.1 lround function.  IEEE specifies "round to the nearest 
+    integer value, rounding halfway cases away from zero, regardless of
+@@ -37,7 +37,15 @@
+    tie, choose the one that is even (least significant bit o).". 
+    So we can't use the PowerPC "round to Nearest" mode. Instead we set
+    "round toward Zero" mode and round by adding +-0.5 before rounding
+-   to the integer value.  */
++   to the integer value.
++
++   It is necessary to detect when x is (+-)0x1.fffffffffffffp-2
++   because adding +-0.5 in this case will cause an erroneous shift,
++   carry and round.  We simply return 0 if 0.5 > x > -0.5.  Likewise
++   if x is and odd number between +-(2^52 and 2^53-1) a shift and
++   carry will erroneously round if biased with +-0.5.  Therefore if x
++   is greater/less than +-2^52 we don't need to bias the number with
++   +-0.5.  */
+ 
+ ENTRY (__llround)
+ 	stwu    r1,-16(r1)
+@@ -57,30 +65,41 @@ ENTRY (__llround)
+ # endif
+ 	mtlr	r11
+ 	cfi_same_value (lr)
+-	lfs	fp12,0(r9)
+-	lfs	fp10,.LC1-.LC0(r9)
++	lfd	fp9,0(r9)
++	lfs	fp10,8(r9)
+ #else
+-	lis	r9,.LC0@ha
+-	lis	r10,.LC1@ha
+-	lfs	fp12,.LC0@l(r9)
+-	lfs	fp10,.LC1@l(r10)
++	lis r9,.LC0@ha
++	lfd fp9,.LC0@l(r9)	/* Load 2^52 into fpr9.  */
++	lfs fp10,.LC0@l+8(r9)	/* Load 0.5 into fpr10.  */
+ #endif
+-	fcmpu	cr6,fp1,fp12	/* if (x > 0.0)  */
+-	ble-	cr6,.L4
+-	fadd	fp1,fp1,fp10	/* x+= 0.5;  */
+-.L9:
+-	fctidz	fp2,fp1		/* Convert To Integer DW round toward 0.  */
+-	stfd	fp2,8(r1)
+-	nop	/* Ensure the following load is in a different dispatch  */
+-	nop	/* group to avoid pipe stall on POWER4&5.  */
++	fabs	fp2,fp1		/* Get the absolute value of x.  */
++	fsub	fp12,fp10,fp10	/* Compute 0.0 into fpr12.  */
++	fcmpu	cr6,fp2,fp10	/* if |x| < 0.5  */
++	fcmpu	cr4,fp2,fp9	/* if |x| >= 2^52  */
++	fcmpu	cr3,fp1,fp12	/* x is negative? x < 0.0  */
++	blt-	cr6,.Lretzero	/* 0.5 > x < -0.5 so just return 0.  */
++	bge-	cr4,.Lnobias	/* 2^52 > x < -2^52 just convert with no bias.  */
++	fadd	fp3,fp2,fp10	/* |x|+=0.5 bias to prepare to round.  */
++	bge	cr3,.Lconvert	/* x is positive so don't negate x.  */
++	fnabs	fp3,fp3		/* -(|x|+=0.5)  */
++.Lconvert:
++	fctidz	fp4,fp3		/* Convert to Integer double word round toward 0.  */
++	stfd	fp4,8(r1)
++	nop
++	nop
+ 	nop
+-	lwz	r4,12(r1)
++	lwz	r4,12(r1)	/* Load return as integer.  */
+ 	lwz	r3,8(r1)
++.Lout:
+ 	addi	r1,r1,16
+ 	blr
+-.L4:
+-	fsub	fp1,fp1,fp10	/* x-= 0.5;  */
+-	b	.L9
++.Lretzero:			/* 0.5 > x > -0.5  */
++	li	r3,0		/* return 0.  */
++	li	r4,0
++	b	.Lout
++.Lnobias:
++	fmr	fp3,fp1
++	b	.Lconvert
+ 	END (__llround)
+ 
+ weak_alias (__llround, llround)
+diff --git a/sysdeps/powerpc/powerpc32/power5+/fpu/s_llroundf.S b/sysdeps/powerpc/powerpc32/power5+/fpu/s_llroundf.S
+index ffe6b7e..030d2fd 100644
+--- a/sysdeps/powerpc/powerpc32/power5+/fpu/s_llroundf.S
++++ b/sysdeps/powerpc/powerpc32/power5+/fpu/s_llroundf.S
+@@ -1,2 +1 @@
+ /* __llroundf is in s_llround.S  */
+-/* __llroundf is in s_llround.S  */
+diff --git a/sysdeps/powerpc/powerpc32/power6/fpu/s_llroundf.S b/sysdeps/powerpc/powerpc32/power6/fpu/s_llroundf.S
+index ffe6b7e..030d2fd 100644
+--- a/sysdeps/powerpc/powerpc32/power6/fpu/s_llroundf.S
++++ b/sysdeps/powerpc/powerpc32/power6/fpu/s_llroundf.S
+@@ -1,2 +1 @@
+ /* __llroundf is in s_llround.S  */
+-/* __llroundf is in s_llround.S  */
+diff --git a/sysdeps/powerpc/powerpc64/fpu/s_llround.S b/sysdeps/powerpc/powerpc64/fpu/s_llround.S
+index d023b8f..4134847 100644
+--- a/sysdeps/powerpc/powerpc64/fpu/s_llround.S
++++ b/sysdeps/powerpc/powerpc64/fpu/s_llround.S
+@@ -1,5 +1,5 @@
+ /* llround function.  PowerPC64 version.
+-   Copyright (C) 2004, 2006 Free Software Foundation, Inc.
++   Copyright (C) 2004, 2006, 2007 Free Software Foundation, Inc.
+    This file is part of the GNU C Library.
+ 
+    The GNU C Library is free software; you can redistribute it and/or
+@@ -21,13 +21,13 @@
+ #include <math_ldbl_opt.h>
+ 
+ 	.section	".toc","aw"
+-.LC0:	/* -0.0 */
+-	.tc FD_00000000_0[TC],0x0000000000000000
++.LC0:	/* 2^52 */
++	.tc FD_43300000_0[TC],0x4330000000000000
+ .LC1:	/* 0.5 */
+ 	.tc FD_3fe00000_0[TC],0x3fe0000000000000
+ 	.section	".text"
+ 	
+-/* long long [r3] llround (float x [fp1])
++/* long long [r3] llround (double x [fp1])
+    IEEE 1003.1 llround function.  IEEE specifies "round to the nearest 
+    integer value, rounding halfway cases away from zero, regardless of
+    the current rounding mode."  However PowerPC Architecture defines
+@@ -35,26 +35,45 @@
+    tie, choose the one that is even (least significant bit o).". 
+    So we can't use the PowerPC "round to Nearest" mode. Instead we set
+    "round toward Zero" mode and round by adding +-0.5 before rounding
+-   to the integer value.  */
++   to the integer value.
++
++   It is necessary to detect when x is (+-)0x1.fffffffffffffp-2
++   because adding +-0.5 in this case will cause an erroneous shift,
++   carry and round.  We simply return 0 if 0.5 > x > -0.5.  Likewise
++   if x is and odd number between +-(2^52 and 2^53-1) a shift and
++   carry will erroneously round if biased with +-0.5.  Therefore if x
++   is greater/less than +-2^52 we don't need to bias the number with
++   +-0.5.  */
+ 
+ ENTRY (__llround)
+ 	CALL_MCOUNT 0
+-	lfd	fp12,.LC0@toc(2)
+-	lfd	fp10,.LC1@toc(2)
+-	fcmpu	cr6,fp1,fp12	/* if (x > 0.0)  */
+-	ble-	cr6,.L4
+-	fadd	fp1,fp1,fp10	/* x+= 0.5;  */
+-.L9:
+-	fctidz	fp2,fp1		/* Convert To Integer DW llround toward 0.  */
+-	stfd	fp2,-16(r1)
+-	nop	/* Insure the following load is in a different dispatch group */
+-	nop	/* to avoid pipe stall on POWER4&5.  */
++	lfd	fp9,.LC0@toc(2)	/* Load 2^52 into fpr9.  */
++	lfd	fp10,.LC1@toc(2)/* Load 0.5 into fpr10.  */
++	fabs	fp2,fp1		/* Get the absolute value of x.  */
++	fsub	fp12,fp10,fp10	/* Compute 0.0 into fp12.  */
++	fcmpu	cr6,fp2,fp10	/* if |x| < 0.5  */
++	fcmpu	cr4,fp2,fp9	/* if |x| >= 2^52  */
++	fcmpu	cr3,fp1,fp12	/* x is negative? x < 0.0  */
++	blt-	cr6,.Lretzero	/* 0.5 > x < -0.5 so just return 0.  */
++	bge-	cr4,.Lnobias	/* 2^52 > x < -2^52 just convert with no bias.  */
++	fadd	fp3,fp2,fp10	/* |x|+=0.5 bias to prepare to round.  */
++	bge	cr3,.Lconvert	/* x is positive so don't negate x.  */
++	fnabs	fp3,fp3		/* -(|x|+=0.5)  */
++.Lconvert:
++	fctidz	fp4,fp3		/* Convert to Integer double word round toward 0.  */
++	stfd	fp4,-16(r1)
++	nop
++	nop
+ 	nop
+-	ld	r3,-16(r1)
++	ld	r3,-16(r1)	/* Load return as integer.  */
++.Lout:
+ 	blr
+-.L4:
+-	fsub	fp1,fp1,fp10	/* x-= 0.5;  */
+-	b	.L9
++.Lretzero:			/* 0.5 > x > -0.5  */
++	li	r3,0		/* return 0.  */
++	b	.Lout
++.Lnobias:
++	fmr	fp3,fp1
++	b	.Lconvert
+ 	END (__llround)
+ 
+ strong_alias (__llround, __lround)
+diff --git a/sysdeps/powerpc/powerpc64/fpu/s_llroundf.S b/sysdeps/powerpc/powerpc64/fpu/s_llroundf.S
+index bbbd054..a211879 100644
+--- a/sysdeps/powerpc/powerpc64/fpu/s_llroundf.S
++++ b/sysdeps/powerpc/powerpc64/fpu/s_llroundf.S
+@@ -1,5 +1,5 @@
+ /* llroundf function.  PowerPC64 version.
+-   Copyright (C) 2004, 2006 Free Software Foundation, Inc.
++   Copyright (C) 2004, 2006, 2007 Free Software Foundation, Inc.
+    This file is part of the GNU C Library.
+ 
+    The GNU C Library is free software; you can redistribute it and/or
+@@ -20,8 +20,8 @@
+ #include <sysdep.h>
+ 
+ 	.section	".toc","aw"
+-.LC0:	/* -0.0 */
+-	.tc FD_00000000_0[TC],0x0000000000000000
++.LC0:	/* 2^23 */
++	.tc FD_41600000_0[TC],0x4160000000000000
+ .LC1:	/* 0.5 */
+ 	.tc FD_3fe00000_0[TC],0x3fe0000000000000
+ 	.section	".text"
+@@ -34,24 +34,45 @@
+    tie, choose the one that is even (least significant bit o).". 
+    So we can't use the PowerPC "round to Nearest" mode. Instead we set
+    "round toward Zero" mode and round by adding +-0.5 before rounding
+-   to the integer value.  */
++   to the integer value.
++
++   It is necessary to detect when x is (+-)0x1.fffffffffffffp-2
++   because adding +-0.5 in this case will cause an erroneous shift,
++   carry and round.  We simply return 0 if 0.5 > x > -0.5.  Likewise
++   if x is and odd number between +-(2^23 and 2^24-1) a shift and
++   carry will erroneously round if biased with +-0.5.  Therefore if x
++   is greater/less than +-2^23 we don't need to bias the number with
++   +-0.5.  */
+ 
+ ENTRY (__llroundf)
+ 	CALL_MCOUNT 0
+-	lfd	fp12,.LC0@toc(2)
+-	lfd	fp10,.LC1@toc(2)
+-	fcmpu	cr6,fp1,fp12	/* if (x < 0.0)  */
+-	fsubs	fp3,fp1,fp10	/* x-= 0.5;  */
+-	ble-	cr6,.L9
+-	fadds	fp3,fp1,fp10	/* x+= 0.5;  */
+-.L9:
+-	fctidz	fp2,fp3		/* Convert To Integer DW round toward 0.  */
+-	stfd	fp2,-16(r1)
+-	nop	/* Insure the following load is in a different dispatch group */
+-	nop	/* to avoid pipe stall on POWER4&5.  */
++	lfd	fp9,.LC0@toc(2)	/* Load 2^23 into fpr9.  */
++	lfd	fp10,.LC1@toc(2)/* Load 0.5 into fpr10.  */
++	fabs	fp2,fp1		/* Get the absolute value of x.  */
++	fsub	fp12,fp10,fp10	/* Compute 0.0 into fp12.  */
++	fcmpu	cr6,fp2,fp10	/* if |x| < 0.5  */
++	fcmpu	cr4,fp2,fp9	/* if |x| >= 2^23  */
++	fcmpu	cr3,fp1,fp12	/* x is negative? x < 0.0  */
++	blt-	cr6,.Lretzero	/* 0.5 > x < -0.5 so just return 0.  */
++	bge-	cr4,.Lnobias	/* 2^23 > x < -2^23 just convert with no bias.  */
++	fadd	fp3,fp2,fp10	/* |x|+=0.5 bias to prepare to round.  */
++	bge	cr3,.Lconvert	/* x is positive so don't negate x.  */
++	fnabs	fp3,fp3		/* -(|x|+=0.5)  */
++.Lconvert:
++	fctidz	fp4,fp3		/* Convert to Integer double word round toward 0.  */
++	stfd	fp4,-16(r1)
++	nop
++	nop
+ 	nop
+-	ld	r3,-16(r1)
++	ld	r3,-16(r1)	/* Load return as integer.  */
++.Lout:
+ 	blr
++.Lretzero:			/* 0.5 > x > -0.5  */
++	li	r3,0		/* return 0.  */
++	b	.Lout
++.Lnobias:
++	fmr	fp3,fp1
++	b	.Lconvert
+ 	END (__llroundf)
+ 
+ strong_alias (__llroundf, __lroundf)
+diff --git a/sysdeps/powerpc/powerpc64/fpu/s_lrint.S b/sysdeps/powerpc/powerpc64/fpu/s_lrint.S
+index fe77469..d3c2fff 100644
+--- a/sysdeps/powerpc/powerpc64/fpu/s_lrint.S
++++ b/sysdeps/powerpc/powerpc64/fpu/s_lrint.S
+@@ -1,2 +1 @@
+ /* __lrint is in s_llrint.c  */
+-/* __lrint is in s_llrint.c  */
+diff --git a/sysdeps/powerpc/powerpc64/fpu/s_lround.S b/sysdeps/powerpc/powerpc64/fpu/s_lround.S
+index 883bba1..4306c40 100644
+--- a/sysdeps/powerpc/powerpc64/fpu/s_lround.S
++++ b/sysdeps/powerpc/powerpc64/fpu/s_lround.S
+@@ -1,2 +1 @@
+ /* __lround is in s_llround.S  */
+-/* __lround is in s_llround.S  */
+diff --git a/sysdeps/powerpc/powerpc64/fpu/s_lroundf.S b/sysdeps/powerpc/powerpc64/fpu/s_lroundf.S
+index 15506f6..6b2a4e3 100644
+--- a/sysdeps/powerpc/powerpc64/fpu/s_lroundf.S
++++ b/sysdeps/powerpc/powerpc64/fpu/s_lroundf.S
+@@ -1,2 +1 @@
+ /* __lroundf is in s_llroundf.S  */
+-/* __lroundf is in s_llroundf.S  */
+diff --git a/sysdeps/unix/sysv/linux/configure b/sysdeps/unix/sysv/linux/configure
+index a8a9cc4..253e9c5 100644
+--- a/sysdeps/unix/sysv/linux/configure
++++ b/sysdeps/unix/sysv/linux/configure
+@@ -22,23 +22,170 @@ if test -n "$sysheaders"; then
+ fi
+ 
+ 
+-echo "$as_me:$LINENO: checking for egrep" >&5
+-echo $ECHO_N "checking for egrep... $ECHO_C" >&6
+-if test "${ac_cv_prog_egrep+set}" = set; then
++{ echo "$as_me:$LINENO: checking for grep that handles long lines and -e" >&5
++echo $ECHO_N "checking for grep that handles long lines and -e... $ECHO_C" >&6; }
++if test "${ac_cv_path_GREP+set}" = set; then
+   echo $ECHO_N "(cached) $ECHO_C" >&6
+ else
+-  if echo a | (grep -E '(a|b)') >/dev/null 2>&1
+-    then ac_cv_prog_egrep='grep -E'
+-    else ac_cv_prog_egrep='egrep'
++  # Extract the first word of "grep ggrep" to use in msg output
++if test -z "$GREP"; then
++set dummy grep ggrep; ac_prog_name=$2
++if test "${ac_cv_path_GREP+set}" = set; then
++  echo $ECHO_N "(cached) $ECHO_C" >&6
++else
++  ac_path_GREP_found=false
++# Loop through the user's path and test for each of PROGNAME-LIST
++as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
++for as_dir in $PATH$PATH_SEPARATOR/usr/xpg4/bin
++do
++  IFS=$as_save_IFS
++  test -z "$as_dir" && as_dir=.
++  for ac_prog in grep ggrep; do
++  for ac_exec_ext in '' $ac_executable_extensions; do
++    ac_path_GREP="$as_dir/$ac_prog$ac_exec_ext"
++    { test -f "$ac_path_GREP" && $as_test_x "$ac_path_GREP"; } || continue
++    # Check for GNU ac_path_GREP and select it if it is found.
++  # Check for GNU $ac_path_GREP
++case `"$ac_path_GREP" --version 2>&1` in
++*GNU*)
++  ac_cv_path_GREP="$ac_path_GREP" ac_path_GREP_found=:;;
++*)
++  ac_count=0
++  echo $ECHO_N "0123456789$ECHO_C" >"conftest.in"
++  while :
++  do
++    cat "conftest.in" "conftest.in" >"conftest.tmp"
++    mv "conftest.tmp" "conftest.in"
++    cp "conftest.in" "conftest.nl"
++    echo 'GREP' >> "conftest.nl"
++    "$ac_path_GREP" -e 'GREP$' -e '-(cannot match)-' < "conftest.nl" >"conftest.out" 2>/dev/null || break
++    diff "conftest.out" "conftest.nl" >/dev/null 2>&1 || break
++    ac_count=`expr $ac_count + 1`
++    if test $ac_count -gt ${ac_path_GREP_max-0}; then
++      # Best one so far, save it but keep looking for a better one
++      ac_cv_path_GREP="$ac_path_GREP"
++      ac_path_GREP_max=$ac_count
+     fi
++    # 10*(2^10) chars as input seems more than enough
++    test $ac_count -gt 10 && break
++  done
++  rm -f conftest.in conftest.tmp conftest.nl conftest.out;;
++esac
++
++
++    $ac_path_GREP_found && break 3
++  done
++done
++
++done
++IFS=$as_save_IFS
++
++
++fi
++
++GREP="$ac_cv_path_GREP"
++if test -z "$GREP"; then
++  { { echo "$as_me:$LINENO: error: no acceptable $ac_prog_name could be found in $PATH$PATH_SEPARATOR/usr/xpg4/bin" >&5
++echo "$as_me: error: no acceptable $ac_prog_name could be found in $PATH$PATH_SEPARATOR/usr/xpg4/bin" >&2;}
++   { (exit 1); exit 1; }; }
+ fi
+-echo "$as_me:$LINENO: result: $ac_cv_prog_egrep" >&5
+-echo "${ECHO_T}$ac_cv_prog_egrep" >&6
+- EGREP=$ac_cv_prog_egrep
++
++else
++  ac_cv_path_GREP=$GREP
++fi
++
++
++fi
++{ echo "$as_me:$LINENO: result: $ac_cv_path_GREP" >&5
++echo "${ECHO_T}$ac_cv_path_GREP" >&6; }
++ GREP="$ac_cv_path_GREP"
+ 
+ 
+-echo "$as_me:$LINENO: checking installed Linux kernel header files" >&5
+-echo $ECHO_N "checking installed Linux kernel header files... $ECHO_C" >&6
++{ echo "$as_me:$LINENO: checking for egrep" >&5
++echo $ECHO_N "checking for egrep... $ECHO_C" >&6; }
++if test "${ac_cv_path_EGREP+set}" = set; then
++  echo $ECHO_N "(cached) $ECHO_C" >&6
++else
++  if echo a | $GREP -E '(a|b)' >/dev/null 2>&1
++   then ac_cv_path_EGREP="$GREP -E"
++   else
++     # Extract the first word of "egrep" to use in msg output
++if test -z "$EGREP"; then
++set dummy egrep; ac_prog_name=$2
++if test "${ac_cv_path_EGREP+set}" = set; then
++  echo $ECHO_N "(cached) $ECHO_C" >&6
++else
++  ac_path_EGREP_found=false
++# Loop through the user's path and test for each of PROGNAME-LIST
++as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
++for as_dir in $PATH$PATH_SEPARATOR/usr/xpg4/bin
++do
++  IFS=$as_save_IFS
++  test -z "$as_dir" && as_dir=.
++  for ac_prog in egrep; do
++  for ac_exec_ext in '' $ac_executable_extensions; do
++    ac_path_EGREP="$as_dir/$ac_prog$ac_exec_ext"
++    { test -f "$ac_path_EGREP" && $as_test_x "$ac_path_EGREP"; } || continue
++    # Check for GNU ac_path_EGREP and select it if it is found.
++  # Check for GNU $ac_path_EGREP
++case `"$ac_path_EGREP" --version 2>&1` in
++*GNU*)
++  ac_cv_path_EGREP="$ac_path_EGREP" ac_path_EGREP_found=:;;
++*)
++  ac_count=0
++  echo $ECHO_N "0123456789$ECHO_C" >"conftest.in"
++  while :
++  do
++    cat "conftest.in" "conftest.in" >"conftest.tmp"
++    mv "conftest.tmp" "conftest.in"
++    cp "conftest.in" "conftest.nl"
++    echo 'EGREP' >> "conftest.nl"
++    "$ac_path_EGREP" 'EGREP$' < "conftest.nl" >"conftest.out" 2>/dev/null || break
++    diff "conftest.out" "conftest.nl" >/dev/null 2>&1 || break
++    ac_count=`expr $ac_count + 1`
++    if test $ac_count -gt ${ac_path_EGREP_max-0}; then
++      # Best one so far, save it but keep looking for a better one
++      ac_cv_path_EGREP="$ac_path_EGREP"
++      ac_path_EGREP_max=$ac_count
++    fi
++    # 10*(2^10) chars as input seems more than enough
++    test $ac_count -gt 10 && break
++  done
++  rm -f conftest.in conftest.tmp conftest.nl conftest.out;;
++esac
++
++
++    $ac_path_EGREP_found && break 3
++  done
++done
++
++done
++IFS=$as_save_IFS
++
++
++fi
++
++EGREP="$ac_cv_path_EGREP"
++if test -z "$EGREP"; then
++  { { echo "$as_me:$LINENO: error: no acceptable $ac_prog_name could be found in $PATH$PATH_SEPARATOR/usr/xpg4/bin" >&5
++echo "$as_me: error: no acceptable $ac_prog_name could be found in $PATH$PATH_SEPARATOR/usr/xpg4/bin" >&2;}
++   { (exit 1); exit 1; }; }
++fi
++
++else
++  ac_cv_path_EGREP=$EGREP
++fi
++
++
++   fi
++fi
++{ echo "$as_me:$LINENO: result: $ac_cv_path_EGREP" >&5
++echo "${ECHO_T}$ac_cv_path_EGREP" >&6; }
++ EGREP="$ac_cv_path_EGREP"
++
++
++{ echo "$as_me:$LINENO: checking installed Linux kernel header files" >&5
++echo $ECHO_N "checking installed Linux kernel header files... $ECHO_C" >&6; }
+ if test "${libc_cv_linux2010+set}" = set; then
+   echo $ECHO_N "(cached) $ECHO_C" >&6
+ else
+@@ -62,8 +209,8 @@ fi
+ rm -f conftest*
+ 
+ fi
+-echo "$as_me:$LINENO: result: $libc_cv_linux2010" >&5
+-echo "${ECHO_T}$libc_cv_linux2010" >&6
++{ echo "$as_me:$LINENO: result: $libc_cv_linux2010" >&5
++echo "${ECHO_T}$libc_cv_linux2010" >&6; }
+ if test "$libc_cv_linux2010" != '2.0.10 or later'; then
+   { { echo "$as_me:$LINENO: error: GNU libc requires kernel header files from
+ Linux 2.0.10 or later to be installed before configuring.
+@@ -120,7 +267,7 @@ case "$machine" in
+     arch_minimum_kernel=2.0.10
+     ;;
+   powerpc/powerpc64)
+-    arch_minimum_kernel=2.4.19
++    arch_minimum_kernel=2.4.21
+     ;;
+   s390/s390-32)
+     libc_cv_gcc_unwind_find_fde=yes
+@@ -166,8 +313,8 @@ else
+ fi
+ 
+ if test -n "$minimum_kernel"; then
+-  echo "$as_me:$LINENO: checking for kernel header at least $minimum_kernel" >&5
+-echo $ECHO_N "checking for kernel header at least $minimum_kernel... $ECHO_C" >&6
++  { echo "$as_me:$LINENO: checking for kernel header at least $minimum_kernel" >&5
++echo $ECHO_N "checking for kernel header at least $minimum_kernel... $ECHO_C" >&6; }
+   decnum=`echo "$minimum_kernel.0.0.0" | sed 's/\([0-9]*\)\.\([0-9]*\)\.\([0-9]*\).*/(\1 * 65536 + \2 * 256 + \3)/'`;
+   abinum=`echo "$minimum_kernel.0.0.0" | sed 's/\([0-9]*\)\.\([0-9]*\)\.\([0-9]*\).*/\1,\2,\3/'`;
+   cat >conftest.$ac_ext <<_ACEOF
+@@ -189,8 +336,8 @@ else
+ fi
+ rm -f conftest*
+ 
+-  echo "$as_me:$LINENO: result: $libc_minimum_kernel" >&5
+-echo "${ECHO_T}$libc_minimum_kernel" >&6
++  { echo "$as_me:$LINENO: result: $libc_minimum_kernel" >&5
++echo "${ECHO_T}$libc_minimum_kernel" >&6; }
+   if test "$libc_minimum_kernel" = ok; then
+     cat >>confdefs.h <<_ACEOF
+ #define __LINUX_KERNEL_VERSION $decnum
+@@ -333,8 +480,8 @@ if test $host = $build; then
+   else
+     ac_prefix=$ac_default_prefix
+   fi
+-  echo "$as_me:$LINENO: checking for symlinks in ${ac_prefix}/include" >&5
+-echo $ECHO_N "checking for symlinks in ${ac_prefix}/include... $ECHO_C" >&6
++  { echo "$as_me:$LINENO: checking for symlinks in ${ac_prefix}/include" >&5
++echo $ECHO_N "checking for symlinks in ${ac_prefix}/include... $ECHO_C" >&6; }
+   ac_message=
+   if test -L ${ac_prefix}/include/net; then
+     ac_message="$ac_message
+@@ -355,8 +502,8 @@ Delete the links and re-run configure, or better still, move the entire
+ ${ac_prefix}/include directory out of the way." >&2;}
+    { (exit 1); exit 1; }; }
+   else
+-    echo "$as_me:$LINENO: result: ok" >&5
+-echo "${ECHO_T}ok" >&6
++    { echo "$as_me:$LINENO: result: ok" >&5
++echo "${ECHO_T}ok" >&6; }
+   fi
+ fi
+ 
+diff --git a/sysdeps/unix/sysv/linux/configure.in b/sysdeps/unix/sysv/linux/configure.in
+index 43681f3..5330e98 100644
+--- a/sysdeps/unix/sysv/linux/configure.in
++++ b/sysdeps/unix/sysv/linux/configure.in
+@@ -80,7 +80,7 @@ case "$machine" in
+     arch_minimum_kernel=2.0.10
+     ;;
+   powerpc/powerpc64)
+-    arch_minimum_kernel=2.4.19
++    arch_minimum_kernel=2.4.21
+     ;;
+   s390/s390-32)
+     libc_cv_gcc_unwind_find_fde=yes
+diff --git a/sysdeps/unix/sysv/linux/powerpc/bits/mathinline.h b/sysdeps/unix/sysv/linux/powerpc/bits/mathinline.h
+new file mode 100644
+index 0000000..4f17391
+--- /dev/null
++++ b/sysdeps/unix/sysv/linux/powerpc/bits/mathinline.h
+@@ -0,0 +1,132 @@
++/* Inline math functions for powerpc.
++   Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2004, 2006, 2007, 2008
++   Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, write to the Free
++   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
++   02111-1307 USA.  */
++
++#ifndef _MATH_H
++# error "Never use <bits/mathinline.h> directly; include <math.h> instead."
++#endif
++
++#ifndef __extern_inline
++# define __MATH_INLINE __inline
++#else
++# define __MATH_INLINE __extern_inline
++#endif  /* __cplusplus */
++
++#if defined __GNUC__ && !defined _SOFT_FLOAT
++
++#ifdef __USE_ISOC99
++# if !__GNUC_PREREQ (2,97)
++#  define __unordered_cmp(x, y) \
++  (__extension__							      \
++   ({ __typeof__(x) __x = (x); __typeof__(y) __y = (y);			      \
++      unsigned __r;							      \
++      __asm__("fcmpu 7,%1,%2 ; mfcr %0" : "=r" (__r) : "f" (__x), "f"(__y)    \
++              : "cr7");  \
++      __r; }))
++
++#  undef isgreater
++#  undef isgreaterequal
++#  undef isless
++#  undef islessequal
++#  undef islessgreater
++#  undef isunordered
++
++#  define isgreater(x, y) (__unordered_cmp (x, y) >> 2 & 1)
++#  define isgreaterequal(x, y) ((__unordered_cmp (x, y) & 6) != 0)
++#  define isless(x, y) (__unordered_cmp (x, y) >> 3 & 1)
++#  define islessequal(x, y) ((__unordered_cmp (x, y) & 0xA) != 0)
++#  define islessgreater(x, y) ((__unordered_cmp (x, y) & 0xC) != 0)
++#  define isunordered(x, y) (__unordered_cmp (x, y) & 1)
++
++# endif /* __GNUC_PREREQ (2,97) */
++
++/* The gcc, version 2.7 or below, has problems with all this inlining
++   code.  So disable it for this version of the compiler.  */
++# if __GNUC_PREREQ (2, 8)
++/* Test for negative number.  Used in the signbit() macro.  */
++__MATH_INLINE int
++__NTH (__signbitf (float __x))
++{
++  __extension__ union { float __f; int __i; } __u = { __f: __x };
++  return __u.__i < 0;
++}
++__MATH_INLINE int
++__NTH (__signbit (double __x))
++{
++  __extension__ union { double __d; int __i[2]; } __u = { __d: __x };
++  return __u.__i[0] < 0;
++}
++#  ifdef __LONGDOUBLE128
++__MATH_INLINE int
++__NTH (__signbitl (long double __x))
++{
++  __extension__ union { long double __d; int __i[4]; } __u = { __d: __x };
++  return __u.__i[0] < 0;
++}
++#  endif
++# endif
++#endif /* __USE_ISOC99 */
++
++#if !defined __NO_MATH_INLINES && defined __OPTIMIZE__
++
++#ifdef __USE_ISOC99
++
++# ifndef __powerpc64__
++__MATH_INLINE long int lrint (double __x) __THROW;
++__MATH_INLINE long int
++__NTH (lrint (double __x))
++{
++  union {
++    double __d;
++    int __ll[2];
++  } __u;
++  __asm__ ("fctiw %0,%1" : "=f"(__u.__d) : "f"(__x));
++  return __u.__ll[1];
++}
++
++__MATH_INLINE long int lrintf (float __x) __THROW;
++__MATH_INLINE long int
++__NTH (lrintf (float __x))
++{
++  union {
++    double __d;
++    int __ll[2];
++  } __u;
++  __asm__ ("fctiw %0,%1" : "=f"(__u.__d) : "f"(__x));
++  return __u.__ll[1];
++}
++# endif
++
++__MATH_INLINE double fdim (double __x, double __y) __THROW;
++__MATH_INLINE double
++__NTH (fdim (double __x, double __y))
++{
++  return __x <= __y ? 0 : __x - __y;
++}
++
++__MATH_INLINE float fdimf (float __x, float __y) __THROW;
++__MATH_INLINE float
++__NTH (fdimf (float __x, float __y))
++{
++  return __x <= __y ? 0 : __x - __y;
++}
++
++#endif /* __USE_ISOC99 */
++#endif /* !__NO_MATH_INLINES && __OPTIMIZE__ */
++#endif /* __GNUC__ && !_SOFT_FLOAT */
+diff --git a/sysdeps/unix/sysv/linux/powerpc/powerpc32/fpu/fe_nomask.c b/sysdeps/unix/sysv/linux/powerpc/powerpc32/fpu/fe_nomask.c
+index 8d3b9ad..50071e1 100644
+--- a/sysdeps/unix/sysv/linux/powerpc/powerpc32/fpu/fe_nomask.c
++++ b/sysdeps/unix/sysv/linux/powerpc/powerpc32/fpu/fe_nomask.c
+@@ -1,5 +1,5 @@
+ /* Procedure definition for FE_NOMASK_ENV for Linux/ppc.
+-   Copyright (C) 2000, 2006 Free Software Foundation, Inc.
++   Copyright (C) 2000, 2006, 2008 Free Software Foundation, Inc.
+    This file is part of the GNU C Library.
+ 
+    The GNU C Library is free software; you can redistribute it and/or
+@@ -17,7 +17,7 @@
+    Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
+    02111-1307 USA.  */
+ 
+-#include <fenv.h>
++#include <fenv_libc.h>
+ #include <errno.h>
+ #include <signal.h>
+ #include <unistd.h>
+@@ -66,3 +66,4 @@ __fe_nomask_env (void)
+ 
+   return FE_ENABLED_ENV;
+ }
++libm_hidden_def (__fe_nomask_env)
+diff --git a/sysdeps/unix/sysv/linux/powerpc/powerpc64/fpu/fe_nomask.c b/sysdeps/unix/sysv/linux/powerpc/powerpc64/fpu/fe_nomask.c
+index 62f7355..d0cf859 100644
+--- a/sysdeps/unix/sysv/linux/powerpc/powerpc64/fpu/fe_nomask.c
++++ b/sysdeps/unix/sysv/linux/powerpc/powerpc64/fpu/fe_nomask.c
+@@ -1,5 +1,5 @@
+ /* Procedure definition for FE_NOMASK_ENV for Linux/ppc64.
+-   Copyright (C) 2003, 2006 Free Software Foundation, Inc.
++   Copyright (C) 2003, 2006, 2008 Free Software Foundation, Inc.
+    This file is part of the GNU C Library.
+ 
+    The GNU C Library is free software; you can redistribute it and/or
+@@ -17,7 +17,7 @@
+    Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
+    02111-1307 USA.  */
+ 
+-#include <fenv.h>
++#include <fenv_libc.h>
+ #include <errno.h>
+ #include <sysdep.h>
+ #include <sys/syscall.h>
+@@ -41,3 +41,4 @@ __fe_nomask_env (void)
+ #endif
+   return FE_ENABLED_ENV;
+ }
++libm_hidden_def (__fe_nomask_env)

@@ -1,0 +1,45 @@
+--- xf86-video-vesa-1.99.1/src/vesa.c.jx	2007-01-30 10:31:32.000000000 -0500
++++ xf86-video-vesa-1.99.1/src/vesa.c	2007-01-30 10:56:15.000000000 -0500
+@@ -638,8 +638,40 @@
+ 	xf86UnloadSubModule(pDDCModule);
+     }
+ 
+-    if ((pScrn->monitor->DDC = pVesa->monitor) != NULL)
+-	xf86SetDDCproperties(pScrn, pVesa->monitor);
++    /* UNCLEAN */
++    do {
++	Bool had_cfg_ranges, have_ddc_ranges;
++
++	had_cfg_ranges = (pScrn->monitor->nHsync || pScrn->monitor->nVrefresh);
++	if ((pScrn->monitor->DDC = pVesa->monitor) != NULL)
++	    xf86SetDDCproperties(pScrn, pVesa->monitor);
++	have_ddc_ranges = (pScrn->monitor->nHsync || pScrn->monitor->nVrefresh);
++
++	if (have_ddc_ranges && !had_cfg_ranges) {
++	    int i;
++	    for (i = 0; i < DET_TIMINGS; i++) {
++		if (pVesa->monitor->det_mon[i].type == DS_RANGES)
++		    break;
++	    }
++	    if (i < DET_TIMINGS)
++		break;
++
++	    /*
++	     * DDC added ranges, but they're inferred from the modes, not
++	     * copied from a range section.  So in the worst case, where it's
++	     * not a range but a single frequency, stretch things out to be
++	     * a range.  Panels with only one mode listed in DDC will
++	     * otherwise probably not match any VESA modes.  Hooray for
++	     * conformance.
++	     */
++	    if (pScrn->monitor->hsync[0].lo == pScrn->monitor->hsync[0].hi
++		 && pScrn->monitor->hsync[0].lo > 31.5)
++		pScrn->monitor->hsync[0].lo = 31.5;
++	    if (pScrn->monitor->vrefresh[0].lo == pScrn->monitor->vrefresh[0].hi
++		 && pScrn->monitor->vrefresh[0].lo > 50.0)
++		pScrn->monitor->vrefresh[0].lo = 50;
++	}
++    } while (0);
+ 
+     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DEBUG_VERB,
+ 			"Searching for matching VESA mode(s):\n");

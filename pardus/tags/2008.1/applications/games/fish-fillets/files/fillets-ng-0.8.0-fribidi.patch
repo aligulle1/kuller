@@ -1,0 +1,23 @@
+diff -Naupr fillets-ng-0.8.0.orig/src/effect/Font.cpp fillets-ng-0.8.0.fribidi/src/effect/Font.cpp
+--- fillets-ng-0.8.0.orig/src/effect/Font.cpp	2006-01-05 22:55:24.000000000 +0100
++++ fillets-ng-0.8.0.fribidi/src/effect/Font.cpp	2008-02-24 13:44:37.000000000 +0100
+@@ -26,7 +26,8 @@ Font::biditize(const std::string &text)
+     FriBidiChar *logicalString = new FriBidiChar[text.length() + 1];
+     FriBidiChar *visualString = new FriBidiChar[text.length() + 1];
+ 
+-    int ucsLength = fribidi_utf8_to_unicode(const_cast<char*>(text.c_str()),
++    int ucsLength = fribidi_charset_to_unicode(FRIBIDI_CHAR_SET_UTF8,
++            const_cast<char*>(text.c_str()),
+             text.length(), logicalString);
+     fribidi_boolean ok = fribidi_log2vis(logicalString, ucsLength, &base,
+             visualString, NULL, NULL, NULL);
+@@ -37,7 +38,8 @@ Font::biditize(const std::string &text)
+     }
+ 
+     char *buffer = new char[text.length() + 1];
+-    int length = fribidi_unicode_to_utf8(visualString, ucsLength, buffer);
++    int length = fribidi_unicode_to_charset(FRIBIDI_CHAR_SET_UTF8,
++            visualString, ucsLength, buffer);
+     std::string result = std::string(buffer, length);
+     delete[] buffer;
+     delete[] visualString;

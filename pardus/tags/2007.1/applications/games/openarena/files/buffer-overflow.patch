@@ -1,0 +1,42 @@
+--- openarena-0.6.0~/code/qcommon/net_chan.c	2006-12-13 00:02:30.000000000 +0100
++++ openarena-0.6.0/code/qcommon/net_chan.c	2006-12-31 17:16:12.963347000 +0100
+@@ -720,7 +720,7 @@
+ 	string[3] = -1;
+ 
+ 	va_start( argptr, format );
+-	vsprintf( string+4, format, argptr );
++	vsnprintf( string+4, sizeof(string)-4, format, argptr );
+ 	va_end( argptr );
+ 
+ 	// send the datagram
+diff -urNad openarena-0.6.0~/code/server/sv_client.c openarena-0.6.0/code/server/sv_client.c
+--- openarena-0.6.0~/code/server/sv_client.c	2006-12-13 00:02:29.000000000 +0100
++++ openarena-0.6.0/code/server/sv_client.c	2006-12-31 17:23:24.742331500 +0100
+@@ -158,7 +158,6 @@
+ 	int		i;
+ 	char	*s;
+ 	char	*r;
+-	char	ret[1024];
+ 
+ 	if ( !NET_CompareBaseAdr( from, svs.authorizeAddress ) ) {
+ 		Com_Printf( "SV_AuthorizeIpPacket: not from authorize server\n" );
+@@ -204,8 +203,7 @@
+ 		if (!r) {
+ 			NET_OutOfBandPrint( NS_SERVER, svs.challenges[i].adr, "print\nAwaiting CD key authorization\n" );
+ 		} else {
+-			sprintf(ret, "print\n%s\n", r);
+-			NET_OutOfBandPrint( NS_SERVER, svs.challenges[i].adr, ret );
++			NET_OutOfBandPrint( NS_SERVER, svs.challenges[i].adr, "print\n%s\n", r);
+ 		}
+ 		// clear the challenge record so it won't timeout and let them through
+ 		Com_Memset( &svs.challenges[i], 0, sizeof( svs.challenges[i] ) );
+@@ -216,8 +214,7 @@
+ 	if (!r) {
+ 		NET_OutOfBandPrint( NS_SERVER, svs.challenges[i].adr, "print\nSomeone is using this CD Key\n" );
+ 	} else {
+-		sprintf(ret, "print\n%s\n", r);
+-		NET_OutOfBandPrint( NS_SERVER, svs.challenges[i].adr, ret );
++		NET_OutOfBandPrint( NS_SERVER, svs.challenges[i].adr, "print\n%s\n", r );
+ 	}
+ 
+ 	// clear the challenge record so it won't timeout and let them through

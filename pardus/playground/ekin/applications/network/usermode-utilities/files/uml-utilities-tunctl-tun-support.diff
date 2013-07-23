@@ -1,0 +1,72 @@
+--- tunctl/tunctl.c
++++ tunctl/tunctl.c	2008/05/29 14:21:06
+@@ -22,12 +22,15 @@
+ static void Usage(char *name)
+ {
+   fprintf(stderr, "Create: %s [-b] [-u owner] [-g group] [-t device-name] "
+-	  "[-f tun-clone-device]\n", name);
++	  "[-p|-n] [-f tun-clone-device]\n", name);
+   fprintf(stderr, "Delete: %s -d device-name [-f tun-clone-device]\n\n",
+ 	  name);
+   fprintf(stderr, "The default tun clone device is /dev/net/tun - some systems"
+ 	  " use\n/dev/misc/net/tun instead\n\n");
+   fprintf(stderr, "-b will result in brief output (just the device name)\n");
++  fprintf(stderr, "-n will result in a point-to-point tun device,\n");
++  fprintf(stderr, "-p in an ethernet tap device. Default is a tap,\n");
++  fprintf(stderr, "   except the device contains \"tun\" in the name.\n");
+   exit(1);
+ }
+ 
+@@ -38,10 +41,10 @@
+   struct group *gr;
+   uid_t owner = -1;
+   gid_t group = -1;
+-  int tap_fd, opt, delete = 0, brief = 0;
++  int tap_fd, opt, delete = 0, brief = 0, type = 0;
+   char *tun = "", *file = "/dev/net/tun", *name = argv[0], *end;
+ 
+-  while((opt = getopt(argc, argv, "bd:f:t:u:g:")) > 0){
++  while((opt = getopt(argc, argv, "bd:f:npt:u:g:h")) > 0){
+     switch(opt) {
+       case 'b':
+         brief = 1;
+@@ -53,6 +56,16 @@
+       case 'f':
+ 	file = optarg;
+ 	break;
++      case 'p':
++        if(type != 0)
++          Usage(name);
++        type = IFF_TAP;
++        break;
++      case 'n':
++        if(type != 0)
++          Usage(name);
++        type = IFF_TUN;
++        break;
+       case 'u':
+ 	pw = getpwnam(optarg);
+ 	if(pw != NULL){
+@@ -83,6 +96,7 @@
+       case 't':
+         tun = optarg;
+         break;
++      case '?':
+       case 'h':
+       default:
+         Usage(name);
+@@ -101,9 +115,13 @@
+     exit(1);
+   }
+ 
++  if(type == 0) {
++    type = strstr(tun, "tun") ? IFF_TUN : IFF_TAP;
++  }
++
+   memset(&ifr, 0, sizeof(ifr));
+ 
+-  ifr.ifr_flags = IFF_TAP | IFF_NO_PI;
++  ifr.ifr_flags = type | IFF_NO_PI;
+   strncpy(ifr.ifr_name, tun, sizeof(ifr.ifr_name) - 1);
+   if(ioctl(tap_fd, TUNSETIFF, (void *) &ifr) < 0){
+     perror("TUNSETIFF");

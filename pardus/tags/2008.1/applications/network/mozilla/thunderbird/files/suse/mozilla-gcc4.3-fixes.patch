@@ -1,0 +1,109 @@
+References:
+https://bugzilla.mozilla.org/show_bug.cgi?id=403675
+https://bugzilla.mozilla.org/show_bug.cgi?id=386362
+
+Index: modules/libpr0n/encoders/png/nsPNGEncoder.h
+===================================================================
+RCS file: /cvsroot/mozilla/modules/libpr0n/encoders/png/nsPNGEncoder.h,v
+retrieving revision 1.1.18.1
+diff -u -p -6 -r1.1.18.1 nsPNGEncoder.h
+--- modules/libpr0n/encoders/png/nsPNGEncoder.h	20 May 2006 17:20:49 -0000	1.1.18.1
++++ modules/libpr0n/encoders/png/nsPNGEncoder.h	13 Nov 2007 22:07:36 -0000
+@@ -35,14 +35,16 @@
+  *
+  * ***** END LICENSE BLOCK ***** */
+ 
+ #include "imgIEncoder.h"
+ #ifdef MOZILLA_1_8_BRANCH
+ #define imgIEncoder imgIEncoder_MOZILLA_1_8_BRANCH
++#ifndef NS_DECL_IMGIENCODER
+ #define NS_DECL_IMGIENCODER NS_DECL_IMGIENCODER_MOZILLA_1_8_BRANCH
+ #endif
++#endif
+ 
+ #include <png.h>
+ 
+ #define NS_PNGENCODER_CID \
+ { /* 38d1592e-b81e-432b-86f8-471878bbfe07 */         \
+      0x38d1592e,                                     \
+@@ -60,12 +62,20 @@ public:
+   NS_DECL_ISUPPORTS
+   NS_DECL_IMGIENCODER
+   NS_DECL_NSIINPUTSTREAM
+ 
+   nsPNGEncoder();
+ 
++  NS_IMETHOD InitFromData(const PRUint8* aData,
++                          PRUint32 aLength, // (unused, req'd by JS)
++                          PRUint32 aWidth,
++                          PRUint32 aHeight,
++                          PRUint32 aStride,
++                          PRUint32 aInputFormat,
++                          const nsAString& aOutputOptions);
++
+ private:
+   ~nsPNGEncoder();
+ 
+ protected:
+   void ConvertHostARGBRow(const PRUint8* aSrc, PRUint8* aDest,
+                           PRUint32 aPixelWidth, PRBool aUseTransparency);
+Index: modules/libpr0n/encoders/jpeg/nsJPEGEncoder.h
+===================================================================
+RCS file: /cvsroot/mozilla/modules/libpr0n/encoders/jpeg/nsJPEGEncoder.h,v
+retrieving revision 1.1.14.1
+diff -u -p -6 -r1.1.14.1 nsJPEGEncoder.h
+--- modules/libpr0n/encoders/jpeg/nsJPEGEncoder.h	20 May 2006 17:20:48 -0000	1.1.14.1
++++ modules/libpr0n/encoders/jpeg/nsJPEGEncoder.h	13 Nov 2007 22:07:57 -0000
+@@ -36,14 +36,16 @@
+  *
+  * ***** END LICENSE BLOCK ***** */
+ 
+ #include "imgIEncoder.h"
+ #ifdef MOZILLA_1_8_BRANCH
+ #define imgIEncoder imgIEncoder_MOZILLA_1_8_BRANCH
++#ifndef NS_DECL_IMGIENCODER
+ #define NS_DECL_IMGIENCODER NS_DECL_IMGIENCODER_MOZILLA_1_8_BRANCH
+ #endif
++#endif
+ 
+ // needed for JPEG library
+ #include <stdio.h>
+ 
+ extern "C" {
+ #include "jpeglib.h"
+@@ -66,12 +68,20 @@ public:
+   NS_DECL_ISUPPORTS
+   NS_DECL_IMGIENCODER
+   NS_DECL_NSIINPUTSTREAM
+ 
+   nsJPEGEncoder();
+ 
++  NS_IMETHOD InitFromData(const PRUint8* aData,
++                          PRUint32 aLength, // (unused, req'd by JS)
++                          PRUint32 aWidth,
++                          PRUint32 aHeight,
++                          PRUint32 aStride,
++                          PRUint32 aInputFormat,
++                          const nsAString& aOutputOptions);
++
+ private:
+   ~nsJPEGEncoder();
+ 
+ protected:
+ 
+   void ConvertHostARGBRow(const PRUint8* aSrc, PRUint8* aDest,
+Index: modules/libpr0n/public/imgIEncoder.idl
+===================================================================
+RCS file: /cvsroot/mozilla/modules/libpr0n/public/imgIEncoder.idl,v
+retrieving revision 1.1.10.3
+diff -u -p -r1.1.10.3 imgIEncoder.idl
+--- modules/libpr0n/public/imgIEncoder.idl	20 May 2006 17:20:49 -0000	1.1.10.3
++++ modules/libpr0n/public/imgIEncoder.idl	14 Nov 2007 10:41:40 -0000
+@@ -96,6 +96,6 @@ interface nsIFile;
+ [scriptable, uuid(CCC5B3AD-3E67-4e3d-97E1-B06B2E96FEF8)]
+ interface imgIEncoder : nsISupports
+ {
+-  void encodeClipboardImage(in nsIClipboardImage aClipboardImage, out nsIFile aImageFile);
++  /* void encodeClipboardImage(in nsIClipboardImage aClipboardImage, out nsIFile aImageFile); */
+ };
+ 

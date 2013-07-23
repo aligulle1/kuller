@@ -1,0 +1,84 @@
+--- builders/hardsid-builder/src/hardsid-builder.cpp
++++ builders/hardsid-builder/src/hardsid-builder.cpp
+@@ -376,6 +376,7 @@
+             m_count = index;
+     }
+     closedir (dir);
++    return 0;
+ }
+ 
+ #endif // HAVE_MSWINDOWS
+--- builders/resid-builder/Makefile.am
++++ builders/resid-builder/Makefile.am
+@@ -1,4 +1,5 @@
+ 
++ACLOCAL_AMFLAGS = -I unix
+ AUTOMAKE_OPTIONS = foreign
+ 
+ SUBDIRS = unix include src
+--- libsidplay/Makefile.am
++++ libsidplay/Makefile.am
+@@ -1,4 +1,5 @@
+ 
++ACLOCAL_AMFLAGS = -I unix
+ AUTOMAKE_OPTIONS = foreign
+ 
+ SUBDIRS = unix include src
+--- libsidplay/include/sidplay/sidendian.h
++++ libsidplay/include/sidplay/sidendian.h
+@@ -141,7 +141,7 @@
+ // Convert high-byte and low-byte to 16-bit word.
+ inline uint_least16_t endian_16 (uint8_t hi, uint8_t lo)
+ {
+-    uint_least16_t word;
++    uint_least16_t word = 0;
+     endian_16lo8 (word, lo);
+     endian_16hi8 (word, hi);
+     return word;
+--- libsidutils/Makefile.am
++++ libsidutils/Makefile.am
+@@ -1,4 +1,5 @@
+ 
++ACLOCAL_AMFLAGS = -I unix
+ AUTOMAKE_OPTIONS = foreign
+ 
+ SUBDIRS = unix include src
+--- resid/Makefile.am
++++ resid/Makefile.am
+@@ -3,17 +3,17 @@
+ resid_headers=siddefs.h sid.h voice.h wave.h envelope.h filter.h extfilt.h pot.h spline.h
+ resid_sources=sid.cc voice.cc wave.cc envelope.cc filter.cc extfilt.cc pot.cc version.cc $(noinst_DATA:.dat=.cc)
+ 
+-if INSTALL_RESID
++#if INSTALL_RESID
+ lib_LTLIBRARIES = libresid.la
+ pkginclude_HEADERS = $(resid_headers)
+-else
+-noinst_LTLIBRARIES = libresidc.la
+-noinst_HEADERS = $(resid_headers)
+-
+-all-local:
+-	ln -sf libresidc.la libresid.la
+-
+-endif
++#else
++#noinst_LTLIBRARIES = libresidc.la
++#noinst_HEADERS = $(resid_headers)
++#
++#all-local:
++#	ln -sf libresidc.la libresid.la
++#
++#endif
+ 
+ ## Make sure these will be cleaned even when they're not built by
+ ## default.
+--- resid/Makefile.am.orig
++++ resid/Makefile.am
+@@ -1,5 +1,8 @@
+ ## Process this file with automake to create Makefile.in
+ 
++ACLOCAL_AMFLAGS = -I unix
++AUTOMAKE_OPTIONS = foreign
++
+ resid_headers=siddefs.h sid.h voice.h wave.h envelope.h filter.h extfilt.h pot.h spline.h
+ resid_sources=sid.cc voice.cc wave.cc envelope.cc filter.cc extfilt.cc pot.cc version.cc $(noinst_DATA:.dat=.cc)

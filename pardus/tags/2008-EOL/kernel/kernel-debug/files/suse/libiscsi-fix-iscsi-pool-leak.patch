@@ -1,0 +1,29 @@
+From: Mike Christie <michaelc@cs.wisc.edu>
+Date: Fri Jan 16 12:36:51 2009 -0600
+Subject: [SCSI] libiscsi: fix iscsi pool leak
+References: bnc#472896
+
+I am not sure what happened. It looks like we have always leaked
+the q->queue that is allocated from the kfifo_init call. nab finally
+noticed that we were leaking and this patch fixes it by adding a
+kfree call to iscsi_pool_free. kfifo_free is not used per kfifo_init's
+instructions to use kfree.
+
+Signed-off-by: Mike Christie <michaelc@cs.wisc.edu>
+Signed-off-by: James Bottomley <James.Bottomley@HansenPartnership.com>
+Acked-by: Jean Delvare <jdelvare@suse.de>
+
+---
+ drivers/scsi/libiscsi.c |    1 +
+ 1 file changed, 1 insertion(+)
+
+--- a/drivers/scsi/libiscsi.c
++++ b/drivers/scsi/libiscsi.c
+@@ -1657,6 +1657,7 @@ void iscsi_pool_free(struct iscsi_pool *
+ 		kfree(q->pool[i]);
+ 	if (q->pool)
+ 		kfree(q->pool);
++	kfree(q->queue);
+ }
+ EXPORT_SYMBOL_GPL(iscsi_pool_free);
+ 

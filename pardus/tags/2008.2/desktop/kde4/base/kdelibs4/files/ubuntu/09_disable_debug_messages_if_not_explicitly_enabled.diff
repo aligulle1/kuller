@@ -1,0 +1,30 @@
+We build with debugging symbols enabled, that's why we get a lot of debugging
+messages on the konsole. This patch disables these messages. Kdebugdialog
+can be used to enable them. 
+See also 04_disable_debug_by_default.diff in kdebase-runtime.
+Index: kdelibs-4.1.85/kdecore/io/kdebug.cpp
+===================================================================
+--- kdelibs-4.1.85.orig/kdecore/io/kdebug.cpp	2008-12-11 18:13:25.000000000 +0100
++++ kdelibs-4.1.85/kdecore/io/kdebug.cpp	2008-12-11 18:15:14.000000000 +0100
+@@ -313,7 +313,7 @@
+         }
+ 
+         KConfigGroup cg(config, QString::number(area));
+-        int mode = cg.readEntry(key, 2);
++        int mode = cg.readEntry(key, 4);
+         return OutputMode(mode);
+     }
+ 
+Index: kdelibs-4.1.85/kdecore/kdebugrc
+===================================================================
+--- kdelibs-4.1.85.orig/kdecore/kdebugrc	2008-12-11 18:13:25.000000000 +0100
++++ kdelibs-4.1.85/kdecore/kdebugrc	2008-12-11 18:15:14.000000000 +0100
+@@ -82,7 +82,7 @@
+ 
+ # KMail
+ [5006]
+-InfoOutput=2
++InfoOutput=4
+ 
+ # KitchenSync (Syncing Algorithm)
+ [5250]

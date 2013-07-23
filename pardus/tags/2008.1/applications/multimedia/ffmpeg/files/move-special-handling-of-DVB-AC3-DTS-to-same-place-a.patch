@@ -1,0 +1,46 @@
+From 17d71e674e1b9df1793e720b44bf5ecb0a000326 Mon Sep 17 00:00:00 2001
+From: elupus <elupus@ecce.se>
+Date: Thu, 14 Aug 2008 01:35:42 +0200
+Subject: [PATCH] move special handling of DVB AC3/DTS to same place as other desc tag handling
+
+---
+ libavformat/mpegts.c |   16 +++++++---------
+ 1 files changed, 7 insertions(+), 9 deletions(-)
+
+diff --git a/libavformat/mpegts.c b/libavformat/mpegts.c
+index b896062..aaa5726 100644
+--- a/libavformat/mpegts.c
++++ b/libavformat/mpegts.c
+@@ -553,15 +553,6 @@ static void pmt_cb(MpegTSFilter *filter, const uint8_t *section, int section_len
+             desc_tag = get8(&p, desc_list_end);
+             if (desc_tag < 0)
+                 break;
+-            if (stream_type == STREAM_TYPE_PRIVATE_DATA) {
+-                if((desc_tag == 0x6A) || (desc_tag == 0x7A)) {
+-                    /*assume DVB AC-3 Audio*/
+-                    stream_type = STREAM_TYPE_AUDIO_AC3;
+-                } else if(desc_tag == 0x7B) {
+-                    /* DVB DTS audio */
+-                    stream_type = STREAM_TYPE_AUDIO_DTS;
+-                }
+-            }
+             desc_len = get8(&p, desc_list_end);
+             desc_end = p + desc_len;
+             if (desc_end > desc_list_end)
+@@ -571,6 +562,13 @@ static void pmt_cb(MpegTSFilter *filter, const uint8_t *section, int section_len
+                    desc_tag, desc_len);
+ #endif
+             switch(desc_tag) {
++            case 0x6A:
++            case 0x7A:
++                if (stream_type == STREAM_TYPE_PRIVATE_DATA)
++                    stream_type = STREAM_TYPE_AUDIO_AC3; /* DVB AC-3 audio */
++            case 0x7B:
++                if (stream_type == STREAM_TYPE_PRIVATE_DATA)
++                    stream_type = STREAM_TYPE_AUDIO_DTS; /* DVB DTS audio */
+             case DVB_SUBT_DESCID:
+                 if (stream_type == STREAM_TYPE_PRIVATE_DATA)
+                     stream_type = STREAM_TYPE_SUBTITLE_DVB;
+-- 
+1.5.5.1015.g9d258
+

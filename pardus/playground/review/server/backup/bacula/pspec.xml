@@ -1,0 +1,161 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>bacula</Name>
+        <Homepage>http://www.bacula.org/</Homepage>
+        <Packager>
+            <Name>Kaan Özdinçer</Name>
+            <Email>kozdincer@pardus.org.tr</Email>
+        </Packager>
+        <License>AGPLv3</License>
+        <Summary>Featureful client/server network backup suite</Summary>
+        <Description>Bacula is a set of programs to manage backup, recovery and verification of computer data across a network of computers of different kinds.</Description>
+        <Archive sha1sum="4ced1c4f8984a063a1134b59968d163243017611" type="targz">mirrors://sourceforge/bacula/5.0.3/bacula-5.0.3.tar.gz</Archive>
+        <BuildDependencies>
+            <Dependency>mysql-libs</Dependency>
+            <Dependency>gtk2</Dependency>
+            <Dependency>pango</Dependency>
+            <Dependency>gdk-pixbuf</Dependency>
+            <Dependency>cdrtools</Dependency>
+            <Dependency>dvd+rw-tools</Dependency>
+            <Dependency>imagemagick</Dependency>
+            <Dependency>libcap</Dependency>
+            <Dependency>mtx</Dependency>
+            <Dependency>openssl</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <Patch level="0">ldflags.patch</Patch>
+            <Patch level="0">lib-search-path.patch</Patch>
+            <Patch level="0">openssl-1.patch</Patch>
+            <Patch level="1">no-locale-aware-conversion.patch</Patch>
+            <Patch level="1">as-needed.patch</Patch>
+            <Patch level="1">bacula-5.0.1-gzip.patch</Patch>
+            <Patch level="2">bacula-5.0.3-log-path.patch</Patch>
+            <Patch level="2">bacula-5.0.3-tray-dir.patch</Patch>
+            <Patch level="1">bacula-config.patch</Patch>
+            <Patch level="1">bacula-pamd.patch</Patch>
+            <Patch level="1">bacula-backupdir.diff</Patch>
+            <Patch level="1">bacula-updatedb.diff</Patch>
+            <Patch>bacula-5.0.2-python27.patch</Patch>
+            <Patch>bacula-5.0.3-mysql55.patch</Patch>
+            <Patch>bacula-5.0.3-sqlite-priv.patch</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>bacula-common</Name>
+        <IsA>library</IsA>
+        <Summary>Common config files, libraries and some utils for Bacula daemons</Summary>
+        <RuntimeDependencies>
+            <Dependency>mysql-libs</Dependency>
+            <Dependency>gtk2</Dependency>
+            <Dependency>pango</Dependency>
+            <Dependency>gdk-pixbuf</Dependency>
+            <Dependency>cdrtools</Dependency>
+            <Dependency>dvd+rw-tools</Dependency>
+            <Dependency>imagemagick</Dependency>
+            <Dependency>libcap</Dependency>
+            <Dependency>mtx</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="config">/etc/bacula/scripts</Path>
+            <Path fileType="config">/etc/bacula/bconsole.conf</Path>
+            <Path fileType="config">/etc/bacula/tray-monitor.conf</Path>
+            <Path fileType="config">/etc/logrotate.d/bacula</Path>
+            <Path fileType="executable">/usr/sbin/bsmtp</Path>
+            <Path fileType="executable">/usr/sbin/btraceback</Path>
+            <Path fileType="executable">/usr/sbin/bregex</Path>
+            <Path fileType="executable">/usr/sbin/bwild</Path>
+            <Path fileType="executable">/usr/sbin/bacula-tray-monitor</Path>
+            <Path fileType="executable">/usr/sbin/bconsole</Path>
+            <Path fileType="executable">/usr/sbin/dbcheck</Path>
+            <Path fileType="executable">/usr/sbin/bacula</Path>
+            <Path fileType="executable">/usr/sbin/bcopy</Path>
+            <Path fileType="executable">/usr/sbin/btape</Path>
+            <Path fileType="executable">/usr/sbin/bscan</Path>
+            <Path fileType="library">/usr/lib</Path>
+            <Path fileType="man">/usr/share/man</Path>
+            <Path fileType="doc">/usr/share/doc/bacula</Path>
+            <Path fileType="data">/var/spool/bacula</Path>
+            <Path fileType="data">/var/lib/bacula</Path>
+            <Path fileType="data">/usr/share</Path>
+        </Files>
+        <AdditionalFiles>
+            <AdditionalFile owner="root" permission="0644" target="/usr/share/pixmaps/bacula-traymonitor.png">bacula-traymonitor.png</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/usr/share/applications/bacula-traymonitor.desktop">bacula-traymonitor.desktop</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/etc/logrotate.d/bacula">bacula.logrotate</AdditionalFile>
+        </AdditionalFiles>
+        <Provides>
+            <COMAR script="package.py">System.Package</COMAR>
+        </Provides>
+    </Package>
+
+    <Package>
+        <Name>bacula-dir</Name>
+        <IsA>service</IsA>
+        <Summary>Bacula director daemon</Summary>
+        <RuntimeDependencies>
+            <Dependency release="current">bacula-common</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="executable">/usr/sbin/bacula-dir</Path>
+            <Path fileType="config">/etc/bacula/bacula-dir.conf</Path>
+        </Files>
+        <Provides>
+            <COMAR name="bacula_dir" script="bacula-dir-service.py">System.Service</COMAR>
+        </Provides>
+    </Package>
+
+    <Package>
+        <Name>bacula-sd</Name>
+        <IsA>service</IsA>
+        <Summary>Bacula storage daemon</Summary>
+        <RuntimeDependencies>
+            <Dependency release="current">bacula-common</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="config">/etc/bacula/bacula-sd.conf</Path>
+            <Path fileType="executable">/usr/sbin/bacula-sd</Path>
+            <Path fileType="executable">/usr/sbin/bextract</Path>
+            <Path fileType="executable">/usr/sbin/bls</Path>
+        </Files>
+        <Provides>
+            <COMAR name="bacula_sd" script="bacula-sd-service.py">System.Service</COMAR>
+        </Provides>
+    </Package>
+
+    <Package>
+        <Name>bacula-fd</Name>
+        <IsA>service</IsA>
+        <Summary>Bacula file deamon</Summary>
+        <RuntimeDependencies>
+            <Dependency release="current">bacula-common</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="config">/etc/bacula/bacula-fd.conf</Path>
+            <Path fileType="executable">/usr/sbin/bacula-fd</Path>
+        </Files>
+        <Provides>
+            <COMAR name="bacula_fd" script="bacula-fd-service.py">System.Service</COMAR>
+        </Provides>
+    </Package>
+
+    <History>
+        <Update release="2">
+            <Date>2011-09-27</Date>
+            <Version>5.0.3</Version>
+            <Comment>Split packages as bacula-common, bacula-dir, bacula-sd, bacula-fd.</Comment>
+            <Name>Kaan Özdinçer</Name>
+            <Email>kozdincer@pardus.org.tr</Email>
+        </Update>
+        <Update release="1">
+            <Date>2011-08-19</Date>
+            <Version>5.0.3</Version>
+            <Comment>First release, Thanks to Kozdincer for his previous support.</Comment>
+            <Name>Serdar Dalgıç</Name>
+            <Email>serdar@pardus.org.tr</Email>
+        </Update>
+    </History>
+</PISI>
+

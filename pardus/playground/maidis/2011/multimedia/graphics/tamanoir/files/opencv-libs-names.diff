@@ -1,0 +1,37 @@
+--- Tamanoir.pro.orig	2011-11-01 02:49:54.000000000 +0200
++++ Tamanoir.pro	2011-11-01 19:06:36.792000005 +0200
+@@ -93,8 +93,7 @@
+ 
+     DYN_LIBS += -L"C:\Program Files\OpenCV\lib" \
+         -L"C:\Program Files\OpenCV\bin" \
+-        -lcxcore \
+-        -lcv
++        -lopencv_core
+     exists("C:\Program Files\GnuWin32\include\tiffio.h" ) {
+         INCLUDEPATH += "C:\Program Files\GnuWin32\include"
+         DYN_LIBS += -L"C:\Program Files\GnuWin32\lib" \
+@@ -203,12 +202,12 @@
+     message ( Testing CV lib = '$$CV_LIB' )
+     exists( $$CV_LIB ) { 
+         message( " => Linking with -lcv ('$$CV_LIB' exists)")
+-        DYN_LIBS += -lcv
++        DYN_LIBS += -lopencv_core
+         STATIC_LIBS += $$OPENCV_STATIC_LIBDIR/lib_cxcore.a
+     }
+     else { 
+         message( " => Linking with -lopencv ('$$CV_LIB' does not exist)")
+-        DYN_LIBS += -lopencv
++        DYN_LIBS += -lopencv_core
+         STATIC_LIBS += $$OPENCV_STATIC_LIBDIR/libopencv.a
+     }
+     INSTALL_DUSTHOOVER = $(DUSTHOOVER_DIR)
+@@ -222,8 +221,7 @@
+ }
+ 
+ # libtool --mode=link g++ -o Tamanoir .obj-simple/imgproc.o .obj-simple/imgutils.o .obj-simple/main.o .obj-simple/tamanoir.o .obj-simple/qimagedisplay.o .obj-simple/cv2tiff.o .obj-simple/moc_tamanoir.o .obj-simple/moc_qimagedisplay.o .obj-simple/qrc_tamanoir.o -L/usr/lib /usr/lib/libtiff.a /usr/local/lib/libcxcore.la /usr/local/lib/libcv.la /usr/local/lib/libcvaux.la /usr/local/lib/libhighgui.la -lQtGui -lQtCore -lpthread
+-DYN_LIBS += -lcvaux \
+-    -lhighgui
++DYN_LIBS += -lopencv_highgui
+ STATIC_LIBS += $$OPENCV_STATIC_LIBDIR/lib_cv.a \
+     $$OPENCV_STATIC_LIBDIR/lib_cvaux.a \
+     $$OPENCV_STATIC_LIBDIR/libtiff.a \

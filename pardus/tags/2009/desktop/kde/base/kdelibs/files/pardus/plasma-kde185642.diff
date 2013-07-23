@@ -1,0 +1,45 @@
+--- plasma/widgets/meter.cpp.gokcen	2009-05-29 21:13:06.937318284 +0300
++++ plasma/widgets/meter.cpp	2009-05-29 21:16:07.024271707 +0300
+@@ -165,6 +165,10 @@
+         //be retrocompatible with themes for kde <= 4.1
+         if (image->hasElement("background-center")) {
+             QRectF elementRect = barRect();
++            if (elementRect.isEmpty()) {
++                return; // nothing to be done·
++            }
++
+             QSize imageSize = image->size();
+             image->resize();
+ 
+@@ -183,6 +187,7 @@
+     {
+         QRectF elementRect = barRect();
+ 
++        image->setUsingRenderingCache(false);
+         if (image->hasElement("hint-bar-stretch")) {
+             image->resizeFrame(elementRect.size());
+             image->paintFrame(p);
+@@ -206,6 +211,7 @@
+             p->drawTiledPixmap(elementRect, image->framePixmap());
+             image->resize(imageSize);
+         }
++        image->setUsingRenderingCache(true);
+     }
+ 
+     void paintForeground(QPainter *p)
+@@ -479,6 +485,7 @@
+     if (d->maximum != d->minimum) {
+         percentage = (qreal)d->value / (d->maximum - d->minimum);
+     }
++
+     p->setRenderHint(QPainter::SmoothPixmapTransform);
+     switch (d->meterType) {
+     case BarMeterHorizontal:
+@@ -495,6 +502,7 @@
+             clipRect.moveBottom(bottom);
+         }
+         p->setClipRect(clipRect);
++
+         //be retrocompatible
+         if (d->image->hasElement("bar-active-center")) {
+             d->paintBar(p, "bar-active");

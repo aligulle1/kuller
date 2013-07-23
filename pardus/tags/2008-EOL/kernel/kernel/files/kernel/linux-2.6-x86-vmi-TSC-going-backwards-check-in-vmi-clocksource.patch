@@ -1,0 +1,37 @@
+From: Alok N Kataria <akataria <at> vmware.com>
+
+commit 48ffc70b675aa7798a52a2e92e20f6cce9140b3d upstream.
+
+Impact: fix time warps under vmware
+
+Similar to the check for TSC going backwards in the TSC clocksource,
+we also need this check for VMI clocksource.
+
+Signed-off-by: Alok N Kataria <akataria <at> vmware.com>
+Cc: Zachary Amsden <zach <at> vmware.com>
+Signed-off-by: Ingo Molnar <mingo <at> elte.hu>
+Signed-off-by: Greg Kroah-Hartman <gregkh <at> suse.de>
+
+---
+ arch/x86/kernel/vmiclock_32.c |    5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+Index: linux-2.6.25/arch/x86/kernel/vmiclock_32.c
+===================================================================
+--- linux-2.6.25.orig/arch/x86/kernel/vmiclock_32.c
++++ linux-2.6.25/arch/x86/kernel/vmiclock_32.c
+@@ -282,9 +282,13 @@ void __devinit vmi_time_ap_init(void)
+ 
+ /** vmi clocksource */
+ 
++static struct clocksource clocksource_vmi;
++
+ static cycle_t read_real_cycles(void)
+ {
+-	return vmi_timer_ops.get_cycle_counter(VMI_CYCLES_REAL);
++    cycle_t ret = (cycle_t)vmi_timer_ops.get_cycle_counter(VMI_CYCLES_REAL);
++    return ret >= clocksource_vmi.cycle_last ?
++        ret : clocksource_vmi.cycle_last;
+ }
+ 
+ static struct clocksource clocksource_vmi = {

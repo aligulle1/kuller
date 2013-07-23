@@ -1,0 +1,907 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>kdesdk</Name>
+        <Homepage>http://www.kde.org</Homepage>
+        <Packager>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Packager>
+        <License>GPLv2</License>
+        <IsA>app:gui</IsA>
+        <Summary>KDE4 Software Development Kit</Summary>
+        <Description>kdesdk is a collection of applications and tools used by developers. In package, cervisia (CVS frontend), kate (advanced text editor), kompare (diff tool), lokalize (computer-aided translation system), umbrello (UML modeller and diagram tool) and kcachegrind (a browser for data produced by profiling tools e.g. cachegrind) applications are included.</Description>
+        <Archive type="tarbz2" sha1sum="6326560c55f5ba5e4fdee4b1d941aaaa6047689e">mirrors://kde/stable/4.5.3/src/kdesdk-4.5.3.tar.bz2</Archive>
+        <BuildDependencies>
+            <Dependency versionFrom="4.7.0">qt-devel</Dependency>
+            <Dependency versionFrom="4.5.3">kdelibs-devel</Dependency>
+            <Dependency versionFrom="4.5.3">kdebase-devel</Dependency>
+            <Dependency versionFrom="4.5.3">kdepimlibs-devel</Dependency>
+            <Dependency>subversion</Dependency>
+            <Dependency>hunspell-devel</Dependency>
+            <Dependency>apr</Dependency>
+            <Dependency>boost-devel</Dependency>
+            <Dependency>strigi-devel</Dependency>
+            <!-- po2xml needs that guy -->
+            <Dependency>antlr</Dependency>
+            <Dependency>libxslt-devel</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <Patch>kdesdk-4.4.0-lokalize-fix-crash.patch</Patch>
+            <Patch level="1">fix-malformed-diff-warning-b1193416.diff</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>kdesdk</Name>
+        <RuntimeDependencies>
+            <Dependency release="current">cervisia</Dependency>
+            <Dependency release="current">kapptemplate</Dependency>
+            <Dependency release="current">kate</Dependency>
+            <Dependency release="current">kbugbuster</Dependency>
+        </RuntimeDependencies>
+        <Conflicts>
+            <!-- /usr/kde/4/share/apps/kdevappwizard/templates/qmake_qt4guiapp.tar.bz2 file is common till 3.9.95 -->
+            <Package versionTo="3.9.94">kdevelop</Package>
+        </Conflicts>
+        <Replaces>
+            <Package>kdesdk4</Package>
+        </Replaces>
+        <Files>
+            <Path fileType="data">/usr/share/doc/kdesdk</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>kdesdk-devel</Name>
+        <Summary>Development files for kdesdk</Summary>
+        <RuntimeDependencies>
+            <Dependency release="current">kdesdk</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="header">/usr/include</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>cervisia</Name>
+        <Icon>cervisia</Icon>
+        <Summary>Front-end for the CVS version control system client</Summary>
+        <Description>
+        Cervisia provides a convenient
+        graphical interface for viewing, editing, and manipulating files in a CVS
+        repository or working directory.  It includes tools designed to ease the use
+        of CVS, such as a log browser, conflict resolver, and changelog editor that
+        checks for incorrect formatting.
+        This package also provides a D-Bus service for browsing and manipulating
+        remote CVS repositories.  Applications may make use of it directly from
+        C++, or access the service over D-Bus.
+        This package also provides set of cvs related scripts.
+        This package is part of the kdesdk.
+        </Description>
+        <RuntimeDependencies>
+            <Dependency versionFrom="4.7.0">qt</Dependency>
+            <Dependency versionFrom="4.5.3">kdelibs</Dependency>
+            <Dependency>cvs</Dependency>
+        </RuntimeDependencies>
+        <Conflicts>
+            <Package releaseTo="43">kdesdk</Package>
+        </Conflicts>
+        <Files>
+            <!-- cervisia -->
+            <Path fileType="executable">/usr/bin/cervisia</Path>
+            <Path fileType="library">/usr/lib/libkdeinit4_cervisia.so</Path>
+            <Path fileType="library">/usr/lib/kde4/cervisiapart.so</Path>
+            <Path fileType="data">/usr/share/applications/kde4/cervisia.desktop</Path>
+            <Path fileType="data">/usr/share/dbus-1/interfaces/org.kde.cervisia.*.xml</Path>
+            <Path fileType="data">/usr/share/doc/kde4/html/*/cervisia</Path>
+            <Path fileType="data">/usr/share/icons/*/*/apps/cervisia.*</Path>
+            <Path fileType="data">/usr/share/icons/oxygen/*/actions/vcs_*.*</Path>
+            <Path fileType="data">/usr/share/kde4/apps/cervisia</Path>
+            <Path fileType="data">/usr/share/kde4/apps/cervisiapart</Path>
+            <Path fileType="data">/usr/share/kde4/apps/kconf_update/cervisia*</Path>
+            <Path fileType="data">/usr/share/kde4/apps/kconf_update/change_colors.pl</Path>
+            <Path fileType="config">/usr/share/config.kcfg/cervisiapart.kcfg</Path>
+            <Path fileType="data">/usr/share/kde4/services/cervisiapart.desktop</Path>
+            <Path fileType="man">/usr/share/man/man1/cervisia.1</Path>
+            <!-- cvs service -->
+            <Path fileType="executable">/usr/bin/cvsaskpass</Path>
+            <Path fileType="executable">/usr/bin/cvsservice</Path>
+            <Path fileType="library">/usr/lib/libkdeinit4_cvsaskpass.so</Path>
+            <Path fileType="library">/usr/lib/libkdeinit4_cvsservice.so</Path>
+            <Path fileType="data">/usr/share/kde4/services/cvsservice.desktop</Path>
+            <!-- cvs scripts -->
+            <Path fileType="executable">/usr/bin/create_cvsignore</Path>
+            <Path fileType="executable">/usr/bin/cvsaddcurrentdir</Path>
+            <Path fileType="executable">/usr/bin/cvsbackport</Path>
+            <Path fileType="executable">/usr/bin/cvsblame</Path>
+            <Path fileType="executable">/usr/bin/cvscheck</Path>
+            <Path fileType="executable">/usr/bin/cvs-clean</Path>
+            <Path fileType="executable">/usr/bin/cvsforwardport</Path>
+            <Path fileType="executable">/usr/bin/cvslastchange</Path>
+            <Path fileType="executable">/usr/bin/cvslastlog</Path>
+            <Path fileType="executable">/usr/bin/cvsrevertlast</Path>
+            <Path fileType="executable">/usr/bin/cvsversion</Path>
+            <Path fileType="executable">/usr/bin/noncvslist</Path>
+            <Path fileType="executable">/usr/bin/pruneemptydirs</Path>
+            <Path fileType="man">/usr/share/man/man1/create_cvsignore.1</Path>
+            <Path fileType="man">/usr/share/man/man1/cvscheck.1</Path>
+            <Path fileType="man">/usr/share/man/man1/cvslastchange.1</Path>
+            <Path fileType="man">/usr/share/man/man1/cvslastlog.1</Path>
+            <Path fileType="man">/usr/share/man/man1/cvsrevertlast.1</Path>
+            <Path fileType="man">/usr/share/man/man1/pruneemptydirs.1</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>kapptemplate</Name>
+        <Icon>kapptemplate</Icon>
+        <Summary>application template generator for Qt and KDE</Summary>
+        <Description>
+        KAppTemplate is a shell script that will create the necessary framework to
+        develop several types of applications, including applications based on the
+        KDE development platform. It generates the build-system  configuration and provides example code
+        for a simple application.
+        This package is part of the kdesdk.
+        </Description>
+        <RuntimeDependencies>
+            <Dependency versionFrom="4.7.0">qt</Dependency>
+            <Dependency versionFrom="4.5.3">kdelibs</Dependency>
+        </RuntimeDependencies>
+        <Conflicts>
+            <Package releaseTo="43">kdesdk</Package>
+        </Conflicts>
+        <Files>
+            <Path fileType="executable">/usr/bin/kapptemplate</Path>
+            <Path fileType="data">/usr/share/applications/kde4/kapptemplate.desktop</Path>
+            <Path fileType="data">/usr/share/doc/kde4/html/*/kapptemplate</Path>
+            <Path fileType="data">/usr/share/icons/hicolor/*/apps/kapptemplate.png</Path>
+            <Path fileType="data">/usr/share/kde4/apps/kdevappwizard</Path>
+            <Path fileType="config">/usr/share/config.kcfg/kapptemplate.kcfg</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>kate</Name>
+        <Icon>kate</Icon>
+        <Summary>Kde Advanced Text Editor</Summary>
+        <Description>
+        Kate is a powerful text editor that can open multiple files simultaneously.
+        With a built-in terminal, syntax highlighting, and tabbed sidebar, it performs
+        as a lightweight but capable development environment.  Kate's many tools,
+        plugins, and scripts make it highly customizable.
+        Kate's features include:
+        * Multiple saved sessions, each with numerous files
+        * Scriptable syntax highlighting, indentation, and code-folding
+        * Configurable templates and text snippets
+        * Symbol viewers for C, C++, and Python
+        * XML completion and validation
+        This package is part of the kdesdk.
+        </Description>
+        <RuntimeDependencies>
+            <Dependency versionFrom="4.7.0">qt</Dependency>
+            <Dependency versionFrom="4.5.3">kdelibs</Dependency>
+        </RuntimeDependencies>
+        <Conflicts>
+            <Package releaseTo="43">kdesdk</Package>
+        </Conflicts>
+        <Files>
+            <Path fileType="executable">/usr/bin/kate</Path>
+            <Path fileType="executable">/usr/bin/ktesnippets_editor</Path>
+            <Path fileType="library">/usr/lib/kde4/kate*.so</Path>
+            <Path fileType="library">/usr/lib/kde4/plasma_applet_katesession.so</Path>
+            <Path fileType="library">/usr/lib/libkateinterfaces*</Path>
+            <Path fileType="library">/usr/lib/libkdeinit4_kate.so</Path>
+            <Path fileType="library">/usr/lib/libktexteditor_codesnippets_core*</Path>
+            <Path fileType="data">/usr/share/applications/kde4/kate.desktop</Path>
+            <Path fileType="data">/usr/share/applications/kde4/ktesnippets_editor.desktop</Path>
+            <Path fileType="data">/usr/share/doc/kde4/html/*/kate</Path>
+            <Path fileType="data">/usr/share/icons/*/*/apps/kate.*</Path>
+            <Path fileType="data">/usr/share/icons/oxygen/*/actions/repoadd.png</Path>
+            <Path fileType="data">/usr/share/icons/oxygen/*/actions/repomanage.png</Path>
+            <Path fileType="data">/usr/share/icons/oxygen/*/actions/snippetadd.png</Path>
+            <Path fileType="data">/usr/share/icons/oxygen/*/actions/snippetedit.png</Path>
+            <Path fileType="data">/usr/share/kde4/apps/kate</Path>
+            <Path fileType="data">/usr/share/kde4/apps/katepart</Path>
+            <Path fileType="data">/usr/share/kde4/apps/katexmltools</Path>
+            <Path fileType="data">/usr/share/kde4/apps/kconf_update/kate-2.4.upd</Path>
+            <Path fileType="data">/usr/share/kde4/apps/ktexteditor_snippets</Path>
+            <Path fileType="data">/usr/share/kde4/config/katefiletemplates.knsrc</Path>
+            <Path fileType="data">/usr/share/kde4/config/katerc</Path>
+            <Path fileType="data">/usr/share/kde4/config/ktexteditor_codesnippets_core.knsrc</Path>
+            <Path fileType="data">/usr/share/kde4/services/kate*.desktop</Path>
+            <Path fileType="data">/usr/share/kde4/services/plasma-applet-katesession.desktop</Path>
+            <Path fileType="data">/usr/share/kde4/servicetypes/kateplugin.desktop</Path>
+            <Path fileType="data">/usr/share/man/man1/kate.1</Path>
+            <Path fileType="data">/usr/share/mime/packages/kateplugin_katesnippets_tng.xml</Path>
+            <Path fileType="data">/usr/share/mime/packages/ktesnippets.xml</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>kbugbuster</Name>
+        <Icon>kbugbuster</Icon>
+        <Summary>Bugzilla client</Summary>
+        <Description>
+        KBugBuster is a client for the Bugzilla bug tracking system.
+        It provides a variety of tools for querying, viewing, and manipulating bug
+        reports.
+        This package is part of the kdesdk.
+        </Description>
+        <RuntimeDependencies>
+            <Dependency versionFrom="4.7.0">qt</Dependency>
+            <Dependency versionFrom="4.5.3">kdelibs</Dependency>
+            <Dependency versionFrom="4.5.3">kdepimlibs</Dependency>
+        </RuntimeDependencies>
+        <Conflicts>
+            <Package releaseTo="43">kdesdk</Package>
+        </Conflicts>
+        <Files>
+            <Path fileType="executable">/usr/bin/kbugbuster</Path>
+            <Path fileType="library">/usr/lib/kde4/kcal_bugzilla.so</Path>
+            <Path fileType="data">/usr/share/applications/kde4/kbugbuster.desktop</Path>
+            <Path fileType="data">/usr/share/doc/kde4/html/*/kbugbuster</Path>
+            <Path fileType="data">/usr/share/icons/hicolor/*/apps/kbugbuster.png</Path>
+            <Path fileType="data">/usr/share/kde4/apps/kbugbuster</Path>
+            <Path fileType="data">/usr/share/kde4/services/kresources/kcal/bugzilla.desktop</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>kcachegrind</Name>
+        <Icon>kcachegrind</Icon>
+        <Summary>visualisation tool for the Valgrind profiler</Summary>
+        <Description>
+        KCachegrind is a visualisation tool for the profiling data generated
+        by calltree, a memory profiling tool for valgrind.  Any executable can be
+        profiled using calltree without being recompiled, including multi-threaded
+        applications, shared libraries, and plugins.
+        For visualising the output from profiling tools other than Valgrind, several
+        converters can be found in the kcachegrind-converters package.
+        This package is part of the kdesdk.
+        </Description>
+        <RuntimeDependencies>
+            <Dependency versionFrom="4.7.0">qt</Dependency>
+            <Dependency versionFrom="4.5.3">kdelibs</Dependency>
+        </RuntimeDependencies>
+        <Conflicts>
+            <Package releaseTo="43">kdesdk</Package>
+        </Conflicts>
+        <Files>
+            <Path fileType="executable">/usr/bin/kcachegrind</Path>
+            <Path fileType="data">/usr/share/applications/kde4/kcachegrind.desktop</Path>
+            <Path fileType="data">/usr/share/doc/kde4/html/*/kcachegrind</Path>
+            <Path fileType="data">/usr/share/icons/hicolor/*/apps/kcachegrind.png</Path>
+            <Path fileType="data">/usr/share/kde4/apps/kcachegrind</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>kcachegrind-converters</Name>
+        <Icon>kcachegrind</Icon>
+        <Summary>format converters for KCachegrind profiler visualisation tool</Summary>
+        <Description>
+        This is a collection of scripts for converting the output from several
+        different profiling tools into a format that KCachegrind can display.
+        The included scripts are:
+        * dprof2calltree: converts the tmon.out output of Perl's Devel::DProf package
+        * pprof2calltree: converts the pprof output from APD
+        * memprof2calltree: converts the memory profiles of memprof
+        * op2calltree: converts the OProfile's output of "opreport -gdf" (v 0.8)
+        * hotshot2calltree: converts the pstat output of the hotshot Python profiler
+        This package is part of the kdesdk.
+        </Description>
+        <RuntimeDependencies>
+            <Dependency release="current">kcachegrind</Dependency>
+            <Dependency>php-cli</Dependency>
+        </RuntimeDependencies>
+        <Conflicts>
+            <Package releaseTo="43">kdesdk</Package>
+        </Conflicts>
+        <Files>
+            <Path fileType="executable">/usr/bin/dprof2calltree</Path>
+            <Path fileType="executable">/usr/bin/hotshot2calltree</Path>
+            <Path fileType="executable">/usr/bin/memprof2calltree</Path>
+            <Path fileType="executable">/usr/bin/op2calltree</Path>
+            <Path fileType="executable">/usr/bin/pprof2calltree</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>kompare</Name>
+        <Icon>kompare</Icon>
+        <Summary>file difference viewer</Summary>
+        <Description>
+        Kompare is displays the differences between files.  It can compare the
+        contents of files or directories, as well as create, display, and merge patch
+        files.
+        This package is part of the kdesdk.
+        </Description>
+        <RuntimeDependencies>
+            <Dependency versionFrom="4.7.0">qt</Dependency>
+            <Dependency versionFrom="4.5.3">kdelibs</Dependency>
+            <Dependency>strigi-libs</Dependency>
+        </RuntimeDependencies>
+        <Conflicts>
+            <Package releaseTo="43">kdesdk</Package>
+        </Conflicts>
+        <Files>
+            <Path fileType="executable">/usr/bin/kompare</Path>
+            <Path fileType="library">/usr/lib/libkompare*</Path>
+            <Path fileType="library">/usr/lib/kde4/libkompare*</Path>
+            <Path fileType="data">/usr/share/applications/kde4/kompare.desktop</Path>
+            <Path fileType="data">/usr/share/doc/kde4/html/*/kompare</Path>
+            <Path fileType="data">/usr/share/icons/*/*/apps/kompare.*</Path>
+            <Path fileType="data">/usr/share/kde4/apps/kompare</Path>
+            <Path fileType="data">/usr/share/kde4/services/kompare*.desktop</Path>
+            <Path fileType="data">/usr/share/kde4/servicetypes/kompare*.desktop</Path>
+            <!-- strigi support for diff files -->
+            <Path fileType="library">/usr/lib/strigi/strigila_diff.so</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>kdesdk-tools</Name>
+        <Summary>Various KDE development tools</Summary>
+        <Description>
+        kpartloader is a very simple application to test loading of a KPart.
+        kuiviewer is a utility to display and check user interface (.ui) files created in Qt Designer.
+        kmtrace is a KDE tool to assist with malloc debugging using glibc's "mtrace" functionality.
+        kstartperf measures startup time for KDE applications.
+        kprofilemethod.h is header-file macros to help profiling using QTime class.
+        There is also subversion, perldoc and git support for dolphin and file dialogs.
+        There are also bunch of subversion supoport scripts.
+        kdesrc-build is tool for building KDE from source (subversion and/or git repositories).
+        </Description>
+        <RuntimeDependencies>
+            <Dependency versionFrom="4.7.0">qt</Dependency>
+            <Dependency versionFrom="4.5.3">kdelibs</Dependency>
+            <Dependency versionFrom="4.5.3">kdebase</Dependency>
+            <Dependency>subversion</Dependency>
+            <Dependency>apr</Dependency>
+        </RuntimeDependencies>
+        <Conflicts>
+            <Package releaseTo="43">kdesdk</Package>
+        </Conflicts>
+        <Files>
+            <!-- kpartloader -->
+            <Path fileType="executable">/usr/bin/kpartloader</Path>
+            <Path fileType="data">/usr/share/kde4/apps/kpartloader/kpartloaderui.rc</Path>
+            <!-- kuiviewer -->
+            <Path fileType="executable">/usr/bin/kuiviewer</Path>
+            <Path fileType="library">/usr/lib/kde4/libkuiviewerpart.so</Path>
+            <Path fileType="library">/usr/lib/kde4/quithumbnail.so</Path>
+            <Path fileType="data">/usr/share/applications/kde4/kuiviewer.desktop</Path>
+            <Path fileType="data">/usr/share/icons/hicolor/*/apps/kuiviewer.png</Path>
+            <Path fileType="data">/usr/share/kde4/apps/kuiviewer/kuiviewerui.rc</Path>
+            <Path fileType="data">/usr/share/kde4/apps/kuiviewerpart/kuiviewer_part.rc</Path>
+            <Path fileType="data">/usr/share/kde4/services/designerthumbnail.desktop</Path>
+            <Path fileType="data">/usr/share/kde4/services/kuiviewer_part.desktop</Path>
+            <!-- kmtrace -->
+            <Path fileType="executable">/usr/bin/demangle</Path>
+            <Path fileType="executable">/usr/bin/kminspector</Path>
+            <Path fileType="executable">/usr/bin/kmmatch</Path>
+            <Path fileType="executable">/usr/bin/kmtrace</Path>
+            <Path fileType="library">/usr/lib/libktrace.so*</Path>
+            <Path fileType="data">/usr/share/kde4/apps/kmtrace/kde.excludes</Path>
+            <Path fileType="man">/usr/share/man/man1/demangle.1</Path>
+            <!-- kstartperf -->
+            <Path fileType="executable">/usr/bin/kstartperf</Path>
+            <Path fileType="library">/usr/lib/kde4/kstartperf.so</Path>
+            <!-- kprofilemethod -->
+            <Path fileType="header">/usr/include/kprofilemethod.h</Path>
+            <!-- kio_svn: subversion support -->
+            <Path fileType="executable">/usr/bin/kio_svn_helper</Path>
+            <Path fileType="library">/usr/lib/kde4/fileviewsvnplugin.so</Path>
+            <Path fileType="library">/usr/lib/kde4/kded_ksvnd.so</Path>
+            <Path fileType="library">/usr/lib/kde4/kio_svn.so</Path>
+            <Path fileType="config">/usr/share/config.kcfg/fileviewsvnpluginsettings.kcfg</Path>
+            <Path fileType="data">/usr/share/icons/*/*/actions/svn_*.*</Path>
+            <Path fileType="data">/usr/share/dbus-1/interfaces/org.kde.ksvnd.xml</Path>
+            <Path fileType="data">/usr/share/kde4/services/fileviewsvnplugin.desktop</Path>
+            <Path fileType="data">/usr/share/kde4/services/svn.protocol</Path>
+            <Path fileType="data">/usr/share/kde4/services/svn+file.protocol</Path>
+            <Path fileType="data">/usr/share/kde4/services/svn+http.protocol</Path>
+            <Path fileType="data">/usr/share/kde4/services/svn+https.protocol</Path>
+            <Path fileType="data">/usr/share/kde4/services/svn+ssh.protocol</Path>
+            <Path fileType="data">/usr/share/kde4/services/kded/ksvnd.desktop</Path>
+            <Path fileType="data">/usr/share/kde4/services/ServiceMenus/subversion*.desktop</Path>
+            <!-- kio_perldoc: perldoc support -->
+            <Path fileType="library">/usr/lib/kde4/kio_perldoc.so</Path>
+            <Path fileType="data">/usr/share/kde4/apps/kio_perldoc</Path>
+            <Path fileType="data">/usr/share/kde4/services/perldoc.protocol</Path>
+            <!-- git support -->
+            <Path fileType="library">/usr/lib/kde4/fileviewgitplugin.so</Path>
+            <Path fileType="data">/usr/share/kde4/services/fileviewgitplugin.desktop</Path>
+            <!-- subversion scripts -->
+            <Path fileType="executable">/usr/bin/colorsvn</Path>
+            <Path fileType="executable">/usr/bin/create_svnignore</Path>
+            <Path fileType="executable">/usr/bin/nonsvnlist</Path>
+            <Path fileType="executable">/usr/bin/svnbackport</Path>
+            <Path fileType="executable">/usr/bin/svnchangesince</Path>
+            <Path fileType="executable">/usr/bin/svn-clean</Path>
+            <Path fileType="executable">/usr/bin/svnforwardport</Path>
+            <Path fileType="executable">/usr/bin/svngettags</Path>
+            <Path fileType="executable">/usr/bin/svnintegrate</Path>
+            <Path fileType="executable">/usr/bin/svnversions</Path>
+            <Path fileType="executable">/usr/bin/wcgrep</Path>
+            <!-- debug scripts -->
+            <Path fileType="executable">/usr/bin/adddebug</Path>
+            <Path fileType="executable">/usr/bin/extend_dmalloc</Path>
+            <Path fileType="executable">/usr/bin/kdekillall</Path>
+            <Path fileType="man">/usr/share/man/man1/adddebug.1</Path>
+            <Path fileType="man">/usr/share/man/man1/extend_dmalloc.1</Path>
+            <!-- programming support scripts -->
+            <Path fileType="executable">/usr/bin/cheatmake</Path>
+            <Path fileType="executable">/usr/bin/create_makefile</Path>
+            <Path fileType="executable">/usr/bin/create_makefiles</Path>
+            <Path fileType="executable">/usr/bin/cxxmetric</Path>
+            <Path fileType="executable">/usr/bin/fix-include.sh</Path>
+            <Path fileType="executable">/usr/bin/fixkdeincludes</Path>
+            <Path fileType="executable">/usr/bin/fixuifiles</Path>
+            <Path fileType="executable">/usr/bin/includemocs</Path>
+            <Path fileType="executable">/usr/bin/kdedoc</Path>
+            <Path fileType="executable">/usr/bin/kde_generate_export_header</Path>
+            <Path fileType="executable">/usr/bin/kde-systemsettings-tree.py</Path>
+            <Path fileType="executable">/usr/bin/optimizegraphics</Path>
+            <Path fileType="executable">/usr/bin/qtdoc</Path>
+            <Path fileType="executable">/usr/bin/zonetab2pot.py</Path>
+            <Path fileType="man">/usr/share/man/man1/cheatmake.1</Path>
+            <Path fileType="man">/usr/share/man/man1/create_makefile.1</Path>
+            <Path fileType="man">/usr/share/man/man1/create_makefiles.1</Path>
+            <Path fileType="man">/usr/share/man/man1/cxxmetric.1</Path>
+            <Path fileType="man">/usr/share/man/man1/fixincludes.1</Path>
+            <Path fileType="man">/usr/share/man/man1/qtdoc.1</Path>
+            <Path fileType="man">/usr/share/man/man1/zonetab2pot.py.1</Path>
+            <!-- modernization scripts -->
+            <Path fileType="executable">/usr/bin/kdelnk2desktop.py</Path>
+            <!-- information extraction scripts -->
+            <Path fileType="executable">/usr/bin/makeobj</Path>
+            <Path fileType="executable">/usr/bin/extractattr</Path>
+            <Path fileType="executable">/usr/bin/extractqml</Path>
+            <Path fileType="executable">/usr/bin/extractrc</Path>
+            <Path fileType="executable">/usr/bin/findmissingcrystal</Path>
+            <Path fileType="executable">/usr/bin/kdemangen.pl</Path>
+            <Path fileType="executable">/usr/bin/png2mng.pl</Path>
+            <Path fileType="executable">/usr/bin/package_crystalsvg</Path>
+            <Path fileType="man">/usr/share/man/man1/extractrc.1</Path>
+            <!-- kde build specific scripts -->
+            <Path fileType="executable">/usr/bin/build-progress.sh</Path>
+            <Path fileType="executable">/usr/bin/kdesrc-build</Path>
+            <Path fileType="executable">/usr/bin/krazy-licensecheck</Path>
+            <Path fileType="data">/usr/share/applications/kde4/kdesrc-build.desktop</Path>
+            <Path fileType="doc">/usr/share/doc/kde4/html/*/kdesrc-build</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>lokalize</Name>
+        <Icon>lokalize</Icon>
+        <Summary>computer-aided translation system</Summary>
+        <Description>
+        Lokalize is a computer-aided translation system that focuses on productivity
+        and quality assurance. It has components usual for CAT tools: translation
+        memory, glossary, and also a unique translation merging (synchronization)
+        capability. It is primarily targeted at software translation and also
+        integrates external conversion tools for office document translation.
+        This package is part of the kdesdk.
+        </Description>
+        <RuntimeDependencies>
+            <Dependency versionFrom="4.7.0">qt</Dependency>
+            <Dependency versionFrom="4.7.0">qt-sql-sqlite</Dependency>
+            <Dependency versionFrom="4.5.3">kdelibs</Dependency>
+            <!--we need kross-python to create a new project in lokalize, see #12395-->
+            <Dependency versionFrom="4.5.3">python-kross</Dependency>
+            <Dependency>strigi-libs</Dependency>
+            <Dependency>hunspell</Dependency>
+        </RuntimeDependencies>
+        <Conflicts>
+            <Package releaseTo="43">kdesdk</Package>
+        </Conflicts>
+        <Files>
+            <Path fileType="executable">/usr/bin/lokalize</Path>
+            <Path fileType="data">/usr/share/applications/kde4/lokalize.desktop</Path>
+            <Path fileType="data">/usr/share/doc/kde4/html/*/lokalize</Path>
+            <Path fileType="data">/usr/share/icons/*/*/apps/lokalize.*</Path>
+            <Path fileType="data">/usr/share/icons/*/*/actions/approved.*</Path>
+            <Path fileType="data">/usr/share/icons/*/*/actions/catalogmanager.png</Path>
+            <Path fileType="data">/usr/share/icons/*/*/actions/diff.png</Path>
+            <Path fileType="data">/usr/share/icons/*/*/actions/insert_arg.png</Path>
+            <Path fileType="data">/usr/share/icons/*/*/actions/insert_tag.png</Path>
+            <Path fileType="data">/usr/share/icons/*/*/actions/msgid2msgstr.png</Path>
+            <Path fileType="data">/usr/share/icons/*/*/actions/nexterror.png</Path>
+            <Path fileType="data">/usr/share/icons/*/*/actions/nextfuzzy.png</Path>
+            <Path fileType="data">/usr/share/icons/*/*/actions/nextfuzzyuntrans.png</Path>
+            <Path fileType="data">/usr/share/icons/*/*/actions/nextpo.png</Path>
+            <Path fileType="data">/usr/share/icons/*/*/actions/nexttemplate.png</Path>
+            <Path fileType="data">/usr/share/icons/*/*/actions/nextuntranslated.png</Path>
+            <Path fileType="data">/usr/share/icons/*/*/actions/preverror.png</Path>
+            <Path fileType="data">/usr/share/icons/*/*/actions/prevfuzzy.png</Path>
+            <Path fileType="data">/usr/share/icons/*/*/actions/prevfuzzyuntrans.png</Path>
+            <Path fileType="data">/usr/share/icons/*/*/actions/prevpo.png</Path>
+            <Path fileType="data">/usr/share/icons/*/*/actions/prevtemplate.png</Path>
+            <Path fileType="data">/usr/share/icons/*/*/actions/prevuntranslated.png</Path>
+            <Path fileType="data">/usr/share/icons/*/*/actions/search2msgstr.png</Path>
+            <Path fileType="data">/usr/share/icons/*/*/actions/transsearch.png</Path>
+            <Path fileType="data">/usr/share/kde4/apps/lokalize</Path>
+            <Path fileType="config">/usr/share/config.kcfg/lokalize.kcfg</Path>
+            <!-- strigi -->
+            <Path fileType="library">/usr/lib/strigi/strigila_po.so</Path>
+            <Path fileType="library">/usr/lib/strigi/strigita_ts.so</Path>
+            <Path fileType="data">/usr/share/strigi/fieldproperties/strigi_translation.fieldproperties</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>poxml</Name>
+        <Summary>tools for translating DocBook XML files with gettext</Summary>
+        <Description>
+        This is a collection of tools that facilitate translating DocBook XML
+        files using gettext message files (PO-files).
+        Also included are several command-line utilities for manipulating DocBook XML
+        files, PO-files and PO-template files.
+        This package is part of the kdesdk.
+        </Description>
+        <RuntimeDependencies>
+            <Dependency versionFrom="4.7.0">qt</Dependency>
+            <Dependency>antlr</Dependency>
+        </RuntimeDependencies>
+        <Conflicts>
+            <Package releaseTo="43">kdesdk</Package>
+        </Conflicts>
+        <Files>
+            <Path fileType="executable">/usr/bin/po2xml</Path>
+            <Path fileType="executable">/usr/bin/split2po</Path>
+            <Path fileType="executable">/usr/bin/swappo</Path>
+            <Path fileType="executable">/usr/bin/xml2pot</Path>
+            <Path fileType="library">/usr/lib/libantlr.so*</Path>
+            <Path fileType="data">/usr/share/man/man1/po2xml.1</Path>
+            <Path fileType="data">/usr/share/man/man1/split2po.1</Path>
+            <Path fileType="data">/usr/share/man/man1/swappo.1</Path>
+            <Path fileType="data">/usr/share/man/man1/xml2pot.1</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>umbrello</Name>
+        <Icon>umbrello</Icon>
+        <Summary>UML modelling tool and code generator</Summary>
+        <Description>
+        Umbrello UML Modeller is a Unified Modelling Language diagram editor for KDE.
+        It can create diagrams of software and other systems in the industry-standard
+        UML format, and can also generate code from UML diagrams in a variety of
+        programming languages.
+        This package is part of the kdesdk.
+        </Description>
+        <RuntimeDependencies>
+            <Dependency versionFrom="4.7.0">qt</Dependency>
+            <Dependency versionFrom="4.5.3">kdelibs</Dependency>
+            <Dependency>libxslt</Dependency>
+        </RuntimeDependencies>
+        <Conflicts>
+            <Package releaseTo="43">kdesdk</Package>
+        </Conflicts>
+        <Files>
+            <Path fileType="executable">/usr/bin/umbrello</Path>
+            <Path fileType="data">/usr/share/applications/kde4/umbrello.desktop</Path>
+            <Path fileType="data">/usr/share/doc/kde4/html/*/umbrello</Path>
+            <Path fileType="data">/usr/share/icons/*/*/apps/umbrello.*</Path>
+            <Path fileType="data">/usr/share/icons/hicolor/*/mimetypes/umbrellofile.png</Path>
+            <Path fileType="data">/usr/share/icons/hicolor/*/mimetypes/application-x-uml.png</Path>
+            <Path fileType="data">/usr/share/icons/*/*/actions/umbrello_*.*</Path>
+            <Path fileType="data">/usr/share/kde4/apps/umbrello</Path>
+        </Files>
+    </Package>
+
+    <History>
+        <Update release="44">
+            <Date>2010-11-12</Date>
+            <Version>4.5.3</Version>
+            <Comment>Split package.</Comment>
+            <Name>David Stegbauer</Name>
+            <Email>daaste@gmail.com</Email>
+        </Update>
+        <Update release="43">
+            <Date>2010-11-11</Date>
+            <Version>4.5.3</Version>
+            <Comment>Update runtime dependencies for newly split kdebindings.</Comment>
+            <Name>David Stegbauer</Name>
+            <Email>daaste@gmail.com</Email>
+        </Update>
+        <Update release="42">
+            <Date>2010-11-06</Date>
+            <Version>4.5.3</Version>
+            <Comment>Fix malformed diff output warning of Kompare in SVN patches.</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="41">
+            <Date>2010-11-02</Date>
+            <Version>4.5.3</Version>
+            <Comment>Version bump to 4.5.3</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="40">
+            <Date>2010-10-12</Date>
+            <Version>4.5.2</Version>
+            <Comment>Mass rebuild for Pardus 2011 Beta</Comment>
+            <Name>Fatih Aşıcı</Name>
+            <Email>fatih@pardus.org.tr</Email>
+        </Update>
+        <Update release="39">
+            <Date>2010-10-04</Date>
+            <Version>4.5.2</Version>
+            <Comment>Version bump to 4.5.2</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="38">
+            <Date>2010-09-01</Date>
+            <Version>4.5.1</Version>
+            <Comment>Version bump to 4.5.1</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="37">
+            <Date>2010-08-28</Date>
+            <Version>4.5.0</Version>
+            <Comment>Split devel package.</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="36">
+            <Date>2010-08-23</Date>
+            <Version>4.5.0</Version>
+            <Comment>Version bump to 4.5.0</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="35">
+            <Date>2010-08-02</Date>
+            <Version>4.4.5</Version>
+            <Comment>Version bump to 4.4.5</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="34">
+            <Date>2010-05-31</Date>
+            <Version>4.4.4</Version>
+            <Comment>Version bump to 4.4.4</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="33">
+            <Date>2010-05-04</Date>
+            <Version>4.4.3</Version>
+            <Comment>Version bump to 4.4.3</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="32">
+            <Date>2010-04-13</Date>
+            <Version>4.4.2</Version>
+            <Comment>Version bump to 4.4.2</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="31">
+            <Date>2010-03-09</Date>
+            <Version>4.3.5</Version>
+            <Comment>Add missing kdebindings runtime dep. fix #12395.</Comment>
+            <Name>H. İbrahim Güngör</Name>
+            <Email>h.ibrahim.gungor@gmail.com</Email>
+        </Update>
+        <Update release="30">
+            <Date>2010-01-26</Date>
+            <Version>4.3.5</Version>
+            <Comment>Version bump to 4.3.5</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="29">
+            <Date>2009-12-04</Date>
+            <Version>4.3.4</Version>
+            <Comment>Version bump to 4.3.4</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="28">
+            <Date>2009-11-03</Date>
+            <Version>4.3.3</Version>
+            <Comment>Version bump to 4.3.3</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="27">
+            <Date>2009-10-12</Date>
+            <Version>4.3.2</Version>
+            <Comment>Fix Kompare regression due to a typo in the patch for kde#139209.</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="26">
+            <Date>2009-10-06</Date>
+            <Version>4.3.2</Version>
+            <Comment>Version bump to 4.3.2 release</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="25">
+            <Date>2009-07-22</Date>
+            <Version>4.2.4</Version>
+            <Comment>Replace umbrello.</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="24">
+            <Date>2009-06-03</Date>
+            <Version>4.2.4</Version>
+            <Comment>Version bump to 4.2.4 bugfix release</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="23">
+            <Date>2009-05-07</Date>
+            <Version>4.2.3</Version>
+            <Comment>Version bump to 4.2.3 bugfix release</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="22">
+            <Date>2009-04-10</Date>
+            <Version>4.2.2</Version>
+            <Comment>Version bump to 4.2.2 bugfix release</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="21">
+            <Date>2009-03-04</Date>
+            <Version>4.2.1</Version>
+            <Comment>Version bump to 4.2.1 bugfix release</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="20">
+            <Date>2009-02-09</Date>
+            <Version>4.2.0</Version>
+            <Comment>Changed dependency to kdepimlibs-devel</Comment>
+            <Name>David Stegbauer</Name>
+            <Email>daaste@gmail.com</Email>
+        </Update>
+        <Update release="19">
+            <Date>2009-01-29</Date>
+            <Version>4.2.0</Version>
+            <Comment>Version bump to 4.2 final release</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="18">
+            <Date>2009-01-09</Date>
+            <Version>4.1.87</Version>
+            <Comment>qt4-sql-sqlite dep added.</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="17">
+            <Date>2009-01-07</Date>
+            <Version>4.1.87</Version>
+            <Comment>Version bump to 4.1.87</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="16">
+            <Date>2008-12-23</Date>
+            <Version>4.1.85</Version>
+            <Comment>Version bump to 4.2 beta 2</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="15">
+            <Date>2008-11-28</Date>
+            <Version>4.1.80</Version>
+            <Comment>Version bump to 4.2 beta 1</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="14">
+            <Date>2008-11-02</Date>
+            <Version>4.1.3</Version>
+            <Comment>Stable update</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="13">
+            <Date>2008-09-26</Date>
+            <Version>4.1.2</Version>
+            <Comment>Stable update to bugfix release</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="12">
+            <Date>2008-09-05</Date>
+            <Version>4.1.1</Version>
+            <Comment>Stable update to new bugfix release</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="11">
+            <Date>2008-07-27</Date>
+            <Version>4.1.0</Version>
+            <Comment>Stable update</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="10">
+            <Date>2008-07-25</Date>
+            <Version>4.0.99</Version>
+            <Comment>Version bump</Comment>
+            <Name>İşbaran Akçayır</Name>
+            <Email>isbaran@comu.edu.tr</Email>
+        </Update>
+        <Update release="9">
+            <Date>2008-07-15</Date>
+            <Version>4.0.98</Version>
+            <Comment>Version bump</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="8">
+            <Date>2008-07-04</Date>
+            <Version>4.0.85</Version>
+            <Comment>Version bump</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="7">
+            <Date>2008-06-24</Date>
+            <Version>4.0.83</Version>
+            <Comment>Beta 2</Comment>
+            <Name>İşbaran Akçayır</Name>
+            <Email>isbaran@comu.edu.tr</Email>
+        </Update>
+        <Update release="6">
+            <Date>2008-05-28</Date>
+            <Version>4.0.80</Version>
+            <Comment>Stable update</Comment>
+            <Name>Kenan Pelit</Name>
+            <Email>kpelit@gmail.com</Email>
+        </Update>
+        <Update release="5">
+            <Date>2008-05-07</Date>
+            <Version>4.0.4</Version>
+            <Comment>Stable update</Comment>
+            <Name>Kenan Pelit</Name>
+            <Email>kpelit@gmail.com</Email>
+        </Update>
+        <Update release="4">
+            <Date>2008-04-07</Date>
+            <Version>4.0.3</Version>
+            <Comment>Stable update</Comment>
+            <Name>Kenan Pelit</Name>
+            <Email>kpelit@gmail.com</Email>
+        </Update>
+        <Update release="3">
+            <Date>2008-03-05</Date>
+            <Version>4.0.2</Version>
+            <Comment>Stable update</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="2">
+            <Date>2008-01-31</Date>
+            <Version>4.0.1</Version>
+            <Comment>Stable update</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="1">
+            <Date>2008-01-07</Date>
+            <Version>4.0.0</Version>
+            <Comment>First release</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+    </History>
+</PISI>

@@ -1,0 +1,125 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>abrt</Name>
+        <Homepage>http://fedorahosted.org/abrt</Homepage>
+        <Packager>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Packager>
+        <License>GPLv2+</License>
+        <Summary>Automatic bug detection and reporting tool</Summary>
+        <Description>abrt is a tool to help users to detect defects in applications and to create a bug report with all informations needed by maintainer to fix it. It uses plugin system to extend its functionality.</Description>
+        <Archive sha1sum="b6bfc485732c41480c0227fa0d3facafe961b08a" type="targz">http://cekirdek.pardus.org.tr/~gokcen/files/abrt-be1660c8.tar.gz</Archive>
+        <!--<Archive sha1sum="c356a9745d774869600213d20ac5ab4ba2615fe9" type="targz">https://fedorahosted.org/released/abrt/abrt-2.0.5.tar.gz</Archive>-->
+        <AdditionalFiles>
+            <AdditionalFile target="po/tr.po">tr.po</AdditionalFile>
+        </AdditionalFiles>
+        <BuildDependencies>
+            <Dependency>libreport-devel</Dependency>
+            <Dependency>gtk2-devel</Dependency>
+            <Dependency>xmlto</Dependency>
+            <Dependency>nss-devel</Dependency>
+            <Dependency>libnotify-devel</Dependency>
+            <Dependency>nspr-devel</Dependency>
+            <Dependency>btparser-devel</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <Patch level="1">add-pisi-support.patch</Patch>
+            <Patch level="1">fix-checkelf.diff</Patch>
+            <Patch level="1">add-tr-to-LINGUAS.diff</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>abrt</Name>
+        <IsA>service</IsA>
+        <RuntimeDependencies>
+            <Dependency>libreport</Dependency>
+            <Dependency>btparser</Dependency>
+            <Dependency>abrt-libs</Dependency>
+            <Dependency>nss</Dependency>
+            <Dependency>nspr</Dependency>
+
+            <!-- ccpp addon requires gdb -->
+            <Dependency>gdb</Dependency>
+
+            <!-- needed by mailx addon -->
+            <Dependency>mailx</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="config">/etc</Path>
+            <Path fileType="executable">/usr/bin</Path>
+            <Path fileType="executable">/usr/sbin</Path>
+            <Path fileType="library">/usr/lib</Path>
+            <Path fileType="library">/usr/libexec</Path>
+            <Path fileType="localedata">/usr/share/locale</Path>
+            <Path fileType="man">/usr/share/man</Path>
+            <Path fileType="doc">/usr/share/doc</Path>
+            <Path fileType="data">/usr/share</Path>
+            <Path fileType="data">/var</Path>
+        </Files>
+        <Provides>
+            <COMAR script="abrt.py" name="abrt">System.Service</COMAR>
+            <COMAR script="abrt-oops.py" name="abrt-oops">System.Service</COMAR>
+        </Provides>
+    </Package>
+
+    <Package>
+        <Name>abrt-devel</Name>
+        <IsA>data</IsA>
+        <Summary>Development files for abrt</Summary>
+        <RuntimeDependencies>
+            <Dependency release="current">abrt</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="header">/usr/include</Path>
+            <Path fileType="data">/usr/lib/pkgconfig</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>abrt-libs</Name>
+        <IsA>library</IsA>
+        <Summary>Libraries for abrt</Summary>
+        <RuntimeDependencies>
+            <Dependency>libreport</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="library">/usr/lib/libabrt.so*</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>abrt-gui</Name>
+        <Icon>abrt</Icon>
+        <IsA>app:gui</IsA>
+        <Summary>Necessary data files and GUI of ABRT</Summary>
+        <RuntimeDependencies>
+            <Dependency>gtk2</Dependency>
+            <Dependency>libreport</Dependency>
+            <Dependency>libreport-gtk</Dependency>
+            <Dependency>libnotify</Dependency>
+            <Dependency>abrt-libs</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="data">/etc/xdg/autostart/abrt-applet.desktop</Path>
+            <Path fileType="executable">/usr/bin/abrt-applet</Path>
+            <Path fileType="executable">/usr/bin/abrt-gui</Path>
+            <Path fileType="data">/usr/share/icons</Path>
+            <Path fileType="data">/usr/share/applications</Path>
+            <Path fileType="data">/usr/share/abrt</Path>
+        </Files>
+    </Package>
+
+    <History>
+        <Update release="1">
+            <Date>2011-10-12</Date>
+            <Version>2.0.5</Version>
+            <Comment>First release.</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+    </History>
+</PISI>

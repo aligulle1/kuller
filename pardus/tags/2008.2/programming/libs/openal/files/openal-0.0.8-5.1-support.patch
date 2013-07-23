@@ -1,0 +1,491 @@
+# HG changeset patch
+# User tiwai
+# Date 1182851747 -7200
+# Node ID 0db436732d7dcfa45d2d25885eaf071d884a673b
+# Parent  abe8ba9de91a4d173209ec750df3de6f3e7389fb
+Add 5.1 support
+
+diff -r abe8ba9de91a -r 0db436732d7d include/AL/alext.h
+--- a/include/AL/alext.h	Tue Jun 26 11:53:00 2007 +0200
++++ b/include/AL/alext.h	Tue Jun 26 11:55:47 2007 +0200
+@@ -17,6 +17,13 @@ extern "C" {
+ /* four point formats */
+ #define AL_FORMAT_QUAD8_LOKI                      0x10004
+ #define AL_FORMAT_QUAD16_LOKI                     0x10005
++
++/* five point formats */
++#define AL_FORMAT_51_8	                          0x10006
++#define AL_FORMAT_51_16                           0x10007
++/* seven point formats */
++#define AL_FORMAT_71_8	                          0x10008
++#define AL_FORMAT_71_16                           0x10009
+ 
+ /**
+  * token extensions, base 0x20000
+diff -r abe8ba9de91a -r 0db436732d7d src/al_buffer.c
+--- a/src/al_buffer.c	Tue Jun 26 11:53:00 2007 +0200
++++ b/src/al_buffer.c	Tue Jun 26 11:55:47 2007 +0200
+@@ -383,6 +383,10 @@ void alBufferData( ALuint  bid,
+ 		case AL_FORMAT_STEREO16:
+ 		case AL_FORMAT_QUAD8_LOKI:
+ 		case AL_FORMAT_QUAD16_LOKI:
++		case AL_FORMAT_51_8:
++		case AL_FORMAT_51_16:
++		case AL_FORMAT_71_8:
++		case AL_FORMAT_71_16:
+ 		case AL_FORMAT_IMA_ADPCM_MONO16_EXT:
+ 		case AL_FORMAT_IMA_ADPCM_STEREO16_EXT:
+ 			break;
+@@ -458,11 +462,13 @@ void alBufferData( ALuint  bid,
+ 	{
+ 		void *temp_copies[_ALC_MAX_CHANNELS] = { NULL };
+ 		ALboolean success = AL_TRUE;
++		int chs;
+ 
+ 		/* don't use realloc */
+ 		_alBufferFreeOrigBuffers(buf);
+ 
+-		for(i = 0; i < _alGetChannelsFromFormat(buf->format); i++)
++		chs = _alGetChannelsFromFormat(buf->format);
++		for(i = 0; i < chs; i++)
+ 		{
+ 			temp_copies[i] = malloc(retsize);
+ 			success = (temp_copies[i] != NULL) ? AL_TRUE : AL_FALSE;
+@@ -472,7 +478,7 @@ void alBufferData( ALuint  bid,
+ 		{
+ 			free(cdata);
+ 
+-			for(i = 0; i < _alGetChannelsFromFormat(buf->format); i++)
++			for(i = 0; i < chs; i++)
+ 			{
+ 				free(temp_copies[i]);
+ 			}
+@@ -487,43 +493,18 @@ void alBufferData( ALuint  bid,
+ 			return;
+ 		}
+ 
+-		switch(_alGetChannelsFromFormat(buf->format))
++		switch (chs)
+ 		{
+ 			case 1:
+-			  for(i = 0; i < elementsof(buf->orig_buffers); i++)
++			case 2:
++			case 4:
++			case 6:
++			case 8:
++			  for(i = 0; i < elementsof(buf->orig_buffers);)
+ 			  {
+-				  buf->orig_buffers[i] = temp_copies[0];
+-			  }
+-
+-			  break;
+-			case 2:
+-			  for(i = 0; i < elementsof(buf->orig_buffers); i += 2)
+-			  {
+-				  buf->orig_buffers[i]   = temp_copies[0];
+-				  buf->orig_buffers[i+1] = temp_copies[1];
+-			  }
+-
+-			  break;
+-			case 4:
+-			  assert(elementsof(buf->orig_buffers) >= 4);
+-			  for(i = 0; i < elementsof(buf->orig_buffers); i += 4)
+-			  {
+-				  buf->orig_buffers[i]   = temp_copies[0];
+-				  buf->orig_buffers[i+1] = temp_copies[1];
+-				  buf->orig_buffers[i+2] = temp_copies[2];
+-				  buf->orig_buffers[i+3] = temp_copies[3];
+-			  }
+-			  break;
+-			case 6:
+-			  assert(elementsof(buf->orig_buffers) >= 6);
+-			  for(i = 0; i < elementsof(buf->orig_buffers); i += 6)
+-			  {
+-				  buf->orig_buffers[i]   = temp_copies[0];
+-				  buf->orig_buffers[i+1] = temp_copies[1];
+-				  buf->orig_buffers[i+2] = temp_copies[2];
+-				  buf->orig_buffers[i+3] = temp_copies[3];
+-				  buf->orig_buffers[i+4] = temp_copies[4];
+-				  buf->orig_buffers[i+5] = temp_copies[5];
++				  int j;
++				  for (j = 0; j < chs; j++, i++)
++					  buf->orig_buffers[i] = temp_copies[0];
+ 			  }
+ 
+ 			  break;
+diff -r abe8ba9de91a -r 0db436732d7d src/al_ext.c
+--- a/src/al_ext.c	Tue Jun 26 11:53:00 2007 +0200
++++ b/src/al_ext.c	Tue Jun 26 11:55:47 2007 +0200
+@@ -875,6 +875,18 @@ getExtensionEnumValue( ALenum *value, co
+ 	} else if (strcmp(name, "AL_FORMAT_QUAD8_LOKI") == 0) {
+ 		*value = AL_FORMAT_QUAD8_LOKI;
+ 		return AL_TRUE;
++	} else if (strcmp(name, "AL_FORMAT_51_16") == 0) {
++		*value = AL_FORMAT_51_16;
++		return AL_TRUE;
++	} else if (strcmp(name, "AL_FORMAT_51_8") == 0) {
++		*value = AL_FORMAT_51_8;
++		return AL_TRUE;
++	} else if (strcmp(name, "AL_FORMAT_71_16") == 0) {
++		*value = AL_FORMAT_71_16;
++		return AL_TRUE;
++	} else if (strcmp(name, "AL_FORMAT_71_8") == 0) {
++		*value = AL_FORMAT_71_8;
++		return AL_TRUE;
+ 	} else {
+ 		return AL_FALSE;
+ 	}
+diff -r abe8ba9de91a -r 0db436732d7d src/al_main.c
+--- a/src/al_main.c	Tue Jun 26 11:53:00 2007 +0200
++++ b/src/al_main.c	Tue Jun 26 11:55:47 2007 +0200
+@@ -248,6 +248,12 @@ ALenum _al_AC2ALFMT( ALuint acformat, AL
+ ALenum _al_AC2ALFMT( ALuint acformat, ALuint channels ) {
+ 	switch( acformat ) {
+ 		case AUDIO_U8:
++			if(channels == 8) {
++				return AL_FORMAT_71_8;
++			}
++			if(channels == 6) {
++				return AL_FORMAT_51_8;
++			}
+ 			if(channels == 4) {
+ 				return AL_FORMAT_QUAD8_LOKI;
+ 			}
+@@ -260,6 +266,12 @@ ALenum _al_AC2ALFMT( ALuint acformat, AL
+ 			break;
+ 		case AUDIO_S16LSB:
+ 		case AUDIO_S16MSB:
++			if(channels == 8) {
++				return AL_FORMAT_71_16;
++			}
++			if(channels == 6) {
++				return AL_FORMAT_51_16;
++			}
+ 			if(channels == 4) {
+ 				return AL_FORMAT_QUAD16_LOKI;
+ 			}
+@@ -288,10 +300,14 @@ ALenum _al_AC2ALFMT( ALuint acformat, AL
+  */
+ ALushort _al_AL2ACFMT( ALenum alformat ) {
+ 	switch( alformat ) {
++		case AL_FORMAT_71_8:
++		case AL_FORMAT_51_8:
+ 		case AL_FORMAT_QUAD8_LOKI:
+ 		case AL_FORMAT_STEREO8:
+ 		case AL_FORMAT_MONO8:
+ 			return AUDIO_U8;
++		case AL_FORMAT_71_16:
++		case AL_FORMAT_51_16:
+ 		case AL_FORMAT_QUAD16_LOKI:
+ 		case AL_FORMAT_STEREO16:
+ 		case AL_FORMAT_MONO16:
+@@ -324,6 +340,12 @@ ALubyte _alGetChannelsFromFormat(ALenum 
+ 		case AL_FORMAT_QUAD8_LOKI:
+ 		case AL_FORMAT_QUAD16_LOKI:
+ 			return 4;
++		case AL_FORMAT_51_8:
++		case AL_FORMAT_51_16:
++			return 6;
++		case AL_FORMAT_71_8:
++		case AL_FORMAT_71_16:
++			return 8;
+ 		default:
+ 			break;
+ 	}
+@@ -365,6 +387,20 @@ ALenum _al_formatscale(ALenum format, AL
+ 			  default: return -1;
+ 		  }
+ 		  break;
++		case 6:
++		  switch(fmt_bits) {
++			  case 8: return AL_FORMAT_51_8; break;
++			  case 16: return AL_FORMAT_51_16; break;
++			  default: return -1;
++		  }
++		  break;
++		case 8:
++		  switch(fmt_bits) {
++			  case 8: return AL_FORMAT_71_8; break;
++			  case 16: return AL_FORMAT_71_16; break;
++			  default: return -1;
++		  }
++		  break;
+ 		default:
+ #ifdef DEBUG_CONVERT
+ 		  fprintf(stderr,
+@@ -580,6 +616,14 @@ ALenum _al_AL2FMT(ALuint channels, ALuin
+ 		case 4:
+ 			if(bits == 8) return AL_FORMAT_QUAD8_LOKI;
+ 			if(bits == 16) return AL_FORMAT_QUAD16_LOKI;
++			break;
++		case 6:
++			if(bits == 8) return AL_FORMAT_51_8;
++			if(bits == 16) return AL_FORMAT_51_16;
++			break;
++		case 8:
++			if(bits == 8) return AL_FORMAT_71_8;
++			if(bits == 16) return AL_FORMAT_71_16;
+ 			break;
+ 	}
+ 
+@@ -719,6 +763,10 @@ ALboolean _al_RAWFORMAT(ALenum format)
+ 		case AL_FORMAT_STEREO8:
+ 		case AL_FORMAT_QUAD16_LOKI:
+ 		case AL_FORMAT_QUAD8_LOKI:
++		case AL_FORMAT_51_8:
++		case AL_FORMAT_51_16:
++		case AL_FORMAT_71_8:
++		case AL_FORMAT_71_16:
+ 			return AL_TRUE;
+ 		default:
+ 			break;
+@@ -738,6 +786,8 @@ ALbyte _alGetBitsFromFormat(ALenum forma
+ 		case AL_FORMAT_MONO16:
+ 		case AL_FORMAT_STEREO16:
+ 		case AL_FORMAT_QUAD16_LOKI:
++		case AL_FORMAT_51_16:
++		case AL_FORMAT_71_16:
+ 		case AL_FORMAT_IMA_ADPCM_MONO16_EXT:
+ 		case AL_FORMAT_IMA_ADPCM_STEREO16_EXT:
+ 			return 16;
+@@ -745,6 +795,8 @@ ALbyte _alGetBitsFromFormat(ALenum forma
+ 		case AL_FORMAT_MONO8:
+ 		case AL_FORMAT_STEREO8:
+ 		case AL_FORMAT_QUAD8_LOKI:
++		case AL_FORMAT_51_8:
++		case AL_FORMAT_71_8:
+ 			return 8;
+ 			break;
+ 	}
+diff -r abe8ba9de91a -r 0db436732d7d src/al_source.c
+--- a/src/al_source.c	Tue Jun 26 11:53:00 2007 +0200
++++ b/src/al_source.c	Tue Jun 26 11:55:47 2007 +0200
+@@ -58,6 +58,9 @@ static void _alMonoifyOffset1to4(ALshort
+ static void _alMonoifyOffset1to4(ALshort **dstref, ALuint offset, ALvoid *src, ALuint ssize);
+ static void _alMonoifyOffset2to4(ALshort **dstref, ALuint offset, ALvoid *src, ALuint ssize);
+ static void _alMonoifyOffset4to4(ALshort **dstref, ALuint offset, ALvoid *src, ALuint ssize);
++static void _alMonoifyOffsetNtoN( ALshort **dsts, ALuint offset,
++				  ALvoid *srcp, ALuint size,
++				  ALuint dstchan, ALuint srcchan);
+ 
+ /*
+  * Channelify functions copy the PCM data from srcs[0..nc-1] into an
+@@ -67,6 +70,8 @@ static void _alMonoifyOffset4to4(ALshort
+  */
+ static void _alChannelify2Offset(ALshort *dst, ALuint offset, ALshort **srcs, ALuint size);
+ static void _alChannelify4Offset(ALshort *dst, ALuint offset, ALshort **srcs, ALuint size);
++static void _alChannelifyNOffset( ALshort *dst, ALuint offset,
++				  ALshort **srcs, ALuint size, int nchan );
+ 
+ /* static data */
+ static ALshort *stereoptr = NULL; /*
+@@ -1850,6 +1855,16 @@ void _alMonoifyOffset(ALshort **dstref, 
+ void _alMonoifyOffset(ALshort **dstref, ALuint offset,
+ 		      ALvoid *srcp, ALuint size, ALuint dc, ALuint sc) {
+ 	switch( dc ) {
++	        case 6:
++	        case 8:
++			if (sc == 1 || sc == 2 || sc == 4)
++				_alMonoifyOffsetNtoN(dstref, offset, srcp, size, dc, sc);
++			else {
++			  	fprintf(stderr, "unhandled Monoify (dc %d sc %d)\n",
++					dc, sc);
++				break;
++			}
++		  break;
+ 	        case 4:
+                   switch(sc) {
+                           case 1:
+@@ -1901,6 +1916,28 @@ void _alMonoifyOffset(ALshort **dstref, 
+ 	return;
+ }
+ 
++static void _alMonoifyOffsetNtoN( ALshort **dsts, ALuint offset,
++				  ALvoid *srcp, ALuint size,
++				  ALuint dstchan, ALuint srcchan) {
++	ALshort *src = (ALshort *) srcp;
++	ALshort *dst[_ALC_MAX_CHANNELS];
++
++	int len      = size / sizeof *src;
++        int i, j, n;
++
++	offset /= sizeof **dsts;
++	for (i = 0; i < dstchan; i++)
++		dst[i] = dsts[0] + offset;
++
++	for(i = 0; i < len; i++) {
++		for (n = 0; n < dstchan; )
++			for (j = 0; j < srcchan; j++, n++)
++				dst[n][i] = src[j];
++		src += srcchan;
++	}
++
++}
++
+ static void _alMonoifyOffset1to4( ALshort **dsts, ALuint offset,
+ 				  ALvoid *srcp, ALuint size) {
+ 	ALshort *src = (ALshort *) srcp;
+@@ -2069,9 +2106,16 @@ void _alChannelifyOffset( ALshort *dst, 
+ {
+ 	switch( nc )
+ 	{
++		case 6:
++		case 8:
++		case 4:
++			_alChannelifyNOffset(dst, offset, srcs, size, nc);
++			break;
++#if 0
+ 		case 4:
+ 			_alChannelify4Offset(dst, offset, srcs, size);
+ 			break;
++#endif
+ 		case 2:
+ 			_alChannelify2Offset(dst, offset, srcs, size);
+ 			break;
+@@ -2144,6 +2188,25 @@ void _alChannelify4Offset( ALshort *dst,
+ }
+ 
+ 
++void _alChannelifyNOffset( ALshort *dst, ALuint offset,
++			   ALshort **srcs, ALuint size, int nchan ) {
++	ALshort *src[_ALC_MAX_CHANNELS];
++	ALuint i, j;
++
++	for (i = 0; i < nchan; i++)
++		src[i] = &srcs[i][offset / sizeof *srcs];
++
++        size /= sizeof *dst; /* we need sample offsets */
++
++        for (i = 0; i < size; i++ ) {
++		for (j = 0; j < nchan; j++) {
++			*dst++ = *src[j];
++			src[j]++;
++		}
++        }
++
++        return;
++}
+ 
+ /*
+  * alDeleteSources( ALsizei n, ALuint *sources )
+diff -r abe8ba9de91a -r 0db436732d7d src/al_types.h
+--- a/src/al_types.h	Tue Jun 26 11:53:00 2007 +0200
++++ b/src/al_types.h	Tue Jun 26 11:55:47 2007 +0200
+@@ -21,7 +21,7 @@
+ #include <stddef.h>
+ #include <sys/types.h>
+ 
+-#define _ALC_MAX_CHANNELS    6
++#define _ALC_MAX_CHANNELS    8
+ #define _ALC_MAX_FILTERS     9
+ 
+ #define _ALF_MAX_NAME        15
+diff -r abe8ba9de91a -r 0db436732d7d src/alc/alc_speaker.c
+--- a/src/alc/alc_speaker.c	Tue Jun 26 11:53:00 2007 +0200
++++ b/src/alc/alc_speaker.c	Tue Jun 26 11:55:47 2007 +0200
+@@ -159,28 +159,45 @@ void _alcSpeakerInit( ALuint cid ) {
+ 
+ 	num = _alcGetNumSpeakers(cid);
+ 
+-	/* fourpoint */
+-
+-	if (num >= 4)
+-	{
+-		sdis *= M_SQRT1_2;
+-
++	switch (num) {
++	case 5:
++	case 6:
++		/* 5.0 */
++		cc->_speaker_pos[ALS_CENTER].pos[2] += sdis;
++		cc->_speaker_pos[ALS_LFE].pos[2] += sdis;
++		sdis *= 0.70710678;
++		cc->_speaker_pos[ALS_LEFT].pos[0] -=sdis;
+ 		cc->_speaker_pos[ALS_LEFT].pos[2] += sdis;
++		cc->_speaker_pos[ALS_RIGHT].pos[0] += sdis;
+ 		cc->_speaker_pos[ALS_RIGHT].pos[2] += sdis;
+-
+ 		cc->_speaker_pos[ALS_LEFTS].pos[0] -= sdis;
+ 		cc->_speaker_pos[ALS_LEFTS].pos[2] -= sdis;
+-
+ 		cc->_speaker_pos[ALS_RIGHTS].pos[0] += sdis;
+ 		cc->_speaker_pos[ALS_RIGHTS].pos[2] -= sdis;
+-	}
+-
+-	/* stereo */
+-
+-	if (num >= 2)
+-	{
++		break;
++
++	case 4:
++		/* fourpoint */
++		sdis *= M_SQRT1_2;
++
+ 		cc->_speaker_pos[ALS_LEFT].pos[0] -= sdis;
+-		cc->_speaker_pos[ALS_RIGHT].pos[0] += sdis;
++		cc->_speaker_pos[ALS_LEFT].pos[2] += sdis;
++		cc->_speaker_pos[ALS_RIGHT].pos[0] += sdis;
++		cc->_speaker_pos[ALS_RIGHT].pos[2] += sdis;
++
++		cc->_speaker_pos[ALS_LEFTS].pos[0] -= sdis;
++		cc->_speaker_pos[ALS_LEFTS].pos[2] -= sdis;
++
++		cc->_speaker_pos[ALS_RIGHTS].pos[0] += sdis;
++		cc->_speaker_pos[ALS_RIGHTS].pos[2] -= sdis;
++		break;
++
++	case 3:
++	case 2:
++		/* stereo */
++		cc->_speaker_pos[ALS_LEFT].pos[0] -= sdis;
++		cc->_speaker_pos[ALS_RIGHT].pos[0] += sdis;
++		break;
+ 	}
+ 	return;
+ }
+diff -r abe8ba9de91a -r 0db436732d7d src/alc/alc_speaker.h
+--- a/src/alc/alc_speaker.h	Tue Jun 26 11:53:00 2007 +0200
++++ b/src/alc/alc_speaker.h	Tue Jun 26 11:55:47 2007 +0200
+@@ -18,7 +18,9 @@ typedef enum {
+ 	ALS_LEFT,
+ 	ALS_RIGHT,
+ 	ALS_LEFTS,
+-	ALS_RIGHTS
++	ALS_RIGHTS,
++	ALS_CENTER,
++	ALS_LFE
+ } _alcSpeakerEnum;
+ 
+ /*
+diff -r abe8ba9de91a -r 0db436732d7d src/backends/alc_backend_alsa.c
+--- a/src/backends/alc_backend_alsa.c	Tue Jun 26 11:53:00 2007 +0200
++++ b/src/backends/alc_backend_alsa.c	Tue Jun 26 11:55:47 2007 +0200
+@@ -234,9 +234,11 @@ static ALboolean set_read_alsa( void *ha
+ 		return AL_FALSE;
+ 
+ 
+-	if ((*fmt == AL_FORMAT_QUAD8_LOKI) || (*fmt == AL_FORMAT_STEREO8))
++	if ((*fmt == AL_FORMAT_QUAD8_LOKI) || (*fmt == AL_FORMAT_STEREO8) ||
++	    *fmt == AL_FORMAT_51_8 || *fmt == AL_FORMAT_71_8)
+ 		*fmt = AL_FORMAT_MONO8;
+-	if ((*fmt == AL_FORMAT_QUAD16_LOKI) || (*fmt == AL_FORMAT_STEREO16))
++	if ((*fmt == AL_FORMAT_QUAD16_LOKI) || (*fmt == AL_FORMAT_STEREO16) ||
++	    *fmt == AL_FORMAT_51_16 || *fmt == AL_FORMAT_71_16)
+ 		*fmt = AL_FORMAT_MONO16;
+ 
+ 	ai->channels    = 1;
+@@ -664,9 +666,13 @@ static int AL2ALSAFMT(ALenum format) {
+ 		case AL_FORMAT_STEREO8:     return SND_PCM_FORMAT_U8;
+ 		case AL_FORMAT_MONO8:       return SND_PCM_FORMAT_U8;
+ 		case AL_FORMAT_QUAD8_LOKI:  return SND_PCM_FORMAT_U8;
++		case AL_FORMAT_51_8:        return SND_PCM_FORMAT_U8;
++		case AL_FORMAT_71_8:        return SND_PCM_FORMAT_U8;
+ 		case AL_FORMAT_STEREO16:    return SND_PCM_FORMAT_S16;
+ 		case AL_FORMAT_MONO16:      return SND_PCM_FORMAT_S16;
+ 		case AL_FORMAT_QUAD16_LOKI: return SND_PCM_FORMAT_S16;
++		case AL_FORMAT_51_16:       return SND_PCM_FORMAT_S16;
++		case AL_FORMAT_71_16:       return SND_PCM_FORMAT_S16;
+ 
+ 		default: break;
+ 	}

@@ -1,0 +1,45 @@
+From caacceca00e5a6911f8b87d6bab5afd6eb0f4927 Mon Sep 17 00:00:00 2001
+From: Brian Paul <brian.paul@tungstengraphics.com>
+Date: Tue, 2 Sep 2008 18:10:34 -0600
+Subject: [PATCH] fix BUFFER_DEPTH/BUFFER_ACCUM mix-up
+
+---
+ src/mesa/main/framebuffer.c |   12 ++++++------
+ 1 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git Mesa-7.0.4/src/mesa/main/framebuffer.c Mesa-7.0.4/src/mesa/main/framebuffer.c
+index 8aeb369..3b4f9b1 100644
+--- Mesa-7.0.4/src/mesa/main/framebuffer.c
++++ Mesa-7.0.4/src/mesa/main/framebuffer.c
+@@ -1,8 +1,8 @@
+ /*
+  * Mesa 3-D graphics library
+- * Version:  6.5.1
++ * Version:  7.2
+  *
+- * Copyright (C) 1999-2006  Brian Paul   All Rights Reserved.
++ * Copyright (C) 1999-2008  Brian Paul   All Rights Reserved.
+  *
+  * Permission is hereby granted, free of charge, to any person obtaining a
+  * copy of this software and associated documentation files (the "Software"),
+@@ -485,13 +485,13 @@ _mesa_update_framebuffer_visual(struct gl_framebuffer *fb)
+    if (fb->Attachment[BUFFER_ACCUM].Renderbuffer) {
+       fb->Visual.haveAccumBuffer = GL_TRUE;
+       fb->Visual.accumRedBits
+-         = fb->Attachment[BUFFER_DEPTH].Renderbuffer->RedBits;
++         = fb->Attachment[BUFFER_ACCUM].Renderbuffer->RedBits;
+       fb->Visual.accumGreenBits
+-         = fb->Attachment[BUFFER_DEPTH].Renderbuffer->GreenBits;
++         = fb->Attachment[BUFFER_ACCUM].Renderbuffer->GreenBits;
+       fb->Visual.accumBlueBits
+-         = fb->Attachment[BUFFER_DEPTH].Renderbuffer->BlueBits;
++         = fb->Attachment[BUFFER_ACCUM].Renderbuffer->BlueBits;
+       fb->Visual.accumAlphaBits
+-         = fb->Attachment[BUFFER_DEPTH].Renderbuffer->AlphaBits;
++         = fb->Attachment[BUFFER_ACCUM].Renderbuffer->AlphaBits;
+    }
+ 
+    compute_depth_max(fb);
+-- 
+1.6.0.2
+

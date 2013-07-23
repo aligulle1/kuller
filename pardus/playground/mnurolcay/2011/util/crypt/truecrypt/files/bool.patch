@@ -1,0 +1,70 @@
+diff -Naur truecrypt-6.2-source.orig/Common/Crypto.h truecrypt-6.2-source/Common/Crypto.h
+--- truecrypt-6.2-source.orig/Common/Crypto.h	2009-05-16 01:42:18.157810949 +0300
++++ truecrypt-6.2-source/Common/Crypto.h	2009-05-16 01:43:03.374685389 +0300
+@@ -29,6 +29,10 @@
+ 
+ #include "Tcdefs.h"
+ 
++#ifndef BOOL
++#define BOOL BOOL1
++#endif
++
+ #ifdef __cplusplus
+ extern "C" {
+ #endif
+@@ -46,9 +50,9 @@
+ #define LEGACY_VOL_IV_SIZE			32
+ 
+ // The first PRF to try when mounting
+-#define FIRST_PRF_ID		1	
++#define FIRST_PRF_ID		1
+ 
+-// Hash algorithms (pseudorandom functions). 
++// Hash algorithms (pseudorandom functions).
+ enum
+ {
+ 	RIPEMD160 = FIRST_PRF_ID,
+@@ -61,12 +65,12 @@
+ };
+ 
+ // The last PRF to try when mounting and also the number of implemented PRFs
+-#define LAST_PRF_ID			(HASH_ENUM_END_ID - 1)	
++#define LAST_PRF_ID			(HASH_ENUM_END_ID - 1)
+ 
+ #define RIPEMD160_BLOCKSIZE		64
+ #define RIPEMD160_DIGESTSIZE	20
+ 
+-#define SHA1_BLOCKSIZE			64	
++#define SHA1_BLOCKSIZE			64
+ #define SHA1_DIGESTSIZE			20
+ 
+ #define SHA512_BLOCKSIZE		128
+@@ -114,8 +118,8 @@
+ {
+ 	NONE = 0,
+ 	AES,
+-	SERPENT,			
+-	TWOFISH,			
++	SERPENT,
++	TWOFISH,
+ #ifndef TC_WINDOWS_BOOT
+ 	BLOWFISH,		// Deprecated/legacy
+ 	CAST,			// Deprecated/legacy
+@@ -220,7 +224,7 @@
+ #ifndef TC_WINDOWS_BOOT
+ 	uint16 HeaderVersion;
+ 
+-	GfCtx gf_ctx; 
++	GfCtx gf_ctx;
+ 
+ 	unsigned __int8 master_keydata[MASTER_KEYDATA_SIZE];	/* This holds the volume header area containing concatenated master key(s) and secondary key(s) (XTS mode). For LRW (deprecated/legacy), it contains the tweak key before the master key(s). For CBC (deprecated/legacy), it contains the IV seed before the master key(s). */
+ 	unsigned __int8 k2[MASTER_KEYDATA_SIZE];				/* For XTS, this contains the secondary key (if cascade, multiple concatenated). For LRW (deprecated/legacy), it contains the tweak key. For CBC (deprecated/legacy), it contains the IV seed. */
+@@ -233,7 +237,7 @@
+ 
+ 	BOOL bProtectHiddenVolume;			// Indicates whether the volume contains a hidden volume to be protected against overwriting
+ 	BOOL bHiddenVolProtectionAction;		// TRUE if a write operation has been denied by the driver in order to prevent the hidden volume from being overwritten (set to FALSE upon volume mount).
+-	
++
+ 	uint64 volDataAreaOffset;		// Absolute position, in bytes, of the first data sector of the volume.
+ 
+ 	uint64 hiddenVolumeSize;		// Size of the hidden volume excluding the header (in bytes). Set to 0 for standard volumes.

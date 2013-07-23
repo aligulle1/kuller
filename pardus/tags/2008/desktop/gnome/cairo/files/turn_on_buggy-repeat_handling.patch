@@ -1,0 +1,30 @@
+#! /bin/sh /usr/share/dpatch/dpatch-run
+## 03-turn_on_buggy-repeat_handling.dpatch by Fabien Tassin <fta@sofaraway.org>
+##
+## All lines beginning with `## DP:' are a description of the patch.
+## DP: No description.
+
+@DPATCH@
+diff -urNad cairo-1.5.8.orig/src/cairo-xlib-display.c cairo-1.5.8/src/cairo-xlib-display.c
+--- cairo-1.5.8.orig/src/cairo-xlib-display.c
++++ cairo-1.5.8/src/cairo-xlib-display.c
+@@ -297,16 +297,19 @@
+ 	 * back up to 6.7 or 6.8. */
+ 	if (VendorRelease (dpy) >= 60700000 && VendorRelease (dpy) <= 60802000)
+ 	    display->buggy_repeat = TRUE;
+     } else if (strstr (ServerVendor (dpy), "XFree86") != NULL) {
+ 	if (VendorRelease (dpy) <= 40500000)
+ 	    display->buggy_repeat = TRUE;
+     }
+ 
++    /* XXX workaround; see https://bugzilla.mozilla.org/show_bug.cgi?id=413583 */
++    display->buggy_repeat = TRUE;
++
+     display->next = _cairo_xlib_display_list;
+     _cairo_xlib_display_list = display;
+ 
+ UNLOCK:
+     CAIRO_MUTEX_UNLOCK (_cairo_xlib_display_mutex);
+     return display;
+ }
+ 

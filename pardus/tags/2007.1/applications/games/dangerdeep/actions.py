@@ -1,0 +1,33 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+#
+# Copyright 2006 TUBITAK/UEKAE
+# Licensed under the GNU General Public License, version 2.
+# See the file http://www.gnu.org/copyleft/gpl.txt.
+
+from pisi.actionsapi import pisitools
+from pisi.actionsapi import shelltools
+from pisi.actionsapi import scons
+from pisi.actionsapi import get
+
+datadir = "/usr/share/dangerdeep"
+
+def setup():
+    pisitools.dosed("SConstruct", "/usr/local/bin", "/usr/bin")
+    pisitools.dosed("SConstruct", "/usr/local/share/dangerdeep", datadir)
+    pisitools.dosed("SConstruct", "pardus_ccflags", get.CXXFLAGS())
+
+
+def build():
+    shelltools.export("CXX", get.CXX())
+    scons.make("usex86sse=2 \
+                datadir=%s \
+                DESTDIR=%s \
+                --cache-disable" % (datadir, get.installDIR()))
+
+def install():
+    pisitools.dobin("build/linux/dangerdeep")
+
+    pisitools.doman("doc/man/dangerdeep.6")
+    pisitools.dodoc("README", "CREDITS", "ChangeLog")
+

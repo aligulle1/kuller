@@ -1,0 +1,1022 @@
+Index: thumbnail/directorythumbnail.desktop
+===================================================================
+--- kioslave/thumbnail/directorythumbnail.desktop	(revision 0)
++++ kioslave/thumbnail/directorythumbnail.desktop	(revision 952147)
+@@ -0,0 +1,21 @@
++[Desktop Entry]
++Type=Service
++Name=Directories
++Name[el]=Κατάλογοι
++Name[et]=Kataloogid
++Name[ga]=Comhadlanna
++Name[gu]=ડિરેક્ટરીઓ
++Name[ko]=디렉터리
++Name[nb]=Mapper
++Name[nds]=Ornern
++Name[pt]=Pastas
++Name[pt_BR]=Pastas
++Name[si]=බහලුම්
++Name[sv]=Kataloger
++Name[tr]=Dizinler
++Name[uk]=Каталоги
++Name[x-test]=xxDirectoriesxx
++Name[zh_TW]=目錄
++X-KDE-ServiceTypes=ThumbCreator
++MimeType=inode/directory;
++CacheThumbnail=false
+Index: thumbnail/thumbnail.h
+===================================================================
+--- kioslave/thumbnail/thumbnail.h	(revision 939914)
++++ kioslave/thumbnail/thumbnail.h	(revision 952147)
+@@ -36,8 +36,15 @@
+     virtual void get(const KUrl &url);
+ 
+ protected:
++    ThumbCreator* getThumbCreator(const QString& plugin);
+     const QImage getIcon();
++    void drawPictureFrame(QPainter *painter, const QPoint &pos, const QImage &image,
++                          int frameWidth) const;
++    QImage thumbForDirectory(const KUrl& directory);
++    QString pluginForMimeType(const QString& mimeType);
+ 
++    float sequenceIndex() const;
++
+ private:
+     QString m_mimeType;
+     int m_width;
+@@ -49,6 +56,7 @@
+     QHash<QString, ThumbCreator*> m_creators;
+     // transparent icon cache
+     QHash<QString, QImage> m_iconDict;
++    QStringList m_enabledPlugins;
+ };
+ 
+ #endif
+Index: thumbnail/imagefilter.cpp
+===================================================================
+--- kioslave/thumbnail/imagefilter.cpp	(revision 0)
++++ kioslave/thumbnail/imagefilter.cpp	(revision 952147)
+@@ -0,0 +1,265 @@
++//krazy:exclude=copyright (email of Maxim is missing)
++/*
++    This file is a part of the KDE project
++
++    Copyright © 2006 Zack Rusin <zack@kde.org>
++    Copyright © 2006-2007, 2008 Fredrik Höglund <fredrik@kde.org>
++
++    The stack blur algorithm was invented by Mario Klingemann <mario@quasimondo.com>
++
++    This implementation is based on the version in Anti-Grain Geometry Version 2.4,
++    Copyright © 2002-2005 Maxim Shemanarev (http://www.antigrain.com)
++
++    Redistribution and use in source and binary forms, with or without
++    modification, are permitted provided that the following conditions
++    are met:
++
++    1. Redistributions of source code must retain the above copyright
++       notice, this list of conditions and the following disclaimer.
++    2. Redistributions in binary form must reproduce the above copyright
++       notice, this list of conditions and the following disclaimer in the
++       documentation and/or other materials provided with the distribution.
++
++    THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
++    IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
++    OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
++    IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
++    INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
++    NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++    DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
++    THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
++    THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++*/
++
++#include "imagefilter.h"
++
++#include <QPainter>
++#include <QImage>
++#include <QColor>
++#include <QDebug>
++
++#include <cmath>
++#include <string.h>
++
++static const quint32 stack_blur8_mul[255] =
++{
++    512,512,456,512,328,456,335,512,405,328,271,456,388,335,292,512,
++    454,405,364,328,298,271,496,456,420,388,360,335,312,292,273,512,
++    482,454,428,405,383,364,345,328,312,298,284,271,259,496,475,456,
++    437,420,404,388,374,360,347,335,323,312,302,292,282,273,265,512,
++    497,482,468,454,441,428,417,405,394,383,373,364,354,345,337,328,
++    320,312,305,298,291,284,278,271,265,259,507,496,485,475,465,456,
++    446,437,428,420,412,404,396,388,381,374,367,360,354,347,341,335,
++    329,323,318,312,307,302,297,292,287,282,278,273,269,265,261,512,
++    505,497,489,482,475,468,461,454,447,441,435,428,422,417,411,405,
++    399,394,389,383,378,373,368,364,359,354,350,345,341,337,332,328,
++    324,320,316,312,309,305,301,298,294,291,287,284,281,278,274,271,
++    268,265,262,259,257,507,501,496,491,485,480,475,470,465,460,456,
++    451,446,442,437,433,428,424,420,416,412,408,404,400,396,392,388,
++    385,381,377,374,370,367,363,360,357,354,350,347,344,341,338,335,
++    332,329,326,323,320,318,315,312,310,307,304,302,299,297,294,292,
++    289,287,285,282,280,278,275,273,271,269,267,265,263,261,259
++};
++
++static const quint32 stack_blur8_shr[255] =
++{
++    9, 11, 12, 13, 13, 14, 14, 15, 15, 15, 15, 16, 16, 16, 16, 17,
++    17, 17, 17, 17, 17, 17, 18, 18, 18, 18, 18, 18, 18, 18, 18, 19,
++    19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 20, 20, 20,
++    20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 21,
++    21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21,
++    21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 22, 22, 22, 22, 22, 22,
++    22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22,
++    22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 23,
++    23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23,
++    23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23,
++    23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23,
++    23, 23, 23, 23, 23, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24,
++    24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24,
++    24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24,
++    24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24,
++    24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24
++};
++
++inline static void blurHorizontal(QImage &image, unsigned int *stack, int div, int radius)
++{
++    int stackindex;
++    int stackstart;
++
++    quint32 * const pixels = reinterpret_cast<quint32 *>(image.bits());
++    quint32 pixel;
++
++    int w = image.width();
++    int h = image.height();
++    int wm = w - 1;
++
++    unsigned int mul_sum = stack_blur8_mul[radius];
++    unsigned int shr_sum = stack_blur8_shr[radius];
++
++    unsigned int sum, sum_in, sum_out;
++
++    for (int y = 0; y < h; y++)
++    {
++        sum     = 0;
++        sum_in  = 0;
++        sum_out = 0;
++
++        const int yw = y * w;
++        pixel = pixels[yw];
++        for (int i = 0; i <= radius; i++)
++        {
++            stack[i] = qAlpha(pixel);
++
++            sum += stack[i] * (i + 1);
++            sum_out += stack[i];
++        }
++
++        for (int i = 1; i <= radius; i++)
++        {
++            pixel = pixels[yw + qMin(i, wm)];
++
++            unsigned int *stackpix = &stack[i + radius];
++            *stackpix = qAlpha(pixel);
++
++            sum    += *stackpix * (radius + 1 - i);
++            sum_in += *stackpix;
++        }
++
++        stackindex = radius;
++        for (int x = 0, i = yw; x < w; x++)
++        {
++            pixels[i++] = (((sum * mul_sum) >> shr_sum) << 24) & 0xff000000;
++
++            sum -= sum_out;
++
++            stackstart = stackindex + div - radius;
++            if (stackstart >= div)
++                stackstart -= div;
++
++            unsigned int *stackpix = &stack[stackstart];
++
++            sum_out -= *stackpix;
++
++            pixel = pixels[yw + qMin(x + radius + 1, wm)];
++
++            *stackpix = qAlpha(pixel);
++
++            sum_in += *stackpix;
++            sum    += sum_in;
++
++            if (++stackindex >= div)
++                stackindex = 0;
++
++            stackpix = &stack[stackindex];
++
++            sum_out += *stackpix;
++            sum_in  -= *stackpix;
++        } // for (x = 0, ...)
++    } // for (y = 0, ...)
++}
++
++inline static void blurVertical(QImage &image, unsigned int *stack, int div, int radius)
++{
++    int stackindex;
++    int stackstart;
++
++    quint32 * const pixels = reinterpret_cast<quint32 *>(image.bits());
++    quint32 pixel;
++
++    int w = image.width();
++    int h = image.height();
++    int hm = h - 1;
++
++    int mul_sum = stack_blur8_mul[radius];
++    int shr_sum = stack_blur8_shr[radius];
++
++    unsigned int sum, sum_in, sum_out;
++
++    for (int x = 0; x < w; x++)
++    {
++        sum     = 0;
++        sum_in  = 0;
++        sum_out = 0;
++
++        pixel = pixels[x];
++        for (int i = 0; i <= radius; i++)
++        {
++            stack[i] = qAlpha(pixel);
++
++            sum += stack[i] * (i + 1);
++            sum_out += stack[i];
++        }
++
++        for (int i = 1; i <= radius; i++)
++        {
++            pixel = pixels[qMin(i, hm) * w + x];
++
++            unsigned int *stackpix = &stack[i + radius];
++            *stackpix = qAlpha(pixel);
++
++            sum    += *stackpix * (radius + 1 - i);
++            sum_in += *stackpix;
++        }
++
++        stackindex = radius;
++        for (int y = 0, i = x; y < h; y++, i += w)
++        {
++            pixels[i] = (((sum * mul_sum) >> shr_sum) << 24) & 0xff000000;
++
++            sum -= sum_out;
++
++            stackstart = stackindex + div - radius;
++            if (stackstart >= div)
++                stackstart -= div;
++
++            unsigned int *stackpix = &stack[stackstart];
++
++            sum_out -= *stackpix;
++
++            pixel = pixels[qMin(y + radius + 1, hm) * w + x];
++
++            *stackpix = qAlpha(pixel);
++
++            sum_in += *stackpix;
++            sum    += sum_in;
++
++            if (++stackindex >= div)
++                stackindex = 0;
++
++            stackpix = &stack[stackindex];
++
++            sum_out += *stackpix;
++            sum_in  -= *stackpix;
++        } // for (y = 0, ...)
++    } // for (x = 0, ...)
++}
++
++static void stackBlur(QImage &image, float radius)
++{
++    radius = qRound(radius);
++
++    int div = int(radius * 2) + 1;
++    unsigned int *stack  = new unsigned int[div];
++
++    blurHorizontal(image, stack, div, radius);
++    blurVertical(image, stack, div, radius);
++
++    delete [] stack;
++}
++
++void ImageFilter::shadowBlur(QImage &image, float radius, const QColor &color)
++{
++    if (radius < 0)
++        return;
++
++    if (radius > 0)
++        stackBlur(image, radius);
++
++    // Correct the color and opacity of the shadow
++    QPainter p(&image);
++    p.setCompositionMode(QPainter::CompositionMode_SourceIn);
++    p.fillRect(image.rect(), color);
++}
++
++// kate: space-indent on; indent-width 4; replace-tabs on;
+Index: thumbnail/CMakeLists.txt
+===================================================================
+--- kioslave/thumbnail/CMakeLists.txt	(revision 939914)
++++ kioslave/thumbnail/CMakeLists.txt	(revision 952147)
+@@ -6,7 +6,7 @@
+ 
+ ########### next target ###############
+ 
+-set(kio_thumbnail_PART_SRCS thumbnail.cpp)
++set(kio_thumbnail_PART_SRCS thumbnail.cpp imagefilter.cpp)
+ 
+ kde4_add_plugin(kio_thumbnail ${kio_thumbnail_PART_SRCS})
+ 
+@@ -26,6 +26,10 @@
+ 
+ ########### next target ###############
+ 
++install( FILES directorythumbnail.desktop DESTINATION ${SERVICES_INSTALL_DIR})
++
++########### next target ###############
++
+ set(jpegthumbnail_PART_SRCS jpegcreator.cpp)
+ 
+ kde4_add_plugin(jpegthumbnail ${jpegthumbnail_PART_SRCS})
+Index: thumbnail/thumbnail.cpp
+===================================================================
+--- kioslave/thumbnail/thumbnail.cpp	(revision 939914)
++++ kioslave/thumbnail/thumbnail.cpp	(revision 952147)
+@@ -38,6 +38,7 @@
+ #include <QtGui/QPainter>
+ #include <QtGui/QPixmap>
+ 
++#include <kcodecs.h>
+ #include <kurl.h>
+ #include <kapplication.h>
+ #include <kcmdlineargs.h>
+@@ -51,13 +52,19 @@
+ #include <kservicetype.h>
+ #include <kservicetypetrader.h>
+ #include <kmimetypetrader.h>
++#include <ktemporaryfile.h>
+ #include <kfilemetainfo.h>
+ #include <klocale.h>
++#include <kde_file.h>
+ 
+ #include <config-runtime.h> // For HAVE_NICE
+ #include <kio/thumbcreator.h>
++#include <kio/thumbsequencecreator.h>
+ #include <kconfiggroup.h>
+ 
++#include <iostream>
++#include <QtCore/QDirIterator>
++
+ // Use correctly KComponentData instead of KApplication (but then no QPixmap)
+ #undef USE_KINSTANCE
+ // Fix thumbnail: protocol
+@@ -67,6 +74,8 @@
+ # include <QFileInfo>
+ #endif
+ 
++#include "imagefilter.h"
++
+ // Recognized metadata entries:
+ // mimeType     - the mime type of the file, used for the overlay icon if any
+ // width        - maximum width for the thumbnail
+@@ -116,8 +125,8 @@
+     KApplication app( true);
+ #endif
+ 
+-    if (argc != 4)
+-    {
++
++    if (argc != 4) {
+         kError(7115) << "Usage: kio_thumbnail protocol domain-socket1 domain-socket2" << endl;
+         exit(-1);
+     }
+@@ -136,8 +145,8 @@
+ 
+ ThumbnailProtocol::~ThumbnailProtocol()
+ {
+-  qDeleteAll( m_creators );
+-  m_creators.clear();
++    qDeleteAll( m_creators );
++    m_creators.clear();
+ }
+ 
+ void ThumbnailProtocol::get(const KUrl &url)
+@@ -147,36 +156,31 @@
+ #ifdef THUMBNAIL_HACK
+     // ### HACK
+     bool direct=false;
+-    if (m_mimeType.isEmpty())
+-    {
+-        kDebug(7115) << "PATH: " << url.path();
++    if (m_mimeType.isEmpty()) {
+         QFileInfo info(url.path());
+-        if (info.isDir())
+-        {
+-            // We cannot process a directory
+-            error(KIO::ERR_IS_DIRECTORY,url.path());
+-            return;
+-        }
+-        else if (!info.exists())
+-        {
++        kDebug(7115) << "PATH: " << url.path() << "isDir:" << info.isDir();
++        if (!info.exists()) {
+             // The file does not exist
+             error(KIO::ERR_DOES_NOT_EXIST,url.path());
+             return;
+-        }
+-        else if (!info.isReadable())
+-        {
++        } else if (!info.isReadable()) {
+             // The file is not readable!
+             error(KIO::ERR_COULD_NOT_READ,url.path());
+             return;
+         }
+-        m_mimeType = KMimeType::findByUrl(url)->name();
++
++        if (info.isDir()) {
++            m_mimeType = "inode/directory";
++        } else {
++            KMimeType::findByUrl(KUrl(info.filePath()))->name();
++        }
++
+         kDebug(7115) << "Guessing MIME Type:" << m_mimeType;
+         direct=true; // thumbnail: was probably called from Konqueror
+     }
+ #endif
+ 
+-    if (m_mimeType.isEmpty())
+-    {
++    if (m_mimeType.isEmpty()) {
+         error(KIO::ERR_INTERNAL, i18n("No MIME Type specified."));
+         return;
+     }
+@@ -185,23 +189,22 @@
+     m_height = metaData("height").toInt();
+     int iconSize = metaData("iconSize").toInt();
+ 
+-    if (m_width < 0 || m_height < 0)
+-    {
++    if (m_width < 0 || m_height < 0) {
+         error(KIO::ERR_INTERNAL, i18n("No or invalid size specified."));
+         return;
+     }
+ #ifdef THUMBNAIL_HACK
+-    else if (!m_width || !m_height)
+-    {
++    else if (!m_width || !m_height) {
+         kDebug(7115) << "Guessing height, width, icon size!";
+-        m_width=128;
+-        m_height=128;
+-        iconSize=128;
++        m_width = 128;
++        m_height = 128;
++        iconSize = 128;
+     }
+ #endif
+ 
+-    if (!iconSize)
++    if (!iconSize) {
+         iconSize = KIconLoader::global()->currentSize(KIconLoader::Desktop);
++    }
+     if (iconSize != m_iconSize) {
+         m_iconDict.clear();
+     }
+@@ -213,7 +216,6 @@
+ 
+     KConfigGroup group( KGlobal::config(), "PreviewSettings" );
+ 
+-
+     // ### KFMI
+     bool kfmiThumb = false;
+     if (group.readEntry( "UseFileThumbnails", true)) {
+@@ -221,17 +223,14 @@
+             KMimeTypeTrader::self()->preferredService( m_mimeType, "KFilePlugin");
+ 
+         if (service && service->isValid() &&
+-            service->property("SupportsThumbnail").toBool())
+-        {
++            service->property("SupportsThumbnail").toBool()) {
+             // was:  KFileMetaInfo info(url.path(), m_mimeType, KFileMetaInfo::Thumbnail);
+             // but m_mimeType and WhatFlags are now unused in KFileMetaInfo, and not present in the
+             // call that takes a KUrl
+             KFileMetaInfo info(url);
+-            if (info.isValid())
+-            {
++            if (info.isValid()) {
+                 KFileMetaInfoItem item = info.item("thumbnail");
+-                if (item.isValid() && item.value().type() == QVariant::Image)
+-                {
++                if (item.isValid() && item.value().type() == QVariant::Image) {
+                     img = item.value().value<QImage>();
+                     kDebug(7115) << "using KFMI for the thumbnail\n";
+                     kfmiThumb = true;
+@@ -241,71 +240,57 @@
+     }
+     ThumbCreator::Flags flags = ThumbCreator::None;
+ 
+-    if (!kfmiThumb)
+-    {
+-        kDebug(7115) << "using thumb creator for the thumbnail\n";
++    if (!kfmiThumb) {
+         QString plugin = metaData("plugin");
++        if ((plugin.isEmpty() || plugin == "directorythumbnail") && m_mimeType == "inode/directory") {
++            img = thumbForDirectory(url);
++            if(img.isNull()) {
++              error(KIO::ERR_INTERNAL, i18n("Cannot create thumbnail for directory"));
++              return;
++            }
++        } else {
+ #ifdef THUMBNAIL_HACK
+-        if (plugin.isEmpty())
+-        {
+-            KService::List offers = KMimeTypeTrader::self()->query( m_mimeType, QLatin1String( "ThumbCreator" ) );
++            if (plugin.isEmpty()) {
++                plugin = pluginForMimeType(m_mimeType);
++            }
+ 
+-            if(!offers.isEmpty())
+-            {
+-                KService::Ptr serv;
+-                serv = offers.first();
+-                plugin = serv->library();
++            kDebug(7115) << "Guess plugin: " << plugin;
++#endif
++            if (plugin.isEmpty()) {
++                error(KIO::ERR_INTERNAL, i18n("No plugin specified."));
++                return;
+             }
+-        }
+-        kDebug(7115) << "Guess plugin: " << plugin;
+-#endif
+-        if (plugin.isEmpty())
+-        {
+-            error(KIO::ERR_INTERNAL, i18n("No plugin specified."));
+-            return;
+-        }
+ 
+-        ThumbCreator *creator = m_creators[plugin];
+-        if (!creator)
+-        {
+-            // Don't use KLibFactory here, this is not a QObject and
+-            // neither is ThumbCreator
+-            KLibrary *library = KLibLoader::self()->library(plugin);
+-            if (library)
+-            {
+-                newCreator create = (newCreator)library->resolveFunction("new_creator");
+-                if (create)
+-                    creator = create();
+-            }
+-            if (!creator)
+-            {
++            ThumbCreator* creator = getThumbCreator(plugin);
++            if(!creator) {
+                 error(KIO::ERR_INTERNAL, i18n("Cannot load ThumbCreator %1", plugin));
+                 return;
+             }
+-            m_creators.insert(plugin, creator);
+-        }
+ 
+-        if (!creator->create(url.path(), m_width, m_height, img))
+-        {
+-            error(KIO::ERR_INTERNAL, i18n("Cannot create thumbnail for %1", url.path()));
+-            return;
++            ThumbSequenceCreator* sequenceCreator = dynamic_cast<ThumbSequenceCreator*>(creator);
++            if(sequenceCreator)
++                sequenceCreator->setSequenceIndex(sequenceIndex());
++
++            if (!creator->create(url.path(), m_width, m_height, img)) {
++                error(KIO::ERR_INTERNAL, i18n("Cannot create thumbnail for %1", url.path()));
++                return;
++            }
++            flags = creator->flags();
+         }
+-        flags = creator->flags();
+     }
+ 
+-    if (img.width() > m_width || img.height() > m_height)
+-    {
++    if (img.width() > m_width || img.height() > m_height) {
+         double imgRatio = (double)img.height() / (double)img.width();
+-        if (imgRatio > (double)m_height / (double)m_width)
++        if (imgRatio > (double)m_height / (double)m_width) {
+             img = img.scaled( int(qMax((double)m_height / imgRatio, 1.0)), m_height, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+-        else
++        } else {
+             img = img.scaled(m_width, int(qMax((double)m_width * imgRatio, 1.0)), Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
++        }
+     }
+ 
+ // ### FIXME
+ #ifndef USE_KINSTANCE
+-    if (flags & ThumbCreator::DrawFrame)
+-    {
++    if (flags & ThumbCreator::DrawFrame) {
+         QPixmap pix = QPixmap::fromImage( img );
+         int x2 = pix.width() - 1;
+         int y2 = pix.height() - 1;
+@@ -321,8 +306,7 @@
+         p.end();
+ 
+         const QBitmap& mask = pix.mask();
+-        if ( !mask.isNull() ) // need to update it so we can see the frame
+-        {
++        if (!mask.isNull()) { // need to update it so we can see the frame
+             QBitmap bitmap( mask );
+             QPainter painter;
+             painter.begin( &bitmap );
+@@ -339,8 +323,7 @@
+     }
+ #endif
+ 
+-    if ((flags & ThumbCreator::BlendIcon) && KIconLoader::global()->alphaBlending(KIconLoader::Desktop))
+-    {
++    if ((flags & ThumbCreator::BlendIcon) && KIconLoader::global()->alphaBlending(KIconLoader::Desktop)) {
+         // blending the mimetype icon in
+         QImage icon = getIcon();
+ 
+@@ -353,23 +336,19 @@
+         p.drawImage(x, y, icon);
+     }
+ 
+-    if (img.isNull())
+-    {
++    if (img.isNull()) {
+         error(KIO::ERR_INTERNAL, i18n("Failed to create a thumbnail."));
+         return;
+     }
+ 
+     const QString shmid = metaData("shmid");
+-    if (shmid.isEmpty())
+-    {
++    if (shmid.isEmpty()) {
+ #ifdef THUMBNAIL_HACK
+-        if (direct)
+-        {
++        if (direct) {
+             // If thumbnail was called directly from Konqueror, then the image needs to be raw
+             //kDebug(7115) << "RAW IMAGE TO STREAM";
+             QBuffer buf;
+-            if (!buf.open(QIODevice::WriteOnly))
+-            {
++            if (!buf.open(QIODevice::WriteOnly)) {
+                 error(KIO::ERR_INTERNAL, i18n("Could not write image."));
+                 return;
+             }
+@@ -386,27 +365,24 @@
+             stream << img;
+             data(imgData);
+         }
+-    }
+-    else
+-    {
++    } else {
+ #ifndef Q_WS_WIN
+         QByteArray imgData;
+         QDataStream stream( &imgData, QIODevice::WriteOnly );
+         //kDebug(7115) << "IMAGE TO SHMID";
+         void *shmaddr = shmat(shmid.toInt(), 0, 0);
+-        if (shmaddr == (void *)-1)
+-        {
++        if (shmaddr == (void *)-1) {
+             error(KIO::ERR_INTERNAL, i18n("Failed to attach to shared memory segment %1", shmid));
+             return;
+         }
+-        if (img.width() * img.height() > m_width * m_height)
+-        {
++        if (img.width() * img.height() > m_width * m_height) {
+             error(KIO::ERR_INTERNAL, i18n("Image is too big for the shared memory segment"));
+             shmdt((char*)shmaddr);
+             return;
+         }
+-        if( img.depth() != 32 ) // KIO::PreviewJob and this code below completely ignores colortable :-/,
++        if( img.format() != QImage::Format_ARGB32 ) { // KIO::PreviewJob and this code below completely ignores colortable :-/,
+             img = img.convertToFormat(QImage::Format_ARGB32); //  so make sure there is none
++        }
+         // Keep in sync with kdelibs/kio/kio/previewjob.cpp
+         stream << img.width() << img.height() << quint8(img.format());
+         memcpy(shmaddr, img.bits(), img.numBytes());
+@@ -417,16 +393,257 @@
+     finished();
+ }
+ 
++QString ThumbnailProtocol::pluginForMimeType(const QString& mimeType) {
++    KService::List offers = KMimeTypeTrader::self()->query( mimeType, QLatin1String("ThumbCreator"));
++    if (!offers.isEmpty()) {
++        KService::Ptr serv;
++        serv = offers.first();
++        return serv->library();
++    }
++
++    return QString();
++}
++
++float ThumbnailProtocol::sequenceIndex() const {
++    return metaData("sequence-index").toFloat();
++}
++
++void ThumbnailProtocol::drawPictureFrame(QPainter *painter, const QPoint &centerPos,
++                                         const QImage &image, int frameWidth) const
++{
++    QImage frame(image.size() + QSize(frameWidth * 2, frameWidth * 2),
++                 QImage::Format_ARGB32);
++    frame.fill(0);
++
++    QPainter p(&frame);
++    p.setCompositionMode(QPainter::CompositionMode_Source);
++    p.setRenderHint(QPainter::Antialiasing);
++    p.setPen(Qt::NoPen);
++    p.setBrush(Qt::white);
++    p.drawRoundedRect(frame.rect(), frameWidth / 2., frameWidth / 2.);
++    p.setCompositionMode(QPainter::CompositionMode_SourceOver);
++    p.drawImage(frameWidth, frameWidth, image);
++    p.end();
++
++    QTransform m;
++    m.rotate(qrand() % 16 - 8); // Random rotation ±8°
++
++    QRect r = m.mapRect(QRectF(frame.rect())).toAlignedRect();
++
++    QImage transformed(r.size(), frame.format());
++    transformed.fill(0);
++    p.begin(&transformed);
++    p.setRenderHint(QPainter::SmoothPixmapTransform);
++    p.setCompositionMode(QPainter::CompositionMode_Source);
++    p.translate(-r.topLeft());
++    p.setWorldTransform(m, true);
++    p.drawImage(0, 0, frame);
++    p.end();
++
++    int radius = qMax(frameWidth, 1);
++
++    QImage shadow(r.size() + QSize(radius * 2, radius * 2), QImage::Format_ARGB32);
++    shadow.fill(0);
++
++    p.begin(&shadow);
++    p.setCompositionMode(QPainter::CompositionMode_Source);
++    p.drawImage(radius, radius, transformed);
++    p.end();
++
++    ImageFilter::shadowBlur(shadow, radius, QColor(0, 0, 0, 128));
++
++    r.moveCenter(centerPos);
++
++    painter->drawImage(r.topLeft() - QPoint(radius / 2, radius / 2), shadow);
++    painter->drawImage(r.topLeft(), transformed);
++}
++
++QImage ThumbnailProtocol::thumbForDirectory(const KUrl& directory)
++{
++    QImage img;
++
++    const int tiles = 2; //Count of items shown on each dimension
++    const int spacing = 1;
++
++    // TODO: the margins are optimized for the Oxygen iconset
++    // Provide a fallback solution for other iconsets (e. g. draw folder
++    // only as small overlay, use no margins)
++    const QPixmap folder = KIconLoader::global()->loadMimeTypeIcon("inode-directory",
++                                                                   KIconLoader::Desktop,
++                                                                   qMin(m_width, m_height));
++    const int folderWidth  = folder.width();
++    const int folderHeight = folder.height();
++
++    const int topMargin = folderHeight * 30 / 100;
++    const int bottomMargin = folderHeight / 6;
++    const int leftMargin = folderWidth / 13;
++    const int rightMargin = leftMargin;
++
++    const int segmentWidth  = (folderWidth  - leftMargin - rightMargin  + spacing) / tiles - spacing;
++    const int segmentHeight = (folderHeight - topMargin  - bottomMargin + spacing) / tiles - spacing;
++    if ((segmentWidth < 5) || (segmentHeight <  5)) {
++        // the segment size is too small for a useful preview
++        return img;
++    }
++
++    QString localFile = directory.path();
++
++    // Multiply with a high number, so we get some semi-random sequence
++    int skipValidItems = ((int)sequenceIndex()) * tiles * tiles;
++
++    if (skipValidItems) {
++        skipValidItems = skipValidItems % QDir(localFile).count();
++    }
++
++    // Seed the random number generator so that it always returns the same result
++    // for the same directory and sequence-item
++    qsrand(qHash(localFile) + skipValidItems);
++
++    img = QImage(QSize(folderWidth, folderHeight), QImage::Format_ARGB32);
++    img.fill(0);
++
++    QPainter p(&img);
++    p.setCompositionMode(QPainter::CompositionMode_Source);
++    p.drawPixmap(0, 0, folder);
++    p.setCompositionMode(QPainter::CompositionMode_SourceOver);
++
++    int xPos = leftMargin;
++    int yPos = topMargin;
++
++    QDirIterator dir(localFile, QDir::Files | QDir::Readable);
++    if (!dir.hasNext()) {
++        return img;
++    }
++
++    int frameWidth = qRound(folderWidth / 85.);
++
++    int iterations = 0;
++    bool hadThumbnail = false;
++    int skipped = 0;
++
++    const int maxYPos = folderHeight - bottomMargin - segmentHeight;
++
++    while (dir.hasNext() && (yPos <= maxYPos)) {
++        ++iterations;
++        if (iterations > 50 + 10 * skipValidItems) {
++            // kDebug(7115) << "maximum iteration reached";
++            return QImage();
++        }
++
++        dir.next();
++
++        if (m_enabledPlugins.isEmpty()) {
++            const KConfigGroup globalConfig(KGlobal::config(), "PreviewSettings");
++            m_enabledPlugins = globalConfig.readEntry("Plugins", QStringList()
++                                                                 << "imagethumbnail"
++                                                                 << "jpegthumbnail");
++        }
++
++        const KUrl fileName = dir.filePath();
++        const QString subPlugin = pluginForMimeType(KMimeType::findByUrl(fileName)->name());
++        if (subPlugin.isEmpty() || !m_enabledPlugins.contains(subPlugin)) {
++            // kDebug(7115) << "found no sub-plugin for" << dir.filePath();
++            continue;
++        }
++
++        ThumbCreator* subCreator = getThumbCreator(subPlugin);
++        if (!subCreator) {
++            // kDebug(7115) << "found no creator for" << dir.filePath();
++            continue;
++        }
++
++        if (skipped < skipValidItems) {
++          ++skipped;;
++          continue;
++        }
++
++
++        QImage subImg;
++
++        // check whether a cached version of the file is available for 128 x 128 pixels
++        KMD5 md5(QFile::encodeName(fileName.url()));
++        const QString thumbName = QFile::encodeName(md5.hexDigest()) + ".png";
++        const QString thumbPath = QDir::homePath() + "/.thumbnails/normal/";
++        if (!subImg.load(thumbPath + thumbName)) {
++            // no cached version is available, a new thumbnail must be created
++            if (subCreator->create(dir.filePath(), 128, 128, subImg)) {
++                // The thumbnail has been created successfully. Store the thumbnail
++                // to the cache for future access.
++                KTemporaryFile temp;
++                temp.setPrefix(thumbPath + "kde-tmp-");
++                temp.setSuffix(".png");
++                temp.setAutoRemove(false);
++                if (temp.open()) {
++                    subImg.save(temp.fileName(), "PNG");
++                    ::rename(QFile::encodeName(temp.fileName()), QFile::encodeName(thumbPath + thumbName));
++                }
++            } else {
++                // kDebug(7115) <<  "failed to create thumbnail for" << dir.filePath();
++                continue;
++            }
++
++        }
++
++        hadThumbnail = true;
++
++        if (subImg.width() > segmentWidth || subImg.height() > segmentHeight) {
++            subImg = subImg.scaled(segmentWidth, segmentHeight,
++                                   Qt::KeepAspectRatio, Qt::SmoothTransformation);
++        }
++
++        // center the image inside the segment boundaries
++        const QPoint centerPos(xPos + (segmentWidth / 2), yPos + (segmentHeight / 2));
++        drawPictureFrame(&p, centerPos, subImg, frameWidth);
++
++        xPos += segmentWidth + spacing;
++        if (xPos > folderWidth - rightMargin - segmentWidth) {
++            xPos = leftMargin;
++            yPos += segmentHeight + spacing;
++        }
++    }
++
++    if (!hadThumbnail) {
++        return QImage();
++    }
++
++    return img;
++}
++
++ThumbCreator* ThumbnailProtocol::getThumbCreator(const QString& plugin)
++{
++    ThumbCreator *creator = m_creators[plugin];
++    if (!creator) {
++        // Don't use KLibFactory here, this is not a QObject and
++        // neither is ThumbCreator
++        KLibrary *library = KLibLoader::self()->library(plugin);
++        if (library) {
++            newCreator create = (newCreator)library->resolveFunction("new_creator");
++            if (create) {
++                creator = create();
++            }
++        }
++        if (!creator) {
++          return 0;
++        }
++
++        m_creators.insert(plugin, creator);
++    }
++
++    return creator;
++}
++
++
+ const QImage ThumbnailProtocol::getIcon()
+ {
+-    if ( !m_iconDict.contains(m_mimeType) ) { // generate it
++    ///@todo Can we really do this? It doesn't seem to respect the size
++    if (!m_iconDict.contains(m_mimeType)) { // generate it
+         QImage icon( KIconLoader::global()->loadMimeTypeIcon( KMimeType::mimeType(m_mimeType)->iconName(), KIconLoader::Desktop, m_iconSize ).toImage() );
+-	icon = icon.convertToFormat( QImage::Format_ARGB32 );
+-        m_iconDict.insert( m_mimeType, icon );
++        icon = icon.convertToFormat(QImage::Format_ARGB32);
++        m_iconDict.insert(m_mimeType, icon);
+ 
+         return icon;
+     }
+ 
+-    return m_iconDict.value( m_mimeType );
++    return m_iconDict.value(m_mimeType);
+ }
+ 
+Index: thumbnail/imagefilter.h
+===================================================================
+--- kioslave/thumbnail/imagefilter.h	(revision 0)
++++ kioslave/thumbnail/imagefilter.h	(revision 952147)
+@@ -0,0 +1,50 @@
++//krazy:exclude=copyright (email of Maxim is missing)
++/*
++    This file is a part of the KDE project
++
++    Copyright © 2006 Zack Rusin <zack@kde.org>
++    Copyright © 2006-2007, 2008 Fredrik Höglund <fredrik@kde.org>
++
++    The stack blur algorithm was invented by Mario Klingemann <mario@quasimondo.com>
++
++    This implementation is based on the version in Anti-Grain Geometry Version 2.4,
++    Copyright © 2002-2005 Maxim Shemanarev (http://www.antigrain.com)
++
++    Redistribution and use in source and binary forms, with or without
++    modification, are permitted provided that the following conditions
++    are met:
++
++    1. Redistributions of source code must retain the above copyright
++       notice, this list of conditions and the following disclaimer.
++    2. Redistributions in binary form must reproduce the above copyright
++       notice, this list of conditions and the following disclaimer in the
++       documentation and/or other materials provided with the distribution.
++
++    THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
++    IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
++    OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
++    IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
++    INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
++    NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++    DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
++    THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
++    THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++*/
++
++#ifndef IMAGEFILTER_H
++#define IMAGEFILTER_H
++
++class QImage;
++class QColor;
++
++class ImageFilter
++{
++public:
++    // Blurs the alpha channel of the image and recolors it to the specified color.
++    // The image must have transparent padding on all sides, or the shadow will be clipped.
++    static void shadowBlur(QImage &image, float radius, const QColor &color);
++};
++
++#endif
++

@@ -1,0 +1,198 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>bugzilla</Name>
+        <Homepage>http://www.bugzilla.org</Homepage>
+        <Packager>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Packager>
+        <License>MPL-1.1</License>
+        <IsA>service</IsA>
+        <Summary>Bug tracking system</Summary>
+        <Description>bugzilla is a popular bug tracking system used by multiple open source projects.</Description>
+        <Archive sha1sum="eb2d93bd8df2af601e9e988fb535132b306a9288" type="targz">http://ftp.mozilla.org/pub/mozilla.org/webtools/bugzilla-4.0.2.tar.gz</Archive>
+        <!-- Exact copy of plain English templates -->
+        <Archive sha1sum="d2ae64f628daa9780e40f23df3d35177418d4dfa" type="tarbz2" target="bugzilla-4.0.2/template">http://cekirdek.pardus.org.tr/~ozan/dist/sources/bugzilla-4.0-tr-templates.tar.bz2</Archive>
+        <AdditionalFiles>
+            <AdditionalFile target="cleanup" permission="0755">cleanup.sh</AdditionalFile>
+            <AdditionalFile target="cron.daily" permission="0644">cron.daily</AdditionalFile>
+            <AdditionalFile target="cron.whine" permission="0644">cron.whine</AdditionalFile>
+        </AdditionalFiles>
+        <BuildDependencies>
+            <!-- These are not really build dependencies but are needed during checksetup.pl -->
+            <Dependency>perl-GD</Dependency>
+            <Dependency>perl-URI</Dependency>
+            <Dependency>perl-DBI</Dependency>
+            <Dependency versionFrom="2.0.5">mod_perl</Dependency>
+            <!-- FIXME: Included in 5.12.2, will be a dep for C2
+            <Dependency>perl-CGI</Dependency>
+            -->
+            <Dependency>perl-ldap</Dependency>
+            <Dependency>patchutils</Dependency>
+            <Dependency>perl-Chart</Dependency>
+            <Dependency>perl-DBD-Pg</Dependency>
+            <Dependency>imagemagick</Dependency>
+            <Dependency>perl-libwww</Dependency>
+            <Dependency>perl-JSON-XS</Dependency>
+            <Dependency>perl-JSON-RPC</Dependency>
+            <Dependency>perl-GD-Graph</Dependency>
+            <Dependency>perl-TimeDate</Dependency>
+            <Dependency>perl-XML-Twig</Dependency>
+            <Dependency>perl-DateTime</Dependency>
+            <Dependency>perl-DBD-mysql</Dependency>
+            <Dependency>perl-Test-Taint</Dependency>
+            <Dependency>perl-Email-Send</Dependency>
+            <Dependency>perl-MIME-tools</Dependency>
+            <Dependency>perl-TheSchwartz</Dependency>
+            <Dependency>perl-Authen-SASL</Dependency>
+            <Dependency>perl-GD-TextUtil</Dependency>
+            <Dependency>perl-PatchReader</Dependency>
+            <Dependency>perl-Template-GD</Dependency>
+            <Dependency>perl-Digest-SHA1</Dependency>
+            <Dependency>perl-Email-Reply</Dependency>
+            <Dependency>perl-HTML-Parser</Dependency>
+            <Dependency>perl-HTML-Scrubber</Dependency>
+            <Dependency>perl-List-MoreUtils</Dependency>
+            <Dependency>perl-Template-Toolkit</Dependency>
+            <Dependency>perl-DateTime-TimeZone</Dependency>
+            <Dependency>perl-Math-Random-Secure</Dependency>
+            <Dependency>perl-Email-MIME-Encodings</Dependency>
+            <Dependency versionFrom="0.712">perl-SOAP-Lite</Dependency>
+            <Dependency versionFrom="1.904">perl-Email-MIME</Dependency>
+            <Dependency>perl-Email-MIME-Attachment-Stripper</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <Patch level="1">upstream/decrease-memory-limit-for-sizelimit.patch</Patch>
+
+            <Patch level="1">fedora/bugzilla-rw-paths.patch</Patch>
+            <Patch level="1">pardus/fallback-to-text-plain-if-octet-stream-detected.patch</Patch>
+
+            <!-- Patch Turkish translations -->
+            <Patch level="1">pardus/tr-template.patch</Patch>
+        </Patches>
+    </Source>
+
+    <!--
+    <Package>
+        <Name>bugzilla-template-tr</Name>
+        <Summary>Turkish templates for bugzilla</Summary>
+        <RuntimeDependencies>
+            <Dependency>bugzilla</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="data">/usr/share/bugzilla/template/tr</Path>
+        </Files>
+    </Package>
+    -->
+
+    <Package>
+        <Name>bugzilla-docs</Name>
+        <Summary>Documentation distributed with the Bugzilla bug tracking system</Summary>
+        <Files>
+            <Path fileType="doc">/usr/share/bugzilla/docs</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>bugzilla</Name>
+        <RuntimeDependencies>
+            <!-- Bugzilla recommends Apache as HTTPD and mySql as DB -->
+            <Dependency>apache</Dependency>
+            <Dependency>postfix</Dependency>
+            <Dependency>mysql-server</Dependency>
+
+            <Dependency>perl-GD</Dependency>
+            <Dependency>perl-URI</Dependency>
+            <Dependency>perl-DBI</Dependency>
+            <Dependency versionFrom="2.0.5">mod_perl</Dependency>
+            <!-- FIXME: Included in 5.12.2, will be a dep for C2
+            <Dependency>perl-CGI</Dependency>
+            -->
+            <Dependency>perl-ldap</Dependency>
+            <Dependency>patchutils</Dependency>
+            <Dependency>perl-Chart</Dependency>
+            <Dependency>perl-DBD-Pg</Dependency>
+            <Dependency>imagemagick</Dependency>
+            <Dependency>perl-libwww</Dependency>
+            <Dependency>perl-JSON-XS</Dependency>
+            <Dependency>perl-JSON-RPC</Dependency>
+            <Dependency>perl-GD-Graph</Dependency>
+            <Dependency>perl-TimeDate</Dependency>
+            <Dependency>perl-XML-Twig</Dependency>
+            <Dependency>perl-DateTime</Dependency>
+            <Dependency>perl-DBD-mysql</Dependency>
+            <Dependency>perl-Test-Taint</Dependency>
+            <Dependency>perl-Email-Send</Dependency>
+            <Dependency>perl-MIME-tools</Dependency>
+            <Dependency>perl-TheSchwartz</Dependency>
+            <Dependency>perl-Authen-SASL</Dependency>
+            <Dependency>perl-GD-TextUtil</Dependency>
+            <Dependency>perl-PatchReader</Dependency>
+            <Dependency>perl-Template-GD</Dependency>
+            <Dependency>perl-Digest-SHA1</Dependency>
+            <Dependency>perl-Email-Reply</Dependency>
+            <Dependency>perl-HTML-Parser</Dependency>
+            <Dependency>perl-HTML-Scrubber</Dependency>
+            <Dependency>perl-List-MoreUtils</Dependency>
+            <Dependency>perl-Template-Toolkit</Dependency>
+            <Dependency>perl-DateTime-TimeZone</Dependency>
+            <Dependency>perl-Math-Random-Secure</Dependency>
+            <Dependency>perl-Email-MIME-Encodings</Dependency>
+            <Dependency versionFrom="0.712">perl-SOAP-Lite</Dependency>
+            <Dependency versionFrom="1.904">perl-Email-MIME</Dependency>
+            <Dependency>perl-Email-MIME-Attachment-Stripper</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="executable">/usr/bin</Path>
+            <Path fileType="doc">/usr/share/doc</Path>
+            <Path fileType="config">/etc/apache2/conf.d/bugzilla.conf</Path>
+            <Path fileType="config">/etc/bugzilla</Path>
+            <Path fileType="data">/var/lib/bugzilla</Path>
+            <Path fileType="data">/usr/share/bugzilla</Path>
+        </Files>
+        <AdditionalFiles>
+            <!-- mod_perl configuration file -->
+            <AdditionalFile owner="root" permission="0644" target="/etc/apache2/conf.d/bugzilla.conf">httpd-mod_perl.conf</AdditionalFile>
+
+            <!-- Pardus' specific bugzilla management scripts -->
+            <AdditionalFile owner="root" permission="0755" target="/usr/bin/bugzilla-init">scripts/bugzilla-init</AdditionalFile>
+            <AdditionalFile owner="root" permission="0755" target="/usr/bin/bugzilla-backup">scripts/bugzilla-backup</AdditionalFile>
+            <AdditionalFile owner="root" permission="0755" target="/usr/bin/bugzilla-restore">scripts/bugzilla-restore</AdditionalFile>
+
+            <!-- Simple Fedora HOWTO -->
+            <AdditionalFile owner="root" permission="0644" target="/usr/share/doc/bugzilla/HOWTO">HOWTO</AdditionalFile>
+
+            <!-- robots.txt to disallow web indexing -->
+            <AdditionalFile owner="root" permission="0644" target="/usr/share/bugzilla/robots.txt">pardus/robots.txt</AdditionalFile>
+        </AdditionalFiles>
+        <Provides>
+            <COMAR script="package.py">System.Package</COMAR>
+        </Provides>
+    </Package>
+
+    <History>
+        <Update release="3">
+            <Date>2011-08-09</Date>
+            <Version>4.0.2</Version>
+            <Comment>Version bump</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="2">
+            <Date>2011-08-09</Date>
+            <Version>4.0.1</Version>
+            <Comment>Version bump</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="1">
+            <Date>2011-03-11</Date>
+            <Version>4.0</Version>
+            <Comment>Initial release.</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+    </History>
+</PISI>

@@ -1,0 +1,64 @@
+From dd5de0988e14e0da67441044dea339eb7ac3a615 Mon Sep 17 00:00:00 2001
+From: Gabriel Burt <gabriel.burt@gmail.com>
+Date: Thu, 16 Dec 2010 19:18:29 +0000
+Subject: [Hyena.Gui] Fix issue with YOptions in SimpleTable
+
+---
+Index: banshee.git/src/Hyena/Hyena.Gui/Hyena.Widgets/SimpleTable.cs
+===================================================================
+--- banshee.git.orig/src/Hyena/Hyena.Gui/Hyena.Widgets/SimpleTable.cs	2010-12-19 17:57:15.928165427 +0000
++++ banshee.git/src/Hyena/Hyena.Gui/Hyena.Widgets/SimpleTable.cs	2010-12-19 18:00:49.624675350 +0000
+@@ -38,6 +38,7 @@
+ 
+         private List<T> items = new List<T> ();
+         private Dictionary<T, Widget []> item_widgets = new Dictionary<T, Widget []> ();
++        private AttachOptions default_options = AttachOptions.Fill | AttachOptions.Expand;
+ 
+         public SimpleTable () : this (2) {}
+ 
+@@ -47,7 +48,9 @@
+             RowSpacing = 5;
+ 
+             XOptions = new AttachOptions [n_columns];
+-            YOptions = new AttachOptions [n_columns];
++            for (int i = 0; i < n_columns; i++) {
++                XOptions[i] = default_options;
++            }
+         }
+ 
+         public void AddRow (T item, params Widget [] cols)
+@@ -56,7 +59,6 @@
+         }
+ 
+         public AttachOptions [] XOptions { get; private set; }
+-        public AttachOptions [] YOptions { get; private set; }
+ 
+         public void InsertRow (T item, uint row, params Widget [] cols)
+         {
+@@ -72,7 +74,7 @@
+                 for (uint x = 0; x < NColumns; x++) {
+                     var widget = item_widgets[items[y]][x];
+                     Remove (widget);
+-                    Attach (widget, x, x + 1, (uint) y + 1, (uint) y + 2, XOptions[x], YOptions[y], 0, 0);
++                    Attach (widget, x, x + 1, (uint) y + 1, (uint) y + 2, XOptions[x], default_options, 0, 0);
+                 }
+             }
+ 
+@@ -80,7 +82,7 @@
+             item_widgets[item] = cols;
+ 
+             for (uint x = 0; x < NColumns; x++) {
+-                Attach (cols[x], x, x + 1, row, row + 1, XOptions[x], YOptions[row], 0, 0);
++                Attach (cols[x], x, x + 1, row, row + 1, XOptions[x], default_options, 0, 0);
+             }
+         }
+ 
+@@ -97,7 +99,7 @@
+                 for (uint x = 0; x < NColumns; x++) {
+                     var widget = item_widgets[items[y]][x];
+                     Remove (widget);
+-                    Attach (widget, x, x + 1, (uint) y - 1, (uint) y, XOptions[x], YOptions[y], 0, 0);
++                    Attach (widget, x, x + 1, (uint) y - 1, (uint) y, XOptions[x], default_options, 0, 0);
+                 }
+             }
+ 

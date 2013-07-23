@@ -1,0 +1,58 @@
+Index: qutecom-2.2-RC3/wengophone/src/presentation/qt/CMakeLists-install-linux.txt
+===================================================================
+--- qutecom-2.2-RC3.orig/wengophone/src/presentation/qt/CMakeLists-install-linux.txt
++++ qutecom-2.2-RC3/wengophone/src/presentation/qt/CMakeLists-install-linux.txt
+@@ -30,10 +30,11 @@ if (PHAPI_CODEC_AMR_SUPPORT)
+ 		${TMP_BUILD_DIR}/phapi-plugins/libphamrplugin.so
+ 	)
+ 
+-if (PHAPI_CODEC_ILBC_SUPPORT)
+-	install(PROGRAMS
+-		${TMP_BUILD_DIR}/phapi-plugins/philbcplugin.so
+-	)
++	if (PHAPI_CODEC_ILBC_SUPPORT)
++		install(PROGRAMS
++			${TMP_BUILD_DIR}/phapi-plugins/philbcplugin.so
++		)
++	endif (PHAPI_CODEC_ILBC_SUPPORT)
+ 	
+ endif (PHAPI_CODEC_AMR_SUPPORT)
+ 
+@@ -59,27 +60,32 @@ endif (LIBPURPLE_INTERNAL)
+ install(DIRECTORY
+ 	${TMP_BUILD_DIR}/lang
+ 	DESTINATION ${DATA_INSTALL_DIR}
+-	PATTERN "*.qm")
++	PATTERN "*.qm"
++)
+ 
+ install(DIRECTORY
+ 	# Keep trailing slash here. See 'install' doc.
+ 	${CMAKE_SOURCE_DIR}/wengophone/resources/
+ 	DESTINATION ${DATA_INSTALL_DIR}
+ 	PATTERN ".svn" EXCLUDE
+-	PATTERN "CMakeLists.txt" EXCLUDE)
++	PATTERN "CMakeLists.txt" EXCLUDE
++)
+ 
+ install(FILES
+ 	${CMAKE_SOURCE_DIR}/wengophone/res/qutecom.desktop
+-	DESTINATION share/applications)
++	DESTINATION share/applications
++)
+ 
+ foreach(size 16 32 48 64)
+ 	install(FILES
+ 		${CMAKE_SOURCE_DIR}/wengophone/res/wengophone_${size}x${size}.png
+ 		DESTINATION share/icons/hicolor/${size}x${size}/apps/
+-		RENAME qutecom.png)
++		RENAME qutecom.png
++	)
+ endforeach(size)
+ 
+ install(FILES
+ 	${CMAKE_SOURCE_DIR}/wengophone/COPYING
+ 	${CMAKE_SOURCE_DIR}/wengophone/AUTHORS
+-	DESTINATION ${DATA_INSTALL_DIR})
++	DESTINATION ${DATA_INSTALL_DIR}
++)

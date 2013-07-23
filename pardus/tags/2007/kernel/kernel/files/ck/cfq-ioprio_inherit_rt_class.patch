@@ -1,0 +1,60 @@
+If a realtime task does not explicitly set an ioprio make it inherit the
+realtime class and a priority dependant on its realtime priority.
+
+Signed-off-by: Con Kolivas <kernel@kolivas.org>
+
+---
+ block/cfq-iosched.c    |    4 ++--
+ include/linux/ioprio.h |   13 ++++++++++++-
+ 2 files changed, 14 insertions(+), 3 deletions(-)
+
+Index: linux-2.6.18-ck1/block/cfq-iosched.c
+===================================================================
+--- linux-2.6.18-ck1.orig/block/cfq-iosched.c	2006-09-21 20:00:43.000000000 +1000
++++ linux-2.6.18-ck1/block/cfq-iosched.c	2006-09-21 20:05:30.000000000 +1000
+@@ -1359,10 +1359,10 @@ static void cfq_init_prio_data(struct cf
+ 			printk(KERN_ERR "cfq: bad prio %x\n", ioprio_class);
+ 		case IOPRIO_CLASS_NONE:
+ 			/*
+-			 * no prio set, place us in the middle of the BE classes
++			 * Select class and ioprio according to policy and nice
+ 			 */
++			cfqq->ioprio_class = task_policy_ioprio_class(tsk);
+ 			cfqq->ioprio = task_nice_ioprio(tsk);
+-			cfqq->ioprio_class = IOPRIO_CLASS_BE;
+ 			break;
+ 		case IOPRIO_CLASS_RT:
+ 			cfqq->ioprio = task_ioprio(tsk);
+Index: linux-2.6.18-ck1/include/linux/ioprio.h
+===================================================================
+--- linux-2.6.18-ck1.orig/include/linux/ioprio.h	2006-09-21 20:00:43.000000000 +1000
++++ linux-2.6.18-ck1/include/linux/ioprio.h	2006-09-21 20:05:30.000000000 +1000
+@@ -22,7 +22,7 @@
+  * class, the default for any process. IDLE is the idle scheduling class, it
+  * is only served when no one else is using the disk.
+  */
+-enum {
++enum ioprio_class {
+ 	IOPRIO_CLASS_NONE,
+ 	IOPRIO_CLASS_RT,
+ 	IOPRIO_CLASS_BE,
+@@ -51,8 +51,19 @@ static inline int task_ioprio(struct tas
+ 	return IOPRIO_PRIO_DATA(task->ioprio);
+ }
+ 
++static inline enum ioprio_class
++	task_policy_ioprio_class(struct task_struct *task)
++{
++	if (rt_task(task))
++		return IOPRIO_CLASS_RT;
++	return IOPRIO_CLASS_BE;
++}
++
+ static inline int task_nice_ioprio(struct task_struct *task)
+ {
++	if (rt_task(task))
++		return (MAX_RT_PRIO - task->rt_priority) * IOPRIO_BE_NR /
++			(MAX_RT_PRIO + 1);
+ 	return (task_nice(task) + 20) / 5;
+ }
+ 

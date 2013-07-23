@@ -1,0 +1,31 @@
+default 0
+timeout 10
+splashimage /boot/grub/splash.xpm.gz
+background 10333C
+
+title=%(title)s
+root 
+kernel /boot/%(kernel)s root=/dev/ram0 video=vesafb:nomtrr,pmipal,ywrap,1024x768-32@60 splash=silent,fadein,theme:pardus console=tty2 mudur=livecd,language:en quiet %(exparams)s
+initrd /boot/%(initramfs)s
+
+title=%(title)s (Standard Graphics Mode)
+root 
+kernel /boot/%(kernel)s root=/dev/ram0 video=vesafb:off mudur=livecd,language:en quiet %(exparams)s
+initrd /boot/%(initramfs)s
+
+title=%(title)s (Minimum Option)
+root 
+kernel /boot/%(kernel)s root=/dev/ram0 video=vesafb:off acpi=off apm=off nolapic noapic pci=nomsi maxcpus=0 mudur=livecd,language:en %(exparams)s
+initrd /boot/%(initramfs)s
+
+title = Memory test
+root 
+kernel /boot/memtest.bin
+
+title=Continue From Harddisk
+rootnoverify (hd0)
+chainloader +1
+
+title=Other Languages
+configfile /boot/grub/menu.lst
+

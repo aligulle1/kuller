@@ -1,0 +1,81 @@
+diff -Nur libwnck-2.15.3/libwnck/pager.c libwnck-2.15.3.new/libwnck/pager.c
+--- libwnck-2.15.3/libwnck/pager.c	2006-05-20 19:26:28.000000000 +0200
++++ libwnck-2.15.3.new/libwnck/pager.c	2006-06-14 14:37:55.000000000 +0200
+@@ -22,6 +22,9 @@
+  * Boston, MA 02111-1307, USA.
+  */
+ 
++#include <config.h>
++#include <glib/gi18n-lib.h>
++
+ #include "pager.h"
+ #include "workspace.h"
+ #include "window.h"
+@@ -60,6 +63,9 @@
+ 
+   guint dnd_activate; /* GSource that triggers switching to this workspace during dnd */
+   guint dnd_time; /* time of last event during dnd (for delayed workspace activation) */
++
++  gint motion_workspace_number;
++  GtkTooltips * tips;
+ };
+ 
+ enum
+@@ -206,6 +212,7 @@
+   pager->priv->bg_cache = NULL;
+   pager->priv->layout_manager_token = WNCK_NO_MANAGER_TOKEN;
+   pager->priv->prelight = -1;
++  pager->priv->tips = gtk_tooltips_new();
+ 
+   gtk_drag_dest_set (GTK_WIDGET (pager), 0, targets, G_N_ELEMENTS (targets), GDK_ACTION_MOVE);
+   GTK_WIDGET_SET_FLAGS (GTK_WIDGET (pager), GTK_CAN_FOCUS);
+@@ -1087,6 +1094,8 @@
+           if (first &&
+               pager->priv->display_mode == WNCK_PAGER_DISPLAY_CONTENT)
+             {
++	      gtk_tooltips_set_tip(pager->priv->tips,
++				   gtk_widget_get_parent(GTK_WIDGET(pager)), _("Switch between workspaces"), NULL);
+               bg_pixbuf = wnck_pager_get_background (pager,
+                                                      rect.width,
+                                                      rect.height);
+@@ -1518,6 +1527,18 @@
+   pager = WNCK_PAGER (widget);
+ 
+   gdk_window_get_pointer (widget->window, &x, &y, NULL);
++  if (pager->priv->display_mode == WNCK_PAGER_DISPLAY_CONTENT)
++    {
++      int workspace_number = workspace_at_point (pager, x, y, NULL, NULL);
++      if (workspace_number != pager->priv->motion_workspace_number && workspace_number != -1)
++	{
++	  gtk_tooltips_set_tip(pager->priv->tips, 
++			       gtk_widget_get_parent(GTK_WIDGET(pager)), 
++			       wnck_workspace_get_name (wnck_screen_get_workspace (pager->priv->screen, workspace_number)),
++			       NULL); 
++	  pager->priv->motion_workspace_number = workspace_number;
++	}
++    }
+ 
+   if (!pager->priv->dragging &&
+       pager->priv->drag_window != NULL &&
+@@ -1724,6 +1745,10 @@
+     return;
+ 
+   pager->priv->display_mode = mode;
++  if (mode == WNCK_PAGER_DISPLAY_NAME)
++    gtk_tooltips_disable(pager->priv->tips);
++  else
++    gtk_tooltips_enable(pager->priv->tips);
+   gtk_widget_queue_resize (GTK_WIDGET (pager));
+ }
+ 
+diff -Nur libwnck-2.15.3/po/POTFILES.in libwnck-2.15.3.new/po/POTFILES.in
+--- libwnck-2.15.3/po/POTFILES.in	2005-01-31 21:44:52.000000000 +0100
++++ libwnck-2.15.3.new/po/POTFILES.in	2006-06-14 14:30:21.000000000 +0200
+@@ -2,6 +2,7 @@
+ # Please keep this file sorted alphabetically.
+ libwnck/application.c
+ libwnck/pager-accessible.c
++libwnck/pager.c
+ libwnck/selector.c
+ libwnck/tasklist.c
+ libwnck/window-action-menu.c

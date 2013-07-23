@@ -1,0 +1,34 @@
+Index: iscan-2.20.0/configure.ac
+===================================================================
+--- iscan-2.20.0.orig/configure.ac
++++ iscan-2.20.0/configure.ac
+@@ -238,7 +238,6 @@ dnl  The somewhat obscure LT_AC_PROG_SED
+ dnl  SED environment variable gets set before it's used by the libtool
+ dnl  machinery.  This works around buggy libtool versions.
+ LT_AC_PROG_SED
+-AC_LIB_LTDL
+ AC_LIBLTDL_INSTALLABLE
+ AC_LIBTOOL_DLOPEN
+ AC_PROG_LIBTOOL
+Index: iscan-2.20.0/lib/basic-imgstream.cc
+===================================================================
+--- iscan-2.20.0.orig/lib/basic-imgstream.cc
++++ iscan-2.20.0/lib/basic-imgstream.cc
+@@ -89,6 +89,17 @@ namespace iscan
+   basic_imgstream::dlopen (const char *libname,
+                            bool (*validate) (lt_dlhandle))
+   {
++    // forward compatibility
++#ifndef LTDL_SHLIB_EXT
++#define LTDL_SHLIB_EXT LT_MODULE_EXT
++#endif
++#ifndef LTDL_SHLIBPATH_VAR
++#define LTDL_SHLIBPATH_VAR LT_MODULE_PATH_VAR
++#endif
++#ifndef LTDL_SYSSEARCHPATH
++#define LTDL_SYSSEARCHPATH LT_DLSEARCH_PATH 
++#endif
++
+     if (0 != lt_dlinit ())
+       {
+         throw runtime_error (lt_dlerror ());

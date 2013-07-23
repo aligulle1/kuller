@@ -1,0 +1,161 @@
+Only in virt-viewer-0.0.3.orig/src: .#main.c
+Only in virt-viewer-0.0.3.orig/src: #main.c#
+diff -rup virt-viewer-0.0.3.orig/src/main.c virt-viewer-0.0.3.new/src/main.c
+--- virt-viewer-0.0.3.orig/src/main.c	2009-05-07 12:40:03.000000000 +0100
++++ virt-viewer-0.0.3.new/src/main.c	2009-05-07 12:49:34.000000000 +0100
+@@ -81,16 +81,21 @@ struct menuItem {
+ 	guint menu;
+ 	GtkWidget *label;
+ 	const char *ungrabbed_text;
+-	const char *grabbed_text;
+ };
+ 
+ static struct menuItem menuItems[] = {
+-	{ FILE_MENU, NULL, "_File", "File" },
+-	{ VIEW_MENU, NULL, "_View", "View" },
+-	{ SEND_KEY_MENU, NULL, "_Send Key", "Send Key" },
+-	{ HELP_MENU, NULL, "_Help", "Help" }
++	{ FILE_MENU, NULL, "_File" },
++	{ VIEW_MENU, NULL, "_View" },
++	{ SEND_KEY_MENU, NULL, "_Send Key"},
++	{ HELP_MENU, NULL, "_Help" },
+ };
+ 
++static gboolean accelEnabled = TRUE;
++static GValue accelSetting;
++static GSList *accelList = NULL;
++static int accelMenuSig[LAST_MENU];
++
++
+ static void viewer_set_title(VncDisplay *vnc G_GNUC_UNUSED, GtkWidget *window, gboolean grabbed)
+ {
+ 	char title[1024];
+@@ -109,24 +114,89 @@ static void viewer_set_title(VncDisplay 
+ 
+ static void viewer_grab(GtkWidget *vnc, GtkWidget *window)
+ {
++	viewer_set_title(VNC_DISPLAY(vnc), window, TRUE);
++}
++
++static void viewer_ungrab(GtkWidget *vnc, GtkWidget *window)
++{
++	viewer_set_title(VNC_DISPLAY(vnc), window, FALSE);
++}
++
++static void viewer_ignore_accel(GtkWidget *menu G_GNUC_UNUSED,
++				GtkWindow *window G_GNUC_UNUSED)
++{
++	/* ignore accelerator */
++}
++
++
++static void viewer_disable_modifiers(GtkWindow *window)
++{
++	GtkSettings *settings = gtk_settings_get_default();
++	GValue empty;
++	GSList *accels;
+ 	int i;
+ 
+-	viewer_set_title(VNC_DISPLAY(vnc), window, TRUE);
++	if (!accelEnabled)
++		return;
++
++	/* This stops F10 activating menu bar */
++	memset(&empty, 0, sizeof empty);
++	g_value_init(&empty, G_TYPE_STRING);
++	g_object_get_property(G_OBJECT(settings), "gtk-menu-bar-accel", &accelSetting);
++	g_object_set_property(G_OBJECT(settings), "gtk-menu-bar-accel", &empty);
++
++	/* This stops global accelerators like Ctrl+Q == Quit */
++	for (accels = accelList ; accels ; accels = accels->next) {
++		gtk_window_remove_accel_group(GTK_WINDOW(window), accels->data);
++	}
+ 
+-	for (i = 0 ; i < LAST_MENU; i++) {
+-		gtk_label_set_text_with_mnemonic(GTK_LABEL(menuItems[i].label), menuItems[i].grabbed_text);
++	/* This stops menu bar shortcuts like Alt+F == File */
++	for (i = 0 ; i < LAST_MENU ; i++) {
++		GtkWidget *menu = menuItems[i].label;
++		accelMenuSig[i] =
++			g_signal_connect(GTK_OBJECT(menu), "mnemonic-activate",
++					 GTK_SIGNAL_FUNC(viewer_ignore_accel), window);
+ 	}
++
++	accelEnabled = FALSE;
+ }
+ 
+-static void viewer_ungrab(GtkWidget *vnc, GtkWidget *window)
++
++static void viewer_enable_modifiers(GtkWindow *window)
+ {
++	GtkSettings *settings = gtk_settings_get_default();
++        GSList *accels;
+ 	int i;
+ 
+-	viewer_set_title(VNC_DISPLAY(vnc), window, FALSE);
++	if (accelEnabled)
++		return;
++
++	/* This allows F10 activating menu bar */
++	g_object_set_property(G_OBJECT(settings), "gtk-menu-bar-accel", &accelSetting);
+ 
+-	for (i = 0 ; i < LAST_MENU; i++) {
+-		gtk_label_set_text_with_mnemonic(GTK_LABEL(menuItems[i].label), menuItems[i].ungrabbed_text);
++	/* This allows global accelerators like Ctrl+Q == Quit */
++	for (accels = accelList ; accels ; accels = accels->next) {
++		gtk_window_add_accel_group(GTK_WINDOW(window), accels->data);
+ 	}
++
++	/* This allows menu bar shortcuts like Alt+F == File */
++	for (i = 0 ; i < LAST_MENU ; i++) {
++		GtkWidget *menu = menuItems[i].label;
++		g_signal_handler_disconnect(GTK_OBJECT(menu),
++					    accelMenuSig[i]);
++	}
++
++	accelEnabled = TRUE;
++}
++
++static void viewer_key_grab(GtkWidget *vnc G_GNUC_UNUSED, GtkWidget *window)
++{
++	viewer_disable_modifiers(GTK_WINDOW(window));
++}
++
++static void viewer_key_ungrab(GtkWidget *vnc G_GNUC_UNUSED, GtkWidget *window)
++{
++	viewer_enable_modifiers(GTK_WINDOW(window));
+ }
+ 
+ static void viewer_shutdown(GtkWidget *src G_GNUC_UNUSED, void *dummy G_GNUC_UNUSED, GtkWidget *vnc)
+@@ -528,11 +598,19 @@ static GtkWidget *viewer_build_window(Vn
+ 	gtk_window_set_resizable(GTK_WINDOW(window), TRUE);
+ 
+ 	if (with_menubar) {
++		GSList *accels;
+ 		layout = gtk_vbox_new(FALSE, 3);
+ 		menubar = viewer_build_menu(vnc, window, gtk_widget_is_composited(window));
+ 		gtk_container_add(GTK_CONTAINER(window), layout);
+ 		gtk_container_add_with_properties(GTK_CONTAINER(layout), menubar, "expand", FALSE, NULL);
+ 		gtk_container_add_with_properties(GTK_CONTAINER(layout), GTK_WIDGET(vnc), "expand", TRUE, NULL);
++
++		accels = gtk_accel_groups_from_object(G_OBJECT(window));
++		for ( ; accels ; accels = accels->next) {
++			accelList = g_slist_append(accelList, accels->data);
++			g_object_ref(G_OBJECT(accels->data));
++		}
++
+ 	} else
+ 		gtk_container_add(GTK_CONTAINER(window), GTK_WIDGET(vnc));
+ 
+@@ -541,6 +619,11 @@ static GtkWidget *viewer_build_window(Vn
+ 	gtk_signal_connect(GTK_OBJECT(vnc), "vnc-pointer-ungrab",
+ 			   GTK_SIGNAL_FUNC(viewer_ungrab), window);
+ 
++	gtk_signal_connect(GTK_OBJECT(vnc), "vnc-keyboard-grab",
++			   GTK_SIGNAL_FUNC(viewer_key_grab), window);
++	gtk_signal_connect(GTK_OBJECT(vnc), "vnc-keyboard-ungrab",
++			   GTK_SIGNAL_FUNC(viewer_key_ungrab), window);
++
+ 	gtk_signal_connect(GTK_OBJECT(window), "delete-event",
+ 			   GTK_SIGNAL_FUNC(viewer_shutdown), vnc);
+ 

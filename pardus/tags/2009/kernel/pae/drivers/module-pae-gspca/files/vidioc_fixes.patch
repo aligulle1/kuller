@@ -1,0 +1,386 @@
+diff -Nur v4l-dvb-5ed2a853b692-old/linux/drivers/media/video/gspca/gspca.c v4l-dvb-5ed2a853b692/linux/drivers/media/video/gspca/gspca.c
+--- v4l-dvb-5ed2a853b692-old/linux/drivers/media/video/gspca/gspca.c	2009-06-09 19:58:15.872987062 +0300
++++ v4l-dvb-5ed2a853b692/linux/drivers/media/video/gspca/gspca.c	2009-06-09 19:59:26.148733893 +0300
+@@ -739,7 +739,7 @@
+ 	return -EINVAL;
+ }
+ 
+-static int vidioc_enum_fmt_vid_cap(struct file *file, void  *priv,
++static int gspca_vidioc_enum_fmt_vid_cap(struct file *file, void  *priv,
+ 				struct v4l2_fmtdesc *fmtdesc)
+ {
+ 	struct gspca_dev *gspca_dev = priv;
+@@ -779,7 +779,7 @@
+ 	return 0;
+ }
+ 
+-static int vidioc_g_fmt_vid_cap(struct file *file, void *priv,
++static int gspca_vidioc_g_fmt_vid_cap(struct file *file, void *priv,
+ 			    struct v4l2_format *fmt)
+ {
+ 	struct gspca_dev *gspca_dev = priv;
+@@ -823,7 +823,7 @@
+ 	return mode;			/* used when s_fmt */
+ }
+ 
+-static int vidioc_try_fmt_vid_cap(struct file *file,
++static int gspca_vidioc_try_fmt_vid_cap(struct file *file,
+ 			      void *priv,
+ 			      struct v4l2_format *fmt)
+ {
+@@ -836,7 +836,7 @@
+ 	return 0;
+ }
+ 
+-static int vidioc_s_fmt_vid_cap(struct file *file, void *priv,
++static int gspca_vidioc_s_fmt_vid_cap(struct file *file, void *priv,
+ 			    struct v4l2_format *fmt)
+ {
+ 	struct gspca_dev *gspca_dev = priv;
+@@ -875,7 +875,7 @@
+ 	return ret;
+ }
+ 
+-static int vidioc_enum_framesizes(struct file *file, void *priv,
++static int gspca_vidioc_enum_framesizes(struct file *file, void *priv,
+ 				  struct v4l2_frmsizeenum *fsize)
+ {
+ 	struct gspca_dev *gspca_dev = priv;
+@@ -987,7 +987,7 @@
+ 	return 0;
+ }
+ 
+-static int vidioc_querycap(struct file *file, void  *priv,
++static int gspca_vidioc_querycap(struct file *file, void  *priv,
+ 			   struct v4l2_capability *cap)
+ {
+ 	struct gspca_dev *gspca_dev = priv;
+@@ -1021,7 +1021,7 @@
+ 	return ret;
+ }
+ 
+-static int vidioc_queryctrl(struct file *file, void *priv,
++static int gspca_vidioc_queryctrl(struct file *file, void *priv,
+ 			   struct v4l2_queryctrl *q_ctrl)
+ {
+ 	struct gspca_dev *gspca_dev = priv;
+@@ -1061,7 +1061,7 @@
+ 	return 0;
+ }
+ 
+-static int vidioc_s_ctrl(struct file *file, void *priv,
++static int gspca_vidioc_s_ctrl(struct file *file, void *priv,
+ 			 struct v4l2_control *ctrl)
+ {
+ 	struct gspca_dev *gspca_dev = priv;
+@@ -1091,7 +1091,7 @@
+ 	return -EINVAL;
+ }
+ 
+-static int vidioc_g_ctrl(struct file *file, void *priv,
++static int gspca_vidioc_g_ctrl(struct file *file, void *priv,
+ 			 struct v4l2_control *ctrl)
+ {
+ 	struct gspca_dev *gspca_dev = priv;
+@@ -1119,7 +1119,7 @@
+ }
+ 
+ /*fixme: have an audio flag in gspca_dev?*/
+-static int vidioc_s_audio(struct file *file, void *priv,
++static int gspca_vidioc_s_audio(struct file *file, void *priv,
+ 			 struct v4l2_audio *audio)
+ {
+ 	if (audio->index != 0)
+@@ -1127,14 +1127,14 @@
+ 	return 0;
+ }
+ 
+-static int vidioc_g_audio(struct file *file, void *priv,
++static int gspca_vidioc_g_audio(struct file *file, void *priv,
+ 			 struct v4l2_audio *audio)
+ {
+ 	strcpy(audio->name, "Microphone");
+ 	return 0;
+ }
+ 
+-static int vidioc_enumaudio(struct file *file, void *priv,
++static int gspca_vidioc_enumaudio(struct file *file, void *priv,
+ 			 struct v4l2_audio *audio)
+ {
+ 	if (audio->index != 0)
+@@ -1146,7 +1146,7 @@
+ 	return 0;
+ }
+ 
+-static int vidioc_querymenu(struct file *file, void *priv,
++static int gspca_vidioc_querymenu(struct file *file, void *priv,
+ 			    struct v4l2_querymenu *qmenu)
+ {
+ 	struct gspca_dev *gspca_dev = priv;
+@@ -1156,7 +1156,7 @@
+ 	return gspca_dev->sd_desc->querymenu(gspca_dev, qmenu);
+ }
+ 
+-static int vidioc_enum_input(struct file *file, void *priv,
++static int gspca_vidioc_enum_input(struct file *file, void *priv,
+ 				struct v4l2_input *input)
+ {
+ 	struct gspca_dev *gspca_dev = priv;
+@@ -1170,20 +1170,20 @@
+ 	return 0;
+ }
+ 
+-static int vidioc_g_input(struct file *file, void *priv, unsigned int *i)
++static int gspca_vidioc_g_input(struct file *file, void *priv, unsigned int *i)
+ {
+ 	*i = 0;
+ 	return 0;
+ }
+ 
+-static int vidioc_s_input(struct file *file, void *priv, unsigned int i)
++static int gspca_vidioc_s_input(struct file *file, void *priv, unsigned int i)
+ {
+ 	if (i > 0)
+ 		return -EINVAL;
+ 	return (0);
+ }
+ 
+-static int vidioc_reqbufs(struct file *file, void *priv,
++static int gspca_vidioc_reqbufs(struct file *file, void *priv,
+ 			  struct v4l2_requestbuffers *rb)
+ {
+ 	struct gspca_dev *gspca_dev = priv;
+@@ -1247,7 +1247,7 @@
+ 	return ret;
+ }
+ 
+-static int vidioc_querybuf(struct file *file, void *priv,
++static int gspca_vidioc_querybuf(struct file *file, void *priv,
+ 			   struct v4l2_buffer *v4l2_buf)
+ {
+ 	struct gspca_dev *gspca_dev = priv;
+@@ -1262,7 +1262,7 @@
+ 	return 0;
+ }
+ 
+-static int vidioc_streamon(struct file *file, void *priv,
++static int gspca_vidioc_streamon(struct file *file, void *priv,
+ 			   enum v4l2_buf_type buf_type)
+ {
+ 	struct gspca_dev *gspca_dev = priv;
+@@ -1297,7 +1297,7 @@
+ 	return ret;
+ }
+ 
+-static int vidioc_streamoff(struct file *file, void *priv,
++static int gspca_vidioc_streamoff(struct file *file, void *priv,
+ 				enum v4l2_buf_type buf_type)
+ {
+ 	struct gspca_dev *gspca_dev = priv;
+@@ -1330,7 +1330,7 @@
+ 	return ret;
+ }
+ 
+-static int vidioc_g_jpegcomp(struct file *file, void *priv,
++static int gspca_vidioc_g_jpegcomp(struct file *file, void *priv,
+ 			struct v4l2_jpegcompression *jpegcomp)
+ {
+ 	struct gspca_dev *gspca_dev = priv;
+@@ -1348,7 +1348,7 @@
+ 	return ret;
+ }
+ 
+-static int vidioc_s_jpegcomp(struct file *file, void *priv,
++static int gspca_vidioc_s_jpegcomp(struct file *file, void *priv,
+ 			struct v4l2_jpegcompression *jpegcomp)
+ {
+ 	struct gspca_dev *gspca_dev = priv;
+@@ -1366,7 +1366,7 @@
+ 	return ret;
+ }
+ 
+-static int vidioc_g_parm(struct file *filp, void *priv,
++static int gspca_vidioc_g_parm(struct file *filp, void *priv,
+ 			struct v4l2_streamparm *parm)
+ {
+ 	struct gspca_dev *gspca_dev = priv;
+@@ -1390,7 +1390,7 @@
+ 	return 0;
+ }
+ 
+-static int vidioc_s_parm(struct file *filp, void *priv,
++static int gspca_vidioc_s_parm(struct file *filp, void *priv,
+ 			struct v4l2_streamparm *parm)
+ {
+ 	struct gspca_dev *gspca_dev = priv;
+@@ -1419,14 +1419,14 @@
+ 	return 0;
+ }
+ 
+-static int vidioc_s_std(struct file *filp, void *priv,
++static int gspca_vidioc_s_std(struct file *filp, void *priv,
+ 			v4l2_std_id *parm)
+ {
+ 	return 0;
+ }
+ 
+ #ifdef CONFIG_VIDEO_V4L1_COMPAT
+-static int vidiocgmbuf(struct file *file, void *priv,
++static int gspca_vidiocgmbuf(struct file *file, void *priv,
+ 			struct video_mbuf *mbuf)
+ {
+ 	struct gspca_dev *gspca_dev = file->private_data;
+@@ -1444,7 +1444,7 @@
+ 			fmt.fmt.pix.width = gspca_dev->cam.cam_mode[i].width;
+ 			fmt.fmt.pix.height = gspca_dev->cam.cam_mode[i].height;
+ 			fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_BGR24;
+-			ret = vidioc_s_fmt_vid_cap(file, priv, &fmt);
++			ret = gspca_vidioc_s_fmt_vid_cap(file, priv, &fmt);
+ 			if (ret != 0)
+ 				return ret;
+ 		}
+@@ -1455,7 +1455,7 @@
+ 			rb.count = 4;
+ 			rb.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+ 			rb.memory = V4L2_MEMORY_MMAP;
+-			ret = vidioc_reqbufs(file, priv, &rb);
++			ret = gspca_vidioc_reqbufs(file, priv, &rb);
+ 			if (ret != 0)
+ 				return ret;
+ 		}
+@@ -1596,7 +1596,7 @@
+  *
+  * If nonblock_ing is false, block until a buffer is available.
+  */
+-static int vidioc_dqbuf(struct file *file, void *priv,
++static int gspca_vidioc_dqbuf(struct file *file, void *priv,
+ 			struct v4l2_buffer *v4l2_buf)
+ {
+ 	struct gspca_dev *gspca_dev = priv;
+@@ -1653,7 +1653,7 @@
+  * Attempting to queue a buffer that has already been
+  * queued will return -EINVAL.
+  */
+-static int vidioc_qbuf(struct file *file, void *priv,
++static int gspca_vidioc_qbuf(struct file *file, void *priv,
+ 			struct v4l2_buffer *v4l2_buf)
+ {
+ 	struct gspca_dev *gspca_dev = priv;
+@@ -1726,7 +1726,7 @@
+ 		rb.count = gspca_dev->nbufread;
+ 		rb.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+ 		rb.memory = GSPCA_MEMORY_READ;
+-		ret = vidioc_reqbufs(file, gspca_dev, &rb);
++		ret = gspca_vidioc_reqbufs(file, gspca_dev, &rb);
+ 		if (ret != 0) {
+ 			PDEBUG(D_STREAM, "read reqbuf err %d", ret);
+ 			return ret;
+@@ -1736,7 +1736,7 @@
+ 		v4l2_buf.memory = GSPCA_MEMORY_READ;
+ 		for (i = 0; i < gspca_dev->nbufread; i++) {
+ 			v4l2_buf.index = i;
+-			ret = vidioc_qbuf(file, gspca_dev, &v4l2_buf);
++			ret = gspca_vidioc_qbuf(file, gspca_dev, &v4l2_buf);
+ 			if (ret != 0) {
+ 				PDEBUG(D_STREAM, "read qbuf err: %d", ret);
+ 				return ret;
+@@ -1746,7 +1746,7 @@
+ 	}
+ 
+ 	/* start streaming */
+-	ret = vidioc_streamon(file, gspca_dev, V4L2_BUF_TYPE_VIDEO_CAPTURE);
++	ret = gspca_vidioc_streamon(file, gspca_dev, V4L2_BUF_TYPE_VIDEO_CAPTURE);
+ 	if (ret != 0)
+ 		PDEBUG(D_STREAM, "read streamon err %d", ret);
+ 	return ret;
+@@ -1820,7 +1820,7 @@
+ 		memset(&v4l2_buf, 0, sizeof v4l2_buf);
+ 		v4l2_buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+ 		v4l2_buf.memory = GSPCA_MEMORY_READ;
+-		ret = vidioc_dqbuf(file, gspca_dev, &v4l2_buf);
++		ret = gspca_vidioc_dqbuf(file, gspca_dev, &v4l2_buf);
+ 		if (ret != 0) {
+ 			PDEBUG(D_STREAM, "read dqbuf err %d", ret);
+ 			return ret;
+@@ -1833,7 +1833,7 @@
+ 			break;			/* avoid infinite loop */
+ 		if (frame->v4l2_buf.timestamp.tv_sec >= timestamp.tv_sec)
+ 			break;
+-		ret = vidioc_qbuf(file, gspca_dev, &v4l2_buf);
++		ret = gspca_vidioc_qbuf(file, gspca_dev, &v4l2_buf);
+ 		if (ret != 0) {
+ 			PDEBUG(D_STREAM, "read qbuf err %d", ret);
+ 			return ret;
+@@ -1853,7 +1853,7 @@
+ 	ret = count;
+ out:
+ 	/* in each case, requeue the buffer */
+-	ret2 = vidioc_qbuf(file, gspca_dev, &v4l2_buf);
++	ret2 = gspca_vidioc_qbuf(file, gspca_dev, &v4l2_buf);
+ 	if (ret2 != 0)
+ 		return ret2;
+ 	return ret;
+@@ -1870,35 +1870,35 @@
+ };
+ 
+ static const struct v4l2_ioctl_ops dev_ioctl_ops = {
+-	.vidioc_querycap	= vidioc_querycap,
+-	.vidioc_dqbuf		= vidioc_dqbuf,
+-	.vidioc_qbuf		= vidioc_qbuf,
+-	.vidioc_enum_fmt_vid_cap = vidioc_enum_fmt_vid_cap,
+-	.vidioc_try_fmt_vid_cap	= vidioc_try_fmt_vid_cap,
+-	.vidioc_g_fmt_vid_cap	= vidioc_g_fmt_vid_cap,
+-	.vidioc_s_fmt_vid_cap	= vidioc_s_fmt_vid_cap,
+-	.vidioc_streamon	= vidioc_streamon,
+-	.vidioc_queryctrl	= vidioc_queryctrl,
+-	.vidioc_g_ctrl		= vidioc_g_ctrl,
+-	.vidioc_s_ctrl		= vidioc_s_ctrl,
+-	.vidioc_g_audio		= vidioc_g_audio,
+-	.vidioc_s_audio		= vidioc_s_audio,
+-	.vidioc_enumaudio	= vidioc_enumaudio,
+-	.vidioc_querymenu	= vidioc_querymenu,
+-	.vidioc_enum_input	= vidioc_enum_input,
+-	.vidioc_g_input		= vidioc_g_input,
+-	.vidioc_s_input		= vidioc_s_input,
+-	.vidioc_reqbufs		= vidioc_reqbufs,
+-	.vidioc_querybuf	= vidioc_querybuf,
+-	.vidioc_streamoff	= vidioc_streamoff,
+-	.vidioc_g_jpegcomp	= vidioc_g_jpegcomp,
+-	.vidioc_s_jpegcomp	= vidioc_s_jpegcomp,
+-	.vidioc_g_parm		= vidioc_g_parm,
+-	.vidioc_s_parm		= vidioc_s_parm,
+-	.vidioc_s_std		= vidioc_s_std,
+-	.vidioc_enum_framesizes = vidioc_enum_framesizes,
++	.vidioc_querycap	= gspca_vidioc_querycap,
++	.vidioc_dqbuf		= gspca_vidioc_dqbuf,
++	.vidioc_qbuf		= gspca_vidioc_qbuf,
++	.vidioc_enum_fmt_vid_cap = gspca_vidioc_enum_fmt_vid_cap,
++	.vidioc_try_fmt_vid_cap	= gspca_vidioc_try_fmt_vid_cap,
++	.vidioc_g_fmt_vid_cap	= gspca_vidioc_g_fmt_vid_cap,
++	.vidioc_s_fmt_vid_cap	= gspca_vidioc_s_fmt_vid_cap,
++	.vidioc_streamon	= gspca_vidioc_streamon,
++	.vidioc_queryctrl	= gspca_vidioc_queryctrl,
++	.vidioc_g_ctrl		= gspca_vidioc_g_ctrl,
++	.vidioc_s_ctrl		= gspca_vidioc_s_ctrl,
++	.vidioc_g_audio		= gspca_vidioc_g_audio,
++	.vidioc_s_audio		= gspca_vidioc_s_audio,
++	.vidioc_enumaudio	= gspca_vidioc_enumaudio,
++	.vidioc_querymenu	= gspca_vidioc_querymenu,
++	.vidioc_enum_input	= gspca_vidioc_enum_input,
++	.vidioc_g_input		= gspca_vidioc_g_input,
++	.vidioc_s_input		= gspca_vidioc_s_input,
++	.vidioc_reqbufs		= gspca_vidioc_reqbufs,
++	.vidioc_querybuf	= gspca_vidioc_querybuf,
++	.vidioc_streamoff	= gspca_vidioc_streamoff,
++	.vidioc_g_jpegcomp	= gspca_vidioc_g_jpegcomp,
++	.vidioc_s_jpegcomp	= gspca_vidioc_s_jpegcomp,
++	.vidioc_g_parm		= gspca_vidioc_g_parm,
++	.vidioc_s_parm		= gspca_vidioc_s_parm,
++	.vidioc_s_std		= gspca_vidioc_s_std,
++	.vidioc_enum_framesizes = gspca_vidioc_enum_framesizes,
+ #ifdef CONFIG_VIDEO_V4L1_COMPAT
+-	.vidiocgmbuf          = vidiocgmbuf,
++	.vidiocgmbuf          = gspca_vidiocgmbuf,
+ #endif
+ };
+ 

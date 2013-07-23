@@ -1,0 +1,39 @@
+--- configure.in	2003-07-24 17:32:43.000000000 +0000
++++ configure.in	2003-07-24 17:32:07.000000000 +0000
+@@ -28,8 +28,6 @@
+ dnl And some custom things
+ dnl
+ 
+-AC_LIBNET_ENDIAN_CHECK
+-AC_LBL_UNALIGNED_ACCESS
+ dnl AC_LBL_LIBRARY_NET
+ 
+ AC_SUBST(ENDIANESS)
+@@ -40,6 +38,9 @@
+ AC_SUBST(LIBNET_CONFIG_LIBS)
+ AC_SUBST(LIBNET_CONFIG_CFLAGS)
+ 
++AC_LIBNET_ENDIAN_CHECK
++AC_LBL_UNALIGNED_ACCESS
++
+ dnl
+ dnl Check for typedefs, structures, and compiler characteristics
+ dnl
+@@ -123,7 +124,7 @@
+     AC_DEFINE(_BSD_SOURCE)
+     AC_DEFINE(__BSD_SOURCE)
+     AC_DEFINE(__FAVOR_BSD)
+-    LIBNET_CONFIG_DEFINES="-D_BSD_SOURCE -D__BSD_SOURCE -D__FAVOR_BSD"
++    LIBNET_CONFIG_DEFINES="$LIBNET_CONFIG_DEFINES -D_BSD_SOURCE -D__BSD_SOURCE -D__FAVOR_BSD"
+     AC_CHECK_HEADERS(net/ethernet.h, \
+         LIBNET_CONFIG_DEFINES="$LIBNET_CONFIG_DEFINES -DHAVE_NET_ETHERNET_H")
+     ;;
+@@ -202,7 +203,7 @@
+ *cygwin*)
+      AC_DEFINE(LIBNET_BSDISH_OS)
+      AC_DEFINE(NO_SNPRINTF)
+-     LIBNET_CONFIG_DEFINES="-DLIBNET_BSDISH_OS -DNO_SNPRINTF"
++     LIBNET_CONFIG_DEFINES="$LIBNET_CONFIG_DEFINES -DLIBNET_BSDISH_OS -DNO_SNPRINTF"
+      CFLAGS="$CFLAGS -mno-cygwin -O0 -fnative-struct -DNO_SNPRINTF -I/usr/include/pcap"
+      AC_CHECK_LIB(packet, PacketSetMode, ,AC_MSG_ERROR(packet lib not found.))
+      AC_CHECK_LIB(wpcap, pcap_setmode, ,AC_MSG_ERROR(pcap lib not found.))

@@ -1,0 +1,77 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>nagios</Name>
+        <Homepage>http://www.nagios.org/</Homepage>
+        <Packager>
+            <Name>Kaan Özdinçer</Name>
+            <Email>kozdincer@pardus.org.tr</Email>
+        </Packager>
+        <License>GPLv2</License>
+        <Summary>Nagios monitors hosts and services and yells if somethings breaks</Summary>
+        <Description>Nagios is a program that will monitor hosts and services on your network. It has the ability to send email or page alerts when a problem arises and when a problem is resolved.</Description>
+        <Archive sha1sum="7b2523de0dacb51b5162dd53fc4c909397800125" type="targz">mirrors://sourceforge/nagios/nagios-3.3.1.tar.gz</Archive>
+        <BuildDependencies>
+            <Dependency>traceroute</Dependency>
+            <Dependency>gd</Dependency>
+            <Dependency>mod_php</Dependency>
+            <Dependency>postfix</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <Patch>scandir.patch</Patch>
+            <Patch>fix_encoding_trends.cgi.patch</Patch>
+            <Patch>fix_spurious_dollar_signs_added_to_command_lines.patch</Patch>
+            <Patch level="1">fixed-strange-permissions.patch</Patch>
+            <Patch level="1">fix-path-to-CGI-executables.patch</Patch>
+            <Patch level="1">install-config-files-too.patch</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>nagios</Name>
+        <RuntimeDependencies>
+            <Dependency>traceroute</Dependency>
+            <Dependency>gd</Dependency>
+            <Dependency>mod_php</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="config">/etc/nagios</Path>
+            <Path fileType="config">/etc/logrotate.d/nagios</Path>
+            <Path fileType="config">/etc/apache2/conf.d/nagios.conf</Path>
+            <Path fileType="executable">/usr/bin</Path>
+            <Path fileType="data">/var/log/nagios</Path>
+            <Path fileType="data">/var/spool/nagios</Path>
+            <Path fileType="data">/var/run/nagios</Path>
+            <Path fileType="data">/usr/lib/nagios/plugins</Path>
+            <Path fileType="data">/usr/share/nagios/cgi-bin</Path>
+            <Path fileType="data">/usr/share/nagios/html</Path>
+        </Files>
+        <AdditionalFiles>
+            <AdditionalFile target="/etc/apache2/conf.d/nagios.conf" owner="root" group="root" permission="0644">nagios.apache2.conf</AdditionalFile>
+            <AdditionalFile target="/etc/nagios/htpasswd.users" owner="root" group="root" permission="0644">htpasswd.users</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/etc/logrotate.d/nagios">nagios.logrotate</AdditionalFile>
+        </AdditionalFiles>
+        <Provides>
+            <COMAR script="service.py">System.Service</COMAR>
+            <COMAR script="package.py">System.Package</COMAR>
+        </Provides>
+    </Package>
+
+    <History>
+        <Update release="2">
+            <Date>2011-10-27</Date>
+            <Version>3.3.1</Version>
+            <Comment>Version bump</Comment>
+            <Name>Kaan Özdinçer</Name>
+            <Email>kozdincer@pardus.org.tr</Email>
+        </Update>
+        <Update release="1">
+            <Date>2011-01-30</Date>
+            <Version>3.2.3</Version>
+            <Comment>First Release</Comment>
+            <Name>Erdem Bayer</Name>
+            <Email>ebayer@bayer.gen.tr</Email>
+        </Update>
+    </History>
+</PISI>

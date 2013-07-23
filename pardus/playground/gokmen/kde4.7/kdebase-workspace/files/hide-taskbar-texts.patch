@@ -1,0 +1,286 @@
+Index: kde-workspace-4.7.1/plasma/desktop/applets/tasks/abstracttaskitem.cpp
+===================================================================
+--- kde-workspace-4.7.1.orig/plasma/desktop/applets/tasks/abstracttaskitem.cpp
++++ kde-workspace-4.7.1/plasma/desktop/applets/tasks/abstracttaskitem.cpp
+@@ -99,10 +99,20 @@ AbstractTaskItem::AbstractTaskItem(QGrap
+     connect(applet, SIGNAL(settingsChanged()), this, SLOT(checkSettings()));
+ }
+ 
++void AbstractTaskItem::setShowIconOnly(bool show)
++{
++    m_showIconOnly = show;
++}
++
++bool AbstractTaskItem::showIconOnly()
++{
++    return m_showIconOnly;
++}
++
+ QSize AbstractTaskItem::basicPreferredSize() const
+ {
+     QFontMetrics fm(KGlobalSettings::taskbarFont());
+-    QSize mSize = fm.size(0, "M");
++    QSize mSize = !m_showIconOnly ? fm.size(0, "M") : QSize(0,0);
+     const int iconsize = KIconLoader::SizeSmall;
+ 
+     //the 4 should be the default spacing between layout items, is there a way to fetch it without hardcoding?
+@@ -551,7 +561,7 @@ void AbstractTaskItem::syncActiveRect()
+     // check to see if there is enough room!
+     QFontMetrics fm(font());
+     const int minimumWidth = left + 8 + IconTextSpacing + right;
+-    m_showText = (size().width() >= fm.width("M") * 6 + minimumWidth);
++    m_showText = size().width() >= fm.width("M") * 6 + minimumWidth;
+     queueUpdate();
+ }
+ 
+Index: kde-workspace-4.7.1/plasma/desktop/applets/tasks/abstracttaskitem.h
+===================================================================
+--- kde-workspace-4.7.1.orig/plasma/desktop/applets/tasks/abstracttaskitem.h
++++ kde-workspace-4.7.1/plasma/desktop/applets/tasks/abstracttaskitem.h
+@@ -136,6 +136,9 @@ public:
+     QPointF animationPos() const;
+     void setAnimationPos(const QPointF &pos);
+ 
++    virtual void setShowIconOnly(bool show);
++    bool showIconOnly();
++
+ Q_SIGNALS:
+     void activated(AbstractTaskItem *);
+     void destroyed(AbstractTaskItem *);
+@@ -260,6 +263,8 @@ private:
+     bool m_showText : 1;
+     bool m_layoutAnimationLock : 1;
+     bool m_firstGeometryUpdate : 1;
++    bool m_showIconOnly : 1;
++
+ };
+ 
+ #endif
+Index: kde-workspace-4.7.1/plasma/desktop/applets/tasks/taskgroupitem.cpp
+===================================================================
+--- kde-workspace-4.7.1.orig/plasma/desktop/applets/tasks/taskgroupitem.cpp
++++ kde-workspace-4.7.1/plasma/desktop/applets/tasks/taskgroupitem.cpp
+@@ -878,6 +878,7 @@ TaskItemLayout *TaskGroupItem::tasksLayo
+         m_tasksLayout->setMaximumRows(m_maximumRows);
+         m_tasksLayout->setForceRows(m_forceRows);
+         m_tasksLayout->setOrientation(m_applet->formFactor());
++        m_tasksLayout->setShowIconOnly(showIconOnly());
+     }
+ 
+     return m_tasksLayout;
+@@ -1368,6 +1369,14 @@ void TaskGroupItem::setForceRows(bool fo
+     }
+ }
+ 
++void TaskGroupItem::setShowIconOnly(bool show)
++{
++    AbstractTaskItem::setShowIconOnly(show);
++    if (m_tasksLayout) {
++        m_tasksLayout->setShowIconOnly(show);
++    }
++}
++
+ int TaskGroupItem::optimumCapacity()
+ {
+     if (m_tasksLayout) {
+Index: kde-workspace-4.7.1/plasma/desktop/applets/tasks/taskgroupitem.h
+===================================================================
+--- kde-workspace-4.7.1.orig/plasma/desktop/applets/tasks/taskgroupitem.h
++++ kde-workspace-4.7.1/plasma/desktop/applets/tasks/taskgroupitem.h
+@@ -83,6 +83,8 @@ public:
+     void setForceRows(bool);
+     bool forceRows();
+ 
++    virtual void setShowIconOnly(bool show);
++
+     /*
+     *Why the split group works.
+     *drag split group: in the drop event the getDirectMember function is used which retrieves the parent item of the split group
+Index: kde-workspace-4.7.1/plasma/desktop/applets/tasks/taskitemlayout.cpp
+===================================================================
+--- kde-workspace-4.7.1.orig/plasma/desktop/applets/tasks/taskitemlayout.cpp
++++ kde-workspace-4.7.1/plasma/desktop/applets/tasks/taskitemlayout.cpp
+@@ -41,6 +41,7 @@
+ TaskItemLayout::TaskItemLayout(TaskGroupItem *parent, Tasks *applet)
+     : QGraphicsGridLayout(0),
+       m_hasSpacer(false),
++      m_showIconOnly(false),
+       m_spacer(0),
+       m_groupItem(parent),
+       m_rowSize(1),
+@@ -104,6 +105,7 @@ void TaskItemLayout::addTaskItem(Abstrac
+         return;
+     }
+ 
++    item->setShowIconOnly(m_showIconOnly);
+     item->show();
+     //kDebug() << "end";
+ }
+@@ -224,6 +226,11 @@ int TaskItemLayout::maximumRows()
+     return maxRows;
+ }
+ 
++bool TaskItemLayout::showIconOnly()
++{
++    return m_showIconOnly;
++}
++
+ //returns a reasonable amount of columns
+ int TaskItemLayout::preferredColumns()
+ {
+@@ -453,6 +460,14 @@ void TaskItemLayout::setForceRows(bool f
+     m_forceRows = forceRows;
+ }
+ 
++void TaskItemLayout::setShowIconOnly(bool show)
++{
++    m_showIconOnly = show;
++    foreach (AbstractTaskItem *item, m_groupItem->members()) {
++        item->setShowIconOnly(show);
++    }
++}
++
+ int TaskItemLayout::insertionIndexAt(const QPointF &pos)
+ {
+     int insertIndex = -1;
+Index: kde-workspace-4.7.1/plasma/desktop/applets/tasks/taskitemlayout.h
+===================================================================
+--- kde-workspace-4.7.1.orig/plasma/desktop/applets/tasks/taskitemlayout.h
++++ kde-workspace-4.7.1/plasma/desktop/applets/tasks/taskitemlayout.h
+@@ -58,6 +58,8 @@ public:
+     /** force the layout to use maximumRows setting and fill rows before columns */
+     void setForceRows(bool);
+ 
++    void setShowIconOnly(bool);
++
+     /** the size including expanded groups*/
+     int size();
+ 
+@@ -71,6 +73,8 @@ public:
+     /** Returns the preferred number of columns calculated on base of AbstractGroupableItem::basicPreferredSize()*/
+     int preferredColumns();
+ 
++    bool showIconOnly();
++
+     /** Populates the actual QGraphicsGridLayout with items*/
+     void layoutItems();
+ 
+@@ -86,6 +90,7 @@ private Q_SLOTS:
+ 
+ private:
+     bool m_hasSpacer;
++    bool m_showIconOnly;
+     QGraphicsWidget *m_spacer;
+ 
+     TaskGroupItem *m_groupItem;
+Index: kde-workspace-4.7.1/plasma/desktop/applets/tasks/tasks.cpp
+===================================================================
+--- kde-workspace-4.7.1.orig/plasma/desktop/applets/tasks/tasks.cpp
++++ kde-workspace-4.7.1/plasma/desktop/applets/tasks/tasks.cpp
+@@ -68,6 +68,7 @@ Tasks::Tasks(QObject* parent, const QVar
+      : Plasma::Applet(parent, arguments),
+        m_showTooltip(false),
+        m_highlightWindows(false),
++       m_showIconOnly(false),
+        m_taskItemBackground(0),
+        m_leftMargin(0),
+        m_topMargin(0),
+@@ -217,6 +218,13 @@ void Tasks::configChanged()
+         changed = true;
+     }
+ 
++    const bool showIconOnly = cg.readEntry("showIconOnly", false);
++    if (showIconOnly != m_showIconOnly) {
++        m_showIconOnly = showIconOnly;
++        m_rootGroupItem->setShowIconOnly(m_showIconOnly);
++        changed = true;
++    }
++
+     m_groupManager->readLauncherConfig();
+ 
+     if (changed) {
+@@ -352,6 +360,7 @@ void Tasks::createConfigurationInterface
+ 
+     m_ui.showTooltip->setChecked(m_showTooltip);
+     m_ui.highlightWindows->setChecked(m_highlightWindows);
++    m_ui.showIconOnly->setChecked(m_showIconOnly);
+     m_ui.showOnlyCurrentDesktop->setChecked(m_groupManager->showOnlyCurrentDesktop());
+     m_ui.showOnlyCurrentActivity->setChecked(m_groupManager->showOnlyCurrentActivity());
+     m_ui.showOnlyCurrentScreen->setChecked(m_groupManager->showOnlyCurrentScreen());
+@@ -410,6 +419,7 @@ void Tasks::createConfigurationInterface
+     connect(m_ui.fillRows, SIGNAL(toggled(bool)), parent, SLOT(settingsModified()));
+     connect(m_ui.showTooltip, SIGNAL(toggled(bool)), parent, SLOT(settingsModified()));
+     connect(m_ui.highlightWindows, SIGNAL(toggled(bool)), parent, SLOT(settingsModified()));
++    connect(m_ui.showIconOnly, SIGNAL(toggled(bool)), parent, SLOT(settingsModified()));
+     connect(m_ui.maxRows, SIGNAL(valueChanged(int)), parent, SLOT(settingsModified()));
+     connect(m_ui.groupingStrategy, SIGNAL(currentIndexChanged(int)), parent, SLOT(settingsModified()));
+     connect(m_ui.groupWhenFull, SIGNAL(toggled(bool)), parent, SLOT(settingsModified()));
+@@ -446,8 +456,11 @@ void Tasks::configAccepted()
+ 
+     cg.writeEntry("showTooltip", m_ui.showTooltip->checkState() == Qt::Checked);
+     cg.writeEntry("highlightWindows", m_ui.highlightWindows->checkState() == Qt::Checked);
++    cg.writeEntry("showIconOnly", m_ui.showIconOnly->checkState() == Qt::Checked);
+ 
+     emit configNeedsSaving();
++
++    update();
+ }
+ 
+ bool Tasks::showToolTip() const
+Index: kde-workspace-4.7.1/plasma/desktop/applets/tasks/tasks.h
+===================================================================
+--- kde-workspace-4.7.1.orig/plasma/desktop/applets/tasks/tasks.h
++++ kde-workspace-4.7.1/plasma/desktop/applets/tasks/tasks.h
+@@ -143,6 +143,7 @@ private slots:
+ private:
+         bool m_showTooltip;
+         bool m_highlightWindows;
++        bool m_showIconOnly;
+         Plasma::LayoutAnimator *m_animator;
+         QGraphicsLinearLayout *layout;
+ 
+Index: kde-workspace-4.7.1/plasma/desktop/applets/tasks/tasksConfig.ui
+===================================================================
+--- kde-workspace-4.7.1.orig/plasma/desktop/applets/tasks/tasksConfig.ui
++++ kde-workspace-4.7.1/plasma/desktop/applets/tasks/tasksConfig.ui
+@@ -6,8 +6,8 @@
+    <rect>
+     <x>0</x>
+     <y>0</y>
+-    <width>479</width>
+-    <height>366</height>
++    <width>500</width>
++    <height>411</height>
+    </rect>
+   </property>
+   <layout class="QFormLayout" name="formLayout">
+@@ -354,7 +354,7 @@
+      </property>
+     </widget>
+    </item>
+-   <item row="14" column="1">
++   <item row="15" column="1">
+     <spacer name="verticalSpacer">
+      <property name="orientation">
+       <enum>Qt::Vertical</enum>
+@@ -367,6 +367,20 @@
+      </property>
+     </spacer>
+    </item>
++   <item row="14" column="1">
++    <widget class="QCheckBox" name="showIconOnly">
++     <property name="text">
++      <string/>
++     </property>
++    </widget>
++   </item>
++   <item row="14" column="0">
++    <widget class="QLabel" name="label_15">
++     <property name="text">
++      <string>Only show icons</string>
++     </property>
++    </widget>
++   </item>
+   </layout>
+  </widget>
+  <customwidgets>

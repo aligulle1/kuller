@@ -1,0 +1,1246 @@
+Index: src/paprefs.cc
+===================================================================
+--- src/paprefs.cc.orig
++++ src/paprefs.cc
+@@ -29,6 +29,9 @@
+ #include <libglademm.h>
+ #include <gconfmm.h>
+ 
++#include <stdlib.h>
++#include <glibmm/spawn.h>
++
+ #define PA_GCONF_ROOT "/system/pulseaudio"
+ #define PA_GCONF_PATH_MODULES PA_GCONF_ROOT"/modules"
+ 
+@@ -55,6 +58,9 @@ public:
+         *rtpSpeakerRadioButton,
+         *rtpNullSinkRadioButton;
+ 
++    Gtk::ComboBox
++       *speakerLayoutComboBox;
++
+     Glib::RefPtr<Gnome::Conf::Client> gconf;
+ 
+     bool ignoreChanges;
+@@ -65,6 +71,7 @@ public:
+     void onChangeZeroconfDiscover();
+     void onChangeRtpReceive();
+     void onChangeRtpSend();
++    void onChangeSpeakerLayout();
+     void onChangeCombine();
+     void readFromGConf();
+     void checkForModules();
+@@ -73,6 +80,7 @@ public:
+     void writeToGConfRtpReceive();
+     void writeToGConfRtpSend();
+     void writeToGConfCombine();
++    void writeToGConfSpeakerLayout();
+     void onGConfChange(const Glib::ustring& key, const Gnome::Conf::Value& value);
+ 
+     bool rtpRecvAvailable, rtpSendAvailable, zeroconfPublishAvailable, zeroconfDiscoverAvailable, remoteAvailable;
+@@ -97,6 +105,8 @@ MainWindow::MainWindow(BaseObjectType* c
+     x->get_widget("rtpSpeakerRadioButton", rtpSpeakerRadioButton);
+     x->get_widget("rtpNullSinkRadioButton", rtpNullSinkRadioButton);
+ 
++    x->get_widget("speakerLayout", speakerLayoutComboBox);
++
+     Gdk::Color c("white");
+     titleEventBox->modify_bg(Gtk::STATE_NORMAL, c);
+ 
+@@ -126,6 +136,8 @@ MainWindow::MainWindow(BaseObjectType* c
+     rtpNullSinkRadioButton->signal_clicked().connect(sigc::mem_fun(*this, &MainWindow::onChangeRtpSend));
+ 
+     combineCheckButton->signal_toggled().connect(sigc::mem_fun(*this, &MainWindow::onChangeCombine));
++
++    speakerLayoutComboBox->signal_changed().connect(sigc::mem_fun(*this, &MainWindow::onChangeSpeakerLayout));
+ }
+ 
+ MainWindow* MainWindow::create() {
+@@ -193,6 +205,13 @@ void MainWindow::onChangeRtpSend() {
+     writeToGConfRtpSend();
+ }
+ 
++void MainWindow::onChangeSpeakerLayout() {
++    if (ignoreChanges)
++        return;
++
++    writeToGConfSpeakerLayout();
++}
++
+ void MainWindow::onChangeCombine() {
+     Gnome::Conf::ChangeSet changeSet;
+ 
+@@ -202,6 +221,64 @@ void MainWindow::onChangeCombine() {
+     writeToGConfCombine();
+ }
+ 
++void MainWindow::writeToGConfSpeakerLayout() {
++    gchar *contents, *local_path;
++    gsize length;
++    GString *new_contents = NULL;
++
++    local_path = g_strdup_printf ("%s/.pulse/daemon.conf", g_get_home_dir ());
++    if (!g_file_get_contents (local_path, &contents, &length, NULL))
++	g_file_get_contents ("/etc/pulse/daemon.conf", &contents, &length, NULL);
++
++    new_contents = g_string_new (NULL);
++    if (contents) {
++	gchar **lines;
++	gint i;
++
++	lines = g_strsplit (contents, "\n", 0);
++	if (lines) {
++    	    gboolean has_default_samples = FALSE;
++	    for (i = 0; lines[i] != NULL; i++) {
++		if (!g_ascii_strncasecmp ((const gchar *) lines[i],
++					  "default-sample-channels",
++					  23)) {
++		    g_string_append_printf (new_contents, "default-sample-channels = %d\n",
++					    speakerLayoutComboBox->get_active_row_number() + 1);
++		    has_default_samples = TRUE;
++		} else {
++                    g_string_append (new_contents, lines[i]);
++		    g_string_append (new_contents, "\n");
++		}
++	    }
++
++	    if (!has_default_samples) {
++		g_string_append_printf (new_contents, "default-sample-channels = %d\n",
++					speakerLayoutComboBox->get_active_row_number() + 1);
++	    }
++
++	    g_strfreev (lines);
++	} else {
++	    g_string_append_printf (new_contents, "default-sample-channels = %d\n",
++				    speakerLayoutComboBox->get_active_row_number() + 1);
++	}
++
++    } else {
++	g_string_append_printf (new_contents, "default-sample-channels = %d\n",
++				speakerLayoutComboBox->get_active_row_number() + 1);
++    }
++
++    /* Save the configuration to local daemon.conf */
++    g_file_set_contents (local_path, new_contents->str, new_contents->len, NULL);
++
++    g_free (contents);
++    g_string_free (new_contents, TRUE);
++    g_free (local_path);
++
++    /* Restart the pulseaudio daemon */
++    Glib::spawn_command_line_sync ("pulseaudio -k");
++    Glib::spawn_command_line_sync ("pulseaudio -D");
++}
++
+ void MainWindow::writeToGConfCombine() {
+     Gnome::Conf::ChangeSet changeSet;
+     changeSet.set(PA_GCONF_PATH_MODULES"/combine/locked", true);
+@@ -385,9 +462,67 @@ void MainWindow::readFromGConf() {
+ 
+     combineCheckButton->set_active(gconf->get_bool(PA_GCONF_PATH_MODULES"/combine/enabled"));
+ 
++    /* Get speaker layout from daemon.conf file */
++    {
++	gchar *contents, *local_path;
++	gsize length;
++	int speakerLayout;
++
++	local_path = g_strdup_printf ("%s/.pulse/daemon.conf", g_get_home_dir ());
++	if (!g_file_get_contents (local_path, &contents, &length, NULL))
++	    g_file_get_contents ("/etc/pulse/daemon.conf", &contents, &length, NULL);
++
++	g_free (local_path);
++
++	if (contents) {
++	    gchar **lines;
++	    gint i;
++
++	    lines = g_strsplit (contents, "\n", 0);
++	    if (lines) {
++		for (i = 0; lines[i] != NULL; i++) {
++		    if (!g_ascii_strncasecmp ((const gchar *) lines[i],
++					      "default-sample-channels",
++					      23)) {
++			gchar **current_line;
++			int j;
++
++			current_line = g_strsplit (lines[i], "=", 2);
++			if (current_line) {
++			    gchar *s = g_strdup (current_line[1] ? current_line[1] : "2");
++			    gchar *number = g_strstrip (s);
++
++			    speakerLayout = number ? atoi (number) : 2;
++			    if (speakerLayout >= 1 && speakerLayout <= 9)
++			        speakerLayoutComboBox->set_active (speakerLayout - 1);
++			    else
++			        speakerLayoutComboBox->set_active(1);
++
++			    g_strfreev (current_line);
++			    g_free (number);
++			} else
++			     speakerLayoutComboBox->set_active(1);
++
++			break;
++		    }
++		}
++
++		g_strfreev (lines);
++	    } else
++		speakerLayoutComboBox->set_active(1);
++
++	    g_free (contents);
++	} else
++	    speakerLayoutComboBox->set_active(1);
++    }
++
++    printf ("Exit from parsing code");
++
+     ignoreChanges = FALSE;
+ 
+     updateSensitive();
++
++    printf ("readFromGConf successful");
+ }
+ 
+ void MainWindow::checkForModules() {
+Index: src/paprefs.glade
+===================================================================
+--- src/paprefs.glade.orig
++++ src/paprefs.glade
+@@ -1,381 +1,657 @@
+-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+-<!DOCTYPE glade-interface SYSTEM "glade-2.0.dtd">
+-<!--*- mode: xml -*-->
++<?xml version="1.0" standalone="no"?> <!--*- mode: xml -*-->
++<!DOCTYPE glade-interface SYSTEM "http://glade.gnome.org/glade-2.0.dtd">
++
+ <glade-interface>
+-  <widget class="GtkWindow" id="mainWindow">
+-    <property name="title" translatable="yes">PulseAudio Preferences</property>
+-    <property name="resizable">False</property>
+-    <property name="icon_name">preferences-desktop</property>
+-    <child>
+-      <widget class="GtkVBox" id="vbox3">
+-        <property name="visible">True</property>
+-        <child>
+-          <widget class="GtkEventBox" id="titleEventBox">
+-            <property name="visible">True</property>
+-            <child>
+-              <widget class="GtkHBox" id="hbox2">
+-                <property name="visible">True</property>
+-                <property name="border_width">12</property>
+-                <property name="spacing">12</property>
+-                <child>
+-                  <widget class="GtkImage" id="image19">
+-                    <property name="visible">True</property>
+-                    <property name="icon_size">6</property>
+-                    <property name="icon_name">preferences-desktop</property>
+-                  </widget>
+-                  <packing>
+-                    <property name="expand">False</property>
+-                    <property name="fill">False</property>
+-                  </packing>
+-                </child>
+-                <child>
+-                  <widget class="GtkVBox" id="vbox22">
+-                    <property name="visible">True</property>
+-                    <property name="spacing">6</property>
+-                    <child>
+-                      <widget class="GtkLabel" id="titleLabel">
+-                        <property name="visible">True</property>
+-                        <property name="xalign">0</property>
+-                        <property name="yalign">1</property>
+-                        <property name="label" translatable="yes">&lt;span size="18000" color="black"&gt;&lt;b&gt;PulseAudio Preferences&lt;/b&gt;&lt;/span&gt;</property>
+-                        <property name="use_markup">True</property>
+-                      </widget>
+-                    </child>
+-                    <child>
+-                      <widget class="GtkLabel" id="label4825">
+-                        <property name="visible">True</property>
+-                        <property name="xalign">0</property>
+-                        <property name="yalign">0</property>
+-                        <property name="label" translatable="yes">&lt;span color="black"&gt;View and modify the configuration of your local sound server&lt;/span&gt;</property>
+-                        <property name="use_markup">True</property>
+-                      </widget>
+-                      <packing>
+-                        <property name="position">1</property>
+-                      </packing>
+-                    </child>
+-                  </widget>
+-                  <packing>
+-                    <property name="position">1</property>
+-                  </packing>
+-                </child>
+-              </widget>
+-            </child>
+-          </widget>
+-          <packing>
+-            <property name="expand">False</property>
+-            <property name="fill">False</property>
+-          </packing>
+-        </child>
+-        <child>
+-          <widget class="GtkHSeparator" id="hseparator1">
+-            <property name="visible">True</property>
+-          </widget>
+-          <packing>
+-            <property name="expand">False</property>
+-            <property name="fill">False</property>
+-            <property name="position">1</property>
+-          </packing>
+-        </child>
+-        <child>
+-          <widget class="GtkVBox" id="vbox20">
+-            <property name="visible">True</property>
+-            <property name="border_width">12</property>
+-            <property name="spacing">12</property>
+-            <child>
+-              <widget class="GtkNotebook" id="notebook1">
+-                <property name="visible">True</property>
+-                <property name="can_focus">True</property>
+-                <property name="events">GDK_POINTER_MOTION_MASK | GDK_POINTER_MOTION_HINT_MASK | GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK</property>
+-                <child>
+-                  <widget class="GtkVBox" id="vbox30">
+-                    <property name="visible">True</property>
+-                    <property name="border_width">12</property>
+-                    <property name="spacing">6</property>
+-                    <child>
+-                      <widget class="GtkCheckButton" id="remoteAccessCheckButton">
+-                        <property name="visible">True</property>
+-                        <property name="can_focus">True</property>
+-                        <property name="label" translatable="yes">Enable _network access to local sound devices</property>
+-                        <property name="use_underline">True</property>
+-                        <property name="response_id">0</property>
+-                        <property name="draw_indicator">True</property>
+-                      </widget>
+-                      <packing>
+-                        <property name="expand">False</property>
+-                        <property name="fill">False</property>
+-                      </packing>
+-                    </child>
+-                    <child>
+-                      <widget class="GtkAlignment" id="alignment8">
+-                        <property name="visible">True</property>
+-                        <property name="left_padding">12</property>
+-                        <child>
+-                          <widget class="GtkVBox" id="vbox34">
+-                            <property name="visible">True</property>
+-                            <property name="spacing">6</property>
+-                            <child>
+-                              <widget class="GtkCheckButton" id="zeroconfBrowseCheckButton">
+-                                <property name="visible">True</property>
+-                                <property name="can_focus">True</property>
+-                                <property name="label" translatable="yes">Allow other machines on the LAN to _discover local sound devices</property>
+-                                <property name="use_underline">True</property>
+-                                <property name="response_id">0</property>
+-                                <property name="draw_indicator">True</property>
+-                              </widget>
+-                              <packing>
+-                                <property name="expand">False</property>
+-                                <property name="fill">False</property>
+-                              </packing>
+-                            </child>
+-                            <child>
+-                              <widget class="GtkCheckButton" id="anonymousAuthCheckButton">
+-                                <property name="visible">True</property>
+-                                <property name="can_focus">True</property>
+-                                <property name="label" translatable="yes">Don't require _authentication</property>
+-                                <property name="use_underline">True</property>
+-                                <property name="response_id">0</property>
+-                                <property name="draw_indicator">True</property>
+-                              </widget>
+-                              <packing>
+-                                <property name="expand">False</property>
+-                                <property name="fill">False</property>
+-                                <property name="position">1</property>
+-                              </packing>
+-                            </child>
+-                          </widget>
+-                        </child>
+-                      </widget>
+-                      <packing>
+-                        <property name="expand">False</property>
+-                        <property name="fill">False</property>
+-                        <property name="position">1</property>
+-                      </packing>
+-                    </child>
+-                    <child>
+-                      <widget class="GtkCheckButton" id="zeroconfDiscoverCheckButton">
+-                        <property name="visible">True</property>
+-                        <property name="can_focus">True</property>
+-                        <property name="events">GDK_POINTER_MOTION_MASK | GDK_POINTER_MOTION_HINT_MASK | GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK</property>
+-                        <property name="label" translatable="yes">_Make discoverable network sound devices available locally</property>
+-                        <property name="use_underline">True</property>
+-                        <property name="response_id">0</property>
+-                        <property name="draw_indicator">True</property>
+-                      </widget>
+-                      <packing>
+-                        <property name="expand">False</property>
+-                        <property name="fill">False</property>
+-                        <property name="position">2</property>
+-                      </packing>
+-                    </child>
+-                  </widget>
+-                </child>
+-                <child>
+-                  <widget class="GtkLabel" id="label1">
+-                    <property name="visible">True</property>
+-                    <property name="events">GDK_POINTER_MOTION_MASK | GDK_POINTER_MOTION_HINT_MASK | GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK</property>
+-                    <property name="label" translatable="yes">N_etwork Access</property>
+-                    <property name="use_underline">True</property>
+-                  </widget>
+-                  <packing>
+-                    <property name="type">tab</property>
+-                    <property name="tab_fill">False</property>
+-                  </packing>
+-                </child>
+-                <child>
+-                  <widget class="GtkVBox" id="vbox31">
+-                    <property name="visible">True</property>
+-                    <property name="border_width">12</property>
+-                    <property name="spacing">6</property>
+-                    <child>
+-                      <widget class="GtkCheckButton" id="rtpReceiveCheckButton">
+-                        <property name="visible">True</property>
+-                        <property name="can_focus">True</property>
+-                        <property name="label" translatable="yes">Enable Multicast/RTP _receiver</property>
+-                        <property name="use_underline">True</property>
+-                        <property name="response_id">0</property>
+-                        <property name="draw_indicator">True</property>
+-                      </widget>
+-                      <packing>
+-                        <property name="expand">False</property>
+-                        <property name="fill">False</property>
+-                      </packing>
+-                    </child>
+-                    <child>
+-                      <widget class="GtkCheckButton" id="rtpSendCheckButton">
+-                        <property name="visible">True</property>
+-                        <property name="can_focus">True</property>
+-                        <property name="label" translatable="yes">Enable Multicast/RTP _sender</property>
+-                        <property name="use_underline">True</property>
+-                        <property name="response_id">0</property>
+-                        <property name="draw_indicator">True</property>
+-                      </widget>
+-                      <packing>
+-                        <property name="expand">False</property>
+-                        <property name="fill">False</property>
+-                        <property name="position">1</property>
+-                      </packing>
+-                    </child>
+-                    <child>
+-                      <widget class="GtkAlignment" id="alignment10">
+-                        <property name="visible">True</property>
+-                        <property name="left_padding">12</property>
+-                        <child>
+-                          <widget class="GtkVBox" id="vbox36">
+-                            <property name="visible">True</property>
+-                            <property name="spacing">6</property>
+-                            <child>
+-                              <widget class="GtkRadioButton" id="rtpMikeRadioButton">
+-                                <property name="visible">True</property>
+-                                <property name="can_focus">True</property>
+-                                <property name="label" translatable="yes">Send audio from local _microphone</property>
+-                                <property name="use_underline">True</property>
+-                                <property name="response_id">0</property>
+-                                <property name="draw_indicator">True</property>
+-                              </widget>
+-                              <packing>
+-                                <property name="expand">False</property>
+-                                <property name="fill">False</property>
+-                              </packing>
+-                            </child>
+-                            <child>
+-                              <widget class="GtkRadioButton" id="rtpSpeakerRadioButton">
+-                                <property name="visible">True</property>
+-                                <property name="can_focus">True</property>
+-                                <property name="label" translatable="yes">Send audio from local s_peakers</property>
+-                                <property name="use_underline">True</property>
+-                                <property name="response_id">0</property>
+-                                <property name="draw_indicator">True</property>
+-                                <property name="group">rtpMikeRadioButton</property>
+-                              </widget>
+-                              <packing>
+-                                <property name="expand">False</property>
+-                                <property name="fill">False</property>
+-                                <property name="position">1</property>
+-                              </packing>
+-                            </child>
+-                            <child>
+-                              <widget class="GtkRadioButton" id="rtpNullSinkRadioButton">
+-                                <property name="visible">True</property>
+-                                <property name="can_focus">True</property>
+-                                <property name="label" translatable="yes">Create seperate audio _device for Multicast/RTP</property>
+-                                <property name="use_underline">True</property>
+-                                <property name="response_id">0</property>
+-                                <property name="draw_indicator">True</property>
+-                                <property name="group">rtpMikeRadioButton</property>
+-                              </widget>
+-                              <packing>
+-                                <property name="expand">False</property>
+-                                <property name="fill">False</property>
+-                                <property name="position">2</property>
+-                              </packing>
+-                            </child>
+-                            <child>
+-                              <widget class="GtkCheckButton" id="rtpLoopbackCheckButton">
+-                                <property name="visible">True</property>
+-                                <property name="can_focus">True</property>
+-                                <property name="label" translatable="yes">_Loopback audio to local speakers</property>
+-                                <property name="use_underline">True</property>
+-                                <property name="response_id">0</property>
+-                                <property name="draw_indicator">True</property>
+-                              </widget>
+-                              <packing>
+-                                <property name="expand">False</property>
+-                                <property name="fill">False</property>
+-                                <property name="position">3</property>
+-                              </packing>
+-                            </child>
+-                          </widget>
+-                        </child>
+-                      </widget>
+-                      <packing>
+-                        <property name="position">2</property>
+-                      </packing>
+-                    </child>
+-                  </widget>
+-                  <packing>
+-                    <property name="position">1</property>
+-                  </packing>
+-                </child>
+-                <child>
+-                  <widget class="GtkLabel" id="label2">
+-                    <property name="visible">True</property>
+-                    <property name="events">GDK_POINTER_MOTION_MASK | GDK_POINTER_MOTION_HINT_MASK | GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK</property>
+-                    <property name="label" translatable="yes">Multicast/R_TP</property>
+-                    <property name="use_underline">True</property>
+-                  </widget>
+-                  <packing>
+-                    <property name="type">tab</property>
+-                    <property name="position">1</property>
+-                    <property name="tab_fill">False</property>
+-                  </packing>
+-                </child>
+-                <child>
+-                  <widget class="GtkVBox" id="vbox4">
+-                    <property name="visible">True</property>
+-                    <property name="border_width">12</property>
+-                    <property name="spacing">6</property>
+-                    <child>
+-                      <widget class="GtkCheckButton" id="combineCheckButton">
+-                        <property name="visible">True</property>
+-                        <property name="can_focus">True</property>
+-                        <property name="label" translatable="yes">Add _virtual output device for simultaneous output on all local sound cards</property>
+-                        <property name="use_underline">True</property>
+-                        <property name="response_id">0</property>
+-                        <property name="draw_indicator">True</property>
+-                      </widget>
+-                      <packing>
+-                        <property name="expand">False</property>
+-                        <property name="fill">False</property>
+-                      </packing>
+-                    </child>
+-                  </widget>
+-                  <packing>
+-                    <property name="position">2</property>
+-                  </packing>
+-                </child>
+-                <child>
+-                  <widget class="GtkLabel" id="label3">
+-                    <property name="visible">True</property>
+-                    <property name="events">GDK_POINTER_MOTION_MASK | GDK_POINTER_MOTION_HINT_MASK | GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK</property>
+-                    <property name="label" translatable="yes">Sim_ultaneous Output</property>
+-                    <property name="use_underline">True</property>
+-                  </widget>
+-                  <packing>
+-                    <property name="type">tab</property>
+-                    <property name="position">2</property>
+-                    <property name="tab_fill">False</property>
+-                  </packing>
+-                </child>
+-              </widget>
+-            </child>
+-            <child>
+-              <widget class="GtkHButtonBox" id="hbuttonbox1">
+-                <property name="visible">True</property>
+-                <property name="layout_style">GTK_BUTTONBOX_END</property>
+-                <child>
+-                  <widget class="GtkButton" id="closeButton">
+-                    <property name="visible">True</property>
+-                    <property name="can_focus">True</property>
+-                    <property name="can_default">True</property>
+-                    <property name="label">gtk-close</property>
+-                    <property name="use_stock">True</property>
+-                    <property name="response_id">0</property>
+-                  </widget>
+-                </child>
+-              </widget>
+-              <packing>
+-                <property name="expand">False</property>
+-                <property name="fill">False</property>
+-                <property name="pack_type">GTK_PACK_END</property>
+-                <property name="position">1</property>
+-              </packing>
+-            </child>
+-          </widget>
+-          <packing>
+-            <property name="position">2</property>
+-          </packing>
+-        </child>
+-      </widget>
+-    </child>
+-  </widget>
++
++<widget class="GtkWindow" id="mainWindow">
++  <property name="title" translatable="yes">PulseAudio Preferences</property>
++  <property name="type">GTK_WINDOW_TOPLEVEL</property>
++  <property name="window_position">GTK_WIN_POS_NONE</property>
++  <property name="modal">False</property>
++  <property name="resizable">False</property>
++  <property name="destroy_with_parent">False</property>
++  <property name="icon_name">preferences-desktop</property>
++  <property name="decorated">True</property>
++  <property name="skip_taskbar_hint">False</property>
++  <property name="skip_pager_hint">False</property>
++  <property name="type_hint">GDK_WINDOW_TYPE_HINT_NORMAL</property>
++  <property name="gravity">GDK_GRAVITY_NORTH_WEST</property>
++  <property name="focus_on_map">True</property>
++  <property name="urgency_hint">False</property>
++
++  <child>
++    <widget class="GtkVBox" id="vbox3">
++      <property name="visible">True</property>
++      <property name="homogeneous">False</property>
++      <property name="spacing">0</property>
++
++      <child>
++	<widget class="GtkEventBox" id="titleEventBox">
++	  <property name="visible">True</property>
++	  <property name="visible_window">True</property>
++	  <property name="above_child">False</property>
++
++	  <child>
++	    <widget class="GtkHBox" id="hbox2">
++	      <property name="border_width">12</property>
++	      <property name="visible">True</property>
++	      <property name="homogeneous">False</property>
++	      <property name="spacing">12</property>
++
++	      <child>
++		<widget class="GtkImage" id="image19">
++		  <property name="visible">True</property>
++		  <property name="icon_size">6</property>
++		  <property name="icon_name">preferences-desktop</property>
++		  <property name="xalign">0.5</property>
++		  <property name="yalign">0.5</property>
++		  <property name="xpad">0</property>
++		  <property name="ypad">0</property>
++		</widget>
++		<packing>
++		  <property name="padding">0</property>
++		  <property name="expand">False</property>
++		  <property name="fill">False</property>
++		</packing>
++	      </child>
++
++	      <child>
++		<widget class="GtkVBox" id="vbox22">
++		  <property name="visible">True</property>
++		  <property name="homogeneous">False</property>
++		  <property name="spacing">6</property>
++
++		  <child>
++		    <widget class="GtkLabel" id="titleLabel">
++		      <property name="visible">True</property>
++		      <property name="label" translatable="yes">&lt;span size=&quot;18000&quot; color=&quot;black&quot;&gt;&lt;b&gt;PulseAudio Preferences&lt;/b&gt;&lt;/span&gt;</property>
++		      <property name="use_underline">False</property>
++		      <property name="use_markup">True</property>
++		      <property name="justify">GTK_JUSTIFY_LEFT</property>
++		      <property name="wrap">False</property>
++		      <property name="selectable">False</property>
++		      <property name="xalign">0</property>
++		      <property name="yalign">1</property>
++		      <property name="xpad">0</property>
++		      <property name="ypad">0</property>
++		      <property name="ellipsize">PANGO_ELLIPSIZE_NONE</property>
++		      <property name="width_chars">-1</property>
++		      <property name="single_line_mode">False</property>
++		      <property name="angle">0</property>
++		    </widget>
++		    <packing>
++		      <property name="padding">0</property>
++		      <property name="expand">True</property>
++		      <property name="fill">True</property>
++		    </packing>
++		  </child>
++
++		  <child>
++		    <widget class="GtkLabel" id="label4825">
++		      <property name="visible">True</property>
++		      <property name="label" translatable="yes">&lt;span color=&quot;black&quot;&gt;View and modify the configuration of your local sound server&lt;/span&gt;</property>
++		      <property name="use_underline">False</property>
++		      <property name="use_markup">True</property>
++		      <property name="justify">GTK_JUSTIFY_LEFT</property>
++		      <property name="wrap">False</property>
++		      <property name="selectable">False</property>
++		      <property name="xalign">0</property>
++		      <property name="yalign">0</property>
++		      <property name="xpad">0</property>
++		      <property name="ypad">0</property>
++		      <property name="ellipsize">PANGO_ELLIPSIZE_NONE</property>
++		      <property name="width_chars">-1</property>
++		      <property name="single_line_mode">False</property>
++		      <property name="angle">0</property>
++		    </widget>
++		    <packing>
++		      <property name="padding">0</property>
++		      <property name="expand">True</property>
++		      <property name="fill">True</property>
++		    </packing>
++		  </child>
++		</widget>
++		<packing>
++		  <property name="padding">0</property>
++		  <property name="expand">True</property>
++		  <property name="fill">True</property>
++		</packing>
++	      </child>
++	    </widget>
++	  </child>
++	</widget>
++	<packing>
++	  <property name="padding">0</property>
++	  <property name="expand">False</property>
++	  <property name="fill">False</property>
++	</packing>
++      </child>
++
++      <child>
++	<widget class="GtkHSeparator" id="hseparator1">
++	  <property name="visible">True</property>
++	</widget>
++	<packing>
++	  <property name="padding">0</property>
++	  <property name="expand">False</property>
++	  <property name="fill">False</property>
++	</packing>
++      </child>
++
++      <child>
++	<widget class="GtkVBox" id="vbox20">
++	  <property name="border_width">12</property>
++	  <property name="visible">True</property>
++	  <property name="homogeneous">False</property>
++	  <property name="spacing">12</property>
++
++	  <child>
++	    <widget class="GtkNotebook" id="notebook1">
++	      <property name="visible">True</property>
++	      <property name="can_focus">True</property>
++	      <property name="show_tabs">True</property>
++	      <property name="show_border">True</property>
++	      <property name="tab_pos">GTK_POS_TOP</property>
++	      <property name="scrollable">False</property>
++	      <property name="enable_popup">False</property>
++
++	      <child>
++		<widget class="GtkVBox" id="vbox30">
++		  <property name="border_width">12</property>
++		  <property name="visible">True</property>
++		  <property name="homogeneous">False</property>
++		  <property name="spacing">6</property>
++
++		  <child>
++		    <widget class="GtkCheckButton" id="remoteAccessCheckButton">
++		      <property name="visible">True</property>
++		      <property name="can_focus">True</property>
++		      <property name="label" translatable="yes">Enable _network access to local sound devices</property>
++		      <property name="use_underline">True</property>
++		      <property name="relief">GTK_RELIEF_NORMAL</property>
++		      <property name="focus_on_click">True</property>
++		      <property name="active">False</property>
++		      <property name="inconsistent">False</property>
++		      <property name="draw_indicator">True</property>
++		    </widget>
++		    <packing>
++		      <property name="padding">0</property>
++		      <property name="expand">False</property>
++		      <property name="fill">False</property>
++		    </packing>
++		  </child>
++
++		  <child>
++		    <widget class="GtkAlignment" id="alignment8">
++		      <property name="visible">True</property>
++		      <property name="xalign">0.5</property>
++		      <property name="yalign">0.5</property>
++		      <property name="xscale">1</property>
++		      <property name="yscale">1</property>
++		      <property name="top_padding">0</property>
++		      <property name="bottom_padding">0</property>
++		      <property name="left_padding">12</property>
++		      <property name="right_padding">0</property>
++
++		      <child>
++			<widget class="GtkVBox" id="vbox34">
++			  <property name="visible">True</property>
++			  <property name="homogeneous">False</property>
++			  <property name="spacing">6</property>
++
++			  <child>
++			    <widget class="GtkCheckButton" id="zeroconfBrowseCheckButton">
++			      <property name="visible">True</property>
++			      <property name="can_focus">True</property>
++			      <property name="label" translatable="yes">Allow other machines on the LAN to _discover local sound devices</property>
++			      <property name="use_underline">True</property>
++			      <property name="relief">GTK_RELIEF_NORMAL</property>
++			      <property name="focus_on_click">True</property>
++			      <property name="active">False</property>
++			      <property name="inconsistent">False</property>
++			      <property name="draw_indicator">True</property>
++			    </widget>
++			    <packing>
++			      <property name="padding">0</property>
++			      <property name="expand">False</property>
++			      <property name="fill">False</property>
++			    </packing>
++			  </child>
++
++			  <child>
++			    <widget class="GtkCheckButton" id="anonymousAuthCheckButton">
++			      <property name="visible">True</property>
++			      <property name="can_focus">True</property>
++			      <property name="label" translatable="yes">Don't require _authentication</property>
++			      <property name="use_underline">True</property>
++			      <property name="relief">GTK_RELIEF_NORMAL</property>
++			      <property name="focus_on_click">True</property>
++			      <property name="active">False</property>
++			      <property name="inconsistent">False</property>
++			      <property name="draw_indicator">True</property>
++			    </widget>
++			    <packing>
++			      <property name="padding">0</property>
++			      <property name="expand">False</property>
++			      <property name="fill">False</property>
++			    </packing>
++			  </child>
++			</widget>
++		      </child>
++		    </widget>
++		    <packing>
++		      <property name="padding">0</property>
++		      <property name="expand">False</property>
++		      <property name="fill">False</property>
++		    </packing>
++		  </child>
++
++		  <child>
++		    <widget class="GtkCheckButton" id="zeroconfDiscoverCheckButton">
++		      <property name="visible">True</property>
++		      <property name="can_focus">True</property>
++		      <property name="label" translatable="yes">_Make discoverable network sound devices available locally</property>
++		      <property name="use_underline">True</property>
++		      <property name="relief">GTK_RELIEF_NORMAL</property>
++		      <property name="focus_on_click">True</property>
++		      <property name="active">False</property>
++		      <property name="inconsistent">False</property>
++		      <property name="draw_indicator">True</property>
++		    </widget>
++		    <packing>
++		      <property name="padding">0</property>
++		      <property name="expand">False</property>
++		      <property name="fill">False</property>
++		    </packing>
++		  </child>
++		</widget>
++		<packing>
++		  <property name="tab_expand">False</property>
++		  <property name="tab_fill">True</property>
++		</packing>
++	      </child>
++
++	      <child>
++		<widget class="GtkLabel" id="label1">
++		  <property name="visible">True</property>
++		  <property name="label" translatable="yes">N_etwork Access</property>
++		  <property name="use_underline">True</property>
++		  <property name="use_markup">False</property>
++		  <property name="justify">GTK_JUSTIFY_LEFT</property>
++		  <property name="wrap">False</property>
++		  <property name="selectable">False</property>
++		  <property name="xalign">0.5</property>
++		  <property name="yalign">0.5</property>
++		  <property name="xpad">0</property>
++		  <property name="ypad">0</property>
++		  <property name="ellipsize">PANGO_ELLIPSIZE_NONE</property>
++		  <property name="width_chars">-1</property>
++		  <property name="single_line_mode">False</property>
++		  <property name="angle">0</property>
++		</widget>
++		<packing>
++		  <property name="type">tab</property>
++		</packing>
++	      </child>
++
++	      <child>
++		<widget class="GtkVBox" id="vbox31">
++		  <property name="border_width">12</property>
++		  <property name="visible">True</property>
++		  <property name="homogeneous">False</property>
++		  <property name="spacing">6</property>
++
++		  <child>
++		    <widget class="GtkCheckButton" id="rtpReceiveCheckButton">
++		      <property name="visible">True</property>
++		      <property name="can_focus">True</property>
++		      <property name="label" translatable="yes">Enable Multicast/RTP _receiver</property>
++		      <property name="use_underline">True</property>
++		      <property name="relief">GTK_RELIEF_NORMAL</property>
++		      <property name="focus_on_click">True</property>
++		      <property name="active">False</property>
++		      <property name="inconsistent">False</property>
++		      <property name="draw_indicator">True</property>
++		    </widget>
++		    <packing>
++		      <property name="padding">0</property>
++		      <property name="expand">False</property>
++		      <property name="fill">False</property>
++		    </packing>
++		  </child>
++
++		  <child>
++		    <widget class="GtkCheckButton" id="rtpSendCheckButton">
++		      <property name="visible">True</property>
++		      <property name="can_focus">True</property>
++		      <property name="label" translatable="yes">Enable Multicast/RTP _sender</property>
++		      <property name="use_underline">True</property>
++		      <property name="relief">GTK_RELIEF_NORMAL</property>
++		      <property name="focus_on_click">True</property>
++		      <property name="active">False</property>
++		      <property name="inconsistent">False</property>
++		      <property name="draw_indicator">True</property>
++		    </widget>
++		    <packing>
++		      <property name="padding">0</property>
++		      <property name="expand">False</property>
++		      <property name="fill">False</property>
++		    </packing>
++		  </child>
++
++		  <child>
++		    <widget class="GtkAlignment" id="alignment10">
++		      <property name="visible">True</property>
++		      <property name="xalign">0.5</property>
++		      <property name="yalign">0.5</property>
++		      <property name="xscale">1</property>
++		      <property name="yscale">1</property>
++		      <property name="top_padding">0</property>
++		      <property name="bottom_padding">0</property>
++		      <property name="left_padding">12</property>
++		      <property name="right_padding">0</property>
++
++		      <child>
++			<widget class="GtkVBox" id="vbox36">
++			  <property name="visible">True</property>
++			  <property name="homogeneous">False</property>
++			  <property name="spacing">6</property>
++
++			  <child>
++			    <widget class="GtkRadioButton" id="rtpMikeRadioButton">
++			      <property name="visible">True</property>
++			      <property name="can_focus">True</property>
++			      <property name="label" translatable="yes">Send audio from local _microphone</property>
++			      <property name="use_underline">True</property>
++			      <property name="relief">GTK_RELIEF_NORMAL</property>
++			      <property name="focus_on_click">True</property>
++			      <property name="active">False</property>
++			      <property name="inconsistent">False</property>
++			      <property name="draw_indicator">True</property>
++			    </widget>
++			    <packing>
++			      <property name="padding">0</property>
++			      <property name="expand">False</property>
++			      <property name="fill">False</property>
++			    </packing>
++			  </child>
++
++			  <child>
++			    <widget class="GtkRadioButton" id="rtpSpeakerRadioButton">
++			      <property name="visible">True</property>
++			      <property name="can_focus">True</property>
++			      <property name="label" translatable="yes">Send audio from local s_peakers</property>
++			      <property name="use_underline">True</property>
++			      <property name="relief">GTK_RELIEF_NORMAL</property>
++			      <property name="focus_on_click">True</property>
++			      <property name="active">False</property>
++			      <property name="inconsistent">False</property>
++			      <property name="draw_indicator">True</property>
++			      <property name="group">rtpMikeRadioButton</property>
++			    </widget>
++			    <packing>
++			      <property name="padding">0</property>
++			      <property name="expand">False</property>
++			      <property name="fill">False</property>
++			    </packing>
++			  </child>
++
++			  <child>
++			    <widget class="GtkRadioButton" id="rtpNullSinkRadioButton">
++			      <property name="visible">True</property>
++			      <property name="can_focus">True</property>
++			      <property name="label" translatable="yes">Create seperate audio _device for Multicast/RTP</property>
++			      <property name="use_underline">True</property>
++			      <property name="relief">GTK_RELIEF_NORMAL</property>
++			      <property name="focus_on_click">True</property>
++			      <property name="active">False</property>
++			      <property name="inconsistent">False</property>
++			      <property name="draw_indicator">True</property>
++			      <property name="group">rtpMikeRadioButton</property>
++			    </widget>
++			    <packing>
++			      <property name="padding">0</property>
++			      <property name="expand">False</property>
++			      <property name="fill">False</property>
++			    </packing>
++			  </child>
++
++			  <child>
++			    <widget class="GtkCheckButton" id="rtpLoopbackCheckButton">
++			      <property name="visible">True</property>
++			      <property name="can_focus">True</property>
++			      <property name="label" translatable="yes">_Loopback audio to local speakers</property>
++			      <property name="use_underline">True</property>
++			      <property name="relief">GTK_RELIEF_NORMAL</property>
++			      <property name="focus_on_click">True</property>
++			      <property name="active">False</property>
++			      <property name="inconsistent">False</property>
++			      <property name="draw_indicator">True</property>
++			    </widget>
++			    <packing>
++			      <property name="padding">0</property>
++			      <property name="expand">False</property>
++			      <property name="fill">False</property>
++			    </packing>
++			  </child>
++			</widget>
++		      </child>
++		    </widget>
++		    <packing>
++		      <property name="padding">0</property>
++		      <property name="expand">True</property>
++		      <property name="fill">True</property>
++		    </packing>
++		  </child>
++		</widget>
++		<packing>
++		  <property name="tab_expand">False</property>
++		  <property name="tab_fill">True</property>
++		</packing>
++	      </child>
++
++	      <child>
++		<widget class="GtkLabel" id="label2">
++		  <property name="visible">True</property>
++		  <property name="label" translatable="yes">Multicast/R_TP</property>
++		  <property name="use_underline">True</property>
++		  <property name="use_markup">False</property>
++		  <property name="justify">GTK_JUSTIFY_LEFT</property>
++		  <property name="wrap">False</property>
++		  <property name="selectable">False</property>
++		  <property name="xalign">0.5</property>
++		  <property name="yalign">0.5</property>
++		  <property name="xpad">0</property>
++		  <property name="ypad">0</property>
++		  <property name="ellipsize">PANGO_ELLIPSIZE_NONE</property>
++		  <property name="width_chars">-1</property>
++		  <property name="single_line_mode">False</property>
++		  <property name="angle">0</property>
++		</widget>
++		<packing>
++		  <property name="type">tab</property>
++		</packing>
++	      </child>
++
++	      <child>
++		<widget class="GtkVBox" id="vbox4">
++		  <property name="border_width">12</property>
++		  <property name="visible">True</property>
++		  <property name="homogeneous">False</property>
++		  <property name="spacing">6</property>
++
++		  <child>
++		    <widget class="GtkCheckButton" id="combineCheckButton">
++		      <property name="visible">True</property>
++		      <property name="can_focus">True</property>
++		      <property name="label" translatable="yes">Add _virtual output device for simultaneous output on all local sound cards</property>
++		      <property name="use_underline">True</property>
++		      <property name="relief">GTK_RELIEF_NORMAL</property>
++		      <property name="focus_on_click">True</property>
++		      <property name="active">False</property>
++		      <property name="inconsistent">False</property>
++		      <property name="draw_indicator">True</property>
++		    </widget>
++		    <packing>
++		      <property name="padding">0</property>
++		      <property name="expand">False</property>
++		      <property name="fill">False</property>
++		    </packing>
++		  </child>
++		</widget>
++		<packing>
++		  <property name="tab_expand">False</property>
++		  <property name="tab_fill">True</property>
++		</packing>
++	      </child>
++
++	      <child>
++		<widget class="GtkLabel" id="label3">
++		  <property name="visible">True</property>
++		  <property name="label" translatable="yes">Sim_ultaneous Output</property>
++		  <property name="use_underline">True</property>
++		  <property name="use_markup">False</property>
++		  <property name="justify">GTK_JUSTIFY_LEFT</property>
++		  <property name="wrap">False</property>
++		  <property name="selectable">False</property>
++		  <property name="xalign">0.5</property>
++		  <property name="yalign">0.5</property>
++		  <property name="xpad">0</property>
++		  <property name="ypad">0</property>
++		  <property name="ellipsize">PANGO_ELLIPSIZE_NONE</property>
++		  <property name="width_chars">-1</property>
++		  <property name="single_line_mode">False</property>
++		  <property name="angle">0</property>
++		</widget>
++		<packing>
++		  <property name="type">tab</property>
++		</packing>
++	      </child>
++
++	      <child>
++		<widget class="GtkVBox" id="vbox37">
++		  <property name="border_width">12</property>
++		  <property name="visible">True</property>
++		  <property name="homogeneous">False</property>
++		  <property name="spacing">6</property>
++
++		  <child>
++		    <widget class="GtkLabel" id="label4827">
++		      <property name="visible">True</property>
++		      <property name="label" translatable="yes">Speaker layout</property>
++		      <property name="use_underline">False</property>
++		      <property name="use_markup">False</property>
++		      <property name="justify">GTK_JUSTIFY_LEFT</property>
++		      <property name="wrap">False</property>
++		      <property name="selectable">False</property>
++		      <property name="xalign">0.5</property>
++		      <property name="yalign">0.5</property>
++		      <property name="xpad">0</property>
++		      <property name="ypad">0</property>
++		      <property name="ellipsize">PANGO_ELLIPSIZE_NONE</property>
++		      <property name="width_chars">-1</property>
++		      <property name="single_line_mode">False</property>
++		      <property name="angle">0</property>
++		    </widget>
++		    <packing>
++		      <property name="padding">0</property>
++		      <property name="expand">False</property>
++		      <property name="fill">False</property>
++		    </packing>
++		  </child>
++
++		  <child>
++		    <widget class="GtkComboBox" id="speakerLayout">
++		      <property name="visible">True</property>
++		      <property name="items" translatable="yes">Mono
++Stereo
++2.1
++3.1
++4.1
++5.1
++6.1
++7.1
++</property>
++		      <property name="add_tearoffs">False</property>
++		      <property name="focus_on_click">True</property>
++		    </widget>
++		    <packing>
++		      <property name="padding">0</property>
++		      <property name="expand">False</property>
++		      <property name="fill">False</property>
++		    </packing>
++		  </child>
++		</widget>
++		<packing>
++		  <property name="tab_expand">False</property>
++		  <property name="tab_fill">True</property>
++		</packing>
++	      </child>
++
++	      <child>
++		<widget class="GtkLabel" id="label4826">
++		  <property name="visible">True</property>
++		  <property name="label" translatable="yes">_Speakers</property>
++		  <property name="use_underline">True</property>
++		  <property name="use_markup">False</property>
++		  <property name="justify">GTK_JUSTIFY_LEFT</property>
++		  <property name="wrap">False</property>
++		  <property name="selectable">False</property>
++		  <property name="xalign">0.5</property>
++		  <property name="yalign">0.5</property>
++		  <property name="xpad">0</property>
++		  <property name="ypad">0</property>
++		  <property name="ellipsize">PANGO_ELLIPSIZE_NONE</property>
++		  <property name="width_chars">-1</property>
++		  <property name="single_line_mode">False</property>
++		  <property name="angle">0</property>
++		</widget>
++		<packing>
++		  <property name="type">tab</property>
++		</packing>
++	      </child>
++	    </widget>
++	    <packing>
++	      <property name="padding">0</property>
++	      <property name="expand">True</property>
++	      <property name="fill">True</property>
++	    </packing>
++	  </child>
++
++	  <child>
++	    <widget class="GtkHButtonBox" id="hbuttonbox1">
++	      <property name="visible">True</property>
++	      <property name="layout_style">GTK_BUTTONBOX_END</property>
++	      <property name="spacing">0</property>
++
++	      <child>
++		<widget class="GtkButton" id="closeButton">
++		  <property name="visible">True</property>
++		  <property name="can_default">True</property>
++		  <property name="can_focus">True</property>
++		  <property name="label">gtk-close</property>
++		  <property name="use_stock">True</property>
++		  <property name="relief">GTK_RELIEF_NORMAL</property>
++		  <property name="focus_on_click">True</property>
++		</widget>
++	      </child>
++	    </widget>
++	    <packing>
++	      <property name="padding">0</property>
++	      <property name="expand">False</property>
++	      <property name="fill">False</property>
++	      <property name="pack_type">GTK_PACK_END</property>
++	    </packing>
++	  </child>
++	</widget>
++	<packing>
++	  <property name="padding">0</property>
++	  <property name="expand">True</property>
++	  <property name="fill">True</property>
++	</packing>
++      </child>
++    </widget>
++  </child>
++</widget>
++
+ </glade-interface>

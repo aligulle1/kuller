@@ -1,0 +1,42 @@
+commit 450da4b84eeaa9614e5cbc73957ff165d1dda974
+Author: misuj1am <misuj1am>
+Date:   Fri Jul 30 07:31:13 2010 +0000
+
+    use page media box/rotation when getting text from a page instead of relying on the default values.
+
+diff --git a/src/kernel/cpagecontents.cc b/src/kernel/cpagecontents.cc
+index bf2240e..3bc8d63 100644
+--- a/src/kernel/cpagecontents.cc
++++ b/src/kernel/cpagecontents.cc
+@@ -400,6 +400,12 @@ CPageContents::getText (std::string& text, const string* encoding, const libs::R
+ 
+ 	// Get the text
+ 	libs::Rectangle rec = (rc)? *rc : _page->display()->getPageRect();
++	// if we use rotation 90,270 then we must change the rectangle from which we want the text
++	// accordingly (TODO - verify for all rotations)
++	int rot = _page->getRotation ();
++	if (90 == rot || 270 == rot)
++		std::swap (rec.xright, rec.yright);
++
+ 	scoped_ptr<GString> gtxt (textDev->getText(rec.xleft, rec.yleft, rec.xright, rec.yright));
+ 	text = gtxt->getCString();
+ }
+diff --git a/src/tools/pdf_to_text.cc b/src/tools/pdf_to_text.cc
+index dcf8626..97d2f4d 100644
+--- a/src/tools/pdf_to_text.cc
++++ b/src/tools/pdf_to_text.cc
+@@ -47,6 +47,14 @@ namespace {
+ 	struct _textify {
+ 		string operator () (shared_ptr<CPage> page)
+ 		{
++			// Update display params to use media box not default page rect (DEFAULT_PAGE_RX, DEFAULT_PAGE_RY)
++			// TODO upsidedown? get/set
++			DisplayParams dp;
++			dp.useMediaBox = gTrue;
++			dp.crop = gFalse;
++			dp.rotate = page->getRotation ();
++			page->setDisplayParams (dp);
++
+ 			string text;
+ 			static const std::string encoding="UTF-8";
+ 			page->getText (text, &encoding);

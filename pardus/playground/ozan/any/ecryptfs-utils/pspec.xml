@@ -1,0 +1,89 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>ecryptfs-utils</Name>
+        <Homepage>https://launchpad.net/ecryptfs</Homepage>
+        <Packager>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Packager>
+        <License>GPLv2+</License>
+        <IsA>app:console</IsA>
+        <Summary>The eCryptfs mount helper and support libraries</Summary>
+        <Description>ecryptfs-utils provides the mount helper and supporting libraries to perform key management and mount functions for eCryptfs which is a stacked cryptographic filesystem that ships in Linux kernel.</Description>
+        <Archive sha1sum="b85c303aa1b304eb86b0e32ebbcedb04e2fd9b8f" type="targz">http://launchpad.net/ecryptfs/trunk/87/+download/ecryptfs-utils_87.orig.tar.gz</Archive>
+        <BuildDependencies>
+            <Dependency>pkcs11-helper-devel</Dependency>
+            <Dependency>trousers-devel</Dependency>
+            <Dependency>nss-devel</Dependency>
+            <Dependency>keyutils</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <Patch level="1">ecryptfs-utils-75-nocryptdisks.patch</Patch>
+            <Patch level="1">ecryptfs-utils-83-fixsalt.patch</Patch>
+            <Patch level="1">ecryptfs-utils-83-splitnss.patch</Patch>
+            <Patch level="1">ecryptfs-utils-84-fixsigness.patch</Patch>
+            <Patch level="1">ecryptfs-utils-84-fgetc.patch</Patch>
+            <Patch level="1">ecryptfs-utils-86-manpage.patch</Patch>
+            <Patch level="1">ecryptfs-utils-87-autoload.patch</Patch>
+            <Patch level="1">ecryptfs-utils-87-mtab.patch</Patch>
+            <!-- fedora specific
+            <Patch level="1">ecryptfs-utils-87-authconfig.patch</Patch>-->
+            <Patch level="1">ecryptfs-utils-75-werror.patch</Patch>
+
+            <Patch level="1">tr.patch</Patch>
+            <Patch level="1">desktop.patch</Patch>
+            <Patch level="1">add-folder-lock-icon.patch</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>ecryptfs-utils</Name>
+        <RuntimeDependencies>
+            <Dependency>pkcs11-helper</Dependency>
+            <Dependency>trousers</Dependency>
+            <Dependency>keyutils</Dependency>
+            <Dependency>nss</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="config">/etc</Path>
+            <Path fileType="executable">/sbin</Path>
+            <Path fileType="executable">/usr/bin</Path>
+            <Path fileType="library">/usr/lib</Path>
+            <Path fileType="library">/lib/security</Path>
+            <Path fileType="doc">/usr/share/doc</Path>
+            <Path fileType="data">/usr/share/pixmaps</Path>
+            <Path fileType="data">/usr/share</Path>
+        </Files>
+        <AdditionalFiles>
+            <AdditionalFile owner="root" permission="0644" target="/usr/share/pixmaps/ecryptfs-mount-private.png">ecryptfs-mount-private.png</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/usr/share/ecryptfs-utils/directory-info">dolphin-directory</AdditionalFile>
+        </AdditionalFiles>
+        <Provides>
+            <COMAR script="package.py">System.Package</COMAR>
+        </Provides>
+    </Package>
+
+    <Package>
+        <Name>ecryptfs-utils-devel</Name>
+        <Summary>Development files for ecryptfs-utils</Summary>
+        <RuntimeDependencies>
+            <Dependency release="current">ecryptfs-utils</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="header">/usr/include</Path>
+            <Path fileType="data">/usr/lib/pkgconfig</Path>
+        </Files>
+    </Package>
+
+    <History>
+        <Update release="1">
+            <Date>2011-06-15</Date>
+            <Version>87</Version>
+            <Comment>Version bump</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+    </History>
+</PISI>

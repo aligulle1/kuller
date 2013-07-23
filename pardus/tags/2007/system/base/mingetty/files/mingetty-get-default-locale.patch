@@ -1,0 +1,36 @@
+diff -ur mingetty-1.00.orig/mingetty.c mingetty-1.00/mingetty.c
+--- mingetty-1.00.orig/mingetty.c	2006-04-05 15:42:27.000000000 +0300
++++ mingetty-1.00/mingetty.c	2006-04-05 15:42:41.000000000 +0300
+@@ -474,8 +474,31 @@
+ {
+ 	char *logname, *s;
+ 	int c;
++        FILE *f;
++        char buf[512], *t, *default_locale = NULL;
++
++	// get default locale
++        f = fopen ("/etc/env.d/03locale", "r");
++        if (!f) return NULL;
++        while (fgets (buf, 512, f)) {
++		strtok (buf, "\r\n");
++		t = strchr (buf, '=');
++		if (!t) break;
++		*t = '\0';
++		t++;
++		
++		if (strncmp(buf, "LC_ALL", 6) == 0) {
++			default_locale = t;
++			break;
++		}
++	}
++	fclose(f);
++
++	if (default_locale)
++		setlocale (LC_ALL, default_locale);
++	else
++		setlocale (LC_ALL, "");
+ 
+-	setlocale (LC_ALL, "");
+ 	bindtextdomain ("mingetty", LOCALEDIR);
+ 	textdomain ("mingetty");
+ 

@@ -1,0 +1,81 @@
+Index: k3b-1.0.4/libk3b/jobs/k3bverificationjob.cpp
+===================================================================
+--- k3b-1.0.4.orig/libk3b/jobs/k3bverificationjob.cpp
++++ k3b-1.0.4/libk3b/jobs/k3bverificationjob.cpp
+@@ -151,35 +151,27 @@ void K3bVerificationJob::start()
+   d->currentTrackIndex = 0;
+   d->alreadyReadSectors = 0;
+ 
+-  emit newTask( i18n("Checking medium") );
+-
+-  d->mediumHasBeenReloaded = false;
+-  connect( K3bDevice::sendCommand( K3bDevice::DeviceHandler::DISKINFO, d->device ),
+-           SIGNAL(finished(K3bDevice::DeviceHandler*)),
+-           this,
+-           SLOT(slotDiskInfoReady(K3bDevice::DeviceHandler*)) );
+-}
+-
+-
+-void K3bVerificationJob::slotMediaReloaded( bool success )
+-{
+-  if( !success )
+-    waitForMedia( d->device,
+-		  K3bDevice::STATE_COMPLETE|K3bDevice::STATE_INCOMPLETE,
+-		  K3bDevice::MEDIA_WRITABLE,
+-		  i18n("Unable to Close the Tray") );
+-
+-  d->mediumHasBeenReloaded = true;
++  waitForMedia( d->device,
++                K3bDevice::STATE_COMPLETE|K3bDevice::STATE_INCOMPLETE,
++                K3bDevice::MEDIA_WRITABLE );
++
++  // make sure the job is initialized
++  if ( d->tracks.isEmpty() ) {
++      emit infoMessage( i18n( "Internal error: Verification job improperly initialized (%1)" )
++                        .arg( "no tracks added" ), ERROR );
++      jobFinished( false );
++      return;
++  }
+ 
+   emit newTask( i18n("Checking medium") );
+ 
++  d->mediumHasBeenReloaded = false;
+   connect( K3bDevice::sendCommand( K3bDevice::DeviceHandler::DISKINFO, d->device ),
+            SIGNAL(finished(K3bDevice::DeviceHandler*)),
+            this,
+            SLOT(slotDiskInfoReady(K3bDevice::DeviceHandler*)) );
+ }
+ 
+-
+ void K3bVerificationJob::slotDiskInfoReady( K3bDevice::DeviceHandler* dh )
+ {
+   if( d->canceled ) {
+@@ -209,11 +201,13 @@ void K3bVerificationJob::slotDiskInfoRea
+         }
+         else {
+             // many drives need to reload the medium to return to a proper state
+-            emit newTask( i18n("Reloading the medium") );
++            d->mediumHasBeenReloaded = true;
++            emit infoMessage( i18n( "Need to reload medium to return to proper state." ), INFO );
++
+             connect( K3bDevice::reload( d->device ),
+-                     SIGNAL(finished(bool)),
++                     SIGNAL(finished(K3bDevice::DeviceHandler*)),
+                      this,
+-                     SLOT(slotMediaReloaded(bool)) );
++                     SLOT(slotDiskInfoReady(K3bDevice::DeviceHandler*)) );
+             return;
+         }
+     }
+Index: k3b-1.0.4/libk3b/jobs/k3bverificationjob.h
+===================================================================
+--- k3b-1.0.4.orig/libk3b/jobs/k3bverificationjob.h
++++ k3b-1.0.4/libk3b/jobs/k3bverificationjob.h
+@@ -75,7 +75,6 @@ class K3bVerificationJob : public K3bJob
+   void setGrownSessionSize( const K3b::Msf& );
+ 
+  private slots:
+-  void slotMediaReloaded( bool success );
+   void slotDiskInfoReady( K3bDevice::DeviceHandler* dh );
+   void readTrack( int trackIndex );
+   void slotMd5JobFinished( bool success );

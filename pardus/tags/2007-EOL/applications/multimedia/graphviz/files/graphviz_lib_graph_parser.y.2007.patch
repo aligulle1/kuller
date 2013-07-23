@@ -1,0 +1,20 @@
+diff -Nur graphviz-2.12/lib/graph/parser.y graphviz-2.12-new/lib/graph/parser.y
+--- graphviz-2.12/lib/graph/parser.y	2005-04-24 01:32:43.000000000 +0300
++++ graphviz-2.12-new/lib/graph/parser.y	2008-10-21 20:01:56.000000000 +0300
+@@ -31,11 +31,15 @@
+ static Agnode_t		*N;
+ static Agedge_t		*E;
+ static objstack_t	*SP;
+-static Agraph_t		*Gstack[32];
++#define GSTACK_SIZE 64
++static Agraph_t         *Gstack[GSTACK_SIZE];
+ static int			GSP;
+ 
+ static void push_subg(Agraph_t *g)
+ {
++  if (GSP >= GSTACK_SIZE) {
++     agerr (AGERR, "Gstack overflow in graph parser\n"); exit(1);
++  }
+ 	G = Gstack[GSP++] = g;
+ }
+ 

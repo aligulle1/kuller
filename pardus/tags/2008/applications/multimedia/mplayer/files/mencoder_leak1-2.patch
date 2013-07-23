@@ -1,0 +1,38 @@
+--- mencoder.c	2008-05-03 10:35:25.308466000 -0700
++++ mencoder.c	2008-05-03 10:35:45.530654000 -0700
+@@ -464,13 +464,17 @@
+ 
+ // check codec.conf
+ if(!codecs_file || !parse_codec_cfg(codecs_file)){
+-  if(!parse_codec_cfg(get_path("codecs.conf"))){
+-    if(!parse_codec_cfg(MPLAYER_CONFDIR "/codecs.conf")){
+-      if(!parse_codec_cfg(NULL)){
+-	mencoder_exit(1,NULL);
++  const char * conf_file = get_path("codecs.conf");
++  if (conf_file) {
++    if(!parse_codec_cfg(conf_file)){
++      if(!parse_codec_cfg(MPLAYER_CONFDIR "/codecs.conf")){
++        if(!parse_codec_cfg(NULL)){
++          mencoder_exit(1,NULL);
++        }
++        mp_msg(MSGT_MENCODER,MSGL_V,MSGTR_BuiltinCodecsConf);
+       }
+-      mp_msg(MSGT_MENCODER,MSGL_V,MSGTR_BuiltinCodecsConf);
+     }
++    free(conf_file);
+   }
+ }
+ 
+@@ -543,7 +547,11 @@
+        if(!vo_font) mp_msg(MSGT_CPLAYER,MSGL_ERR,MSGTR_CantLoadFont,font_name);
+   } else {
+       // try default:
+-       vo_font=read_font_desc(get_path("font/font.desc"),font_factor,verbose>1);
++       const char *path_file = get_path("font/font.desc")
++       if (path_file) {
++         vo_font=read_font_desc(path_file,font_factor,verbose>1);
++         free(path_file);
++       }
+        if(!vo_font)
+          vo_font=read_font_desc(MPLAYER_DATADIR "/font/font.desc",font_factor,verbose>1);
+   }

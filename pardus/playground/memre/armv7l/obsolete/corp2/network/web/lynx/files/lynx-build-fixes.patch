@@ -1,0 +1,41 @@
+--- src/makefile.in.orig	2010-05-07 16:46:37.292650311 +0300
++++ src/makefile.in	2010-05-07 17:04:34.391777100 +0300
+@@ -110,7 +110,7 @@
+ 	@echo "Compiling Lynx sources"
+ 
+ do_chartrans_stuff:
+-	-cd chrtrans && $(MAKE) \
++		$(MAKE) -C chrtrans \
+ 		SITE_DEFS="$(SITE_DEFS)" \
+ 		BUILD_CFLAGS="$(BUILD_CFLAGS)" \
+ 		BUILD_CPPFLAGS="$(BUILD_CPPFLAGS)" \
+@@ -123,7 +123,7 @@
+ 
+ clean:
+ 	rm -f lynx$x core *.core *.leaks *.i *$o *.bak tags TAGS test_*
+-	cd chrtrans && $(MAKE) clean
++	$(MAKE) -C chstrans clean
+ 
+ tags:
+ 	ctags *.[ch]
+@@ -194,8 +194,9 @@
+  $(CHRTR)utf8_uni.h \
+  $(CHRTR)viscii_uni.h
+ 
+-$(TABLES):
+-	-cd chrtrans && $(MAKE) tables
++$(TABLES): chrtrans/makeuctb$(BUILD_EXEEXT)
++	$(MAKE) -C chrtrans tables
++
+ 
+ UCdomap$o :	UCdomap.c \
+ 		chrtrans/UCkd.h \
+@@ -204,7 +205,7 @@
+ 	UCdomap.h $(CMN)UCMap.h $(TABLES) $(top_srcdir)/userdefs.h
+ 
+ chrtrans/makeuctb$(BUILD_EXEEXT):
+-	cd chrtrans; make makeuctb$(BUILD_EXEEXT)
++	-$(MAKE) -C chrtrans makeuctb$(BUILD_EXEEXT)
+ 
+ UCAux$o : UCAux.c $(CMN)UCAux.h $(CMN)UCDefs.h
+ LYCookie$o : $(top_srcdir)/userdefs.h

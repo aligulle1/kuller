@@ -1,0 +1,86 @@
+diff -Naur rrgbis.orig/Makefile rrgbis/Makefile
+--- rrgbis.orig/Makefile	2006-12-06 00:17:17.000000000 +0200
++++ rrgbis/Makefile	2008-01-27 03:33:15.000000000 +0200
+@@ -4,20 +4,20 @@
+ # http://rrgbis.sourceforge.net/
+ #
+ 
+-INSTALL_DIR=/usr/local/share
+-INSTALL_BIN_DIR=/usr/local/bin
++INSTALL_DIR=/usr/share
++INSTALL_BIN_DIR=/usr/bin
+ 
+ CXX = g++
+ #if making rrgbis64 (though it will still crash):
+ #CXXFLAGS = $(shell sdl-config --cflags) -D_SQ64 -Isrc/squirrel/include -O3
+-CXXFLAGS = $(shell sdl-config --cflags) -Isrc/squirrel/include -O3
+-LDFLAGS = $(shell sdl-config --libs) -lSDL_image -lSDL_mixer -lGL -L$(SQUIRREL)/lib
++CXXFLAGS += $(shell sdl-config --cflags) -Isrc/squirrel/include
++LDFLAGS += $(shell sdl-config --libs) -lSDL_image -lSDL_mixer -lGL -L$(SQUIRREL)/lib
+ LIBS = -lsquirrel -lsqstdlib
+ 
+-SOURCES = $(wildcard src/*.cpp) $(wildcard src/scripting/*.cpp)
++SOURCES = $(wildcard src/*.cpp) $(wildcard src/scripting/*.cpp)
+ OBJS = $(SOURCES:.cpp=.o)
+ 
+-TARGET = rrgbis
++TARGET = rrgbis.bin
+ 
+ SQUIRREL=src/squirrel
+ MAKE=make
+@@ -37,8 +37,8 @@
+ 
+ .PHONY: install
+ install: $(TARGET)
+-	install -d $(INSTALL_BIN_DIR)
+-	install $(TARGET) $(INSTALL_BIN_DIR)
++	install -d $(DESTDIR)$(INSTALL_BIN_DIR)
++	install $(TARGET) $(DESTDIR)$(INSTALL_BIN_DIR)
+ 
+ $(TARGET): $(OBJS)
+ 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
+diff -Naur rrgbis.orig/src/squirrel/sqstdlib/Makefile rrgbis/src/squirrel/sqstdlib/Makefile
+--- rrgbis.orig/src/squirrel/sqstdlib/Makefile	2006-03-06 19:01:50.000000000 +0200
++++ rrgbis/src/squirrel/sqstdlib/Makefile	2008-01-27 03:32:35.000000000 +0200
+@@ -16,15 +16,15 @@
+ 	
+ 	
+ sq32:
+-	gcc -O2  -fno-rtti -Wall -c $(SRCS) $(INCZ)
++	$(CC) $(CFLAGS)  -fno-rtti -Wall -c $(SRCS) $(INCZ)
+ 	ar rc $(OUT) *.o
+ 	rm *.o
+ 
+ sqprof:
+-	gcc -O2 -pg -fno-rtti -pie -gstabs -g3 -Wall -c $(SRCS) $(INCZ)
++	$(CC) $(CFLAGS) -pg -fno-rtti -pie -gstabs -g3 -Wall -c $(SRCS) $(INCZ)
+ 	ar rc $(OUT) *.o
+ 	rm *.o
+ sq64:
+-	gcc -O2 -D_SQ64 -fno-rtti -Wall -c $(SRCS) $(INCZ)
++	$(CC) $(CFLAGS) -D_SQ64 -fno-rtti -Wall -c $(SRCS) $(INCZ)
+ 	ar rc $(OUT) *.o
+ 	rm *.o
+diff -Naur rrgbis.orig/src/squirrel/squirrel/Makefile rrgbis/src/squirrel/squirrel/Makefile
+--- rrgbis.orig/src/squirrel/squirrel/Makefile	2006-03-06 19:01:31.000000000 +0200
++++ rrgbis/src/squirrel/squirrel/Makefile	2008-01-27 03:32:35.000000000 +0200
+@@ -37,16 +37,16 @@
+ 	
+ 	
+ sq32:
+-	gcc -O2  -fno-rtti -Wall -c $(SRCS) $(INCZ) $(DEFS)
++	$(CC) $(CFLAGS)  -fno-rtti -Wall -c $(SRCS) $(INCZ) $(DEFS)
+ 	ar rc $(OUT) *.o
+ 	rm *.o
+ 
+ sqprof:
+-	gcc -O2 -pg -fno-rtti -pie -gstabs -g3 -Wall -c $(SRCS) $(INCZ) $(DEFS)
++	$(CC) $(CFLAGS) -pg -fno-rtti -pie -gstabs -g3 -Wall -c $(SRCS) $(INCZ) $(DEFS)
+ 	ar rc $(OUT) *.o
+ 	rm *.o
+ 
+ sq64:
+-	gcc -O2  -D_SQ64 -fno-rtti -Wall -c $(SRCS) $(INCZ) $(DEFS)
++	$(CC) $(CFLAGS)  -D_SQ64 -fno-rtti -Wall -c $(SRCS) $(INCZ) $(DEFS)
+ 	ar rc $(OUT) *.o
+ 	rm *.o

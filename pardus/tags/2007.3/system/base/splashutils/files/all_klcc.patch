@@ -1,0 +1,32 @@
+diff -Nur splashutils-1.3-old/Makefile splashutils-1.3/Makefile
+--- splashutils-1.3-old/Makefile	2006-11-16 23:31:32.518478544 +0200
++++ splashutils-1.3/Makefile	2006-11-16 23:34:16.710517562 +0200
+@@ -71,7 +71,7 @@
+ 
+ # Include the klibc header files so that we can compile against fb.h
+ # from a kernel thee patched with fbsplash.
+-INCLUDES = -I/usr/include/freetype2 -idirafter /usr/lib/klibc/include/linux
++INCLUDES = -I$(FT2SRC)/include -I/usr/lib/klibc/include/linux
+ OBJS     = $(OBJDIR)/splash.o $(OBJDIR)/parse.o $(OBJDIR)/render.o $(OBJDIR)/image.o \
+ 		   $(OBJDIR)/cmd.o $(OBJDIR)/common.o $(OBJDIR)/daemon.o $(OBJDIR)/daemon_cmd.o \
+ 	       $(OBJDIR)/list.o $(OBJDIR)/effects.o
+@@ -137,8 +137,8 @@
+ 
+ $(OBJDIR)/$(SP_UTIL): $(OBJS)
+ 	@$(call infmsg,LD,$@)
+-	$(Q)$(CC) $+ $(LDLIBS) -o $@
+-	$(Q)$(CC) $+ $(LDLIBS) -static -o $@.static
++	$(Q)$(KLCC) $+ $(K_LDLIBS) -o $@
++	$(Q)$(KLCC) $+ $(K_LDLIBS) -static -o $@.static
+ 
+ objdir:	
+ 	@if [ ! -d "$(OBJDIR)" ]; then \
+@@ -216,7 +216,7 @@
+ 
+ $(OBJDIR)/%.o: %.c config.h splash.h daemon.h
+ 	@$(call infmsg,CC,$@)
+-	$(Q)$(CC) $(CFLAGS) $(INCLUDES) -DPKG_VERSION=\"$(PKG_VERSION)\" -c -o $@ $<
++	$(Q)$(KLCC) $(K_CFLAGS) $(INCLUDES) -DPKG_VERSION=\"$(PKG_VERSION)\" -c -o $@ $<
+ 
+ clean:	clean_all
+ 

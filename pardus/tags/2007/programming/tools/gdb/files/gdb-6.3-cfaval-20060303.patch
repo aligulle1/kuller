@@ -1,0 +1,96 @@
+Installed upstream after GDB 6.5 branched.
+
+for gdb/ChangeLog
+2006-03-07  Alexandre Oliva  <aoliva@redhat.com>
+
+	* dwarf2-frame.h (enum dwarf2_frame_reg_rule): Add
+	DWARF2_FRAME_REG_SAVED_VAL_OFFSET and
+	DWARF2_FRAME_REG_SAVED_VAL_EXP.
+	* dwarf2-frame.c (execute_cfa_program): Handle val_offset,
+	val_offset_sf and val_expression.
+	(dwarf2_frame_prev_register): Handle the new reg rules.
+	(dwarf2_frame_this_id): Use pc instead of function entry point.
+
+Index: gdb-6.5/gdb/dwarf2-frame.c
+===================================================================
+--- gdb-6.5.orig/gdb/dwarf2-frame.c	2006-07-07 03:31:56.000000000 -0300
++++ gdb-6.5/gdb/dwarf2-frame.c	2006-07-07 03:32:04.000000000 -0300
+@@ -474,6 +474,34 @@ bad CFI data; mismatched DW_CFA_restore_
+ 	      fs->regs.reg[reg].loc.offset = offset;
+ 	      break;
+ 
++	    case DW_CFA_val_offset:
++	      insn_ptr = read_uleb128 (insn_ptr, insn_end, &reg);
++	      dwarf2_frame_state_alloc_regs (&fs->regs, reg + 1);
++	      insn_ptr = read_uleb128 (insn_ptr, insn_end, &utmp);
++	      offset = utmp * fs->data_align;
++	      fs->regs.reg[reg].how = DWARF2_FRAME_REG_SAVED_VAL_OFFSET;
++	      fs->regs.reg[reg].loc.offset = offset;
++	      break;
++
++	    case DW_CFA_val_offset_sf:
++	      insn_ptr = read_uleb128 (insn_ptr, insn_end, &reg);
++	      dwarf2_frame_state_alloc_regs (&fs->regs, reg + 1);
++	      insn_ptr = read_sleb128 (insn_ptr, insn_end, &offset);
++	      offset *= fs->data_align;
++	      fs->regs.reg[reg].how = DWARF2_FRAME_REG_SAVED_VAL_OFFSET;
++	      fs->regs.reg[reg].loc.offset = offset;
++	      break;
++
++	    case DW_CFA_val_expression:
++	      insn_ptr = read_uleb128 (insn_ptr, insn_end, &reg);
++	      dwarf2_frame_state_alloc_regs (&fs->regs, reg + 1);
++	      insn_ptr = read_uleb128 (insn_ptr, insn_end, &utmp);
++	      fs->regs.reg[reg].loc.exp = insn_ptr;
++	      fs->regs.reg[reg].exp_len = utmp;
++	      fs->regs.reg[reg].how = DWARF2_FRAME_REG_SAVED_VAL_EXP;
++	      insn_ptr += utmp;
++	      break;
++
+ 	    case DW_CFA_def_cfa_sf:
+ 	      insn_ptr = read_uleb128 (insn_ptr, insn_end, &fs->cfa_reg);
+ 	      if (eh_frame_p)
+@@ -992,6 +1020,28 @@ dwarf2_frame_prev_register (struct frame
+ 	}
+       break;
+ 
++    case DWARF2_FRAME_REG_SAVED_VAL_OFFSET:
++      *optimizedp = 0;
++      *lvalp = not_lval;
++      *addrp = 0;
++      *realnump = -1;
++      if (valuep)
++	store_unsigned_integer (valuep, register_size (gdbarch, regnum),
++				cache->cfa + cache->reg[regnum].loc.offset);
++      break;
++
++    case DWARF2_FRAME_REG_SAVED_VAL_EXP:
++      *optimizedp = 0;
++      *lvalp = not_lval;
++      *addrp = 0;
++      *realnump = -1;
++      if (valuep)
++	store_unsigned_integer (valuep, register_size (gdbarch, regnum),
++				execute_stack_op (cache->reg[regnum].loc.exp,
++						  cache->reg[regnum].exp_len,
++						  next_frame, cache->cfa));
++      break;
++
+     case DWARF2_FRAME_REG_UNSPECIFIED:
+       /* GCC, in its infinite wisdom decided to not provide unwind
+ 	 information for registers that are "same value".  Since
+Index: gdb-6.5/gdb/dwarf2-frame.h
+===================================================================
+--- gdb-6.5.orig/gdb/dwarf2-frame.h	2006-07-07 03:31:56.000000000 -0300
++++ gdb-6.5/gdb/dwarf2-frame.h	2006-07-07 03:32:04.000000000 -0300
+@@ -55,6 +55,10 @@ enum dwarf2_frame_reg_rule
+      register.  */
+   DWARF2_FRAME_REG_INDIRECT,
+ 
++  /* These are defined in Dwarf3.  */
++  DWARF2_FRAME_REG_SAVED_VAL_OFFSET,
++  DWARF2_FRAME_REG_SAVED_VAL_EXP,
++
+   /* These aren't defined by the DWARF2 CFI specification, but are
+      used internally by GDB.  These should be superseeded by
+      REG_INDIRECT.  */

@@ -1,0 +1,104 @@
+--- Makefile.orig	2008-12-01 10:14:52.000000000 +0200
++++ Makefile	2008-12-01 11:07:05.000000000 +0200
+@@ -72,7 +72,7 @@
+ ifneq (,$(wildcard /boot/vmlinuz.version.h))
+   VERSION_FILE := /boot/vmlinuz.version.h
+   CONFIG_FILE  := /boot/vmlinuz.autoconf.h
+-  KVER := $(shell $(CC) $(CFLAGS) -E -dM $(VERSION_FILE) | \
++  KVER := $(shell $(CC) $(EXTRA_CFLAGS) -E -dM $(VERSION_FILE) | \
+           grep UTS_RELEASE | awk '{ print $$3 }' | sed 's/\"//g')
+   ifeq ($(KVER),$(BUILD_KERNEL))
+     # set up include path to override headers from kernel source
+@@ -80,7 +80,7 @@
+     x:=$(shell mkdir -p include/linux)
+     x:=$(shell cp /boot/vmlinuz.version.h include/linux/version.h)
+     x:=$(shell cp /boot/vmlinuz.autoconf.h include/linux/autoconf.h)
+-    CFLAGS += -I./include
++    EXTRA_CFLAGS += -I./include
+   else
+     ifneq (,$(wildcard $(KOBJ)/include/linux/utsrelease.h))
+       VERSION_FILE := $(KOBJ)/include/linux/utsrelease.h
+@@ -123,38 +123,38 @@
+ # some additional features are only built on Intel platforms
+ ARCH := $(shell uname -m | sed 's/i.86/i386/')
+ ifeq ($(ARCH),alpha)
+-  CFLAGS += -ffixed-8 -mno-fp-regs
++  EXTRA_CFLAGS += -ffixed-8 -mno-fp-regs
+ endif
+ ifeq ($(ARCH),x86_64)
+-  CFLAGS += -mcmodel=kernel -mno-red-zone
++  EXTRA_CFLAGS += -mcmodel=kernel -mno-red-zone
+ endif
+ ifeq ($(ARCH),ppc)
+-  CFLAGS += -msoft-float
++  EXTRA_CFLAGS += -msoft-float
+ endif
+ ifeq ($(ARCH),ppc64)
+-  CFLAGS += -m64 -msoft-float
++  EXTRA_CFLAGS += -m64 -msoft-float
+   LDFLAGS += -melf64ppc
+ endif
+ 
+ # standard flags for module builds
+-CFLAGS += -DLINUX -D__KERNEL__ -DMODULE -O2 -pipe -Wall -DDBG=0
+-CFLAGS += -I$(KSRC)/include -I.
+-CFLAGS += $(shell [ -f $(KSRC)/include/linux/modversions.h ] && \
++EXTRA_CFLAGS += -DLINUX -D__KERNEL__ -DMODULE -O2 -pipe -Wall -DDBG=0
++EXTRA_CFLAGS += -I$(KSRC)/include -I.
++EXTRA_CFLAGS += $(shell [ -f $(KSRC)/include/linux/modversions.h ] && \
+             echo "-DMODVERSIONS -DEXPORT_SYMTAB \
+-                  -include $(KSRC)/include/linux/modversions.h")
++				  -include $(KSRC)/include/linux/modversions.h")
+ 
+-CFLAGS += $(CFLAGS_EXTRA)
++EXTRA_CFLAGS += $(CFLAGS_EXTRA)
+ 
+ RHC := $(KSRC)/include/linux/rhconfig.h
+ ifneq (,$(wildcard $(RHC)))
+   # 7.3 typo in rhconfig.h
+-  ifneq (,$(shell $(CC) $(CFLAGS) -E -dM $(RHC) | grep __module__bigmem))
+-	CFLAGS += -D__module_bigmem
++  ifneq (,$(shell $(CC) $(EXTRA_CFLAGS) -E -dM $(RHC) | grep __module__bigmem))
++	EXTRA_CFLAGS += -D__module_bigmem
+   endif
+ endif
+ 
+ # get the kernel version - we use this to find the correct install path
+-KVER := $(shell $(CC) $(CFLAGS) -E -dM $(VERSION_FILE) | grep UTS_RELEASE | \
++KVER := $(shell $(CC) $(EXTRA_CFLAGS) -E -dM $(VERSION_FILE) | grep UTS_RELEASE | \
+         awk '{ print $$3 }' | sed 's/\"//g')
+ 
+ # assume source symlink is the same as build, otherwise adjust KOBJ
+@@ -175,7 +175,7 @@
+ INSTDIR := /lib/modules/$(KVER)/kernel/drivers/net/atl1e
+ 
+ # look for SMP in config.h
+-SMP := $(shell $(CC) $(CFLAGS) -E -dM $(CONFIG_FILE) | \
++SMP := $(shell $(CC) $(EXTRA_CFLAGS) -E -dM $(CONFIG_FILE) | \
+          grep -w CONFIG_SMP | awk '{ print $$3 }')
+ ifneq ($(SMP),1)
+   SMP := 0
+@@ -196,7 +196,7 @@
+ endif
+ 
+ ifeq ($(SMP),1)
+-  CFLAGS += -D__SMP__
++  EXTRA_CFLAGS += -D__SMP__
+ endif
+ 
+ ###########################################################################
+@@ -237,12 +237,12 @@
+ 
+ # Get rid of compile warnings in kernel header files from SuSE
+ ifneq (,$(wildcard /etc/SuSE-release))
+-  CFLAGS += -Wno-sign-compare -fno-strict-aliasing
++  EXTRA_CFLAGS += -Wno-sign-compare -fno-strict-aliasing
+ endif
+ 
+ # Get rid of compile warnings in kernel header files from fedora
+ ifneq (,$(wildcard /etc/fedora-release))
+-  CFLAGS += -fno-strict-aliasing
++  EXTRA_CFLAGS += -fno-strict-aliasing
+ endif
+ 
+ .SILENT: $(TARGET)

@@ -1,0 +1,19 @@
+#!/bin/bash
+MAILTO_URL="$@"
+
+# Strip off the protocol
+MAIL_DATA=$(echo "$MAILTO_URL" | sed -s 's/^mailto://I')
+
+# Get Recipient and strip it off
+RECIPIENT=$(echo "$MAIL_DATA" | cut -d? -f1 -)
+MAIL_DATA=$(echo "$MAIL_DATA" | sed -s "s/^$RECIPIENT//")
+
+# Get Subject,BCC, and CC
+SUBJECT=$(echo "$MAIL_DATA" | \
+sed -s 's/.*?subject=//I' | sed -s 's/?.*//')
+BCC=$(echo "$MAIL_DATA" | sed -s 's/.*?bcc=//I' | \
+sed -s 's/?.*//')
+CC=$(echo "$MAIL_DATA" | sed -s 's/.*?cc=//I' | \
+sed -s 's/?.*//')
+
+kmail "$RECIPIENT" -s "$SUBJECT" -c "$CC" -b "$BCC" --body "$MAIL_DATA"

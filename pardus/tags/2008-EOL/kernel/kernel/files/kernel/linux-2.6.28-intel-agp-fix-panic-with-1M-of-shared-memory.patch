@@ -1,0 +1,48 @@
+From: Lubomir Rintel <lkundrak@v3.sk>
+Date: Tue, 10 Mar 2009 19:55:54 +0000 (-0700)
+Subject: intel-agp: fix a panic with 1M of shared memory, no GTT entries
+X-Git-Tag: v2.6.29-rc8~36
+X-Git-Url: http://git.kernel.org/?p=linux%2Fkernel%2Fgit%2Ftorvalds%2Flinux-2.6.git;a=commitdiff_plain;h=9c1e8a4ebcc04226cb6f3a1bf1d72f4cafd6b089
+
+intel-agp: fix a panic with 1M of shared memory, no GTT entries
+
+When GTT size is equal to amount of video memory, the amount of GTT
+entries is computed lower than zero, which is invalid and leads to
+off-by-one error in intel_i915_configure()
+
+Originally posted here:
+http://bugzilla.kernel.org/show_bug.cgi?id=12539
+http://bugzilla.redhat.com/show_bug.cgi?id=445592
+
+Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
+Cc: Lubomir Rintel <lkundrak@v3.sk>
+Cc: Dave Airlie <airlied@linux.ie>
+Reviewed-by: Eric Anholt <eric@anholt.net>
+Cc: <stable@kernel.org>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+---
+
+Index: linux-2.6.25/drivers/char/agp/intel-agp.c
+===================================================================
+--- linux-2.6.25.orig/drivers/char/agp/intel-agp.c
++++ linux-2.6.25/drivers/char/agp/intel-agp.c
+@@ -581,13 +581,15 @@ static void intel_i830_init_gtt_entries(
+ 			break;
+ 		}
+ 	}
+-	if (gtt_entries > 0)
++	if (gtt_entries > 0) {
+ 		printk(KERN_INFO PFX "Detected %dK %s memory.\n",
+ 		       gtt_entries / KB(1), local ? "local" : "stolen");
+-	else
++        gtt_entries /= KB(4);
++    } else {
+ 		printk(KERN_INFO PFX
+ 		       "No pre-allocated video memory detected.\n");
+-	gtt_entries /= KB(4);
++        gtt_entries = 0;
++    }
+ 
+ 	intel_private.gtt_entries = gtt_entries;
+ }

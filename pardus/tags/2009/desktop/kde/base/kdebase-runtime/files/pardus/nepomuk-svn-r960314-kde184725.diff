@@ -1,0 +1,798 @@
+Index: interfaces/org.kde.nepomuk.ServiceManager.xml
+===================================================================
+--- nepomuk/interfaces/org.kde.nepomuk.ServiceManager.xml	(revision 960313)
++++ nepomuk/interfaces/org.kde.nepomuk.ServiceManager.xml	(revision 960314)
+@@ -28,6 +28,10 @@
+       <arg name="name" type="s" direction="in" />
+       <arg name="result" type="b" direction="out" />
+     </method>
++    <method name="isServiceRunning">
++      <arg name="name" type="s" direction="in" />
++      <arg name="result" type="b" direction="out" />
++    </method>
+     <signal name="serviceInitialized">
+       <arg name="name" type="s" direction="out" />
+     </signal>
+Index: interfaces/org.kde.nepomuk.Strigi.xml
+===================================================================
+--- nepomuk/interfaces/org.kde.nepomuk.Strigi.xml	(revision 960313)
++++ nepomuk/interfaces/org.kde.nepomuk.Strigi.xml	(revision 960314)
+@@ -23,6 +23,10 @@
+       <arg name="lastModificationDate" direction="in" type="u" />
+       <arg name="tmpFileName" direction="in" type="s" />
+     </method>
++    <method name="userStatusString">
++      <arg type="s" direction="out" />
++    </method>
++    <signal name="statusChanged" />
+     <signal name="indexingStarted" />
+     <signal name="indexingStopped" />
+     <signal name="indexingFolder">
+Index: services/strigi/eventmonitor.h
+===================================================================
+--- nepomuk/services/strigi/eventmonitor.h	(revision 960313)
++++ nepomuk/services/strigi/eventmonitor.h	(revision 960314)
+@@ -25,7 +25,6 @@
+ #include <QtCore/QTime>
+ 
+ class KDiskFreeSpace;
+-class FileSystemWatcher;
+ 
+ namespace Nepomuk {
+ 
+@@ -41,7 +40,6 @@
+ 
+     private Q_SLOTS:
+         void slotPowerManagementStatusChanged( bool conserveResources );
+-        void updateWatches();
+         void slotCheckAvailableSpace();
+         void slotIndexingStopped();
+         void slotDirDirty( const QString& );
+@@ -56,8 +54,6 @@
+         IndexScheduler* m_indexScheduler;
+         int m_pauseState;
+ 
+-        FileSystemWatcher* m_fsWatcher;
+-
+         // timer used to periodically check for available space
+         QTimer m_availSpaceTimer;
+ 
+Index: services/strigi/filesystemwatcher.cpp
+===================================================================
+--- nepomuk/services/strigi/filesystemwatcher.cpp	(revision 960313)
++++ nepomuk/services/strigi/filesystemwatcher.cpp	(revision 960314)
+@@ -55,6 +55,7 @@
+     Private( FileSystemWatcher* parent )
+         : recursive( true ),
+           interval( 10*60 ),
++          status( FileSystemWatcher::Idle ),
+           q( parent ) {
+     }
+ 
+@@ -63,6 +64,8 @@
+     bool recursive;
+     int interval;
+ 
++    FileSystemWatcher::Status status;
++
+     void start( const QDateTime& startTime );
+     void stop();
+     void run();
+@@ -113,7 +116,11 @@
+         }
+ 
+         // check all folders
++        status = Checking;
++        emit q->statusChanged( Checking );
+         checkFolders();
++        status = Idle;
++        emit q->statusChanged( Idle );
+ 
+         // check if we have been stopped
+         QMutexLocker lock( &m_stoppedMutex );
+@@ -242,6 +249,12 @@
+ }
+ 
+ 
++FileSystemWatcher::Status FileSystemWatcher::status() const
++{
++    return d->status;
++}
++
++
+ void FileSystemWatcher::setFolders( const QStringList& folders )
+ {
+     d->folders = folders;
+Index: services/strigi/strigiserviceadaptor.h
+===================================================================
+--- nepomuk/services/strigi/strigiserviceadaptor.h	(revision 960313)
++++ nepomuk/services/strigi/strigiserviceadaptor.h	(revision 960314)
+@@ -26,7 +26,6 @@
+ 
+ namespace Nepomuk {
+ 
+-    class IndexScheduler;
+     class StrigiService;
+ 
+     class StrigiServiceAdaptor: public QDBusAbstractAdaptor
+@@ -60,6 +59,10 @@
+                     "      <arg name=\"lastModificationDate\" direction=\"in\" type=\"u\" />\n"
+                     "      <arg name=\"tmpFileName\" direction=\"in\" type=\"s\" />\n"
+                     "    </method>\n"
++                    "    <method name=\"userStatusString\" >\n"
++                    "      <arg direction=\"out\" type=\"s\" />\n"
++                    "    </method>\n"
++                    "    <signal name=\"statusChanged\" />\n"
+                     "    <signal name=\"indexingStarted\" />\n"
+                     "    <signal name=\"indexingStopped\" />\n"
+                     "    <signal name=\"indexingFolder\" >\n"
+@@ -69,7 +72,7 @@
+                     "")
+ 
+     public:
+-        StrigiServiceAdaptor( IndexScheduler* scheduler, StrigiService* parent );
++        StrigiServiceAdaptor( StrigiService* parent );
+         ~StrigiServiceAdaptor();
+ 
+     public Q_SLOTS:
+@@ -82,14 +85,16 @@
+         void updateAllFolders();
+         void analyzeResource( const QString& uri, uint mTime, const QByteArray& data );
+         void analyzeResourceFromTempFileAndDeleteTempFile( const QString& uri, uint mTime, const QString& tmpFile );
++        QString userStatusString() const;
+ 
+     Q_SIGNALS:
++        void statusChanged();
+         void indexingFolder( const QString& path );
+         void indexingStarted();
+         void indexingStopped();
+ 
+     private:
+-        IndexScheduler* m_indexScheduler;
++        StrigiService* m_service;
+     };
+ }
+ 
+Index: services/strigi/filesystemwatcher.h
+===================================================================
+--- nepomuk/services/strigi/filesystemwatcher.h	(revision 960313)
++++ nepomuk/services/strigi/filesystemwatcher.h	(revision 960314)
+@@ -39,6 +39,13 @@
+     bool watchRecursively() const;
+     int interval() const;
+ 
++    enum Status {
++        Checking,
++        Idle
++    };
++
++    Status status() const;
++
+ public Q_SLOTS:
+     void setFolders( const QStringList& folders );
+ 
+@@ -68,6 +75,8 @@
+      */
+     void dirty( const QString& folder );
+ 
++    void statusChanged( FileSystemWatcher::Status status );
++
+ private:
+     class Private;
+     Private* const d;
+Index: services/strigi/systray.cpp
+===================================================================
+--- nepomuk/services/strigi/systray.cpp	(revision 960313)
++++ nepomuk/services/strigi/systray.cpp	(revision 960314)
+@@ -18,6 +18,7 @@
+ 
+ #include "systray.h"
+ #include "indexscheduler.h"
++#include "strigiservice.h"
+ 
+ #include <KMenu>
+ #include <KToggleAction>
+@@ -27,9 +28,9 @@
+ 
+ 
+ 
+-Nepomuk::SystemTray::SystemTray( IndexScheduler* scheduler, QWidget* parent )
++Nepomuk::SystemTray::SystemTray( StrigiService* service, QWidget* parent )
+     : KSystemTrayIcon( "nepomuk", parent ),
+-      m_indexScheduler( scheduler )
++      m_service( service )
+ {
+     KMenu* menu = new KMenu;
+     menu->addTitle( i18n( "Strigi File Indexing" ) );
+@@ -38,7 +39,7 @@
+     m_suspendResumeAction->setCheckedState( KGuiItem( i18n( "Suspend Strigi Indexing" ) ) );
+     m_suspendResumeAction->setToolTip( i18n( "Suspend or resume the Strigi file indexer manually" ) );
+     connect( m_suspendResumeAction, SIGNAL( toggled( bool ) ),
+-             m_indexScheduler, SLOT( setSuspended( bool ) ) );
++             m_service->indexScheduler(), SLOT( setSuspended( bool ) ) );
+ 
+     KAction* configAction = new KAction( menu );
+     configAction->setText( i18n( "Configure Strigi" ) );
+@@ -49,14 +50,9 @@
+     menu->addAction( m_suspendResumeAction );
+     menu->addAction( configAction );
+ 
+-    setContextMenu( menu );
++    connect( m_service, SIGNAL( statusStringChanged() ), this, SLOT( slotUpdateStrigiStatus() ) );
+ 
+-    connect( m_indexScheduler, SIGNAL( indexingStarted() ),
+-             this, SLOT( slotUpdateStrigiStatus() ) );
+-    connect( m_indexScheduler, SIGNAL( indexingStopped() ),
+-             this, SLOT( slotUpdateStrigiStatus() ) );
+-    connect( m_indexScheduler, SIGNAL( indexingFolder(QString) ),
+-             this, SLOT( slotUpdateStrigiStatus() ) );
++    setContextMenu( menu );
+ }
+ 
+ 
+@@ -67,18 +63,8 @@
+ 
+ void Nepomuk::SystemTray::slotUpdateStrigiStatus()
+ {
+-    bool indexing = m_indexScheduler->isIndexing();
+-    bool suspended = m_indexScheduler->isSuspended();
+-    QString folder = m_indexScheduler->currentFolder();
+-
+-    if ( suspended )
+-        setToolTip( i18n( "File indexer is suspended" ) );
+-    else if ( indexing )
+-        setToolTip( i18n( "Strigi is currently indexing files in folder %1", folder ) );
+-    else
+-        setToolTip( i18n( "File indexer is idle" ) );
+-
+-    m_suspendResumeAction->setChecked( suspended );
++    setToolTip( m_service->userStatusString() );
++    m_suspendResumeAction->setChecked( m_service->indexScheduler()->isSuspended() );
+ }
+ 
+ 
+Index: services/strigi/strigiservice.cpp
+===================================================================
+--- nepomuk/services/strigi/strigiservice.cpp	(revision 960313)
++++ nepomuk/services/strigi/strigiservice.cpp	(revision 960314)
+@@ -25,6 +25,7 @@
+ #include "strigiserviceconfig.h"
+ #include "statuswidget.h"
+ #include "nepomukstorageinterface.h"
++#include "filesystemwatcher.h"
+ 
+ #include <KDebug>
+ 
+@@ -40,6 +41,7 @@
+     // only so ResourceManager won't open yet another connection to the nepomuk server
+     ResourceManager::instance()->setOverrideMainModel( mainModel() );
+ 
++
+     // lower process priority - we do not want to spoil KDE usage
+     // ==============================================================
+     if ( !lowerPriority() )
+@@ -49,6 +51,7 @@
+     if ( !lowerIOPriority() )
+         kDebug() << "Failed to lower io priority.";
+ 
++
+     // Using Strigi with the redland backend is torture.
+     // Thus we simply fail initialization if it is used
+     // ==============================================================
+@@ -56,16 +59,50 @@
+                                      "/nepomukstorage",
+                                      QDBusConnection::sessionBus() )
+          .usedSopranoBackend().value() != QString::fromLatin1( "redland" ) ) {
++
+         // setup the actual index scheduler including strigi stuff
+         // ==============================================================
+         if ( ( m_indexManager = Strigi::IndexPluginLoader::createIndexManager( "sopranobackend", 0 ) ) ) {
+             m_indexScheduler = new IndexScheduler( m_indexManager, this );
+ 
++            // monitor all kinds of events
+             ( void )new EventMonitor( m_indexScheduler, this );
+-            ( void )new StrigiServiceAdaptor( m_indexScheduler, this );
+-            StatusWidget* sw = new StatusWidget( mainModel(), m_indexScheduler );
+-            ( new SystemTray( m_indexScheduler, sw ) )->show();
+ 
++            // monitor the file system
++            m_fsWatcher = new FileSystemWatcher( this );
++            m_fsWatcher->setWatchRecursively( true );
++            connect( m_fsWatcher, SIGNAL( dirty( QString ) ),
++                     this, SLOT( slotDirDirty( QString ) ) );
++
++            // update the watches if the config changes
++            connect( StrigiServiceConfig::self(), SIGNAL( configChanged() ),
++                     this, SLOT( updateWatches() ) );
++
++            // export on dbus
++            ( void )new StrigiServiceAdaptor( this );
++
++            // create the status widget (hidden)
++            StatusWidget* sw = new StatusWidget( mainModel(), this );
++
++            // create the systray
++            SystemTray* tray =  new SystemTray( this, sw );
++            tray->show();
++
++            // setup status connections
++            connect( m_indexScheduler, SIGNAL( indexingStarted() ),
++                     this, SIGNAL( statusStringChanged() ) );
++            connect( m_indexScheduler, SIGNAL( indexingStopped() ),
++                     this, SIGNAL( statusStringChanged() ) );
++            connect( m_indexScheduler, SIGNAL( indexingFolder(QString) ),
++                     this, SIGNAL( statusStringChanged() ) );
++            connect( m_fsWatcher, SIGNAL( statusChanged(FileSystemWatcher::Status) ),
++                     this, SIGNAL( statusStringChanged() ) );
++
++
++            // start watching the index folders
++            updateWatches();
++
++            // start the actual indexing
+             m_indexScheduler->start();
+         }
+         else {
+@@ -94,6 +131,35 @@
+ }
+ 
+ 
++void Nepomuk::StrigiService::updateWatches()
++{
++    // the hard way since the KDirWatch API is too simple
++    QStringList folders = StrigiServiceConfig::self()->folders();
++    if ( folders != m_fsWatcher->folders() ) {
++        m_fsWatcher->setFolders( StrigiServiceConfig::self()->folders() );
++        m_fsWatcher->setInterval( 2*60 ); // check every 2 minutes
++        m_fsWatcher->start();
++    }
++}
++
++
++QString Nepomuk::StrigiService::userStatusString() const
++{
++    bool indexing = m_indexScheduler->isIndexing();
++    bool suspended = m_indexScheduler->isSuspended();
++    QString folder = m_indexScheduler->currentFolder();
++
++    if ( suspended )
++        return i18nc( "@info:status", "File indexer is suspended" );
++    else if ( indexing )
++        return i18nc( "@info:status", "Strigi is currently indexing files in folder %1", folder );
++    else if ( m_fsWatcher->status() == FileSystemWatcher::Checking )
++        return i18nc( "@info:status", "Checking file system for new files" );
++    else
++        return i18nc( "@info:status", "File indexer is idle" );
++}
++
++
+ #include <kpluginfactory.h>
+ #include <kpluginloader.h>
+ 
+Index: services/strigi/systray.h
+===================================================================
+--- nepomuk/services/strigi/systray.h	(revision 960313)
++++ nepomuk/services/strigi/systray.h	(revision 960314)
+@@ -26,13 +26,14 @@
+ namespace Nepomuk {
+ 
+     class IndexScheduler;
++    class StrigiService;
+ 
+     class SystemTray : public KSystemTrayIcon
+     {
+         Q_OBJECT
+ 
+     public:
+-        SystemTray( IndexScheduler* scheduler, QWidget* parent );
++        SystemTray( StrigiService* service, QWidget* parent );
+         ~SystemTray();
+ 
+     private Q_SLOTS:
+@@ -42,7 +43,7 @@
+     private:
+         KToggleAction* m_suspendResumeAction;
+ 
+-        IndexScheduler* m_indexScheduler;
++        StrigiService* m_service;
+     };
+ }
+ 
+Index: services/strigi/strigiservice.h
+===================================================================
+--- nepomuk/services/strigi/strigiservice.h	(revision 960313)
++++ nepomuk/services/strigi/strigiservice.h	(revision 960314)
+@@ -25,6 +25,7 @@
+ namespace Strigi {
+     class IndexManager;
+ }
++class FileSystemWatcher;
+ 
+ namespace Nepomuk {
+ 
+@@ -41,11 +42,27 @@
+         StrigiService( QObject* parent = 0, const QList<QVariant>& args = QList<QVariant>() );
+         ~StrigiService();
+ 
++        IndexScheduler* indexScheduler() const { return m_indexScheduler; }
++
++    Q_SIGNALS:
++        void statusStringChanged();
++
++    public Q_SLOTS:
++        /**
++         * \return A user readable status string
++         */
++        QString userStatusString() const;
++
++    private Q_SLOTS:
++        void updateWatches();
++
+     private:
+         void updateStrigiConfig();
+ 
+         Strigi::IndexManager* m_indexManager;
+         IndexScheduler* m_indexScheduler;
++
++        FileSystemWatcher* m_fsWatcher;
+     };
+ }
+ 
+Index: services/strigi/statuswidget.cpp
+===================================================================
+--- nepomuk/services/strigi/statuswidget.cpp	(revision 960313)
++++ nepomuk/services/strigi/statuswidget.cpp	(revision 960314)
+@@ -18,6 +18,7 @@
+ 
+ #include "statuswidget.h"
+ #include "indexscheduler.h"
++#include "strigiservice.h"
+ 
+ #include <KToolInvocation>
+ #include <KIcon>
+@@ -34,10 +35,10 @@
+ #include <QtCore/QTimer>
+ 
+ 
+-Nepomuk::StatusWidget::StatusWidget( Soprano::Model* model, IndexScheduler* scheduler, QWidget* parent )
++Nepomuk::StatusWidget::StatusWidget( Soprano::Model* model, StrigiService* service, QWidget* parent )
+     : KDialog( parent ),
+       m_model( model ),
+-      m_indexScheduler( scheduler ),
++      m_service( service ),
+       m_connected( false ),
+       m_updatingJobCnt( 0 ),
+       m_updateRequested( false )
+@@ -68,16 +69,7 @@
+ 
+ void Nepomuk::StatusWidget::slotUpdateStrigiStatus()
+ {
+-    bool indexing = m_indexScheduler->isIndexing();
+-    bool suspended = m_indexScheduler->isSuspended();
+-    QString folder = m_indexScheduler->currentFolder();
+-
+-    if ( suspended )
+-        m_labelStrigiState->setText( i18n( "File indexer is suspended" ) );
+-    else if ( indexing )
+-        m_labelStrigiState->setText( i18n( "Strigi is currently indexing files in folder %1", folder ) );
+-    else
+-        m_labelStrigiState->setText( i18n( "File indexer is idle" ) );
++    m_labelStrigiState->setText( m_service->userStatusString() );
+ }
+ 
+ 
+@@ -214,12 +206,8 @@
+ void Nepomuk::StatusWidget::showEvent( QShowEvent* event )
+ {
+     if ( !m_connected ) {
+-        connect( m_indexScheduler, SIGNAL( indexingStarted() ),
++        connect( m_service, SIGNAL( statusStringChanged() ),
+                  this, SLOT( slotUpdateStrigiStatus() ) );
+-        connect( m_indexScheduler, SIGNAL( indexingStopped() ),
+-                 this, SLOT( slotUpdateStrigiStatus() ) );
+-        connect( m_indexScheduler, SIGNAL( indexingFolder(QString) ),
+-                 this, SLOT( slotUpdateStrigiStatus() ) );
+ 
+         connect( m_model, SIGNAL( statementsAdded() ),
+                  this, SLOT( slotUpdateStoreStatus() ) );
+@@ -244,7 +232,7 @@
+ void Nepomuk::StatusWidget::hideEvent( QHideEvent* event )
+ {
+     if ( m_connected ) {
+-        m_indexScheduler->disconnect( this );
++        m_service->disconnect( this );
+         m_model->disconnect( this );
+         m_connected = false;
+     }
+Index: services/strigi/eventmonitor.cpp
+===================================================================
+--- nepomuk/services/strigi/eventmonitor.cpp	(revision 960313)
++++ nepomuk/services/strigi/eventmonitor.cpp	(revision 960314)
+@@ -19,7 +19,6 @@
+ #include "eventmonitor.h"
+ #include "strigiserviceconfig.h"
+ #include "indexscheduler.h"
+-#include "filesystemwatcher.h"
+ 
+ #include <KDebug>
+ #include <KPassivePopup>
+@@ -46,19 +45,6 @@
+       m_indexScheduler( scheduler ),
+       m_pauseState( NotPaused )
+ {
+-    // monitor the file system
+-    m_fsWatcher = new FileSystemWatcher( this );
+-    m_fsWatcher->setWatchRecursively( true );
+-    connect( m_fsWatcher, SIGNAL( dirty( QString ) ),
+-             this, SLOT( slotDirDirty( QString ) ) );
+-
+-    // update the watches if the config changes
+-    connect( StrigiServiceConfig::self(), SIGNAL( configChanged() ),
+-             this, SLOT( updateWatches() ) );
+-
+-    // start watching the index folders
+-    updateWatches();
+-
+     // FileSystemWatcher does not catch changes to files, only new and removed files
+     // thus, we also do periodic updates of the whole index every two hours
+     connect( &m_periodicUpdateTimer, SIGNAL( timeout() ),
+@@ -104,18 +90,6 @@
+ }
+ 
+ 
+-void Nepomuk::EventMonitor::updateWatches()
+-{
+-    // the hard way since the KDirWatch API is too simple
+-    QStringList folders = StrigiServiceConfig::self()->folders();
+-    if ( folders != m_fsWatcher->folders() ) {
+-        m_fsWatcher->setFolders( StrigiServiceConfig::self()->folders() );
+-        m_fsWatcher->setInterval( 2*60 ); // check every 2 minutes
+-        m_fsWatcher->start();
+-    }
+-}
+-
+-
+ void Nepomuk::EventMonitor::slotDirDirty( const QString& path )
+ {
+     if ( StrigiServiceConfig::self()->shouldFolderBeIndexed( path ) ) {
+Index: services/strigi/statuswidget.h
+===================================================================
+--- nepomuk/services/strigi/statuswidget.h	(revision 960313)
++++ nepomuk/services/strigi/statuswidget.h	(revision 960314)
+@@ -34,14 +34,14 @@
+ 
+ namespace Nepomuk {
+ 
+-    class IndexScheduler;
++    class StrigiService;
+ 
+     class StatusWidget : public KDialog, public Ui::StatusWidget
+     {
+         Q_OBJECT
+ 
+     public:
+-        StatusWidget( Soprano::Model* model, IndexScheduler* scheduler, QWidget* parent = 0 );
++        StatusWidget( Soprano::Model* model, StrigiService* service, QWidget* parent = 0 );
+         ~StatusWidget();
+ 
+     private Q_SLOTS:
+@@ -57,7 +57,7 @@
+         void hideEvent( QHideEvent* event );
+ 
+         Soprano::Model* m_model;
+-        IndexScheduler* m_indexScheduler;
++        StrigiService* m_service;
+ 
+         bool m_connected;
+         QTimer m_updateTimer;
+Index: services/strigi/strigiserviceadaptor.cpp
+===================================================================
+--- nepomuk/services/strigi/strigiserviceadaptor.cpp	(revision 960313)
++++ nepomuk/services/strigi/strigiserviceadaptor.cpp	(revision 960314)
+@@ -31,15 +31,17 @@
+ #include <KDebug>
+ 
+ 
+-Nepomuk::StrigiServiceAdaptor::StrigiServiceAdaptor( IndexScheduler* scheduler, StrigiService* parent )
++Nepomuk::StrigiServiceAdaptor::StrigiServiceAdaptor( StrigiService* parent )
+     : QDBusAbstractAdaptor(parent),
+-      m_indexScheduler( scheduler )
++      m_service( parent )
+ {
+-    connect( m_indexScheduler, SIGNAL( indexingStarted() ),
++    connect( m_service, SIGNAL( statusStringChanged() ),
++             this, SIGNAL( statusChanged() ) );
++    connect( m_service->indexScheduler(), SIGNAL( indexingStarted() ),
+              this, SIGNAL( indexingStarted() ) );
+-    connect( m_indexScheduler, SIGNAL( indexingStopped() ),
++    connect( m_service->indexScheduler(), SIGNAL( indexingStopped() ),
+              this, SIGNAL( indexingStopped() ) );
+-    connect( m_indexScheduler, SIGNAL( indexingFolder(QString) ),
++    connect( m_service->indexScheduler(), SIGNAL( indexingFolder(QString) ),
+              this, SIGNAL( indexingFolder(QString) ) );
+ }
+ 
+@@ -52,53 +54,53 @@
+ bool Nepomuk::StrigiServiceAdaptor::isIndexing()
+ {
+     // handle method call org.kde.nepomuk.Strigi.isIndexing
+-    return m_indexScheduler->isIndexing();
++    return m_service->indexScheduler()->isIndexing();
+ }
+ 
+ 
+ bool Nepomuk::StrigiServiceAdaptor::isSuspended()
+ {
+     // handle method call org.kde.nepomuk.Strigi.isSuspended
+-    return m_indexScheduler->isSuspended();
++    return m_service->indexScheduler()->isSuspended();
+ }
+ 
+ 
+ QString Nepomuk::StrigiServiceAdaptor::currentFolder()
+ {
+-    return m_indexScheduler->currentFolder();
++    return m_service->indexScheduler()->currentFolder();
+ }
+ 
+ 
+ void Nepomuk::StrigiServiceAdaptor::resume()
+ {
+     // handle method call org.kde.nepomuk.Strigi.resume
+-    m_indexScheduler->resume();
++    m_service->indexScheduler()->resume();
+ }
+ 
+ 
+ void Nepomuk::StrigiServiceAdaptor::suspend()
+ {
+     // handle method call org.kde.nepomuk.Strigi.suspend
+-    m_indexScheduler->suspend();
++    m_service->indexScheduler()->suspend();
+ }
+ 
+ 
+ void Nepomuk::StrigiServiceAdaptor::updateFolder( const QString& path )
+ {
+-    m_indexScheduler->updateDir( path );
++    m_service->indexScheduler()->updateDir( path );
+ }
+ 
+ 
+ void Nepomuk::StrigiServiceAdaptor::updateAllFolders()
+ {
+-    m_indexScheduler->updateAll();
++    m_service->indexScheduler()->updateAll();
+ }
+ 
+ 
+ void Nepomuk::StrigiServiceAdaptor::analyzeResource( const QString& uri, uint mTime, const QByteArray& data )
+ {
+     QDataStream stream( data );
+-    m_indexScheduler->analyzeResource( QUrl::fromEncoded( uri.toAscii() ), QDateTime::fromTime_t( mTime ), stream );
++    m_service->indexScheduler()->analyzeResource( QUrl::fromEncoded( uri.toAscii() ), QDateTime::fromTime_t( mTime ), stream );
+ }
+ 
+ 
+@@ -107,10 +109,16 @@
+     QFile file( tmpFile );
+     if ( file.open( QIODevice::ReadOnly ) ) {
+         QDataStream stream( &file );
+-        m_indexScheduler->analyzeResource( QUrl::fromEncoded( uri.toAscii() ), QDateTime::fromTime_t( mTime ), stream );
++        m_service->indexScheduler()->analyzeResource( QUrl::fromEncoded( uri.toAscii() ), QDateTime::fromTime_t( mTime ), stream );
+         file.remove();
+     }
+     else {
+         kDebug() << "Failed to open" << tmpFile;
+     }
+ }
++
++
++QString Nepomuk::StrigiServiceAdaptor::userStatusString() const
++{
++    return m_service->userStatusString();
++}
+Index: server/servicemanager.h
+===================================================================
+--- nepomuk/server/servicemanager.h	(revision 960313)
++++ nepomuk/server/servicemanager.h	(revision 960314)
+@@ -46,12 +46,14 @@
+          * Even uninitialized services are running.
+          *
+          * \return A list of names of all running services.
++         *
++         * \sa isServiceRunning, isServiceInitialized
+          */
+         QStringList runningServices() const;
+ 
+         /**
+          * All services that are available in the system. Started
+-         * and not started. This list does only include valid 
++         * and not started. This list does only include valid
+          * services, i.e. those that have a proper dependency tree.
+          *
+          * \return A list of names of all running services.
+@@ -61,9 +63,19 @@
+         /**
+          * \return \p true if the service identified by \p servicename
+          * is running and initialized.
++         *
++         * \sa isServiceRunning
+          */
+         bool isServiceInitialized( const QString& servicename ) const;
+ 
++        /**
++         * \return \p true if the service identified by \p servicename
++         * is running.
++         *
++         * \sa isServiceInitialized
++         */
++        bool isServiceRunning( const QString& servicename ) const;
++
+     Q_SIGNALS:
+         /**
+          * Emitted once a new service finished its initialization and
+Index: server/servicemanager.cpp
+===================================================================
+--- nepomuk/server/servicemanager.cpp	(revision 960313)
++++ nepomuk/server/servicemanager.cpp	(revision 960314)
+@@ -412,6 +412,17 @@
+ }
+ 
+ 
++bool Nepomuk::ServiceManager::isServiceRunning( const QString& service ) const
++{
++    if ( ServiceController* sc = d->findService( service ) ) {
++        return sc->isRunning();
++    }
++    else {
++        return false;
++    }
++}
++
++
+ bool Nepomuk::ServiceManager::isServiceAutostarted( const QString& name )
+ {
+     if ( ServiceController* sc = d->findService( name ) ) {
+Index: kcm/nepomukserverkcm.cpp
+===================================================================
+--- nepomuk/kcm/nepomukserverkcm.cpp	(revision 960313)
++++ nepomuk/kcm/nepomukserverkcm.cpp	(revision 960314)
+@@ -196,20 +196,13 @@
+ {
+     if ( m_serviceManagerInterface.runningServices().value().contains( "nepomukstrigiservice") ) {
+         if ( m_serviceManagerInterface.isServiceInitialized( "nepomukstrigiservice") ) {
+-            bool indexing = m_strigiInterface->isIndexing();
+-            bool suspended = m_strigiInterface->isSuspended();
+-            QString folder = m_strigiInterface->currentFolder();
+-
+-            if ( m_strigiInterface->lastError().isValid() )
++            QString status = m_strigiInterface->userStatusString();
++            if ( status.isEmpty() )
+                 m_labelStrigiStatus->setText( i18nc( "@info:status %1 is an error message returned by a dbus interface.",
+                                                      "Failed to contact Strigi indexer (%1)",
+                                                      m_strigiInterface->lastError().message() ) );
+-            else if ( suspended )
+-                m_labelStrigiStatus->setText( i18nc( "@info_status", "File indexer is suspended" ) );
+-            else if ( indexing )
+-                m_labelStrigiStatus->setText( i18nc( "@info_status", "Strigi is currently indexing files in folder %1", folder ) );
+             else
+-                m_labelStrigiStatus->setText( i18nc( "@info_status", "File indexer is idle" ) );
++                m_labelStrigiStatus->setText( status );
+         }
+         else {
+             m_labelStrigiStatus->setText( i18nc( "@info_status", "Strigi service failed to initialize, most likely due to an installation problem." ) );
+@@ -225,12 +218,8 @@
+ {
+     delete m_strigiInterface;
+     m_strigiInterface = new org::kde::nepomuk::Strigi( "org.kde.nepomuk.services.nepomukstrigiservice", "/nepomukstrigiservice", QDBusConnection::sessionBus() );
+-    connect( m_strigiInterface, SIGNAL( indexingStarted() ),
++    connect( m_strigiInterface, SIGNAL( statusChanged() ),
+              this, SLOT( slotUpdateStrigiStatus() ) );
+-    connect( m_strigiInterface, SIGNAL( indexingStopped() ),
+-             this, SLOT( slotUpdateStrigiStatus() ) );
+-    connect( m_strigiInterface, SIGNAL( indexingFolder(QString) ),
+-             this, SLOT( slotUpdateStrigiStatus() ) );
+ }
+ 
+ #include "nepomukserverkcm.moc"

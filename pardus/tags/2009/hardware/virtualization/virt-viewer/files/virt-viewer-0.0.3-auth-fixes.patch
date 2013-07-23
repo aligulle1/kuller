@@ -1,0 +1,24 @@
+diff -rup virt-viewer-0.0.3.orig/src/main.c virt-viewer-0.0.3.new/src/main.c
+--- virt-viewer-0.0.3.orig/src/main.c	2008-03-10 14:49:48.000000000 +0000
++++ virt-viewer-0.0.3.new/src/main.c	2009-05-07 12:29:19.000000000 +0100
+@@ -306,7 +306,7 @@ static void viewer_credential(GtkWidget 
+                                 switch (g_value_get_enum(cred)) {
+                                 case VNC_DISPLAY_CREDENTIAL_USERNAME:
+                                 case VNC_DISPLAY_CREDENTIAL_PASSWORD:
+-                                        data[i] = gtk_entry_get_text(GTK_ENTRY(entry[row]));
++                                        data[i] = gtk_entry_get_text(GTK_ENTRY(entry[row++]));
+                                         break;
+                                 }
+                         }
+@@ -795,7 +795,10 @@ viewer_start (const char *uri, const cha
+ 
+ 	verbose = set_verbose;
+ 
+-	conn = virConnectOpenReadOnly(uri);
++	/* XXX Write a graphical auth prompter */
++	conn = virConnectOpenAuth(uri,
++				  virConnectAuthPtrDefault,
++				  VIR_CONNECT_RO);
+ 	if (!conn) {
+ 		fprintf(stderr, "unable to connect to libvirt %s\n",
+ 			uri ? uri : "xen");

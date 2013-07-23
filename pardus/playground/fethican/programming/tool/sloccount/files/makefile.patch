@@ -1,0 +1,65 @@
+--- makefile.orig	2010-05-18 22:08:14.176604721 +0300
++++ makefile	2010-05-18 22:08:43.266602315 +0300
+@@ -70,6 +70,7 @@
+ ARCH=i386
+ VERSIONEDNAME=$(NAME)-$(VERSION)
+ INSTALL_DIR=$(PREFIX)/bin
++LIBEXEC_DIR=$(PREFIX)/libexec/$(NAME)
+ MAN_DIR=$(PREFIX)/share/man
+ MAN_DIR_MAN1=$(MAN_DIR)/man1
+ DOC_DIR=$(PREFIX)/share/doc/$(VERSIONEDNAME)-$(RPM_VERSION)
+@@ -115,11 +116,12 @@
+    sed_count \
+    sh_count \
+    show_filecount \
+-   sloccount \
+    sql_count \
+    tcl_count \
+    $(COMPILED_EXECUTABLES)
+ 
++MAIN_EXECUTABLE=sloccount
++
+ MANPAGES=sloccount.1.gz
+ 
+ MYDOCS=sloccount.html README TODO ChangeLog
+@@ -162,12 +164,24 @@
+ c_lines: C_LINES.C
+ 	$(CC) C_LINES.C -o c_lines$(EXE_SUFFIX)
+ 
++install_prefix:
++	$(INSTALL_A_DIR) $(PREFIX)
+ 
+-install_programs: all
+-	$(INSTALL) $(EXECUTABLES) $(INSTALL_DIR)
++install_program:
++	$(INSTALL_A_DIR) $(INSTALL_DIR)
++	$(INSTALL) $(MAIN_EXECUTABLE) $(INSTALL_DIR)
++
++uninstall_program:
++	cd $(INSTALL_DIR) && rm -f $(MAIN_EXECUTABLE)
++
++install_libexec: all
++	$(INSTALL_A_DIR) $(LIBEXEC_DIR)
++	$(INSTALL) $(EXECUTABLES) $(LIBEXEC_DIR)
++
++uninstall_libexec:
++	cd $(LIBEXEC_DIR) && rm -f $(EXECUTABLES)
++	rmdir $(LIBEXEC_DIR)
+ 
+-uninstall_programs:
+-	cd $(INSTALL_DIR) && rm -f $(EXECUTABLES)
+ 
+ install_man: $(MANPAGES)
+ 	$(INSTALL_A_DIR) $(MAN_DIR_MAN1)
+@@ -184,9 +198,9 @@
+ 	rm -fr $(DOC_DIR)
+ 
+ 
+-install: install_programs install_man install_docs
++install: install_prefix install_program install_libexec install_man install_docs
+ 
+-uninstall: uninstall_programs uninstall_docs uninstall_man
++uninstall: uninstall_program uninstall_libexec uninstall_docs uninstall_man
+ 
+ 
+ clean:

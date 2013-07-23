@@ -1,0 +1,63 @@
+--- log.c.org	2007-02-27 19:34:59.000000000 +0200
++++ log.c	    2007-02-27 19:41:56.000000000 +0200
+@@ -145,7 +145,7 @@
+    SquidGuardLogAlternate[0]='\0';
+    arq[0]='\0';
+ 
+-   strcpy(AccessLog,"/usr/local/squid/var/logs/access.log");
++   strcpy(AccessLog,"/var/log/squid/access.log");
+    sprintf(ExcludeCodes,"%s/exclude_codes",SYSCONFDIR);
+    strcpy(GraphDaysBytesBarColor,"orange");
+    strcpy(BgColor,"#ffffff");
+@@ -160,7 +160,7 @@
+    strcpy(LogoTextColor,"#006699");
+    strcpy(FontSize,"9px");
+    strcpy(TempDir,"/tmp");
+-   strcpy(OutputDir,"/var/www/html/squid-reports");
++   strcpy(OutputDir,"/var/www/localhost/htdocs/squid-reports");
+    strcpy(Ip2Name,"no");
+    strcpy(DateFormat,"u");
+    strcpy(OverwriteReport,"no");
+@@ -1216,7 +1216,7 @@
+ 
+               if(download_flag && strstr(code,"DENIED") == 0) {
+                  ndownload = 1;
+-                 sprintf(bufz, "%s %s %s %s %s %s\n",dia,hora,user,ip,download_url);
++                 sprintf( bufz, "%s %s %s %s %s\n",dia,hora,user,ip,download_url );
+ 
+ #ifdef LEGACY_WRITE_DOWNLOAD
+                  sprintf(tmp3,"%s/sarg/download.unsort",tmp);
+--- sarg.conf.org	2007-02-27 19:55:23.000000000 +0200
++++ sarg.conf	    2007-02-27 19:58:34.000000000 +0200
+@@ -33,7 +33,7 @@
+ #       Where is the access.log file
+ #       sarg -l file
+ #
+-#access_log /usr/local/squid/var/logs/access.log
++#access_log /var/log/squid/access.log
+ 
+ # TAG: graphs yes|no
+ #	Use graphics where is possible.
+@@ -140,7 +140,7 @@
+ #       The reports will be saved in that directory
+ #       sarg -o dir
+ #
+-#output_dir /var/www/html/squid-reports
++#output_dir /var/www/localhost/htdocs/squid-reports
+ 
+ # TAG:  output_email
+ #       Email address to send the reports. If you use this tag, no html reports will be generated.
+--- sarg.1.org	    2007-02-27 19:59:30.000000000 +0200
++++ sarg.1	        2007-02-27 20:00:16.000000000 +0200
+@@ -131,9 +131,9 @@
+ .B \-split
+ Split the log file by date in \fB-d\fP parameter.
+ .SH FILES
+-.BR /usr/local/sarg/sarg.conf
++.BR /etc/sarg/sarg.conf
+ .br
+-.B /usr/local/squid/logs/access.log
++.B /var/log/squid/access.log
+ .br
+ .B /usr/local/squidGuard/logs/squidGuard.log
+ .SH SEE ALSO

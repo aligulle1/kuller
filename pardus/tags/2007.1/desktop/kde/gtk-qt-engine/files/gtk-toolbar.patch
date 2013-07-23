@@ -1,0 +1,50 @@
+Index: src/qt_qt_wrapper.cpp
+===================================================================
+--- src/qt_qt_wrapper.cpp	(revision 25)
++++ src/qt_qt_wrapper.cpp	(revision 26)
+@@ -55,6 +55,7 @@
+ QString iconThemeDir;
+ QColor alternateBackgroundColour;
+ int showIconsOnButtons;
++int toolbarStyle;
+ 
+ const QPixmap* backgroundTile;
+ GdkPixmap* backgroundTileGdk;
+@@ -506,6 +507,19 @@
+ 	alternateBackgroundColour.setRgb(back[0].toInt(), back[1].toInt(), back[2].toInt());
+ 
+ 	showIconsOnButtons = (kdeConfigValue("KDE", "ShowIconsOnPushButtons", "true").lower() == "true");
++	
++	
++	QString tmp = kdeConfigValue("Toolbar style", "IconText", "true").lower();
++	if (tmp == "icononly")
++		toolbarStyle = 0;
++	else if (tmp == "icontextright")
++		toolbarStyle = 3;
++	else if (tmp == "textonly")
++		toolbarStyle = 1;
++	else if (tmp == "icontextbottom")
++		toolbarStyle = 2;
++	else // Should never happen, but just in case we fallback to KDE's default "icononly"
++		toolbarStyle = 0;
+ }
+ 
+ QStyle::SFlags stateToSFlags(GtkStateType state)
+@@ -1689,6 +1703,8 @@
+ 
+ 	gtk_rc_parse_string(("gtk-button-images = " + QString::number(showIconsOnButtons)).latin1());
+ 	
++	gtk_rc_parse_string(("gtk-toolbar-style = " + QString::number(toolbarStyle)).latin1());
++	
+ 	// This function takes quite a long time to execute, and is run at the start of every app.
+ 	// In order to speed it up, we can store the results in a file, along with the name of icon
+ 	// theme and style.  This file can then be regenerated when the icon theme or style change.
+Index: ChangeLog
+===================================================================
+--- ChangeLog	(revision 25)
++++ ChangeLog	(revision 26)
+@@ -12,3 +12,4 @@
+  * When the Qt theme can't be found, display a dialog allowing the user to modify the search paths.
+  * Respect KDE's "Show icons on buttons" setting
+  * Fix icon themes in GNOME apps such as evolution on Fedora Core 5 and 6
++ * GTK apps will now respect KDE's toolbar icon display settings (thanks Bastian Venthur)

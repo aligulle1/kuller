@@ -1,0 +1,126 @@
+Index: konqueror/konq_mainwindow.h
+================================================================================
+--- konqueror/konq_mainwindow.cc
++++ konqueror/konq_mainwindow.cc
+@@ -101,6 +101,8 @@
+ #include <kprocess.h>
+ #include <kio/scheduler.h>
+ #include <kio/netaccess.h>
++#include <kio/http_slave_defaults.h>
++#include <kprotocolmanager.h>
+ #include <kaccelmanager.h>
+ #include <kuser.h>
+ #include <netwm.h>
+@@ -731,7 +733,7 @@
+ 
+   QString serviceName; // default: none provided
+ 
+-  if ( url.url() == "about:konqueror" || url.url() == "about:plugins" )
++  if ( url.url() == "about:konqueror" || url.url() == "about:plugins" || url.url() == "about:offline" )
+   {
+       serviceType = "KonqAboutPage"; // not KParts/ReadOnlyPart, it fills the Location menu ! :)
+       serviceName = "konq_aboutpage";
+@@ -3716,6 +3718,9 @@
+   }
+   (void) new KAction( i18n( "&Open Location..." ), "fileopen", KStdAccel::shortcut(KStdAccel::Open), this, SLOT( slotOpenLocation() ), actionCollection(), "open_location" );
+ 
++  m_paWorkOffline = new KToggleAction( i18n( "Wor&k Offline" ), 0, this, SLOT( slotWorkOffline() ), actionCollection(), "workOffline" );
++  m_paWorkOffline->setChecked( isWorkingOffline() );
++
+   m_paFindFiles = new KToggleAction( i18n( "&Find File..." ), "filefind", KStdAccel::shortcut(KStdAccel::Find), this, SLOT( slotToolFind() ), actionCollection(), "findfile" );
+ 
+   m_paPrint = KStdAction::print( 0, 0, actionCollection(), "print" );
+@@ -5366,6 +5371,36 @@
+     }
+ }
+ 
++void KonqMainWindow::slotWorkOffline()
++{
++	// get the kio_httprc kconfig
++	KConfig * httpConfig = new KConfig("kio_httprc", false, false);
++	/** Toggle kio_http's cache mode */
++	if ( m_paWorkOffline->isChecked() )
++	{
++		KIO::CacheControl cc = KProtocolManager::cacheControl();
++		QString tmp = KIO::getCacheControlString(cc);
++		httpConfig->writeEntry("offlineModeStoredCacheMode", tmp);
++		tmp = KIO::getCacheControlString(KIO::CC_CacheOnly);
++		httpConfig->writeEntry("cache", tmp);
++	}
++	else
++	{
++		QString storedCacheMode = httpConfig->readEntry( "offlineModeStoredCacheMode", KIO::getCacheControlString(DEFAULT_CACHE_CONTROL) );
++		httpConfig->writeEntry("cache", storedCacheMode );
++	}
++	httpConfig->sync();
++	// tell the ioslaves to reparse their config
++	DCOPRef("*", "KIO::Scheduler").send("reparseSlaveConfiguration", QString::null);
++}
++
++bool KonqMainWindow::isWorkingOffline()
++{
++	KConfig const * httpConfig = new KConfig("kio_httprc", false, false);
++	QString mode = httpConfig->readEntry( "cache", KIO::getCacheControlString(DEFAULT_CACHE_CONTROL) );
++	return ( KIO::parseCacheControl(mode) == KIO::CC_CacheOnly );
++}
++
+ void KonqMainWindow::bookmarksIntoCompletion( const KBookmarkGroup& group )
+ {
+     static const QString& http = KGlobal::staticQString( "http" );
+--- konqueror/konq_mainwindow.h
++++ konqueror/konq_mainwindow.h
+@@ -364,6 +364,7 @@
+   void slotOpenTerminal();
+   void slotOpenLocation();
+   void slotToolFind();
++  void slotWorkOffline();
+ 
+   // View menu
+   void slotViewModeToggle( bool toggle );
+@@ -601,6 +602,7 @@
+ 
+   bool stayPreloaded();
+   bool checkPreloadResourceUsage();
++  bool isWorkingOffline();
+ 
+   QObject* lastFrame( KonqView *view );
+ 
+@@ -668,7 +670,8 @@
+ 
+   KToggleAction *m_paShowMenuBar;
+   KToggleAction *m_paShowStatusBar;
+-
++  KToggleAction *m_paWorkOffline;
++  
+   KToggleFullScreenAction *m_ptaFullScreen;
+ 
+   uint m_bLocationBarConnected:1;
+--- konqueror/konq_misc.cc
++++ konqueror/konq_misc.cc
+@@ -215,6 +215,8 @@
+     // We can't use "about:" as it is, KURL doesn't parse it.
+     if (_url == "about:plugins")
+        return "about:plugins";
++    else if (_url == "about:offline")
++       return "about:offline";
+     return "about:konqueror";
+   }
+   return _url;  // return the original url if it cannot be filtered.
+--- konqueror/konqueror.rc
++++ konqueror/konqueror.rc
+@@ -1,6 +1,6 @@
+ <?xml version="1.0"?>
+ <!DOCTYPE gui SYSTEM "kpartgui.dtd">
+-<gui name="Konqueror" version="59">
++<gui name="Konqueror" version="60">
+ <MenuBar>
+  <Menu name="file" noMerge="1"><text>&amp;Location</text>
+   <Action name="new_window"/>
+@@ -16,6 +16,7 @@
+   <DefineGroup name="print" />
+   <Separator/>
+   <ActionList name="openwith" /> <!--Includes termination separator-->
++  <Action name="workOffline" />
+   <Action name="quit"/>
+  </Menu>
+  <Menu name="edit" noMerge="1"><text>&amp;Edit</text>  <!--Here is what applies to a selection-->

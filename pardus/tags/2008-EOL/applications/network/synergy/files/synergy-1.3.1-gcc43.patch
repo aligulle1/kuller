@@ -1,0 +1,231 @@
+diff -Naupr synergy-1.3.1.orig/lib/arch/CArchDaemonUnix.cpp synergy-1.3.1/lib/arch/CArchDaemonUnix.cpp
+--- synergy-1.3.1.orig/lib/arch/CArchDaemonUnix.cpp	2005-04-24 05:02:12.000000000 +0200
++++ synergy-1.3.1/lib/arch/CArchDaemonUnix.cpp	2008-02-24 00:49:30.000000000 +0100
+@@ -19,6 +19,7 @@
+ #include <sys/stat.h>
+ #include <fcntl.h>
+ #include <errno.h>
++#include <cstdlib>
+ 
+ //
+ // CArchDaemonUnix
+diff -Naupr synergy-1.3.1.orig/lib/arch/CMultibyte.cpp synergy-1.3.1/lib/arch/CMultibyte.cpp
+--- synergy-1.3.1.orig/lib/arch/CMultibyte.cpp	2005-11-30 05:33:24.000000000 +0100
++++ synergy-1.3.1/lib/arch/CMultibyte.cpp	2008-02-24 01:31:32.000000000 +0100
+@@ -17,8 +17,9 @@
+ 
+ #include "common.h"
+ #include "CArch.h"
+-#include <limits.h>
+-#include <string.h>
++#include <climits>
++#include <cstring>
++#include <cstdlib>
+ #if HAVE_LOCALE_H
+ #	include <locale.h>
+ #endif
+@@ -26,7 +27,7 @@
+ #	include <wchar.h>
+ #elif __APPLE__
+ 	// wtf?  Darwin puts mbtowc() et al. in stdlib
+-#	include <stdlib.h>
++#	include <cstdlib>
+ #else
+ 	// platform apparently has no wchar_t support.  provide dummy
+ 	// implementations.  hopefully at least the C++ compiler has
+diff -Naupr synergy-1.3.1.orig/lib/arch/XArchUnix.cpp synergy-1.3.1/lib/arch/XArchUnix.cpp
+--- synergy-1.3.1.orig/lib/arch/XArchUnix.cpp	2005-04-24 05:02:13.000000000 +0200
++++ synergy-1.3.1/lib/arch/XArchUnix.cpp	2008-02-24 01:29:33.000000000 +0100
+@@ -13,7 +13,7 @@
+  */
+ 
+ #include "XArchUnix.h"
+-#include <string.h>
++#include <cstring>
+ 
+ //
+ // XArchEvalUnix
+diff -Naupr synergy-1.3.1.orig/lib/base/CStringUtil.cpp synergy-1.3.1/lib/base/CStringUtil.cpp
+--- synergy-1.3.1.orig/lib/base/CStringUtil.cpp	2005-12-14 18:25:20.000000000 +0100
++++ synergy-1.3.1/lib/base/CStringUtil.cpp	2008-02-24 01:01:34.000000000 +0100
+@@ -19,6 +19,7 @@
+ #include <cctype>
+ #include <cstdio>
+ #include <cstdlib>
++#include <cstring>
+ #include <algorithm>
+ 
+ //
+diff -Naupr synergy-1.3.1.orig/lib/base/CUnicode.cpp synergy-1.3.1/lib/base/CUnicode.cpp
+--- synergy-1.3.1.orig/lib/base/CUnicode.cpp	2005-04-24 05:02:13.000000000 +0200
++++ synergy-1.3.1/lib/base/CUnicode.cpp	2008-02-24 01:29:21.000000000 +0100
+@@ -14,7 +14,7 @@
+ 
+ #include "CUnicode.h"
+ #include "CArch.h"
+-#include <string.h>
++#include <cstring>
+ 
+ //
+ // local utility functions
+diff -Naupr synergy-1.3.1.orig/lib/client/CClient.cpp synergy-1.3.1/lib/client/CClient.cpp
+--- synergy-1.3.1.orig/lib/client/CClient.cpp	2006-03-09 05:07:17.000000000 +0100
++++ synergy-1.3.1/lib/client/CClient.cpp	2008-02-24 01:21:56.000000000 +0100
+@@ -26,6 +26,8 @@
+ #include "CLog.h"
+ #include "IEventQueue.h"
+ #include "TMethodEventJob.h"
++#include <cstring>
++#include <cstdlib>
+ 
+ //
+ // CClient
+diff -Naupr synergy-1.3.1.orig/lib/client/CServerProxy.cpp synergy-1.3.1/lib/client/CServerProxy.cpp
+--- synergy-1.3.1.orig/lib/client/CServerProxy.cpp	2006-04-02 03:47:03.000000000 +0200
++++ synergy-1.3.1/lib/client/CServerProxy.cpp	2008-02-24 01:21:28.000000000 +0100
+@@ -24,6 +24,7 @@
+ #include "TMethodEventJob.h"
+ #include "XBase.h"
+ #include <memory>
++#include <cstring>
+ 
+ //
+ // CServerProxy
+diff -Naupr synergy-1.3.1.orig/lib/net/CTCPSocket.cpp synergy-1.3.1/lib/net/CTCPSocket.cpp
+--- synergy-1.3.1.orig/lib/net/CTCPSocket.cpp	2006-04-02 03:47:03.000000000 +0200
++++ synergy-1.3.1/lib/net/CTCPSocket.cpp	2008-02-24 01:11:17.000000000 +0100
+@@ -23,7 +23,9 @@
+ #include "IEventJob.h"
+ #include "CArch.h"
+ #include "XArch.h"
+-#include <string.h>
++#include <cstring>
++#include <cstdlib>
++#include <memory>
+ 
+ //
+ // CTCPSocket
+diff -Naupr synergy-1.3.1.orig/lib/platform/CXWindowsScreen.cpp synergy-1.3.1/lib/platform/CXWindowsScreen.cpp
+--- synergy-1.3.1.orig/lib/platform/CXWindowsScreen.cpp	2006-04-02 21:16:39.000000000 +0200
++++ synergy-1.3.1/lib/platform/CXWindowsScreen.cpp	2008-02-24 01:19:13.000000000 +0100
+@@ -27,6 +27,7 @@
+ #include "IEventQueue.h"
+ #include "TMethodEventJob.h"
+ #include <cstring>
++#include <cstdlib>
+ #if X_DISPLAY_MISSING
+ #	error X11 is required to build synergy
+ #else
+diff -Naupr synergy-1.3.1.orig/lib/server/CClientProxy1_3.cpp synergy-1.3.1/lib/server/CClientProxy1_3.cpp
+--- synergy-1.3.1.orig/lib/server/CClientProxy1_3.cpp	2006-02-12 20:53:43.000000000 +0100
++++ synergy-1.3.1/lib/server/CClientProxy1_3.cpp	2008-02-24 01:27:30.000000000 +0100
+@@ -17,6 +17,8 @@
+ #include "CLog.h"
+ #include "IEventQueue.h"
+ #include "TMethodEventJob.h"
++#include <cstring>
++#include <memory>
+ 
+ //
+ // CClientProxy1_3
+diff -Naupr synergy-1.3.1.orig/lib/server/CConfig.cpp synergy-1.3.1/lib/server/CConfig.cpp
+--- synergy-1.3.1.orig/lib/server/CConfig.cpp	2006-03-22 06:40:27.000000000 +0100
++++ synergy-1.3.1/lib/server/CConfig.cpp	2008-02-24 01:31:48.000000000 +0100
+@@ -19,7 +19,7 @@
+ #include "XSocket.h"
+ #include "stdistream.h"
+ #include "stdostream.h"
+-#include <stdlib.h>
++#include <cstdlib>
+ 
+ //
+ // CConfig
+diff -Naupr synergy-1.3.1.orig/lib/server/CInputFilter.cpp synergy-1.3.1/lib/server/CInputFilter.cpp
+--- synergy-1.3.1.orig/lib/server/CInputFilter.cpp	2006-04-02 03:47:03.000000000 +0200
++++ synergy-1.3.1/lib/server/CInputFilter.cpp	2008-02-24 01:29:05.000000000 +0100
+@@ -19,8 +19,8 @@
+ #include "CEventQueue.h"
+ #include "CLog.h"
+ #include "TMethodEventJob.h"
+-#include <stdlib.h>
+-#include <string.h>
++#include <cstdlib>
++#include <cstring>
+ 
+ // -----------------------------------------------------------------------------
+ // Input Filter Condition Classes
+diff -Naupr synergy-1.3.1.orig/lib/server/CServer.cpp synergy-1.3.1/lib/server/CServer.cpp
+--- synergy-1.3.1.orig/lib/server/CServer.cpp	2006-04-02 03:47:04.000000000 +0200
++++ synergy-1.3.1/lib/server/CServer.cpp	2008-02-24 01:25:14.000000000 +0100
+@@ -28,7 +28,8 @@
+ #include "CLog.h"
+ #include "TMethodEventJob.h"
+ #include "CArch.h"
+-#include <string.h>
++#include <cstring>
++#include <cstdlib>
+ 
+ //
+ // CServer
+diff -Naupr synergy-1.3.1.orig/lib/synergy/CKeyMap.cpp synergy-1.3.1/lib/synergy/CKeyMap.cpp
+--- synergy-1.3.1.orig/lib/synergy/CKeyMap.cpp	2006-03-22 06:40:27.000000000 +0100
++++ synergy-1.3.1/lib/synergy/CKeyMap.cpp	2008-02-24 01:32:13.000000000 +0100
+@@ -16,8 +16,8 @@
+ #include "KeyTypes.h"
+ #include "CLog.h"
+ #include <assert.h>
+-#include <ctype.h>
+-#include <stdlib.h>
++#include <cctype>
++#include <cstdlib>
+ 
+ CKeyMap::CNameToKeyMap*			CKeyMap::s_nameToKeyMap      = NULL;
+ CKeyMap::CNameToModifierMap*	CKeyMap::s_nameToModifierMap = NULL;
+diff -Naupr synergy-1.3.1.orig/lib/synergy/CKeyState.cpp synergy-1.3.1/lib/synergy/CKeyState.cpp
+--- synergy-1.3.1.orig/lib/synergy/CKeyState.cpp	2006-04-01 22:53:08.000000000 +0200
++++ synergy-1.3.1/lib/synergy/CKeyState.cpp	2008-02-24 01:28:45.000000000 +0100
+@@ -15,7 +15,7 @@
+ #include "CKeyState.h"
+ #include "IEventQueue.h"
+ #include "CLog.h"
+-#include <string.h>
++#include <cstring>
+ #include <algorithm>
+ 
+ static const KeyButton kButtonMask = (KeyButton)(IKeyState::kNumButtons - 1);
+diff -Naupr synergy-1.3.1.orig/lib/synergy/CPacketStreamFilter.cpp synergy-1.3.1/lib/synergy/CPacketStreamFilter.cpp
+--- synergy-1.3.1.orig/lib/synergy/CPacketStreamFilter.cpp	2005-04-24 05:02:16.000000000 +0200
++++ synergy-1.3.1/lib/synergy/CPacketStreamFilter.cpp	2008-02-24 01:13:48.000000000 +0100
+@@ -16,6 +16,8 @@
+ #include "IEventQueue.h"
+ #include "CLock.h"
+ #include "TMethodEventJob.h"
++#include <cstring>
++#include <memory>
+ 
+ //
+ // CPacketStreamFilter
+diff -Naupr synergy-1.3.1.orig/lib/synergy/IKeyState.cpp synergy-1.3.1/lib/synergy/IKeyState.cpp
+--- synergy-1.3.1.orig/lib/synergy/IKeyState.cpp	2006-03-22 06:40:27.000000000 +0100
++++ synergy-1.3.1/lib/synergy/IKeyState.cpp	2008-02-24 01:15:42.000000000 +0100
+@@ -13,7 +13,8 @@
+  */
+ 
+ #include "IKeyState.h"
+-#include <string.h>
++#include <cstring>
++#include <cstdlib>
+ 
+ //
+ // IKeyState
+diff -Naupr synergy-1.3.1.orig/lib/synergy/IPrimaryScreen.cpp synergy-1.3.1/lib/synergy/IPrimaryScreen.cpp
+--- synergy-1.3.1.orig/lib/synergy/IPrimaryScreen.cpp	2006-03-22 06:40:27.000000000 +0100
++++ synergy-1.3.1/lib/synergy/IPrimaryScreen.cpp	2008-02-24 01:16:42.000000000 +0100
+@@ -13,6 +13,7 @@
+  */
+ 
+ #include "IPrimaryScreen.h"
++#include <cstdlib>
+ 
+ //
+ // IPrimaryScreen

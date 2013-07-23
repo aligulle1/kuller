@@ -1,0 +1,68 @@
+diff -Nur mplayer-20070524-old/libmpcodecs/dec_audio.c mplayer-20070524/libmpcodecs/dec_audio.c
+--- mplayer-20070524-old/libmpcodecs/dec_audio.c	2007-05-24 12:42:08.244398356 +0300
++++ mplayer-20070524/libmpcodecs/dec_audio.c	2007-05-24 12:45:52.259342907 +0300
+@@ -1,6 +1,7 @@
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <unistd.h>
++#include <locale.h>
+ 
+ #include "config.h"
+ #include "mp_msg.h"
+@@ -124,6 +125,9 @@
+ }
+ 
+ int init_audio(sh_audio_t *sh_audio,char* codecname,char* afm,int status){
++    char *locale_data = setlocale(LC_CTYPE, "");
++    setlocale(LC_CTYPE, "C");
++
+     unsigned int orig_fourcc=sh_audio->wf?sh_audio->wf->wFormatTag:0;
+     int force = 0;
+     if (codecname && codecname[0] == '+') {
+@@ -197,8 +201,12 @@
+ 	    continue; // try next...
+ 	}
+ 	// Yeah! We got it!
++
++    setlocale(LC_CTYPE, locale_data);
+ 	return 1;
+     }
++
++    setlocale(LC_CTYPE, locale_data);
+     return 0;
+ }
+ 
+diff -Nur mplayer-20070524-old/libmpcodecs/dec_video.c mplayer-20070524/libmpcodecs/dec_video.c
+--- mplayer-20070524-old/libmpcodecs/dec_video.c	2007-05-24 12:42:08.718326308 +0300
++++ mplayer-20070524/libmpcodecs/dec_video.c	2007-05-24 12:45:20.970099596 +0300
+@@ -7,6 +7,7 @@
+ #endif
+ #include <stdlib.h>
+ #include <unistd.h>
++#include <locale.h>
+ 
+ #include "mp_msg.h"
+ #include "help_mp.h"
+@@ -176,6 +177,9 @@
+ }
+ 
+ int init_video(sh_video_t *sh_video,char* codecname,char* vfm,int status){
++    char *locale_data = setlocale(LC_CTYPE, "");
++    setlocale(LC_CTYPE, "C");
++
+     int force = 0;
+     unsigned int orig_fourcc=sh_video->bih?sh_video->bih->biCompression:0;
+     sh_video->codec=NULL;
+@@ -272,8 +276,12 @@
+ 	}
+ 	// Yeah! We got it!
+ 	sh_video->inited=1;
++
++    setlocale(LC_CTYPE, locale_data);
+ 	return 1;
+     }
++
++    setlocale(LC_CTYPE, locale_data);
+     return 0;
+ }
+ 

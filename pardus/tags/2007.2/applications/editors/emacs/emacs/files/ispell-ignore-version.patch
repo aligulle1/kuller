@@ -1,0 +1,73 @@
+--- lisp/textmodes/ispell.el	2007-03-21 16:31:23.000000000 +0200
++++ lisp/textmodes/ispell.el	2007-04-10 23:09:36.000000000 +0300
+@@ -761,68 +761,8 @@
+ 				    temporary-file-directory)
+ 			       default-directory))
+ 	result status)
+-    (save-excursion
+-      (let ((buf (get-buffer " *ispell-tmp*")))
+-	(if buf (kill-buffer buf)))
+-      (set-buffer (get-buffer-create " *ispell-tmp*"))
+-      (erase-buffer)
+-      (setq status (ispell-call-process
+-		    ispell-program-name nil t nil
+-		    ;; aspell doesn't accept the -vv switch.
+-		    (let ((case-fold-search
+-			   (memq system-type '(ms-dos windows-nt)))
+-			  (speller
+-			   (file-name-nondirectory ispell-program-name)))
+-		      ;; Assume anything that isn't `aspell' is Ispell.
+-		      (if (string-match "\\`aspell" speller) "-v" "-vv"))))
+-      (goto-char (point-min))
+-      (if interactivep
+-	  ;; report version information of ispell and ispell.el
+-	  (progn
+-	    (end-of-line)
+-	    (setq result (concat (buffer-substring-no-properties (point-min)
+-								 (point))
+-				 ", "
+-				 ispell-version))
+-	    (message "%s" result))
+-	;; return library directory.
+-	(if (re-search-forward "LIBDIR = \\\"\\([^ \t\n]*\\)\\\"" nil t)
+-	    (setq result (buffer-substring (match-beginning 1) (match-end 1)))))
+-      (goto-char (point-min))
+-      (if (not (memq status '(0 nil)))
+-	  (error "%s exited with %s %s" ispell-program-name
+-		 (if (stringp status) "signal" "code") status))
+-      (setq case-fold-search t
+-	    status (re-search-forward
+-		    (concat "\\<\\("
+-			    (format "%d" (car ispell-required-version))
+-			    "\\)\\.\\([0-9]*\\)\\.\\([0-9]*\\)\\>")
+-		    nil t)
+-	    case-fold-search case-fold-search-val)
+-      (if (or (not status)	; major version mismatch
+-	      (< (car (read-from-string (match-string-no-properties 2)))
+-		 (car (cdr ispell-required-version)))) ; minor version mismatch
+-	  (error "%s version 3 release %d.%d.%d or greater is required"
+-		 ispell-program-name (car ispell-required-version)
+-		 (car (cdr ispell-required-version))
+-		 (car (cdr (cdr ispell-required-version))))
+-	;; check that it is the correct version.
+-	(if (and (= (car (read-from-string (match-string-no-properties 2)))
+-		    (car (cdr ispell-required-version)))
+-		 (< (car (read-from-string (match-string-no-properties 3)))
+-		    (car (cdr (cdr ispell-required-version)))))
+-          (setq ispell-offset 0))
+-        ;; Check to see if it's really aspell.
+-        (goto-char (point-min))
+-        (let (case-fold-search)
+-          (setq ispell-really-aspell
+-		(and (search-forward-regexp
+-		      "(but really Aspell \\(.*?\\)\\(-[0-9]+\\)?)" nil t)
+-		     (progn
+-		       (setq ispell-aspell-supports-utf8
+-			     (not (version< (match-string 1) "0.60")))
+-		       t)))))
+-      (kill-buffer (current-buffer)))
++    ;; ispell version just doesn't bother me.
++    ;; I'm turning on zpspell as the default speller
+     result))
+ 
+ (defun ispell-call-process (&rest args)

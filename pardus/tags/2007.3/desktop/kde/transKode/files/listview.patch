@@ -1,0 +1,35 @@
+--- src/app/transkodelistview.cpp.orig	2007-02-19 14:07:10.000000000 +0200
++++ src/app/transkodelistview.cpp	2007-02-19 14:06:53.000000000 +0200
+@@ -181,7 +181,7 @@
+ 
+ 		if ( it.current()->isFile() )
+ 		{
+-			if ( extensions.contains( it.current()->extension().lower() ) )
++			if ( extensions.contains( it.current()->extension( false ).lower() ) )
+ 				files.append( it.current()->absFilePath() );
+ 		}
+ 		else if ( it.current()->isDir() )
+@@ -193,9 +193,9 @@
+ {
+ 	static QString filter(
+ 		"*.mp3 *.MP3 *.ogg *.OGG *.mpc *.MPC *.mpp *.MPP *.mp+ *.MP+ *.aac *.AAC *.m4a *.M4A *.mp4 *.MP4 "
+-		"*.flac *.FLAC *.ogg *.OGG *.ape *.APE *.mac *.MAC *.wv *.WV *.ofr *.OFR *.tta *.TTA *.shn *.SHN "
+-		"*.bonk *.BONK *.la *.LA *.spx *.SPX *.wma *.WMA *.wav *.WAV *.ac3 *.AC3 *.mka *.MKA *.mp2 *.MP2 "
+-		"*.ra *.RA|" + i18n( "All Supported Files" ) +
++		"*.flac *.FLAC *.ogg *.OGG *.ape *.APE *.mac *.MAC *.wv *.WV *.PAC *.pac *.ofr *.OFR *.tta *.TTA "
++		"*.shn *.SHN *.bonk *.BONK *.la *.LA *.spx *.SPX *.wma *.WMA *.wav *.WAV *.ac3 *.AC3 *.mka *.MKA "
++		"*.mp2 *.MP2 *.ra *.RA|" + i18n( "All Supported Files" ) +
+ 		"\n*.mp3 *.MP3|" + i18n( "MPEG Layer 3 Audio" ) +
+ 		"\n*.ogg *.OGG|" + i18n( "Ogg Vorbis Audio" ) +
+ 		"\n*.mpc *.MPC *.mpp *.MPP *.mp+ *.MP+|" + i18n( "Musepack Audio" ) +
+@@ -589,6 +589,10 @@
+ 	kapp->config()->setGroup( "TransKodeListView Settings" );
+ 
+ 	restoreLayout( kapp->config(), "TransKodeListView Settings" );
++	for ( int idx = 0; idx < columns(); ++idx )
++		if ( columnWidth( idx ) == 0 )
++			header()->setResizeEnabled( false, idx );
++
+ 	m_sortColumns = kapp->config()->readIntListEntry( "SortColumns" );
+ 
+ 	m_lastDir = kapp->config()->readPathEntry( "LastDir", QDir::homeDirPath() );

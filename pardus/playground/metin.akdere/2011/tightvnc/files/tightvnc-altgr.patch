@@ -1,0 +1,60 @@
+--- vnc_unixsrc.orig/vncviewer/desktop.c
++++ vnc_unixsrc/vncviewer/desktop.c
+@@ -34,7 +34,7 @@
+ Cursor dotCursor;
+ Widget form, viewport, desktop;
+ 
+-static Bool modifierPressed[256];
++static CARD32 downKeysym[256];
+ 
+ static XImage *image = NULL;
+ 
+@@ -79,8 +79,10 @@
+   XtAddEventHandler(desktop, LeaveWindowMask|ExposureMask,
+ 		    True, HandleBasicDesktopEvent, NULL);
+ 
+-  for (i = 0; i < 256; i++)
+-    modifierPressed[i] = False;
++  for (i = 0; i < 256; i++) {
++    downKeysym[i] = 0;
++  }
++  
+ 
+   CreateImage();
+ }
+@@ -189,9 +191,9 @@
+ 
+   case LeaveNotify:
+     for (i = 0; i < 256; i++) {
+-      if (modifierPressed[i]) {
+-	SendKeyEvent(XKeycodeToKeysym(dpy, i, 0), False);
+-	modifierPressed[i] = False;
++      if (downKeysym[i]) {
++	SendKeyEvent(XKeycodeToKeysym(dpy, downKeysym[i], 0), False);
++	downKeysym[i] = 0;
+       }
+     }
+     break;
+@@ -319,15 +321,16 @@
+     return;
+ 
+   case KeyPress:
+-  case KeyRelease:
+     XLookupString(&ev->xkey, keyname, 256, &ks, NULL);
++    downKeysym[ev->xkey.keycode] = ks;
++    SendKeyEvent(ks, True);
++    return;
+ 
+-    if (IsModifierKey(ks)) {
+-      ks = XKeycodeToKeysym(dpy, ev->xkey.keycode, 0);
+-      modifierPressed[ev->xkey.keycode] = (ev->type == KeyPress);
++  case KeyRelease:
++    if (downKeysym[ev->xkey.keycode]) {
++      SendKeyEvent(downKeysym[ev->xkey.keycode], False);
++      downKeysym[ev->xkey.keycode] = 0;
+     }
+-
+-    SendKeyEvent(ks, (ev->type == KeyPress));
+     return;
+ 
+   default:

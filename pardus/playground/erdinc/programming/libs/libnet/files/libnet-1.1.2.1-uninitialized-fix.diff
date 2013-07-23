@@ -1,0 +1,21 @@
+--- sample/icmp6_echoreq.c
++++ sample/icmp6_echoreq.c
+@@ -107,6 +107,8 @@
+         }
+     }
+ 
++        src_ip = libnet_name2addr6(l, "0:0:0:0:0:0:0:1", LIBNET_DONT_RESOLVE);
++
+     if (!dst_prt || strncmp((char*)&dst_ip,(char*)&in6addr_error,sizeof(in6addr_error))==0 || !packet_amt)
+     {
+         usage(argv[0]);
+--- src/libnet_if_addr.c
++++ src/libnet_if_addr.c
+@@ -157,6 +157,7 @@
+ 	return(-1);
+     }
+ 
++    ifr = NULL;
+     pifr = NULL;
+     lifr = (struct ifreq *)&ifc.ifc_buf[ifc.ifc_len];
+     

@@ -1,0 +1,162 @@
+Index: fakechroot-2.14/man/fakechroot.1
+===================================================================
+--- fakechroot-2.14.orig/man/fakechroot.1
++++ fakechroot-2.14/man/fakechroot.1
+@@ -160,7 +160,7 @@ functionality! You might to call fakechr
+ want to emulate root environment, i.e.:
+ .PP
+ .Vb 3
+-\& $ fakeroot fakechroot /usr/sbin/chroot /tmp/debian /bin/sh
++\& $ fakeroot fakechroot /usr/bin/chroot /tmp/debian /bin/sh
+ \& # id
+ \& uid=0(root) gid=0(root) groups=0(root)
+ .Ve
+@@ -178,12 +178,12 @@ if system dynamic linker (\fI/lib/ld\-li
+ Try this setting if you noticed following errors:
+ .Sp
+ .Vb 4
+-\& $ fakechroot /usr/sbin/chroot /tmp/sarge /bin/true
++\& $ fakechroot /usr/bin/chroot /tmp/sarge /bin/true
+ \& /bin/true: relocation error: /srv/sarge/lib/tls/libc.so.6: symbol _dl
+ \& _starting_up, version GLIBC_PRIVATE not defined in file ld\-linux.so.2
+ \&  with link time reference
+ \&
+-\& $ fakechroot /usr/sbin/chroot /tmp/centos4 /bin/true
++\& $ fakechroot /usr/bin/chroot /tmp/centos4 /bin/true
+ \& Segmentation fault
+ .Ve
+ .IP "[\fB\-\-\fR] \fIcommand\fR" 4
+Index: fakechroot-2.14/man/fakechroot.pod
+===================================================================
+--- fakechroot-2.14.orig/man/fakechroot.pod
++++ fakechroot-2.14/man/fakechroot.pod
+@@ -33,7 +33,7 @@ In the current version, the fakechroot d
+ functionality! You might to call fakechroot with fakeroot command, if you
+ want to emulate root environment, i.e.:
+ 
+- $ fakeroot fakechroot /usr/sbin/chroot /tmp/debian /bin/sh
++ $ fakeroot fakechroot /usr/bin/chroot /tmp/debian /bin/sh
+  # id
+  uid=0(root) gid=0(root) groups=0(root)
+ 
+@@ -53,12 +53,12 @@ F<libc.so> from fake chroot.
+ 
+ Try this setting if you noticed following errors:
+ 
+- $ fakechroot /usr/sbin/chroot /tmp/sarge /bin/true
++ $ fakechroot /usr/bin/chroot /tmp/sarge /bin/true
+  /bin/true: relocation error: /srv/sarge/lib/tls/libc.so.6: symbol _dl
+  _starting_up, version GLIBC_PRIVATE not defined in file ld-linux.so.2
+   with link time reference
+ 
+- $ fakechroot /usr/sbin/chroot /tmp/centos4 /bin/true
++ $ fakechroot /usr/bin/chroot /tmp/centos4 /bin/true
+  Segmentation fault
+ 
+ =item [B<-->] I<command>
+Index: fakechroot-2.14/README
+===================================================================
+--- fakechroot-2.14.orig/README
++++ fakechroot-2.14/README
+@@ -23,7 +23,7 @@ DESCRIPTION
+     functionality! You might to call fakechroot with fakeroot command, if
+     you want to emulate root environment, i.e.:
+ 
+-     $ fakeroot fakechroot /usr/sbin/chroot /tmp/debian /bin/sh
++     $ fakeroot fakechroot /usr/bin/chroot /tmp/debian /bin/sh
+      # id
+      uid=0(root) gid=0(root) groups=0(root)
+ 
+Index: fakechroot-2.14/test/chroot.sh
+===================================================================
+--- fakechroot-2.14.orig/test/chroot.sh
++++ fakechroot-2.14/test/chroot.sh
+@@ -10,7 +10,7 @@ else
+ fi
+ 
+ if [ $# -gt 0 ]; then
+-    HOME=/root exec /usr/sbin/chroot $destdir "$@"
++    HOME=/root exec /usr/bin/chroot $destdir "$@"
+ else
+-    HOME=/root exec /usr/sbin/chroot $destdir $SHELL
++    HOME=/root exec /usr/bin/chroot $destdir $SHELL
+ fi
+Index: fakechroot-2.14/test/debootstrap.sh
+===================================================================
+--- fakechroot-2.14.orig/test/debootstrap.sh
++++ fakechroot-2.14/test/debootstrap.sh
+@@ -6,7 +6,7 @@ srcdir=${srcdir:-.}
+ export PATH=$srcdir/bin:$PATH
+ 
+ run () {
+-    HOME=/root fakechroot /usr/sbin/chroot $destdir "$@"
++    HOME=/root fakechroot /usr/bin/chroot $destdir "$@"
+ }
+ 
+ vendor=${VENDOR:-`lsb_release -s -i`}
+@@ -45,12 +45,12 @@ fakeroot fakechroot /usr/sbin/debootstra
+ # workaround for bug in mountall package
+ rm -rf $destdir/dev
+ mkdir -p $destdir/dev
+-FAKECHROOT_EXCLUDE_PATH=/proc:/sys FAKECHROOT_CMD_SUBST=/bin/rm=/bin/true HOME=/root fakeroot fakechroot /usr/sbin/chroot $destdir apt-get --force-yes -y --no-install-recommends install mountall || true
+-HOME=/root fakeroot fakechroot /usr/sbin/chroot $destdir apt-get --force-yes -y --no-install-recommends install -f
++FAKECHROOT_EXCLUDE_PATH=/proc:/sys FAKECHROOT_CMD_SUBST=/bin/rm=/bin/true HOME=/root fakeroot fakechroot /usr/bin/chroot $destdir apt-get --force-yes -y --no-install-recommends install mountall || true
++HOME=/root fakeroot fakechroot /usr/bin/chroot $destdir apt-get --force-yes -y --no-install-recommends install -f
+ 
+ cp -v `cd $srcdir; pwd`/../scripts/ldd.pl $destdir/usr/bin/ldd
+ 
+-HOME=/root fakeroot fakechroot /usr/sbin/chroot $destdir apt-get --force-yes -y --no-install-recommends install build-essential devscripts fakeroot gnupg
++HOME=/root fakeroot fakechroot /usr/bin/chroot $destdir apt-get --force-yes -y --no-install-recommends install build-essential devscripts fakeroot gnupg
+ 
+ run sh -c 'cat /etc/apt/sources.list | sed "s/^deb/deb-src/" >> /etc/apt/sources.list'
+ run fakeroot apt-get --force-yes -y update
+Index: fakechroot-2.14/test/febootstrap.sh
+===================================================================
+--- fakechroot-2.14.orig/test/febootstrap.sh
++++ fakechroot-2.14/test/febootstrap.sh
+@@ -6,7 +6,7 @@ srcdir=${srcdir:-.}
+ export PATH=$srcdir/bin:$PATH
+ 
+ run () {
+-    HOME=/root fakechroot /usr/sbin/chroot $destdir "$@"
++    HOME=/root fakechroot /usr/bin/chroot $destdir "$@"
+ }
+ 
+ vendor=${VENDOR:-`lsb_release -s -i | tr 'A-Z' 'a-z'`}
+@@ -38,8 +38,8 @@ cp -v /etc/resolv.conf $destdir/etc
+ rm -fv $destdir/etc/yum.repos.d/*update*.repo
+ sed -i 's/^enabled=0/enabled=1/' $destdir/etc/yum.repos.d/*.repo
+ 
+-HOME=/root fakeroot fakechroot /usr/sbin/chroot $destdir yum -y update
+-HOME=/root fakeroot fakechroot /usr/sbin/chroot $destdir yum -y install fakeroot gcc gettext make rpm-build tar yum-utils
++HOME=/root fakeroot fakechroot /usr/bin/chroot $destdir yum -y update
++HOME=/root fakeroot fakechroot /usr/bin/chroot $destdir yum -y install fakeroot gcc gettext make rpm-build tar yum-utils
+ 
+ # rpmbuild has statically compiled glob() function so buildroot directory have to be the same inside and outside fakechroot.
+ FAKECHROOT_EXCLUDE_PATH=$FAKECHROOT_EXCLUDE_PATH:/tmp
+Index: fakechroot-2.14/test/t/chroot.t
+===================================================================
+--- fakechroot-2.14.orig/test/t/chroot.t
++++ fakechroot-2.14/test/t/chroot.t
+@@ -15,7 +15,7 @@ for chroot in chroot fakechroot; do
+     else
+ 
+         for testtree in testtree /testtree ./testtree /./testtree testtree/. testtree/./.; do
+-            t=`$srcdir/$chroot.sh testtree /usr/sbin/chroot $testtree /bin/cat /CHROOT`
++            t=`$srcdir/$chroot.sh testtree /usr/bin/chroot $testtree /bin/cat /CHROOT`
+             test "$t" = "testtree/testtree" || not
+             ok "$chroot chroot $testtree:" $t
+         done
+Index: fakechroot-2.14/test/testtree.sh
+===================================================================
+--- fakechroot-2.14.orig/test/testtree.sh
++++ fakechroot-2.14/test/testtree.sh
+@@ -64,7 +64,7 @@ for p in \
+     '/usr/bin/seq' \
+     '/usr/bin/strace' \
+     '/usr/bin/touch' \
+-    '/usr/sbin/chroot' \
++    '/usr/bin/chroot' \
+     '/usr/local/bin/bash' \
+     '/usr/local/bin/gseq' \
+     '/usr/local/bin/ltrace' \

@@ -1,0 +1,35 @@
+#!/bin/bash
+
+MAIN="yofrankie-bge"
+TARGET="$HOME/.$MAIN"
+DATADIR="/usr/share/$MAIN"
+BLENDER_PLAYER="/usr/bin/blenderplayer"
+
+if [ ! -e "$TARGET" ]; then
+        mkdir "$TARGET"
+fi
+
+BLENDER="/usr/lib/blender"
+BLENDERTOSYMLINK="bpydata locale plugins scripts"
+for d in $BLENDERTOSYMLINK; do
+        if [ ! -e "$TARGET/$d" ] ; then
+                ln -s "$BLENDER/$d" "$TARGET/$d"
+        fi
+done
+
+YOFRANKIETOSYMLINK="audio chars effects hud menus props textures"
+for d in $YOFRANKIETOSYMLINK; do
+        if [ ! -e "$TARGET/$d" ] ; then
+                ln -s "$DATADIR/$d" "$TARGET/$d"
+        fi
+done
+
+YOFRANKIETOCOPY="levels"
+for d in $YOFRANKIETOCOPY; do
+        if [ ! -e "$TARGET/$d" ] ; then
+                cp -R "$DATADIR/$d" "$TARGET/$d"
+        fi
+done
+
+cd $TARGET
+exec $BLENDER_PLAYER -f $TARGET/levels/start_menu.blend

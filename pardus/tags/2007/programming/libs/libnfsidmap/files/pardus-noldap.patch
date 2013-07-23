@@ -1,0 +1,72 @@
+--- Makefile.am.org	2006-03-21 21:25:57.000000000 +0200
++++ Makefile.am	    2006-04-05 11:51:36.000000000 +0300
+@@ -1,10 +1,10 @@
+ man_MANS = nfs4_uid_to_name.3
+ lib_LTLIBRARIES = libnfsidmap.la
+-libnfsidmap_la_SOURCES = libnfsidmap.c nss.c umich_ldap.c cfg.c strlcpy.c cfg.h nfsidmap_internal.h queue.h
++libnfsidmap_la_SOURCES = libnfsidmap.c nss.c cfg.c strlcpy.c cfg.h nfsidmap_internal.h queue.h
+ libnfsidmap_la_LDFLAGS = -version-info 2:0:2
+ include_HEADERS = nfsidmap.h
+ EXTRA_DIST = $(man_MANS) libtest.c idmapd.conf
+-LIBS = -lldap
++#LIBS = -lldap
+ 
+ #	XXX: also exclude debian/files and debian/files.new ? do a clean??
+ dist-hook:
+
+--- Makefile.in.bak	2006-03-22 01:08:13.000000000 +0200
++++ Makefile.in	    2006-04-05 11:52:44.000000000 +0300
+@@ -62,7 +62,7 @@
+ libLTLIBRARIES_INSTALL = $(INSTALL)
+ LTLIBRARIES = $(lib_LTLIBRARIES)
+ libnfsidmap_la_LIBADD =
+-am_libnfsidmap_la_OBJECTS = libnfsidmap.lo nss.lo umich_ldap.lo cfg.lo \
++am_libnfsidmap_la_OBJECTS = libnfsidmap.lo nss.lo cfg.lo \
+ 	strlcpy.lo
+ libnfsidmap_la_OBJECTS = $(am_libnfsidmap_la_OBJECTS)
+ DEFAULT_INCLUDES = -I. -I$(srcdir)
+@@ -131,7 +131,7 @@
+ INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
+ LDFLAGS = @LDFLAGS@
+ LIBOBJS = @LIBOBJS@
+-LIBS = -lldap
++#LIBS = -lldap
+ LIBTOOL = @LIBTOOL@
+ LN_S = @LN_S@
+ LTLIBOBJS = @LTLIBOBJS@
+@@ -194,7 +194,7 @@
+ target_alias = @target_alias@
+ man_MANS = nfs4_uid_to_name.3
+ lib_LTLIBRARIES = libnfsidmap.la
+-libnfsidmap_la_SOURCES = libnfsidmap.c nss.c umich_ldap.c cfg.c strlcpy.c cfg.h nfsidmap_internal.h queue.h
++libnfsidmap_la_SOURCES = libnfsidmap.c nss.c cfg.c strlcpy.c cfg.h nfsidmap_internal.h queue.h
+ libnfsidmap_la_LDFLAGS = -version-info 2:0:2
+ include_HEADERS = nfsidmap.h
+ EXTRA_DIST = $(man_MANS) libtest.c idmapd.conf
+@@ -275,7 +275,7 @@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libnfsidmap.Plo@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nss.Plo@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/strlcpy.Plo@am__quote@
+-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/umich_ldap.Plo@am__quote@
++#@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/umich_ldap.Plo@am__quote@
+ 
+ .c.o:
+ @am__fastdepCC_TRUE@	if $(COMPILE) -MT $@ -MD -MP -MF "$(DEPDIR)/$*.Tpo" -c -o $@ $<; \
+
+--- libnfsidmap.c.gag	2006-03-16 17:05:29.000000000 +0200
++++ libnfsidmap.c	2006-04-05 11:54:38.000000000 +0300
+@@ -177,12 +177,11 @@
+ }
+ 
+ extern struct trans_func nss_trans;
+-extern struct trans_func umichldap_trans;
++extern struct trans_func;
+ 
+-#define TR_SIZE 2
++#define TR_SIZE 1
+ static struct trans_func * t_array[TR_SIZE] = {
+ 	[0] = &nss_trans,
+-	[1] = &umichldap_trans,
+ };
+ 
+ int

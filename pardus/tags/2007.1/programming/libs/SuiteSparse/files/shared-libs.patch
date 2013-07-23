@@ -1,0 +1,276 @@
+diff -ur SuiteSparse-old/AMD/Source/GNUmakefile SuiteSparse-2.1.1/AMD/Source/GNUmakefile
+--- SuiteSparse-old/AMD/Source/GNUmakefile	2006-09-18 12:31:10.000000000 +0300
++++ SuiteSparse-2.1.1/AMD/Source/GNUmakefile	2006-09-18 15:28:13.000000000 +0300
+@@ -2,7 +2,7 @@
+ # AMD Makefile for compiling on Unix systems (for GNU make only)
+ #-------------------------------------------------------------------------------
+ 
+-default: ../Lib/libamd.a
++default: libamd.so
+ 
+ include ../../UFconfig/UFconfig.mk
+ 
+@@ -43,9 +43,10 @@
+ # Create the libamd.a library (C versions only)
+ #-------------------------------------------------------------------------------
+ 
+-../Lib/libamd.a: amd_global.o $(AMDI) $(AMDL)
+-	$(AR) ../Lib/libamd.a $^
+-	- $(RANLIB) ../Lib/libamd.a
++libamd.so: amd_global.o $(AMDI) $(AMDL)
++	$(C) -shared -Wl,-soname,libamd.so.2 -o ../../dist/libamd.so.2.0.1 $^
++	ln -sf libamd.so.2.0.1 ../../dist/libamd.so
++	ln -sf libamd.so.2.0.1 ../../dist/libamd.so.2
+ 
+ #-------------------------------------------------------------------------------
+ # compile the Fortran versions and the libamdf77.a library
+diff -ur SuiteSparse-old/BTF/Lib/Makefile SuiteSparse-2.1.1/BTF/Lib/Makefile
+--- SuiteSparse-old/BTF/Lib/Makefile	2006-09-18 12:31:10.000000000 +0300
++++ SuiteSparse-2.1.1/BTF/Lib/Makefile	2006-09-18 15:28:27.000000000 +0300
+@@ -1,4 +1,4 @@
+-default: all
++default: libbtf.so
+ 
+ ccode: all
+ 
+@@ -19,9 +19,10 @@
+ 
+ OBJ = btf_order.o maxtrans.o strongcomp.o
+ 
+-libbtf.a: $(OBJ)
+-	$(AR) libbtf.a $(OBJ)
+-	$(RANLIB) libbtf.a
++libbtf.so: $(OBJ)
++	$(C) -shared -Wl,-soname,libbtf.so.0 -o ../../dist/libbtf.so.0.9 $(OBJ)
++	ln -sf libbtf.so.0.9 ../../dist/libbtf.so
++	ln -sf libbtf.so.0.9 ../../dist/libbtf.so.0
+ 
+ $(OBJ): $(INC)
+ 
+@@ -41,7 +42,7 @@
+ purge: distclean
+ 
+ distclean: clean
+-	- $(RM) libbtf.a 
++	- $(RM) libbtf.a
+ 
+ clean:
+ 	- $(RM) $(CLEAN)
+diff -ur SuiteSparse-old/CAMD/Source/GNUmakefile SuiteSparse-2.1.1/CAMD/Source/GNUmakefile
+--- SuiteSparse-old/CAMD/Source/GNUmakefile	2006-09-18 12:31:10.000000000 +0300
++++ SuiteSparse-2.1.1/CAMD/Source/GNUmakefile	2006-09-18 15:30:09.000000000 +0300
+@@ -2,7 +2,7 @@
+ # CAMD Makefile for compiling on Unix systems (for GNU make only)
+ #-------------------------------------------------------------------------------
+ 
+-default: ../Lib/libcamd.a
++default: libcamd.so
+ 
+ include ../../UFconfig/UFconfig.mk
+ 
+@@ -43,9 +43,10 @@
+ # Create the libcamd.a library (C versions only)
+ #-------------------------------------------------------------------------------
+ 
+-../Lib/libcamd.a: camd_global.o $(CAMDI) $(CAMDL)
+-	$(AR) ../Lib/libcamd.a $^
+-	- $(RANLIB) ../Lib/libcamd.a
++libcamd.so: camd_global.o $(CAMDI) $(CAMDL)
++	$(C) -shared -Wl,-soname,libcamd.so.2 -o ../../dist/libcamd.so.2.1.1 $^
++	ln -sf libcamd.so.2.1.1 ../../dist/libcamd.so
++	ln -sf libcamd.so.2.1.1 ../../dist/libcamd.so.2
+ 
+ #-------------------------------------------------------------------------------
+ # Remove all but the files in the original distribution
+diff -ur SuiteSparse-old/CCOLAMD/Makefile SuiteSparse-2.1.1/CCOLAMD/Makefile
+--- SuiteSparse-old/CCOLAMD/Makefile	2006-09-18 12:31:10.000000000 +0300
++++ SuiteSparse-2.1.1/CCOLAMD/Makefile	2006-09-18 15:28:43.000000000 +0300
+@@ -1,5 +1,5 @@
+ 
+-default: ccolamd_example ccolamd_l_example libccolamd.a
++default: libccolamd.so
+ 
+ include ../UFconfig/UFconfig.mk
+ 
+@@ -37,11 +37,13 @@
+ 	$(MEX) $(I) csymamdtestmex.c libccolamd.a
+ 
+ # creates libccolamd.a, a C-callable CCOLAMD library
+-libccolamd.a:  ccolamd.c ccolamd_global.c ccolamd.h
++libccolamd.so:  ccolamd.c ccolamd_global.c ccolamd.h
+ 	$(CC) $(CFLAGS) $(I) -c ccolamd_global.c
+ 	$(CC) $(CFLAGS) $(I) -c ccolamd.c
+ 	$(CC) $(CFLAGS) $(I) -c ccolamd.c -DDLONG -o ccolamd_l.o
+-	$(AR) libccolamd.a ccolamd.o ccolamd_l.o ccolamd_global.o
++	$(CC) -shared -Wl,-soname,libccolamd.so.2 -o ../dist/libccolamd.so.2.5.1 ccolamd.o ccolamd_l.o ccolamd_global.o
++	ln -sf libccolamd.so.2.5.1 ../dist/libccolamd.so
++	ln -sf libccolamd.so.2.5.1 ../dist/libccolamd.so.2
+ 
+ ccode: libccolamd.a
+ 
+diff -ur SuiteSparse-old/CHOLMOD/Lib/Makefile SuiteSparse-2.1.1/CHOLMOD/Lib/Makefile
+--- SuiteSparse-old/CHOLMOD/Lib/Makefile	2006-09-18 12:31:10.000000000 +0300
++++ SuiteSparse-2.1.1/CHOLMOD/Lib/Makefile	2006-09-18 15:28:55.000000000 +0300
+@@ -10,7 +10,7 @@
+ 
+ C = $(CC) $(CFLAGS) $(CHOLMOD_CONFIG)
+ 
+-all: libcholmod.a
++all: libcholmod.so
+ 
+ library: libcholmod.a
+ 
+@@ -109,9 +109,10 @@
+ # to compile just the double/int version, use OBJ = $(DI)
+ OBJ = $(DI) $(DL)
+ 
+-libcholmod.a: $(OBJ)
+-	$(AR) libcholmod.a $(OBJ)
+-	$(RANLIB) libcholmod.a
++libcholmod.so: $(OBJ)
++	$(C)  -shared -Wl,-soname,libcholmod.so.1 -o ../../dist/libcholmod.so.1.2 $(OBJ) -llapack
++	ln -sf libcholmod.so.1.2 ../../dist/libcholmod.so
++	ln -sf libcholmod.so.1.2 ../../dist/libcholmod.so.1
+ 
+ $(OBJ): $(INC)
+ 
+diff -ur SuiteSparse-old/COLAMD/Makefile SuiteSparse-2.1.1/COLAMD/Makefile
+--- SuiteSparse-old/COLAMD/Makefile	2006-09-18 12:31:10.000000000 +0300
++++ SuiteSparse-2.1.1/COLAMD/Makefile	2006-09-18 15:29:04.000000000 +0300
+@@ -1,5 +1,5 @@
+ 
+-default: libcolamd.a colamd_example colamd_l_example
++default: libcolamd.so
+ 
+ include ../UFconfig/UFconfig.mk
+ 
+@@ -37,11 +37,13 @@
+ 	$(MEX) $(I) symamdtestmex.c libcolamd.a
+ 
+ # creates libcolamd.a, a C-callable COLAMD library
+-libcolamd.a:  colamd.c colamd_global.c colamd.h
++libcolamd.so:  colamd.c colamd_global.c colamd.h
+ 	$(CC) $(CFLAGS) $(I) -c colamd_global.c
+ 	$(CC) $(CFLAGS) $(I) -c colamd.c
+ 	$(CC) $(CFLAGS) $(I) -c colamd.c -DDLONG -o colamd_l.o
+-	$(AR) libcolamd.a colamd.o colamd_l.o colamd_global.o
++	$(CC) -shared -Wl,-soname,libcolamd.so.2 -o ../dist/libcolamd.so.2.5.1 colamd.o colamd_l.o colamd_global.o
++	ln -sf libcolamd.so.2.5.1 ../dist/libcolamd.so
++	ln -sf libcolamd.so.2.5.1 ../dist/libcolamd.so.2
+ 
+ ccode: libcolamd.a
+ 
+diff -ur SuiteSparse-old/CXSparse/Source/Makefile SuiteSparse-2.1.1/CXSparse/Source/Makefile
+--- SuiteSparse-old/CXSparse/Source/Makefile	2006-09-18 12:31:10.000000000 +0300
++++ SuiteSparse-2.1.1/CXSparse/Source/Makefile	2006-09-18 15:29:19.000000000 +0300
+@@ -6,7 +6,7 @@
+ AR = ar cr
+ RANLIB = ranlib
+ 
+-all: libcxsparse.a
++all: libcxsparse.so
+ 
+ CS_SOURCE = cs_add.c cs_amd.c cs_chol.c cs_cholsol.c cs_counts.c cs_cumsum.c \
+ 	cs_droptol.c cs_dropzeros.c cs_dupl.c cs_entry.c \
+@@ -85,9 +85,10 @@
+ %_cl.o : %.c
+ 	$(CC) $(CFLAGS) $(I) -DCS_LONG -DCS_COMPLEX -c $< -o $@
+ 
+-libcxsparse.a: $(CS)
+-	$(AR) libcxsparse.a $(CS)
+-	$(RANLIB) libcxsparse.a
++libcxsparse.so: $(CS)
++	$(CC) -shared -Wl,-soname,libcxsparse.so.2 -o ../../dist/libcxsparse.so.2.0.2 $(CS)
++	ln -sf libcxsparse.so.2.0.2 ../../dist/libcxsparse.so
++	ln -sf libcxsparse.so.2.0.2 ../../dist/libcxsparse.so.2
+ 
+ clean:
+ 	rm -f *.o
+diff -ur SuiteSparse-old/KLU/Lib/Makefile SuiteSparse-2.1.1/KLU/Lib/Makefile
+--- SuiteSparse-old/KLU/Lib/Makefile	2006-09-18 12:31:10.000000000 +0300
++++ SuiteSparse-2.1.1/KLU/Lib/Makefile	2006-09-18 15:29:29.000000000 +0300
+@@ -16,7 +16,7 @@
+ 
+ all: library
+ 
+-library: libklu.a
++library: libklu.so
+ 
+ KLU_D = klu_d.o klu_d_kernel.o klu_d_dump.o \
+     klu_d_factor.o klu_d_free_numeric.o klu_d_solve.o \
+@@ -33,9 +33,10 @@
+ 
+ OBJ = $(COMMON) $(KLU_D) $(KLU_Z)
+ 
+-libklu.a: $(OBJ)
+-	$(AR) libklu.a $(OBJ)
+-	$(RANLIB) libklu.a
++libklu.so: $(OBJ)
++	$(C) -shared -Wl,-soname,libklu.so.0 -o ../../dist/libklu.so.0.9 $(OBJ)
++	ln -sf libklu.so.0.9 ../../dist/libklu.so
++	ln -sf libklu.so.0.9 ../../dist/libklu.so.0
+ 
+ $(OBJ): $(INC)
+ 
+@@ -135,7 +136,7 @@
+ purge: distclean
+ 
+ distclean: clean
+-	- $(RM) libklu.a 
++	- $(RM) libklu.a
+ 
+ clean:
+ 	- $(RM) $(CLEAN)
+diff -ur SuiteSparse-old/LDL/Makefile SuiteSparse-2.1.1/LDL/Makefile
+--- SuiteSparse-old/LDL/Makefile	2006-09-18 12:31:10.000000000 +0300
++++ SuiteSparse-2.1.1/LDL/Makefile	2006-09-18 15:29:38.000000000 +0300
+@@ -8,7 +8,7 @@
+ 
+ C = $(CC) $(CFLAGS)
+ 
+-all: intro libldl.a ldlsimple ldlmain ldlamd
++all: libldl.so
+ 
+ intro:
+ 	@echo " "
+@@ -24,10 +24,11 @@
+ # the ldl library:
+ #-------------------------------------------------------------------------------
+ 
+-libldl.a: ldl.c ldl.h
++libldl.so: ldl.c ldl.h
+ 	$(C) -c ldl.c -o ldl.o
+-	$(AR) libldl.a ldl.o
+-	- $(RANLIB) libldl.a
++	$(C) -shared -Wl,-soname,libldl.so.1 -o ../dist/libldl.so.1.3.1 ldl.o
++	ln -sf libldl.so.1.3.1 ../dist/libldl.so
++	ln -sf libldl.so.1.3.1 ../dist/libldl.so.1
+ 
+ #-------------------------------------------------------------------------------
+ # stand-alone C programs:
+diff -ur SuiteSparse-old/UMFPACK/Source/GNUmakefile SuiteSparse-2.1.1/UMFPACK/Source/GNUmakefile
+--- SuiteSparse-old/UMFPACK/Source/GNUmakefile	2006-09-18 12:31:10.000000000 +0300
++++ SuiteSparse-2.1.1/UMFPACK/Source/GNUmakefile	2006-09-18 15:29:48.000000000 +0300
+@@ -2,7 +2,7 @@
+ # UMFPACK Makefile for compiling on Unix systems (for GNU Make)
+ #-------------------------------------------------------------------------------
+ 
+-default: ../Lib/libumfpack.a
++default: libumfpack.so
+ 
+ include ../../UFconfig/UFconfig.mk
+ 
+@@ -242,9 +242,10 @@
+ # Create the libumfpack.a library
+ #-------------------------------------------------------------------------------
+ 
+-../Lib/libumfpack.a: $(II) $(LL) $(GN) $(DI) $(DL) $(ZI) $(ZL)
+-	$(AR) ../Lib/libumfpack.a $^
+-	- $(RANLIB) ../Lib/libumfpack.a
++libumfpack.so: $(II) $(LL) $(GN) $(DI) $(DL) $(ZI) $(ZL)
++	$(C) -shared -Wl,-soname,libumfpack.so.5 -o ../../dist/libumfpack.so.5.0.1 $^ -lm
++	ln -sf libumfpack.so.5.0.1 ../../dist/libumfpack.so
++	ln -sf libumfpack.so.5.0.1 ../../dist/libumfpack.so.5
+ 
+ #-------------------------------------------------------------------------------
+ # Remove all but the files in the original distribution

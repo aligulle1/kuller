@@ -1,0 +1,584 @@
+Index: gdb-6.5/gdb/configure
+===================================================================
+--- gdb-6.5.orig/gdb/configure	2006-07-11 15:00:08.000000000 -0300
++++ gdb-6.5/gdb/configure	2006-07-11 15:01:23.000000000 -0300
+@@ -20125,7 +20125,8 @@ fi
+ # gdb/doc/gdbint.texinfo.
+ build_warnings="-Wimplicit -Wreturn-type -Wcomment -Wtrigraphs \
+ -Wformat -Wparentheses -Wpointer-arith -Wformat-nonliteral \
+--Wunused-label -Wunused-function -Wno-pointer-sign"
++-Wunused-label -Wunused-function -Wno-pointer-sign -Wno-unused \
++-Wp,-U_FORTIFY_SOURCE"
+ 
+ # GCC supports -Wuninitialized only with -O or -On, n != 0.
+ if test x${CFLAGS+set} = xset; then
+Index: gdb-6.5/gdb/mi/mi-cmd-env.c
+===================================================================
+--- gdb-6.5.orig/gdb/mi/mi-cmd-env.c	2006-07-11 15:00:08.000000000 -0300
++++ gdb-6.5/gdb/mi/mi-cmd-env.c	2006-07-11 15:01:23.000000000 -0300
+@@ -126,7 +126,7 @@ mi_cmd_env_path (char *command, char **a
+   static struct mi_opt opts[] =
+   {
+     {"r", RESET_OPT, 0},
+-    0
++    {0}
+   };
+ 
+   dont_repeat ();
+@@ -198,7 +198,7 @@ mi_cmd_env_dir (char *command, char **ar
+   static struct mi_opt opts[] =
+   {
+     {"r", RESET_OPT, 0},
+-    0
++    {0}
+   };
+ 
+   dont_repeat ();
+Index: gdb-6.5/gdb/mi/mi-getopt.c
+===================================================================
+--- gdb-6.5.orig/gdb/mi/mi-getopt.c	2006-07-11 15:00:08.000000000 -0300
++++ gdb-6.5/gdb/mi/mi-getopt.c	2006-07-11 15:01:23.000000000 -0300
+@@ -82,7 +82,7 @@ mi_valid_noargs (const char *prefix, int
+   char *optarg;
+   static struct mi_opt opts[] =
+   {
+-    0
++    {0}
+   };
+ 
+   if (mi_getopt (prefix, argc, argv, opts, &optind, &optarg) == -1)
+Index: gdb-6.5/gdb/mi/mi-cmd-break.c
+===================================================================
+--- gdb-6.5.orig/gdb/mi/mi-cmd-break.c	2006-07-11 15:00:08.000000000 -0300
++++ gdb-6.5/gdb/mi/mi-cmd-break.c	2006-07-11 15:01:23.000000000 -0300
+@@ -90,7 +90,7 @@ mi_cmd_break_insert (char *command, char
+     {"c", CONDITION_OPT, 1},
+     {"i", IGNORE_COUNT_OPT, 1},
+     {"p", THREAD_OPT, 1},
+-    0
++    {0}
+   };
+ 
+   /* Parse arguments. It could be -r or -h or -t, <location> or ``--''
+@@ -196,7 +196,7 @@ mi_cmd_break_watch (char *command, char 
+   {
+     {"r", READ_OPT, 0},
+     {"a", ACCESS_OPT, 0},
+-    0
++    {0}
+   };
+ 
+   /* Parse arguments. */
+Index: gdb-6.5/gdb/mi/mi-cmd-disas.c
+===================================================================
+--- gdb-6.5.orig/gdb/mi/mi-cmd-disas.c	2006-07-11 15:01:22.000000000 -0300
++++ gdb-6.5/gdb/mi/mi-cmd-disas.c	2006-07-11 15:01:23.000000000 -0300
+@@ -84,7 +84,7 @@ mi_cmd_disassemble (char *command, char 
+     {"n", NUM_OPT, 1},
+     {"s", START_OPT, 1},
+     {"e", END_OPT, 1},
+-    0
++    {0}
+   };
+ 
+   /* Get the options with their arguments. Keep track of what we
+Index: gdb-6.5/gdb/mi/mi-main.c
+===================================================================
+--- gdb-6.5.orig/gdb/mi/mi-main.c	2006-07-11 15:00:08.000000000 -0300
++++ gdb-6.5/gdb/mi/mi-main.c	2006-07-11 15:01:23.000000000 -0300
+@@ -773,7 +773,7 @@ mi_cmd_data_read_memory (char *command, 
+   static struct mi_opt opts[] =
+   {
+     {"o", OFFSET_OPT, 1},
+-    0
++    {0}
+   };
+ 
+   while (1)
+@@ -975,7 +975,7 @@ mi_cmd_data_write_memory (char *command,
+   static struct mi_opt opts[] =
+   {
+     {"o", OFFSET_OPT, 1},
+-    0
++    {0}
+   };
+ 
+   while (1)
+Index: gdb-6.5/gdb/p-valprint.c
+===================================================================
+--- gdb-6.5.orig/gdb/p-valprint.c	2006-07-11 15:00:08.000000000 -0300
++++ gdb-6.5/gdb/p-valprint.c	2006-07-11 15:01:23.000000000 -0300
+@@ -753,7 +753,7 @@ pascal_object_print_value_fields (struct
+ 				  int dont_print_statmem)
+ {
+   int i, len, n_baseclasses;
+-  struct obstack tmp_obstack;
++  struct obstack tmp_obstack = {0};
+   char *last_dont_print = obstack_next_free (&dont_print_statmem_obstack);
+ 
+   CHECK_TYPEDEF (type);
+@@ -922,7 +922,7 @@ pascal_object_print_value (struct type *
+ 			   enum val_prettyprint pretty,
+ 			   struct type **dont_print_vb)
+ {
+-  struct obstack tmp_obstack;
++  struct obstack tmp_obstack = {0};
+   struct type **last_dont_print
+   = (struct type **) obstack_next_free (&dont_print_vb_obstack);
+   int i, n_baseclasses = TYPE_N_BASECLASSES (type);
+Index: gdb-6.5/gdb/cp-valprint.c
+===================================================================
+--- gdb-6.5.orig/gdb/cp-valprint.c	2006-07-11 15:00:08.000000000 -0300
++++ gdb-6.5/gdb/cp-valprint.c	2006-07-11 15:01:23.000000000 -0300
+@@ -265,7 +265,7 @@ cp_print_value_fields (struct type *type
+ 		       struct type **dont_print_vb,int dont_print_statmem)
+ {
+   int i, len, n_baseclasses;
+-  struct obstack tmp_obstack;
++  struct obstack tmp_obstack = {0};
+   char *last_dont_print = obstack_next_free (&dont_print_statmem_obstack);
+   int fields_seen = 0;
+ 
+@@ -524,7 +524,7 @@ cp_print_value (struct type *type, struc
+ 		struct ui_file *stream, int format, int recurse,
+ 		enum val_prettyprint pretty, struct type **dont_print_vb)
+ {
+-  struct obstack tmp_obstack;
++  struct obstack tmp_obstack = {0};
+   struct type **last_dont_print
+     = (struct type **) obstack_next_free (&dont_print_vb_obstack);
+   int i, n_baseclasses = TYPE_N_BASECLASSES (type);
+Index: gdb-6.5/gdb/tui/tui-layout.c
+===================================================================
+--- gdb-6.5.orig/gdb/tui/tui-layout.c	2006-07-11 15:01:22.000000000 -0300
++++ gdb-6.5/gdb/tui/tui-layout.c	2006-07-11 15:01:23.000000000 -0300
+@@ -755,7 +755,7 @@ show_source_disasm_command (void)
+ 	  if (TUI_DISASM_WIN == NULL)
+ 	    {
+ 	      make_disasm_window (&TUI_DISASM_WIN, asm_height, src_height - 1);
+-	      init_and_make_win ((void **) & locator,
++	      init_and_make_win ((void **)(char *) & locator,
+ 			       LOCATOR_WIN,
+ 			       2 /* 1 */ ,
+ 			       tui_term_width (),
+@@ -848,7 +848,7 @@ show_data (enum tui_layout_type new_layo
+ 	make_source_window (&tui_win_list[win_type], src_height, data_height - 1);
+       else
+ 	make_disasm_window (&tui_win_list[win_type], src_height, data_height - 1);
+-      init_and_make_win ((void **) & locator,
++      init_and_make_win ((void **)(char *) & locator,
+ 		       LOCATOR_WIN,
+ 		       2 /* 1 */ ,
+ 		       tui_term_width (),
+@@ -963,7 +963,7 @@ make_source_or_disasm_window (struct tui
+     execution_info = tui_source_exec_info_win_ptr ();
+   else
+     execution_info = tui_disassem_exec_info_win_ptr ();
+-  init_and_make_win ((void **) & execution_info,
++  init_and_make_win ((void **)(char *) & execution_info,
+ 		   EXEC_INFO_WIN,
+ 		   height,
+ 		   3,
+@@ -1013,7 +1013,7 @@ show_source_or_disasm_and_command (enum 
+ 	    make_source_window (win_info_ptr, src_height - 1, 0);
+ 	  else
+ 	    make_disasm_window (win_info_ptr, src_height - 1, 0);
+-	  init_and_make_win ((void **) & locator,
++	  init_and_make_win ((void **)(char *) & locator,
+ 			   LOCATOR_WIN,
+ 			   2 /* 1 */ ,
+ 			   tui_term_width (),
+Index: gdb-6.5/gdb/testsuite/gdb.base/move-dir.h
+===================================================================
+--- gdb-6.5.orig/gdb/testsuite/gdb.base/move-dir.h	2006-07-11 15:01:23.000000000 -0300
++++ gdb-6.5/gdb/testsuite/gdb.base/move-dir.h	2006-07-11 15:01:23.000000000 -0300
+@@ -1,4 +1,4 @@
+-#include <stdlib.h>
++#include <stdio.h>
+ 
+ void other() {
+   const char* ostring = "other";
+Index: gdb-6.5/gdb/testsuite/gdb.base/sigrepeat.c
+===================================================================
+--- gdb-6.5.orig/gdb/testsuite/gdb.base/sigrepeat.c	2006-07-11 15:00:08.000000000 -0300
++++ gdb-6.5/gdb/testsuite/gdb.base/sigrepeat.c	2006-07-11 15:01:23.000000000 -0300
+@@ -22,6 +22,7 @@
+ #include <stdlib.h>
+ #include <string.h>
+ #include <signal.h>
++#include <stdlib.h>
+ #include <sys/time.h>
+ 
+ static volatile int done[2];
+Index: gdb-6.5/gdb/s390-tdep.c
+===================================================================
+--- gdb-6.5.orig/gdb/s390-tdep.c	2006-07-11 15:00:08.000000000 -0300
++++ gdb-6.5/gdb/s390-tdep.c	2006-07-11 15:02:37.000000000 -0300
+@@ -2277,6 +2277,9 @@ s390_return_value (struct gdbarch *gdbar
+ 	case RETURN_VALUE_STRUCT_CONVENTION:
+ 	  error (_("Cannot set function return value."));
+ 	  break;
++
++        default:
++      	  break;
+ 	}
+     }
+   else if (out)
+@@ -2309,6 +2312,9 @@ s390_return_value (struct gdbarch *gdbar
+ 	case RETURN_VALUE_STRUCT_CONVENTION:
+ 	  error (_("Function return value unknown."));
+ 	  break;
++
++        default:
++      	  break;
+ 	}
+     }
+ 
+Index: gdb-6.5/gdb/remote.c
+===================================================================
+--- gdb-6.5.orig/gdb/remote.c	2006-07-11 15:00:08.000000000 -0300
++++ gdb-6.5/gdb/remote.c	2006-07-11 15:02:32.000000000 -0300
+@@ -2523,10 +2523,10 @@ cleanup_sigint_signal_handler (void *dum
+ {
+   signal (SIGINT, handle_sigint);
+   if (sigint_remote_twice_token)
+-    delete_async_signal_handler ((struct async_signal_handler **) 
++    delete_async_signal_handler ((struct async_signal_handler **) (char *)
+ 				 &sigint_remote_twice_token);
+   if (sigint_remote_token)
+-    delete_async_signal_handler ((struct async_signal_handler **) 
++    delete_async_signal_handler ((struct async_signal_handler **) (char *)
+ 				 &sigint_remote_token);
+ }
+ 
+Index: gdb-6.5/gdb/f-exp.y
+===================================================================
+--- gdb-6.5.orig/gdb/f-exp.y	2006-07-11 15:00:08.000000000 -0300
++++ gdb-6.5/gdb/f-exp.y	2006-07-11 15:01:23.000000000 -0300
+@@ -567,6 +567,8 @@ ptype	:	typebase
+ 		      case tp_function:
+ 			follow_type = lookup_function_type (follow_type);
+ 			break;
++		      default:
++			break;
+ 		      }
+ 		  $$ = follow_type;
+ 		}
+Index: gdb-6.5/gdb/remote-fileio.c
+===================================================================
+--- gdb-6.5.orig/gdb/remote-fileio.c	2006-07-11 15:00:08.000000000 -0300
++++ gdb-6.5/gdb/remote-fileio.c	2006-07-11 15:01:23.000000000 -0300
+@@ -1317,19 +1317,19 @@ static struct {
+   char *name;
+   void (*func)(char *);
+ } remote_fio_func_map[] = {
+-  "open", remote_fileio_func_open,
+-  "close", remote_fileio_func_close,
+-  "read", remote_fileio_func_read,
+-  "write", remote_fileio_func_write,
+-  "lseek", remote_fileio_func_lseek,
+-  "rename", remote_fileio_func_rename,
+-  "unlink", remote_fileio_func_unlink,
+-  "stat", remote_fileio_func_stat,
+-  "fstat", remote_fileio_func_fstat,
+-  "gettimeofday", remote_fileio_func_gettimeofday,
+-  "isatty", remote_fileio_func_isatty,
+-  "system", remote_fileio_func_system,
+-  NULL, NULL
++	{"open", remote_fileio_func_open},
++	{"close", remote_fileio_func_close},
++	{"read", remote_fileio_func_read},
++	{"write", remote_fileio_func_write},
++	{"lseek", remote_fileio_func_lseek},
++	{"rename", remote_fileio_func_rename},
++	{"unlink", remote_fileio_func_unlink},
++	{"stat", remote_fileio_func_stat},
++	{"fstat", remote_fileio_func_fstat},
++	{"gettimeofday", remote_fileio_func_gettimeofday},
++	{"isatty", remote_fileio_func_isatty},
++	{"system", remote_fileio_func_system},
++	{NULL, NULL}
+ };
+ 
+ static int
+Index: gdb-6.5/gdb/source.c
+===================================================================
+--- gdb-6.5.orig/gdb/source.c	2006-07-11 15:00:08.000000000 -0300
++++ gdb-6.5/gdb/source.c	2006-07-11 15:01:23.000000000 -0300
+@@ -160,7 +160,7 @@ get_current_source_symtab_and_line (void
+ void
+ set_default_source_symtab_and_line (void)
+ {
+-  struct symtab_and_line cursal;
++  struct symtab_and_line cursal = {0};
+ 
+   if (!have_full_symbols () && !have_partial_symbols ())
+     error (_("No symbol table is loaded.  Use the \"file\" command."));
+@@ -1314,7 +1314,7 @@ static void
+ line_info (char *arg, int from_tty)
+ {
+   struct symtabs_and_lines sals;
+-  struct symtab_and_line sal;
++  struct symtab_and_line sal = {0};
+   CORE_ADDR start_pc, end_pc;
+   int i;
+ 
+Index: gdb-6.5/gdb/symfile.c
+===================================================================
+--- gdb-6.5.orig/gdb/symfile.c	2006-07-11 15:01:22.000000000 -0300
++++ gdb-6.5/gdb/symfile.c	2006-07-11 15:02:34.000000000 -0300
+@@ -2877,6 +2877,8 @@ add_psymbol_with_dem_name_to_list (char 
+ 	deprecated_bcache (buf, dem_namelength + 1, objfile->psymbol_cache);
+       break;
+       /* FIXME What should be done for the default case? Ignoring for now. */
++    default:
++      break;
+     }
+ 
+   /* val and coreaddr are mutually exclusive, one of them *will* be zero */
+Index: gdb-6.5/gdb/linespec.c
+===================================================================
+--- gdb-6.5.orig/gdb/linespec.c	2006-07-11 15:01:23.000000000 -0300
++++ gdb-6.5/gdb/linespec.c	2006-07-11 15:01:23.000000000 -0300
+@@ -1631,7 +1631,7 @@ static struct symtabs_and_lines
+ find_method (int funfirstline, char ***canonical, char *saved_arg,
+ 	     char *copy, struct type *t, struct symbol *sym_class)
+ {
+-  struct symtabs_and_lines values;
++  struct symtabs_and_lines values = {0};
+   struct symbol *sym = 0;
+   int i1;	/*  Counter for the symbol array.  */
+   struct symbol **sym_arr =  alloca (total_number_of_methods (t)
+Index: gdb-6.5/gdb/macroscope.c
+===================================================================
+--- gdb-6.5.orig/gdb/macroscope.c	2006-07-11 15:00:08.000000000 -0300
++++ gdb-6.5/gdb/macroscope.c	2006-07-11 15:01:23.000000000 -0300
+@@ -33,7 +33,7 @@
+ struct macro_scope *
+ sal_macro_scope (struct symtab_and_line sal)
+ {
+-  struct macro_source_file *main, *inclusion;
++  struct macro_source_file *main_sf, *inclusion;
+   struct macro_scope *ms;
+ 
+   if (! sal.symtab
+@@ -42,8 +42,8 @@ sal_macro_scope (struct symtab_and_line 
+ 
+   ms = (struct macro_scope *) xmalloc (sizeof (*ms));
+ 
+-  main = macro_main (sal.symtab->macro_table);
+-  inclusion = macro_lookup_inclusion (main, sal.symtab->filename);
++  main_sf = macro_main (sal.symtab->macro_table);
++  inclusion = macro_lookup_inclusion (main_sf, sal.symtab->filename);
+ 
+   if (inclusion)
+     {
+@@ -66,7 +66,7 @@ sal_macro_scope (struct symtab_and_line 
+ 
+          For the time being, though, we'll just treat these as
+          occurring at the end of the main source file.  */
+-      ms->file = main;
++      ms->file = main_sf;
+       ms->line = -1;
+ 
+       complaint (&symfile_complaints,
+@@ -83,7 +83,6 @@ struct macro_scope *
+ default_macro_scope (void)
+ {
+   struct symtab_and_line sal;
+-  struct macro_source_file *main;
+   struct macro_scope *ms;
+ 
+   /* If there's a selected frame, use its PC.  */ 
+Index: gdb-6.5/gdb/target.c
+===================================================================
+--- gdb-6.5.orig/gdb/target.c	2006-07-11 15:01:22.000000000 -0300
++++ gdb-6.5/gdb/target.c	2006-07-11 15:02:33.000000000 -0300
+@@ -1142,6 +1142,9 @@ target_xfer_memory (CORE_ADDR memaddr, g
+ 	  if (!write)
+ 	    return EIO;
+ 	  break;
++
++	default:
++	  break;
+ 	}
+ 
+       while (reg_len > 0)
+@@ -1220,6 +1223,9 @@ target_xfer_memory_partial (CORE_ADDR me
+ 	  return -1;
+ 	}
+       break;
++
++    default:
++      break;
+     }
+ 
+   if (region->attrib.cache)
+Index: gdb-6.5/gdb/gdb-events.c
+===================================================================
+--- gdb-6.5.orig/gdb/gdb-events.c	2006-07-11 15:00:08.000000000 -0300
++++ gdb-6.5/gdb/gdb-events.c	2006-07-11 15:01:23.000000000 -0300
+@@ -321,6 +321,8 @@ gdb_events_deliver (struct gdb_events *v
+ 	case architecture_changed:
+ 	  vector->architecture_changed ();
+ 	  break;
++	default:
++	  break;
+ 	}
+       delivering_events = event->next;
+       xfree (event);
+Index: gdb-6.5/gdb/dwarf2read.c
+===================================================================
+--- gdb-6.5.orig/gdb/dwarf2read.c	2006-07-11 15:01:23.000000000 -0300
++++ gdb-6.5/gdb/dwarf2read.c	2006-07-11 15:02:33.000000000 -0300
+@@ -9179,6 +9179,7 @@ dwarf_decode_macros (struct line_header 
+   for (;;)
+     {
+       enum dwarf_macinfo_record_type macinfo_type;
++      int tmp;
+ 
+       /* Do we at least have room for a macinfo type byte?  */
+       if (mac_ptr >= mac_end)
+@@ -9190,13 +9191,16 @@ dwarf_decode_macros (struct line_header 
+       macinfo_type = read_1_byte (abfd, mac_ptr);
+       mac_ptr++;
+ 
++      /* Check for a zero macinfo type which indicates the end of the macro
++         information.  We do this as the compiler may warn us if we
++         try and look for 0 in the switch below because 0 is not
++         an enumerated value.  */
++      tmp = (int)macinfo_type;
++      if (tmp == 0)
++	return;
++
+       switch (macinfo_type)
+         {
+-          /* A zero macinfo type indicates the end of the macro
+-             information.  */
+-        case 0:
+-          return;
+-
+         case DW_MACINFO_define:
+         case DW_MACINFO_undef:
+           {
+Index: gdb-6.5/gdb/stabsread.c
+===================================================================
+--- gdb-6.5.orig/gdb/stabsread.c	2006-07-11 15:00:08.000000000 -0300
++++ gdb-6.5/gdb/stabsread.c	2006-07-11 15:01:23.000000000 -0300
+@@ -1794,7 +1794,8 @@ again:
+ 	  struct type *domain = read_type (pp, objfile);
+ 	  struct type *return_type;
+ 	  struct field *args;
+-	  int nargs, varargs;
++	  int nargs = 0;
++	  int varargs = 0;
+ 
+ 	  if (**pp != ',')
+ 	    /* Invalid member type data format.  */
+Index: gdb-6.5/gdb/dwarf2expr.c
+===================================================================
+--- gdb-6.5.orig/gdb/dwarf2expr.c	2006-07-11 15:00:08.000000000 -0300
++++ gdb-6.5/gdb/dwarf2expr.c	2006-07-11 15:01:23.000000000 -0300
+@@ -559,6 +559,8 @@ execute_stack_op (struct dwarf_expr_cont
+ 	      op_ptr = read_uleb128 (op_ptr, op_end, &reg);
+ 	      result += reg;
+ 	      break;
++	    default:
++	      break;
+ 	    }
+ 	  break;
+ 
+Index: gdb-6.5/gdb/varobj.c
+===================================================================
+--- gdb-6.5.orig/gdb/varobj.c	2006-07-11 15:01:22.000000000 -0300
++++ gdb-6.5/gdb/varobj.c	2006-07-11 15:01:23.000000000 -0300
+@@ -325,10 +325,9 @@ struct language_specific
+ 
+ /* Array of known source language routines. */
+ static struct language_specific
+-  languages[vlang_end][sizeof (struct language_specific)] = {
++  languages[vlang_end] = {
+   /* Unknown (try treating as C */
+-  {
+-   vlang_unknown,
++  {vlang_unknown,
+    c_number_of_children,
+    c_name_of_variable,
+    c_name_of_child,
+@@ -339,8 +338,7 @@ static struct language_specific
+    c_value_of_variable}
+   ,
+   /* C */
+-  {
+-   vlang_c,
++  {vlang_c,
+    c_number_of_children,
+    c_name_of_variable,
+    c_name_of_child,
+@@ -351,8 +349,7 @@ static struct language_specific
+    c_value_of_variable}
+   ,
+   /* C++ */
+-  {
+-   vlang_cplus,
++  {vlang_cplus,
+    cplus_number_of_children,
+    cplus_name_of_variable,
+    cplus_name_of_child,
+@@ -363,8 +360,7 @@ static struct language_specific
+    cplus_value_of_variable}
+   ,
+   /* Java */
+-  {
+-   vlang_java,
++  {vlang_java,
+    java_number_of_children,
+    java_name_of_variable,
+    java_name_of_child,
+@@ -519,7 +515,7 @@ varobj_create (char *objname,
+ 
+       /* Set language info */
+       lang = variable_language (var);
+-      var->root->lang = languages[lang];
++      var->root->lang = &languages[lang];
+ 
+       /* Set ourselves as our root */
+       var->root->rootvar = var;
+Index: gdb-6.5/gdb/configure.ac
+===================================================================
+--- gdb-6.5.orig/gdb/configure.ac	2006-07-11 15:00:08.000000000 -0300
++++ gdb-6.5/gdb/configure.ac	2006-07-11 15:01:23.000000000 -0300
+@@ -1133,7 +1133,8 @@ fi
+ # gdb/doc/gdbint.texinfo.
+ build_warnings="-Wimplicit -Wreturn-type -Wcomment -Wtrigraphs \
+ -Wformat -Wparentheses -Wpointer-arith -Wformat-nonliteral \
+--Wunused-label -Wunused-function -Wno-pointer-sign"
++-Wunused-label -Wunused-function -Wno-pointer-sign -Wno-unused \
++-Wp,-U_FORTIFY_SOURCE"
+ 
+ # GCC supports -Wuninitialized only with -O or -On, n != 0.
+ if test x${CFLAGS+set} = xset; then
+Index: gdb-6.5/gdb/doublest.c
+===================================================================
+--- gdb-6.5.orig/gdb/doublest.c	2006-07-11 15:00:08.000000000 -0300
++++ gdb-6.5/gdb/doublest.c	2006-07-11 15:01:23.000000000 -0300
+@@ -94,15 +94,10 @@ get_field (const bfd_byte *data, enum fl
+     {
+       result |= (unsigned long)*(data + cur_byte) << cur_bitshift;
+       cur_bitshift += FLOATFORMAT_CHAR_BIT;
+-      switch (order)
+-	{
+-	case floatformat_little:
+-	  ++cur_byte;
+-	  break;
+-	case floatformat_big:
+-	  --cur_byte;
+-	  break;
+-	}
++      if (order == floatformat_little)
++	++cur_byte;
++      else
++	--cur_byte;
+     }
+   if (len < sizeof(result) * FLOATFORMAT_CHAR_BIT)
+     /* Mask out bits which are not part of the field */

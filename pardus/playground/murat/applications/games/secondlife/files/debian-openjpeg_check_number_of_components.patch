@@ -1,0 +1,18 @@
+--- linden/indra/llimagej2coj/llimagej2coj.cpp	(revision 9)
++++ linden/indra/llimagej2coj/llimagej2coj.cpp	(working copy)
+@@ -156,6 +156,15 @@
+ 		return TRUE; // done
+ 	}
+ 
++	if(image->numcomps <= first_channel)
++	{
++		llwarns << "trying to decode more channels than are present in image: numcomps: " << image->numcomps << " first_channel: " << first_channel << llendl;
++		if (image)
++			opj_image_destroy(image);
++			
++		return TRUE;
++	}
++
+ 	// Copy image data into our raw image format (instead of the separate channel format
+ 
+ 	S32 img_components = image->numcomps;

@@ -1,0 +1,33 @@
+--- ManiaDrive-1.2-src/raydium/php.c	2009-02-15 21:15:03.000000000 +0100
++++ ManiaDrive-1.2-src.new/raydium/php.c	2009-02-15 20:40:01.000000000 +0100
+@@ -119,7 +119,7 @@
+     FILE *fp;
+     char suffix[32];
+     zval *vars[RAYDIUM_MAX_REG_VARIABLES]; 
+-    zend_file_handle file_handle;
++    zend_file_handle file_handle = { 0, };
+     zend_llist global_vars;
+     int i,nvars;
+ 
+@@ -168,10 +168,10 @@
+ 	raydium_log("php: ERROR: cannot post-open '%s' file",name);
+ 	return 0;
+ 	}
+-    file_handle.filename=name;
++    file_handle.filename = name;
+     file_handle.type = ZEND_HANDLE_FP;
+     file_handle.free_filename = 0;
+-    file_handle.opened_path = NULL;
++    file_handle.opened_path = estrdup(name);
+     
+ 
+ //    if(php_request_startup(CLS_C ELS_CC PLS_CC SLS_CC) == FAILURE) {
+@@ -280,7 +281,7 @@
+     }
+ 
+  php_request_shutdown(NULL);
+- raydium_sapi_module.shutdown(&raydium_sapi_module);
++ php_module_shutdown(TSRMLS_C);
+  return 1;
+ }
+ 

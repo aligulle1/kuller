@@ -1,0 +1,226 @@
+Index: konversation/src/konversationstatusbar.cpp
+===================================================================
+--- konversation/src/konversationstatusbar.cpp.orig
++++ konversation/src/konversationstatusbar.cpp
+@@ -22,6 +22,7 @@
+ #include <klocale.h>
+ #include <kiconloader.h>
+ #include <ksqueezedtextlabel.h>
++#include <networkstatusindicator.h>
+ 
+ 
+ KonversationStatusBar::KonversationStatusBar(KonversationMainWindow* window)
+@@ -57,6 +58,10 @@ KonversationStatusBar::KonversationStatu
+     m_window->statusBar()->addWidget(m_lagLabel, 0, true);
+     m_window->statusBar()->addWidget(m_sslLabel, 0, true);
+ 
++    StatusBarNetworkStatusIndicator * indicator = new StatusBarNetworkStatusIndicator( m_window, "netstatusindicator" );
++    m_window->statusBar()->addWidget( indicator, 0, false );
++    indicator->init();
++
+     QWhatsThis::add(m_window->statusBar(), i18n("<qt>The status bar shows various messages, including any problems connecting to the server.  On the far right the current delay to the server is shown.  The delay is the time it takes for messages from you to reach the server, and from the server back to you.</qt>"));
+ }
+ 
+Index: konversation/src/Makefile.am
+===================================================================
+--- konversation/src/Makefile.am.orig
++++ konversation/src/Makefile.am
+@@ -41,7 +41,7 @@ xdg_apps_DATA = konversation.desktop
+ INCLUDES= -Ilinkaddressbook -I$(srcdir)/linkaddressbook -Iblowfish -I$(srcdir)/blowfish\
+           -Iconfig -I$(srcdir)/config $(all_includes)
+ # the library search path.
+-konversation_LDFLAGS = $(all_libraries) $(KDE_RPATH)
++konversation_LDFLAGS = $(all_libraries) $(KDE_RPATH) -lconnectionmanager
+ 
+ rcdir = $(kde_datadir)/konversation
+ rc_DATA = konversationui.rc eventsrc
+Index: konversation/src/konversationapplication.cpp
+===================================================================
+--- konversation/src/konversationapplication.cpp.orig
++++ konversation/src/konversationapplication.cpp
+@@ -12,6 +12,7 @@
+   Copyright (C) 2005 John Tapsell <johnflux@gmail.com>
+   Copyright (C) 2005-2008 Eike Hein <hein@kde.org>
+ */
++#include <connectionmanager.h>
+ 
+ #include "konversationapplication.h"
+ #include "konversationmainwindow.h"
+@@ -81,7 +82,7 @@ int KonversationApplication::newInstance
+     {
+         connect(this, SIGNAL(shutDown()), this, SLOT(prepareShutdown()));
+ 
+-        m_connectionManager = new ConnectionManager(this);
++        m_connectionManager = new Konversation::ConnectionManager(this);
+ 
+         m_awayManager = new AwayManager(this);
+ 
+@@ -146,17 +147,20 @@ int KonversationApplication::newInstance
+ 
+         bool openServerList = Preferences::showServerList();
+ 
+-        // handle autoconnect on startup
+-        Konversation::ServerGroupList serverGroups = Preferences::serverGroupList();
++        if ( ConnectionManager::self()->status() == NetworkStatus::Online || ConnectionManager::self()->status() == NetworkStatus::NoNetworks ) {
+ 
+-        if (url.isEmpty() && !args->isSet("server"))
+-        {
+-            for (Konversation::ServerGroupList::iterator it = serverGroups.begin(); it != serverGroups.end(); ++it)
++            // handle autoconnect on startup
++            Konversation::ServerGroupList serverGroups = Preferences::serverGroupList();
++
++            if (url.isEmpty() && !args->isSet("server"))
+             {
+-                if ((*it)->autoConnectEnabled())
++                for (Konversation::ServerGroupList::iterator it = serverGroups.begin(); it != serverGroups.end(); ++it)
+                 {
+-                    openServerList = false;
+-                    m_connectionManager->connectTo(Konversation::CreateNewConnection, (*it)->id());
++                    if ((*it)->autoConnectEnabled())
++                    {
++                        openServerList = false;
++                        m_connectionManager->connectTo(Konversation::CreateNewConnection, (*it)->id());
++                    }
+                 }
+             }
+         }
+@@ -202,6 +206,9 @@ int KonversationApplication::newInstance
+                                           args->isSet("ssl"));
+     }
+ 
++    ConnectionManager::self()->registerConnectSlot( this, SLOT( networkConnected() ));
++    ConnectionManager::self()->registerDisconnectSlot( this, SLOT( networkDisconnected() ));
++
+     return KUniqueApplication::newInstance();
+ }
+ 
+@@ -882,6 +889,32 @@ QString KonversationApplication::doAutor
+   return line;
+ }
+ 
++void KonversationApplication::networkConnected()
++{
++    kdDebug() << k_funcinfo << endl;
++    Konversation::ServerGroupList serverGroups = Preferences::serverGroupList();
++
++    for (Konversation::ServerGroupList::iterator it = serverGroups.begin(); it != serverGroups.end(); ++it)
++    {
++        if ((*it)->autoConnectEnabled())
++        {
++            m_connectionManager->connectTo(Konversation::SilentlyReuseConnection, (*it)->id());
++        }
++    }
++}
++
++void KonversationApplication::networkDisconnected()
++{
++    kdDebug() << k_funcinfo << endl;
++    QPtrList<Server> serverList = getConnectionManager()->getServerList();
++    QPtrListIterator<Server> it( serverList );
++    Server * server;
++    while ( ( server = it.current() ) != 0 ) {
++        ++it;
++        server->disconnect();
++    }
++}
++
+ #include "konversationapplication.moc"
+ 
+ // kate: space-indent on; tab-width 4; indent-width 4; mixed-indent off; replace-tabs on;
+Index: konversation/src/konversationapplication.h
+===================================================================
+--- konversation/src/konversationapplication.h.orig
++++ konversation/src/konversationapplication.h
+@@ -21,13 +21,13 @@
+ #include "konvdcop.h"
+ #include "identity.h"
+ #include "nickinfo.h"
++#include "connectionmanager.h"
+ 
+ #include <kuniqueapplication.h>
+ 
+ 
+ class QCString;
+ 
+-class ConnectionManager;
+ class AwayManager;
+ class DccTransferManager;
+ class KonversationMainWindow;
+@@ -71,7 +71,7 @@ class KonversationApplication : public K
+          */
+         KonversationMainWindow* getMainWindow() { return mainWindow; }
+ 
+-        ConnectionManager* getConnectionManager() { return m_connectionManager; }
++        Konversation::ConnectionManager* getConnectionManager() { return m_connectionManager; }
+         AwayManager* getAwayManager() { return m_awayManager; }
+         DccTransferManager* getDccTransferManager() { return m_dccTransferManager; }
+ 
+@@ -144,10 +144,12 @@ class KonversationApplication : public K
+         void dcopSay(const QString& connection, const QString& target, const QString& command);
+         void dcopInfo(const QString& string);
+         void sendMultiServerCommand(const QString& command, const QString& parameter);
++        void networkConnected();
++        void networkDisconnected();
+ 
+ 
+     private:
+-        ConnectionManager* m_connectionManager;
++        Konversation::ConnectionManager* m_connectionManager;
+         AwayManager* m_awayManager;
+         DccTransferManager* m_dccTransferManager;
+         QStringList urlList;
+Index: konversation/src/connectionmanager.h
+===================================================================
+--- konversation/src/connectionmanager.h.orig
++++ konversation/src/connectionmanager.h
+@@ -20,6 +20,8 @@
+ 
+ class ConnectionSettings;
+ 
++namespace Konversation {
++
+ class ConnectionManager : public QObject
+ {
+     Q_OBJECT
+@@ -92,4 +94,6 @@ class ConnectionManager : public QObject
+         enum ConnectionDupe { SameServer, SameServerGroup };
+ };
+ 
++}
++
+ #endif
+Index: konversation/src/connectionmanager.cpp
+===================================================================
+--- konversation/src/connectionmanager.cpp.orig
++++ konversation/src/connectionmanager.cpp
+@@ -23,6 +23,7 @@
+ #include <klocale.h>
+ #include <kmessagebox.h>
+ 
++using namespace Konversation;
+ 
+ ConnectionManager::ConnectionManager(QObject* parent) : QObject(parent)
+ {
+Index: konversation/src/awaymanager.h
+===================================================================
+--- konversation/src/awaymanager.h.orig
++++ konversation/src/awaymanager.h
+@@ -16,8 +16,7 @@
+ #include <qobject.h>
+ #include <qdatetime.h>
+ 
+-
+-class ConnectionManager;
++#include "connectionmanager.h"
+ 
+ class QTimer;
+ 
+@@ -67,7 +66,7 @@ class AwayManager : public QObject
+ 
+         QValueList<int> m_identitiesOnAutoAway;
+ 
+-        ConnectionManager* m_connectionManager;
++        Konversation::ConnectionManager* m_connectionManager;
+ };
+ 
+ #endif

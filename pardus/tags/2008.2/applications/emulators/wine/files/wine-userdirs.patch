@@ -1,0 +1,92 @@
+Index: dlls/shell32/shellpath.c
+===================================================================
+--- dlls/shell32/shellpath.c.orig
++++ dlls/shell32/shellpath.c
+@@ -2012,7 +2012,6 @@ static void _SHCreateSymbolicLinks(void)
+     char szMyStuffTarget[FILENAME_MAX], *pszMyStuff;
+     char szDesktopTarget[FILENAME_MAX], *pszDesktop;
+     struct stat statFolder;
+-    const char *pszHome;
+     HRESULT hr;
+     const unsigned int num = sizeof(xdg_dirs) / sizeof(xdg_dirs[0]);
+     char ** xdg_results = NULL;
+@@ -2027,32 +2026,6 @@ static void _SHCreateSymbolicLinks(void)
+ 
+     XDG_UserDirLookup(xdg_dirs, num, &xdg_results);
+ 
+-    pszHome = getenv("HOME");
+-    if (pszHome && !stat(pszHome, &statFolder) && S_ISDIR(statFolder.st_mode)) {
+-        strcpy(szPersonalTarget, pszHome);
+-        if (_SHAppendToUnixPath(szPersonalTarget, MAKEINTRESOURCEW(IDS_PERSONAL)) &&
+-            !stat(szPersonalTarget, &statFolder) && S_ISDIR(statFolder.st_mode))
+-        {
+-            /* '$HOME/My Documents' exists. Create 'My Pictures', 'My Videos' and 
+-             * 'My Music' subfolders or fail silently if they already exist. */
+-            for (i = 0; i < sizeof(aidsMyStuff)/sizeof(aidsMyStuff[0]); i++) {
+-                strcpy(szMyStuffTarget, szPersonalTarget);
+-                if (_SHAppendToUnixPath(szMyStuffTarget, MAKEINTRESOURCEW(aidsMyStuff[i])))
+-                    mkdir(szMyStuffTarget, 0777);
+-            }
+-        } 
+-        else
+-        {
+-            /* '$HOME/My Documents' doesn't exists, but '$HOME' does. */ 
+-            strcpy(szPersonalTarget, pszHome);
+-        }
+-
+-        /* Replace 'My Documents' directory with a symlink of fail silently if not empty. */
+-        rmdir(pszPersonal);
+-        symlink(szPersonalTarget, pszPersonal);
+-    }
+-    else
+-    {
+         /* '$HOME' doesn't exist. Create 'My Pictures', 'My Videos' and 'My Music' subdirs
+          * in '%USERPROFILE%\\My Documents' or fail silently if they already exist. */
+         strcpy(szPersonalTarget, pszPersonal);
+@@ -2061,46 +2034,8 @@ static void _SHCreateSymbolicLinks(void)
+             if (_SHAppendToUnixPath(szMyStuffTarget, MAKEINTRESOURCEW(aidsMyStuff[i])))
+                 mkdir(szMyStuffTarget, 0777);
+         }
+-    }
+-
+-    /* Create symbolic links for 'My Pictures', 'My Video' and 'My Music'. */
+-    for (i=0; i < sizeof(aidsMyStuff)/sizeof(aidsMyStuff[0]); i++) {
+-        /* Create the current 'My Whatever' folder and get it's unix path. */
+-        hr = SHGetFolderPathW(NULL, acsidlMyStuff[i]|CSIDL_FLAG_CREATE, NULL,
+-                              SHGFP_TYPE_DEFAULT, wszTempPath);
+-        if (FAILED(hr)) continue;
+-        pszMyStuff = wine_get_unix_file_name(wszTempPath);
+-        if (!pszMyStuff) continue;
+-        
+-        strcpy(szMyStuffTarget, szPersonalTarget);
+-        if (_SHAppendToUnixPath(szMyStuffTarget, MAKEINTRESOURCEW(aidsMyStuff[i])) &&
+-            !stat(szMyStuffTarget, &statFolder) && S_ISDIR(statFolder.st_mode))
+-        {
+-            /* If there's a 'My Whatever' directory where 'My Documents' links to, link to it. */
+-            rmdir(pszMyStuff);
+-            symlink(szMyStuffTarget, pszMyStuff);
+-        } 
+-        else
+-        {
+-            rmdir(pszMyStuff);
+-            if (xdg_results && xdg_results[i])
+-            {
+-                /* the folder specified by XDG_XXX_DIR exists, link to it. */
+-                symlink(xdg_results[i], pszMyStuff);
+-            }
+-            else
+-            {
+-                /* Else link to where 'My Documents' itself links to. */
+-                symlink(szPersonalTarget, pszMyStuff);
+-            }
+-        }
+-        HeapFree(GetProcessHeap(), 0, pszMyStuff);
+-    }
+ 
+     /* Last but not least, the Desktop folder */
+-    if (pszHome)
+-        strcpy(szDesktopTarget, pszHome);
+-    else
+         strcpy(szDesktopTarget, pszPersonal);
+     HeapFree(GetProcessHeap(), 0, pszPersonal);
+ 

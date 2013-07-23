@@ -1,0 +1,192 @@
+<?xml version="1.0"?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>sane-backends</Name>
+        <Homepage>http://www.sane-project.org</Homepage>
+        <Packager>
+            <Name>Ekin Meroğlu</Name>
+            <Email>ekin@pardus.org.tr</Email>
+        </Packager>
+        <License>GPLv2</License>
+        <IsA>app:console</IsA>
+        <Summary>SANE Backends</Summary>
+        <Description>sane-backends contains SANE (Scanner Access Now Easy) backend files (communication and rule specifications for specific devices).</Description>
+        <Archive sha1sum="3b4d2ecde8be404bb44269771cf5dc6e4c10b086" type="targz">ftp://ftp.sane-project.org/pub/sane/sane-backends-1.0.20/sane-backends-1.0.20.tar.gz</Archive>
+        <BuildDependencies>
+            <Dependency>libieee1284</Dependency>
+            <Dependency>libgphoto2</Dependency>
+            <Dependency>libexif</Dependency>
+            <Dependency>libv4l</Dependency>
+            <Dependency>tetex</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <!-- fixes too small arrays in backend/niash.c -->
+            <Patch>fix-buffer-overflow.patch</Patch>
+
+            <!-- canon" backend do scanner auto-recognition -->
+            <Patch>canon-backend-autoprobing.patch</Patch>
+
+            <!-- Fix Canon LiDE 50 regression -->
+            <Patch level="1">Always-send-registers-before-trying-to-acquire-line.patch</Patch>
+
+            <!-- Avoid light check on Fujitsu ScanPartner 620C -->
+            <Patch level="1">0001-Avision-backend-Mark-FCPA-620C-with-AV_LIGHT_CHECK_B.patch</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>sane-backends</Name>
+        <RuntimeDependencies>
+            <Dependency>libieee1284</Dependency>
+            <Dependency>libgphoto2</Dependency>
+            <Dependency>libexif</Dependency>
+            <Dependency>libv4l</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="config">/etc</Path>
+            <Path fileType="header">/usr/include/sane</Path>
+            <Path fileType="library">/usr/lib</Path>
+            <Path fileType="executable">/usr/sbin</Path>
+            <Path fileType="executable">/usr/bin</Path>
+            <Path fileType="localedata">/usr/share/locale</Path>
+            <Path fileType="man">/usr/share/man</Path>
+            <Path fileType="data">/usr/share/sane</Path>
+            <Path fileType="data">/usr/share/hal</Path>
+            <Path fileType="doc">/usr/share/doc</Path>
+        </Files>
+        <AdditionalFiles>
+            <!-- a rules file comes with the sane 1.0.18, but dont create /dev/scanner symlink -->
+            <AdditionalFile owner="root" permission="0644" target="/etc/udev/rules.d/66-libsane.rules">66-libsane.rules</AdditionalFile>
+
+            <!-- a rules file for changing ownership of SCSI scanner device nodes -->
+            <AdditionalFile owner="root" permission="0644" target="/etc/udev/rules.d/67-libsane-scsi.rules">67-libsane-scsi.rules</AdditionalFile>
+            <!--
+                Regarding HAL:
+
+                Modify the generated tools/hal/libsane.fdi file as follows:
+                - Add a generic entry for SCSI scanners:
+
+                sed -i -e '/<device>/a<match key="info.category" string="scsi_generic">\n  <match key="@info.parent:scsi.type" string="scanner">\n    <append key="info.capabilities" type="strlist">scanner<\/append>\n  <\/match>\n<\/match>' tools/hal/libsane.fdi
+
+                - Replace 'key="info.bus" string="usb"' by  'key="info.bus" string="usb_device"', and replace 'key="usb.vendor_id"' by 'key="usb_device.vendor_id"', and replace 'key="usb.product_id"' by 'key="usb_device.product_id"', 
+                see the Novell/Suse Bugzilla bug, https://bugzilla.novell.com/show_bug.cgi?id=250659
+
+                sed -i -e '/key="info.bus"/s/string="usb"/string="usb_device"/' tools/hal/libsane.fdi
+                sed -i -e 's/key="usb.vendor_id"/key="usb_device.vendor_id"/' tools/hal/libsane.fdi
+                sed -i -e 's/key="usb.product_id"/key="usb_device.product_id"/' tools/hal/libsane.fdi
+
+                - Remove 'key="scanner.access_method"' lines.
+
+                sed -i -e '/key="scanner.access_method"/d' tools/hal/libsane.fdi
+
+                There is a small number of USB scanners which are not talked to via libusb. They talk an unusual protocol which is a derivative of usb storage. User space should treat them as SCSI scanners. Furthermore, granting access via libusb here could oops the kernel.Therefore USB user access for those scanners must be disabled.
+                See the Novell/Suse Bugzilla bug, https://bugzilla.novell.com/show_bug.cgi?id=341565
+
+                sed -i -e '/usb_device.vendor_id.*0x04ce/I,/append key/{/usb_device.product_id.*0x0300/I,/append key/s/scanner/SCSIviaUSBscanner/g}' tools/hal/libsane.fdi
+                for ID in 0094 0099 009a 00a0 00a3 80a3 80ac 00b6
+                    do sed -i -e "/usb_device.vendor_id.*0x05da/I,/append key/{/usb_device.product_id.*0x$ID/I,/append key/s/scanner/SCSIviaUSBscanner/g}" tools/hal/libsane.fdi
+                done
+            -->
+            <AdditionalFile owner="root" permission="0644" target="/usr/share/hal/fdi/policy/10osvendor/70-scanner.fdi">libsane.fdi</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/etc/env.d/30sane">30sane</AdditionalFile>
+        </AdditionalFiles>
+        <Provides>
+            <COMAR script="package.py">System.Package</COMAR>
+        </Provides>
+   </Package>
+
+   <History>
+        <Update release="13">
+            <Date>2009-06-17</Date>
+            <Version>1.0.20</Version>
+            <Comment>Version bump, add missing dependencies libexif and libv4l.</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="12">
+            <Date>2008-09-21</Date>
+            <Version>1.0.19</Version>
+            <Comment>Enable epkowa and brother2 backends by default.</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="11">
+            <Date>2008-09-12</Date>
+            <Version>1.0.19</Version>
+            <Comment>Add libsane-scsi.rules for correctly detecting SCSI scanners.</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="10">
+            <Date>2008-03-19</Date>
+            <Version>1.0.19</Version>
+            <Comment>Version bump</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="9">
+            <Date>2007-12-17</Date>
+            <Version>1.0.18</Version>
+            <Comment>Added HP Scanjet 3900 backend, fixes bug #6399</Comment>
+            <Name>Onur Küçük</Name>
+            <Email>onur@pardus.org.tr</Email>
+        </Update>
+        <Update release="8">
+            <Date>2007-05-31</Date>
+            <Version>1.0.18</Version>
+            <Comment>Fix Nikon Coolscan LS-30 scanning</Comment>
+            <Name>Onur Küçük</Name>
+            <Email>onur@pardus.org.tr</Email>
+        </Update>
+        <Update release="7">
+            <Date>2006-10-13</Date>
+            <Version>1.0.18</Version>
+            <Comment>Add hplip backend to default config file</Comment>
+            <Name>Onur Küçük</Name>
+            <Email>onur@pardus.org.tr</Email>
+        </Update>
+        <Update release="6">
+            <Date>2006-09-03</Date>
+            <Version>1.0.18</Version>
+            <Comment>Use pnp group</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="5">
+            <Date>2006-08-14</Date>
+            <Version>1.0.18</Version>
+            <Comment>udev rules corrected</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="4">
+            <Date>2006-08-10</Date>
+            <Version>1.0.18</Version>
+            <Comment>New version with more drivers</Comment>
+            <Name>Gürer Özen</Name>
+            <Email>gurer@pardus.org.tr</Email>
+        </Update>
+        <Update release="3">
+            <Date>2006-02-06</Date>
+            <Version>1.0.17</Version>
+            <Comment>Use udev luke!</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="2">
+            <Date>2006-02-06</Date>
+            <Version>1.0.17</Version>
+            <Comment>Version bump</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="1">
+            <Date>2005-11-29</Date>
+            <Version>1.0.16</Version>
+            <Comment>First release.</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+    </History>
+</PISI>

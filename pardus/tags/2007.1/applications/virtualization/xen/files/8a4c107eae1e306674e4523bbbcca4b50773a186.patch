@@ -1,0 +1,240 @@
+
+# HG changeset patch
+# User Ewan Mellor <ewan@xensource.com>
+# Date 1170080920 0
+# Node ID 8a4c107eae1e306674e4523bbbcca4b50773a186
+# Parent 0be1a43e8ec6d566d5ee5b838068add95937d50e
+Fix device reordering that occurs when the config gets read into dictionaries.
+Merging from unstable to 3.0.4
+
+Signed-off-by: Daniele Palumbo <daniele@retaggio.net>
+
+--- a/tools/python/xen/xend/XendConfig.py	Mon Jan 29 11:43:52 2007 +0000
++++ b/tools/python/xen/xend/XendConfig.py	Mon Jan 29 14:28:40 2007 +0000
+@@ -637,19 +637,11 @@ class XendConfig(dict):
+ 
+         # set device references in the configuration
+         self['devices'] = cfg.get('devices', {})
+-        
+-        self['console_refs'] = []
+-        self['vif_refs'] = []
+-        self['vbd_refs'] = []
+-        self['vtpm_refs'] = []
+-        for dev_uuid, (dev_type, dev_info) in self['devices'].items():
+-            if dev_type == 'vif':
+-                self['vif_refs'].append(dev_uuid)
+-            elif dev_type in ('vbd','tap'):
+-                self['vbd_refs'].append(dev_uuid)
+-            elif dev_type in ('vtpm',):
+-                self['vtpm_refs'].append(dev_uuid)
+-        
++        self['console_refs'] = cfg.get('console_refs', [])
++        self['vif_refs'] = cfg.get('vif_refs', [])
++        self['vbd_refs'] = cfg.get('vbd_refs', [])
++        self['vtpm_refs'] = cfg.get('vtpm_refs', [])
++
+ 
+     def _sxp_to_xapi_unsupported(self, sxp_cfg):
+         """Read in an SXP configuration object and populate
+@@ -965,8 +957,8 @@ class XendConfig(dict):
+                 
+                 dev_uuid = cfg_xenapi.get('uuid', uuid.createString())
+                 dev_info['uuid'] = dev_uuid
+-                self['devices'][dev_uuid] = (dev_type, dev_info)
+-                self['vif_refs'].append(dev_uuid)
++                target['devices'][dev_uuid] = (dev_type, dev_info)
++                target['vif_refs'].append(dev_uuid)
+                 return dev_uuid
+             
+             elif dev_type in ('vbd', 'tap'):
+@@ -987,8 +979,8 @@ class XendConfig(dict):
+ 
+                 dev_uuid = cfg_xenapi.get('uuid', uuid.createString())
+                 dev_info['uuid'] = dev_uuid
+-                self['devices'][dev_uuid] = (dev_type, dev_info)
+-                self['vbd_refs'].append(dev_uuid)                
++                target['devices'][dev_uuid] = (dev_type, dev_info)
++                target['vbd_refs'].append(dev_uuid)                
+                 return dev_uuid
+ 
+             elif dev_type in ('vtpm'):
+@@ -997,8 +989,8 @@ class XendConfig(dict):
+ 
+                 dev_uuid = cfg_xenapi.get('uuid', uuid.createString())
+                 dev_info['uuid'] = dev_uuid
+-                self['devices'][dev_uuid] = (dev_type, dev_info)
+-                self['vtpm_refs'].append(dev_uuid)
++                target['devices'][dev_uuid] = (dev_type, dev_info)
++                target['vtpm_refs'].append(dev_uuid)
+                 return dev_uuid
+ 
+         return ''
+@@ -1045,6 +1037,14 @@ class XendConfig(dict):
+ 
+         return sxpr
+ 
++    def ordered_device_refs(self):
++        result = (self['console_refs'] +
++                  self['vbd_refs'] +
++                  self['vif_refs'] +
++                  self['vtpm_refs'])
++        result.extend([u for u in self['devices'].keys() if u not in result])
++        return result
++
+     def all_devices_sxpr(self):
+         """Returns the SXPR for all devices in the current configuration."""
+         sxprs = []
+@@ -1053,7 +1053,9 @@ class XendConfig(dict):
+         if 'devices' not in self:
+             return sxprs
+         
+-        for dev_type, dev_info in self['devices'].values():
++        ordered_refs = self.ordered_device_refs()
++        for dev_uuid in ordered_refs:
++            dev_type, dev_info = self['devices'][dev_uuid]
+             if dev_type == 'pci': # special case for pci devices
+                 sxpr = [['uuid', dev_info['uuid']]]
+                 for pci_dev_info in dev_info['devs']:
+--- a/tools/python/xen/xend/XendDomainInfo.py	Mon Jan 29 11:43:52 2007 +0000
++++ b/tools/python/xen/xend/XendDomainInfo.py	Mon Jan 29 14:28:40 2007 +0000
+@@ -1189,8 +1189,10 @@ class XendDomainInfo:
+ 
+         @raise: VmError for invalid devices
+         """
+-        for (devclass, config) in self.info.get('devices', {}).values():
+-            if devclass in XendDevices.valid_devices():            
++        ordered_refs = self.info.ordered_device_refs()
++        for dev_uuid in ordered_refs:
++            devclass, config = self.info['devices'][dev_uuid]
++            if devclass in XendDevices.valid_devices():
+                 log.info("createDevice: %s : %s" % (devclass, scrub_password(config)))
+                 self._createDevice(devclass, config)
+ 
+--- a/tools/python/xen/xend/image.py	Mon Jan 29 11:43:52 2007 +0000
++++ b/tools/python/xen/xend/image.py	Mon Jan 29 14:28:40 2007 +0000
+@@ -317,7 +317,7 @@ class HVMImageHandler(ImageHandler):
+             raise VmError("HVM guest support is unavailable: is VT/AMD-V "
+                           "supported by your CPU and enabled in your BIOS?")
+ 
+-        self.dmargs = self.parseDeviceModelArgs(imageConfig, deviceConfig)
++        self.dmargs = self.parseDeviceModelArgs(vmConfig)
+         self.device_model = imageConfig['hvm'].get('device_model')
+         if not self.device_model:
+             raise VmError("hvm: missing device model")
+@@ -367,12 +367,12 @@ class HVMImageHandler(ImageHandler):
+ 
+     # Return a list of cmd line args to the device models based on the
+     # xm config file
+-    def parseDeviceModelArgs(self, imageConfig, deviceConfig):
++    def parseDeviceModelArgs(self, vmConfig):
+         dmargs = [ 'boot', 'fda', 'fdb', 'soundhw',
+                    'localtime', 'serial', 'stdvga', 'isa', 'vcpus',
+                    'acpi', 'usb', 'usbdevice', 'keymap' ]
+         ret = []
+-        hvmDeviceConfig = imageConfig['hvm']['devices']
++        hvmDeviceConfig = vmConfig['image']['hvm']['devices']
+         
+         for a in dmargs:
+             v = hvmDeviceConfig.get(a)
+@@ -401,29 +401,32 @@ class HVMImageHandler(ImageHandler):
+         ret = ret + ["-domain-name", str(self.vm.info['name_label'])]
+         nics = 0
+         
+-        for devuuid, (devtype, devinfo) in deviceConfig.items():
+-            if devtype == 'vbd':
+-                uname = devinfo.get('uname')
+-                if uname is not None and 'file:' in uname:
+-                    (_, vbdparam) = string.split(uname, ':', 1)
+-                    if not os.path.isfile(vbdparam):
+-                        raise VmError('Disk image does not exist: %s' %
+-                                      vbdparam)
+-            if devtype == 'vif':
+-                dtype = devinfo.get('type', 'ioemu')
+-                if dtype != 'ioemu':
+-                    continue
+-                nics += 1
+-                mac = devinfo.get('mac')
+-                if mac == None:
+-                    mac = randomMAC()
+-                bridge = devinfo.get('bridge', 'xenbr0')
+-                model = devinfo.get('model', 'rtl8139')
+-                ret.append("-net")
+-                ret.append("nic,vlan=%d,macaddr=%s,model=%s" %
+-                           (nics, mac, model))
+-                ret.append("-net")
+-                ret.append("tap,vlan=%d,bridge=%s" % (nics, bridge))
++        for devuuid in vmConfig['vbd_refs']:
++            devinfo = vmConfig['devices'][devuuid][1]
++            uname = devinfo.get('uname')
++            if uname is not None and 'file:' in uname:
++                (_, vbdparam) = string.split(uname, ':', 1)
++                if not os.path.isfile(vbdparam):
++                    raise VmError('Disk image does not exist: %s' %
++                                  vbdparam)
++
++        for devuuid in vmConfig['vif_refs']:
++            devinfo = vmConfig['devices'][devuuid][1]
++            dtype = devinfo.get('type', 'ioemu')
++            if dtype != 'ioemu':
++                continue
++            nics += 1
++            mac = devinfo.get('mac')
++            if mac is None:
++                mac = randomMAC()
++            bridge = devinfo.get('bridge', 'xenbr0')
++            model = devinfo.get('model', 'rtl8139')
++            ret.append("-net")
++            ret.append("nic,vlan=%d,macaddr=%s,model=%s" %
++                       (nics, mac, model))
++            ret.append("-net")
++            ret.append("tap,vlan=%d,bridge=%s" % (nics, bridge))
++
+         return ret
+ 
+     def configVNC(self, imageConfig):
+--- /dev/null	Thu Jan 01 00:00:00 1970 +0000
++++ b/tools/python/xen/xend/tests/test_XendConfig.py	Mon Jan 29 14:28:40 2007 +0000
+@@ -0,0 +1,42 @@
++import unittest
++
++import xen.xend.XendConfig as XendConfig
++
++
++class test_XendConfig(unittest.TestCase):
++
++    def testParseFromSXP(self):
++        cfg = XendConfig.XendConfig(
++            sxp_obj = (
++            ['vm',
++             ['bootloader_args', '-q --default_args="root=/dev/sda1 ro" --extra_args="quiet" /images/VM1.sda'],
++                       ['bootloader', '/usr/bin/pygrub'],
++             ['device', ['vif', ['mac', '00:16:3E:4C:D1:00'], ['script', 'vif-bridge'], ['bridge', 'xenbr0']]],
++             ['device', ['vif', ['mac', '00:16:3E:48:56:26'], ['script', 'vif-bridge'], ['bridge', 'vbridge0']]],
++             ['device', ['vbd', ['uname', 'phy:/images/VM1.sda'], ['dev', 'sda'], ['mode', 'w']]],
++             ['device', ['vbd', ['uname', 'phy:/images/VM1.sdb'], ['dev', 'sdb'], ['mode', 'w']]],
++             ['memory', '256'], ['name', 'VM1'], ['on_crash', 'restart'],
++             ['uuid', '10927a76-fe27-49b2-8f57-2970b7bbed6c'], ['vcpus', '1']
++             ]))
++
++        self.assertEqual(cfg['uuid'], '10927a76-fe27-49b2-8f57-2970b7bbed6c')
++        self.assertEqual(cfg['name_label'], 'VM1')
++        self.assertEqual(cfg['memory_static_max'], 256)
++
++        ordered_refs = cfg.ordered_device_refs()
++        self.assertEqual(cfg['devices'][ordered_refs[0]][0], 'vbd')
++        self.assertEqual(cfg['devices'][ordered_refs[1]][0], 'vbd')
++        self.assertEqual(cfg['devices'][ordered_refs[2]][0], 'vif')
++        self.assertEqual(cfg['devices'][ordered_refs[3]][0], 'vif')
++        self.assertEqual(cfg['devices'][ordered_refs[0]][1]['uname'],
++                         'phy:/images/VM1.sda')
++        self.assertEqual(cfg['devices'][ordered_refs[1]][1]['uname'],
++                         'phy:/images/VM1.sdb')
++        self.assertEqual(cfg['devices'][ordered_refs[2]][1]['mac'],
++                         '00:16:3E:4C:D1:00')
++        self.assertEqual(cfg['devices'][ordered_refs[3]][1]['mac'],
++                         '00:16:3E:48:56:26')
++
++
++def test_suite():
++    return unittest.makeSuite(test_XendConfig)
+

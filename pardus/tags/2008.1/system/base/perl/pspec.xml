@@ -1,0 +1,203 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>perl</Name>
+        <Homepage>http://www.perl.org/</Homepage>
+        <Packager>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Packager>
+        <License>Artistic</License>
+        <License>GPLv2</License>
+        <IsA>app:console</IsA>
+        <Summary>Larry Wall's Practical Extraction and Reporting Language</Summary>
+        <Archive sha1sum="adf73606dd5248af7ccdd735bcaa0e628ea75b3c" type="targz">mirrors://cpan/authors/id/R/RG/RGARCIA/perl-5.10.0.tar.gz</Archive>
+        <BuildDependencies>
+            <Dependency>groff</Dependency>
+            <Dependency>db4</Dependency>
+            <Dependency versionFrom="1.8.3">gdbm</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <Patch>perl-5.8.5-prelink-lpthread.patch</Patch>
+            <Patch>perl-5.8.5-picdl.patch</Patch>
+            <Patch>pod-disable-locale.patch</Patch>
+            <Patch level="1">perl-5.8.5-noksh.patch</Patch>
+            <!-- http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=474613 -->
+            <Patch level="1">debug-crash.patch</Patch>
+            <!-- rmtree sets symlink target permission to 777, which is vulnerable for system to symlink attack -->
+            <!-- http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=487319 -->
+            <Patch level="1">12_fix_file_path_rmtree_chmod.patch</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>perl-doc</Name>
+            <PartOf>programming.languages.perl</PartOf>
+            <Files>
+                <Path fileType="doc">/usr/share/doc/</Path>
+                <Path fileType="man">/usr/share/man/</Path>
+            </Files>
+    </Package>
+
+    <Package>
+        <Name>perl</Name>
+        <RuntimeDependencies>
+            <Dependency>db4</Dependency>
+            <Dependency versionFrom="1.8.3">gdbm</Dependency>
+        </RuntimeDependencies>
+        <Replaces>
+            <Package>libperl</Package>
+        </Replaces>
+        <Files>
+            <Path fileType="executable">/usr/bin</Path>
+            <Path fileType="library">/usr/lib</Path>
+        </Files>
+        <AdditionalFiles>
+            <AdditionalFile owner="root" permission="0644" target="/usr/lib/perl5/vendor_perl/5.10.0/Turkish.pm">Turkish.pm</AdditionalFile>
+        </AdditionalFiles>
+    </Package>
+
+    <History>
+        <Update release="20" type="security">
+            <Date>2008-06-22</Date>
+            <Version>5.10.0</Version>
+            <Comment>Fix File::Path::Rmtree behaviour. Rmtree sets symlink target to 777.</Comment>
+            <Name>Eren Türkay</Name>
+            <Email>turkay.eren@gmail.com</Email>
+        </Update>
+        <Update release="19">
+            <Date>2008-04-26</Date>
+            <Version>5.10.0</Version>
+            <Comment>Fix 'debugperl -Dm -e 1' segfaults </Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="18">
+            <Date>2007-12-18</Date>
+            <Version>5.10.0</Version>
+            <Comment>Version bump</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="17">
+            <Date>2007-11-13</Date>
+            <Version>5.8.8</Version>
+            <Comment>Enable threading and merge some changes from Fedora</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="16" type="security">
+            <Date>2007-11-05</Date>
+            <Version>5.8.8</Version>
+            <Comment>Fix CVE-2007-5116</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="15">
+            <Date>2007-05-11</Date>
+            <Version>5.8.8</Version>
+            <Comment>Fix Turkish.pm</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="14">
+            <Date>2007-01-18</Date>
+            <Version>5.8.8</Version>
+            <Comment>Fix compilation with gcc 4.2</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="13">
+            <Date>2006-11-25</Date>
+            <Version>5.8.8</Version>
+            <Comment>Fix #59</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="12">
+            <Date>2006-07-01</Date>
+            <Version>5.8.8</Version>
+            <Comment>perldoc doesnt belong to system.base</Comment>
+            <Name>Gürer Özen</Name>
+            <Email>gurer@pardus.org.tr</Email>
+        </Update>
+        <Update release="11">
+            <Date>2006-06-29</Date>
+            <Version>5.8.8</Version>
+            <Comment>Remove duplicate man pages</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="10">
+            <Date>2006-06-12</Date>
+            <Version>5.8.8</Version>
+            <Comment>Fix upstream bugs</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="9" type="security">
+            <Date>2006-04-28</Date>
+            <Version>5.8.8</Version>
+            <Comment>Merge libperl and perl packages, provide suid perl, add some patches</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="8">
+            <Date>2006-02-01</Date>
+            <Version>5.8.8</Version>
+            <Comment>New stable release</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="7">
+            <Date>2005-12-20</Date>
+            <Version>5.8.7</Version>
+            <Comment>Unnecessary .ph file generation at the postInstall removed.</Comment>
+            <Name>Gürer Özen</Name>
+            <Email>gurer@pardus.org.tr</Email>
+        </Update>
+        <Update release="6" type="security">
+            <Date>2005-12-13</Date>
+            <Version>5.8.7</Version>
+            <Comment>Revise fix for CVE-2005-3962 and combine it with a fix for CVE-2005-3912</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="5" type="security">
+            <Date>2005-12-02</Date>
+            <Version>5.8.7</Version>
+            <Comment>Fix CVE-2005-3962</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="4">
+            <Date>2005-10-30</Date>
+            <Version>5.8.7</Version>
+            <Comment>typo fix</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="3" type="security">
+            <Date>2005-10-27</Date>
+            <Version>5.8.7</Version>
+            <Comment>Update to version 5.8.7 and fix CAN-2005-0448</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="2">
+            <Date>2005-10-12</Date>
+            <Version>5.8.5</Version>
+            <Comment>dosed functions in action.py fixed.</Comment>
+            <Name>A. Murat Eren</Name>
+            <Email>meren@pardus.org.tr</Email>
+        </Update>
+        <Update release="1">
+            <Date>2005-08-17</Date>
+            <Version>5.8.5</Version>
+            <Comment>First release.</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+    </History>
+</PISI>

@@ -1,0 +1,56 @@
+Index: kchmviewer-4.1/src/kchmmainwindow.cpp
+===================================================================
+--- kchmviewer-4.1.orig/src/kchmmainwindow.cpp
++++ kchmviewer-4.1/src/kchmmainwindow.cpp
+@@ -31,6 +31,9 @@
+ 
+ #include "kde-qt.h"
+ 
++#include <kio/netaccess.h>
++#include <KUrl>
++
+ #include "libchmfile.h"
+ #include "libchmfileimpl.h"
+ #include "libchmurlfactory.h"
+@@ -147,8 +149,22 @@ bool KCHMMainWindow::loadFile ( const QS
+ 		fileName.remove( 0, 7 );
+ 			
+ 	LCHMFile * new_chmfile = new LCHMFile();
++	const KUrl url = KIO::NetAccess::mostLocalUrl(fileName, this);
++	QString localFile;
+ 	
+-	if ( new_chmfile->loadFile( fileName ) )
++	if ( url.isLocalFile() )
++	{
++		localFile = url.path();
++	}
++	else
++	{
++		if ( !KIO::NetAccess::download( url, localFile, this ) )
++		{
++			localFile = fileName;
++		}
++	}
++
++	if ( new_chmfile->loadFile( localFile ) )
+ 	{
+ 		// The new file is opened, so we can close the old one
+ 		if ( m_chmFile )
+@@ -166,7 +182,7 @@ bool KCHMMainWindow::loadFile ( const QS
+ 
+ 		// Make the file name absolute; we'll need it later
+ 		QDir qd;
+-		qd.setPath (fileName);
++		qd.setPath (localFile);
+ 		m_chmFilename = qd.absolutePath();
+ 		
+ 		// Qt's 'dirname' does not work well
+@@ -484,6 +500,8 @@ void KCHMMainWindow::closeFile( )
+ 	}
+ 	
+ 	appConfig.save();
++
++	KIO::NetAccess::removeTempFile( m_chmFilename );
+ }
+ 
+ 

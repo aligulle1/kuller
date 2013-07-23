@@ -1,0 +1,38 @@
+Index: plasma/view.cpp
+===================================================================
+--- plasma/view.cpp.orig
++++ plasma/view.cpp
+@@ -230,9 +230,12 @@ void View::setContainment(Plasma::Contai
+     int otherScreen = containment->screen();
+     int otherDesktop = containment->desktop();
+ 
++
+     if (screen > -1) {
+         d->lastScreen = screen;
+         d->lastDesktop = desktop;
++        oldContainment->setScreen(-1, -1);
++        containment->setScreen(-1, -1);
+         containment->setScreen(screen, desktop);
+     } else {
+         d->lastScreen = otherScreen;
+@@ -244,6 +247,7 @@ void View::setContainment(Plasma::Contai
+         oldContainment->setScreen(otherScreen, otherDesktop);
+     }
+ 
++
+     /*
+     if (oldContainment) {
+         kDebug() << "old" << (QObject*)oldContainment << screen << oldContainment->screen()
+Index: plasma/containment.cpp
+===================================================================
+--- plasma/containment.cpp.orig
++++ plasma/containment.cpp
+@@ -809,7 +809,7 @@ void Containment::setScreen(int newScree
+         newDesktop = -1;
+     }
+ 
+-    kDebug() << "setting screen to " << newScreen << newDesktop << "and type is" << containmentType();
++    kDebug() << activity() << "setting screen to " << newScreen << newDesktop << "and type is" << d->type;
+ 
+     Containment *swapScreensWith(0);
+     if (d->type == DesktopContainment || d->type >= CustomContainment) {

@@ -1,0 +1,1215 @@
+diff -Naur XBMC.orig/configure.in XBMC/configure.in
+--- XBMC.orig/configure.in	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/configure.in	2009-01-09 13:32:31.000000000 +0200
+@@ -165,7 +165,7 @@
+ fi
+ 
+ if test "$host_cpu" = "powerpc" ; then
+-  AC_CHECK_LIB([python2.4], [main],, AC_MSG_ERROR(== Could not find a required library. Please see README.linux) )
++  AC_CHECK_LIB([python2.5], [main],, AC_MSG_ERROR(== Could not find a required library. Please see README.linux) )
+ fi
+ 
+ AC_CHECK_PROG(HAVE_GAWK,gawk,"yes","no",)
+@@ -335,11 +335,9 @@
+ AC_SUBST(SDL_DEFINES)
+ AC_SUBST(LZO_INCLUDES)
+ AC_CONFIG_FILES([Makefile Makefile.include]
+-                [xbmc/lib/libPython/linux/Makefile]
+                 [xbmc/lib/libUPnP/Makefile]
+                 [tools/Linux/xbmc.sh]
+                 [tools/XBMCTex/Makefile]
+-                [xbmc/cores/dvdplayer/Codecs/Makefile]
+                 [xbmc/lib/cximage-6.0/Makefile]
+                 [xbmc/cores/paplayer/MACDll/Makefile]
+                 [xbmc/cores/paplayer/MIDCodec/Makefile]
+@@ -349,23 +347,18 @@
+                 [xbmc/cores/paplayer/ModuleCodec/vc6/dumb/Makefile]
+                 [xbmc/cores/paplayer/GYMCodec/Makefile]
+                 [xbmc/cores/paplayer/MP3Codec/Makefile]
+-                [xbmc/cores/paplayer/MPCCodec/xbmc/Makefile]
+                 [xbmc/cores/paplayer/NSFCodec/Makefile]
+-                [xbmc/cores/paplayer/SIDCodec/Makefile]
+ 		[xbmc/cores/paplayer/vgmstream/Makefile]
+                 [xbmc/cores/paplayer/SPCCodec/SNES/SNESAPU/Makefile]
+-                [xbmc/cores/paplayer/vorbisfile/Makefile]
+                 [xbmc/cores/paplayer/WavPackCodec/Makefile]
+                 [xbmc/cores/paplayer/YMCodec/StSoundLibrary/Makefile]
+                 [xbmc/lib/libXBMS/Makefile]
+                 [xbmc/lib/libRTV/Makefile]
+-                [xbmc/lib/libexif/Makefile]
+                 [xbmc/lib/libXDAAP/Makefile]
+                 [xbmc/lib/libass/xbmc/Makefile]
+ 		[xbmc/lib/libhdhomerun/Makefile]
+ 		[xbmc/lib/libGoAhead/Makefile]
+ 		[xbmc/lib/libshout/Makefile]
+-		[xbmc/lib/libid3tag/Makefile]
+ 		[xbmc/DllPaths_generated.h]
+ )
+ 
+@@ -386,103 +379,7 @@
+ ])
+ ])
+ 
+-XB_CONFIG_MODULE([xbmc/lib/libPython/Python], [
+-  ./configure \
+-    --enable-ipv6 \
+-    --enable-unicode=ucs4 \
+-    --without-cxx \
+-    --enable-shared \
+-    --without-pymalloc \
+-    --prefix=`pwd`/../linux/python-lib MACOSX_DEPLOYMENT_TARGET=10.5 CFLAGS=-fPIC &&
+-  sed -i -e "s/define HAVE_GETC_UNLOCKED 1/undef HAVE_GETC_UNLOCKED/" pyconfig.h &&
+-  cp pyconfig.h Include
+-])
+-XB_CONFIG_MODULE([xbmc/cores/paplayer/MPCCodec], [./configure])
+-XB_CONFIG_MODULE([xbmc/cores/paplayer/flac-1.2.1], [
+-  ./configure -C \
+-    --with-pic \
+-    --disable-asm-optimizations \
+-    --disable-xmms-plugin \
+-    --disable-cpplibs \
+-    CC="$CC" \
+-    CXX="$CXX" && \
+-    sed -ie s/__DECLARE__XBMC__ARCH__/$ARCH/ Makefile
+-])
+-XB_CONFIG_MODULE([xbmc/cores/paplayer/vorbisfile/libvorbis], [./configure --with-pic])
+-XB_CONFIG_MODULE([xbmc/cores/paplayer/vorbisfile/ogg], [./configure --with-pic])
+-XB_CONFIG_MODULE([xbmc/cores/dvdplayer/Codecs/ffmpeg], [
+-    ./configure \
+-    --extra-cflags="-D_XBOX" \
+-    --disable-static \
+-    --disable-altivec \
+-    --disable-vhook \
+-    --disable-ipv6 \
+-    --disable-debug \
+-    --disable-muxers \
+-    --disable-encoders \
+-    --disable-devices \
+-    --disable-ffplay \
+-    --disable-ffserver \
+-    --disable-ffmpeg \
+-    --enable-shared \
+-    --enable-postproc \
+-    --enable-gpl \
+-    --enable-swscale \
+-    --enable-protocol=http \
+-    --enable-pthreads
+-])
+-XB_CONFIG_MODULE([xbmc/cores/dvdplayer/Codecs/libdts], [
+-  ./configure \
+-    --disable-oss \
+-    --disable-solaris-adio \
+-    --disable-al-audio \
+-    --disable-win \
+-    CFLAGS="-fPIC"
+-])
+-XB_CONFIG_MODULE([xbmc/cores/dvdplayer/Codecs/libDVDCSS], [
+-  ./configure \
+-    --enable-static \
+-    --disable-shared \
+-    --with-pic
+-])
+-XB_CONFIG_MODULE([xbmc/cores/dvdplayer/Codecs/libdvdnav], [
+-  ./configure \
+-    --enable-static \
+-    --disable-shared \
+-    --with-pic \
+-    CFLAGS="-D_XBOX -DHAVE_DVDCSS_DVDCSS_H"
+-])
+-XB_CONFIG_MODULE([xbmc/cores/dvdplayer/Codecs/libfaad2], [
+-  ./configure \
+-    --with-pic \
+-    --with-mp4v2 \
+-    CFLAGS="-O3"
+-])
+-XB_CONFIG_MODULE([xbmc/cores/dvdplayer/Codecs/liba52], [
+-  ./configure \
+-  --with-pic \
+-  --disable-static \
+-  --enable-shared \
+-  --disable-oss \
+-  --disable-solaris-audio \
+-  --disable-win \
+-  --disable-al-audio \
+-  CFLAGS=-fPIC
+-])
+-XB_CONFIG_MODULE([xbmc/cores/dvdplayer/Codecs/libmpeg2], [
+-  ./configure \
+-  --with-pic \
+-  --disable-static \
+-  --enable-shared \
+-  --disable-directx \
+-  --disable-sdl \
+-  --without-x \
+-])
+-XB_CONFIG_MODULE([xbmc/cores/dvdplayer/Codecs/libmad], [./configure --with-pic])
+-XB_CONFIG_MODULE([xbmc/lib/cximage-6.0/zlib], [CFLAGS=-fPIC ./configure])
+ XB_CONFIG_MODULE([xbmc/lib/libass], [CFLAGS=-fPIC ./configure])
+-XB_CONFIG_MODULE([xbmc/lib/libid3tag/libid3tag],[CFLAGS=-O3 ./configure --disable-static --disable-debugging --with-pic])
+-XB_CONFIG_MODULE([xbmc/visualizations/XBMCProjectM/libprojectM],[rm -f CMakeCache.txt && CC="" CXX="" cmake -D CMAKE_BUILD_TYPE:STRING=RelWithDebInfo -D USE_FTGL:BOOL=OFF .])
+ XB_CONFIG_MODULE([xbmc/visualizations/Goom/goom2k4-0],[./configure --disable-shared --enable-static --with-pic])
+ XB_CONFIG_MODULE([xbmc/screensavers/rsxs-0.9/], [CFLAGS=-fPIC CXXFLAGS=-fPIC ./configure --without-xscreensaver --disable-sound --disable-cyclone --disable-fieldlines --disable-flocks --disable-flux --disable-helios --disable-hyperspace --disable-lattice --disable-skyrocket])
+ 
+diff -Naur XBMC.orig/Makefile.in XBMC/Makefile.in
+--- XBMC.orig/Makefile.in	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/Makefile.in	2009-01-09 18:27:16.000000000 +0200
+@@ -41,7 +41,6 @@
+ 	tools/XBMCTex
+ 
+ DVDPCODECS_DIRS= \
+-	xbmc/cores/dvdplayer/Codecs \
+ 	xbmc/lib/libass/xbmc \
+ 
+ PAPCODECS_DIRS= \
+@@ -50,25 +49,18 @@
+ 	xbmc/cores/paplayer/AACCodec \
+ 	xbmc/cores/paplayer/NSFCodec \
+ 	xbmc/cores/paplayer/MIDCodec \
+-	xbmc/cores/paplayer/SIDCodec \
+ 	xbmc/cores/paplayer/WavPackCodec \
+ 	xbmc/cores/paplayer/GYMCodec \
+ 	xbmc/cores/paplayer/YMCodec/StSoundLibrary \
+ 	xbmc/cores/paplayer/ModuleCodec/vc6/dumb \
+-	xbmc/cores/paplayer/MPCCodec/xbmc \
+ 	xbmc/cores/paplayer/SPCCodec/SNES/SNESAPU \
+ 	xbmc/cores/paplayer/vgmstream \
+ 	xbmc/cores/paplayer/MP3Codec \
+-	xbmc/cores/paplayer/flac-1.2.1/ \
+-	xbmc/cores/paplayer/MACDll \
+-	xbmc/cores/paplayer/vorbisfile
++	xbmc/cores/paplayer/MACDll
+ 
+ LIB_DIRS=\
+ 	xbmc/lib/cximage-6.0 \
+-	xbmc/lib/libexif \
+-	xbmc/lib/libhdhomerun \
+-	xbmc/lib/libid3tag \
+-	xbmc/lib/libPython/linux
++	xbmc/lib/libhdhomerun
+ 
+ SS_DIRS=\
+ 	xbmc/screensavers/rsxs-0.9/xbmc
+@@ -76,7 +68,6 @@
+ VIS_DIRS=\
+ 	xbmc/visualizations/OpenGLSpectrum \
+ 	xbmc/visualizations/WaveForm \
+-	xbmc/visualizations/XBMCProjectM \
+ 	xbmc/visualizations/Goom
+ 
+ PM3_MEDIA=skin/Project\ Mayhem\ III/media
+@@ -85,7 +76,7 @@
+ DIRS= $(BIN_DIRS) $(EC_DIRS) $(XBMCTEX_DIRS) $(DVDPCODECS_DIRS) $(PAPCODECS_DIRS) \
+ 			$(LIB_DIRS) $(SS_DIRS) $(VIS_DIRS)
+ 
+-LIBS=@LIBS@
++LIBS=@LIBS@ -lpthread -ldl -lutil -lm -lpython2.5 -lhardsid-builder -lresid-builder -lsidplay2 -lsidutils -lid3tag -lprojectM -lmpcdec -lexif -ldca -lavcodec -lavdevice -lavformat -lavutil -lpostproc -lswscale -logg -lvorbis -lvorbisfile -lFLAC -ldvdcss -ldvdnav -lfaad -lFLAC -la52 -lmpeg2 -lmad 
+ DEBUG_FLAGS=@DEBUG_FLAGS@
+ CFLAGS=@CFLAGS@
+ CXXFLAGS=@CXXFLAGS@
+@@ -134,7 +125,6 @@
+ visualizations: exports
+ 	$(MAKE) -C xbmc/visualizations/OpenGLSpectrum
+ 	$(MAKE) -C xbmc/visualizations/WaveForm
+-	$(MAKE) -C xbmc/visualizations/XBMCProjectM
+ 	$(MAKE) -C xbmc/visualizations/Goom
+ screensaver-interface: 
+ 	$(MAKE) -C xbmc/screensavers
+@@ -155,8 +145,6 @@
+ libpython: dllloader
+ 	$(MAKE) -C xbmc/lib/libPython
+ 	$(MAKE) -C xbmc/lib/libPython/xbmcmodule
+-python:
+-	$(MAKE) -C xbmc/lib/libPython/linux
+ libgoahead: 
+ 	$(MAKE) -C xbmc/lib/libGoAhead
+ libupnp: 
+@@ -166,7 +154,6 @@
+ 	$(MAKE) -C xbmc/cores/VideoRenderers 
+ 	$(MAKE) -C xbmc/cores/VideoRenderers/VideoShaders 
+ dvdpcodecs: dllloader
+-	$(MAKE) -C xbmc/cores/dvdplayer/Codecs
+ 	$(MAKE) -C xbmc/lib/libass/xbmc
+ cdrip:
+ 	$(MAKE) -C xbmc/cdrip
+@@ -178,8 +165,6 @@
+ 	$(MAKE) -C xbmc/lib/libRTMP
+ libxbms:
+ 	$(MAKE) -C xbmc/lib/libXBMS
+-libexif: dllloader
+-	$(MAKE) -C xbmc/lib/libexif
+ librtv:
+ 	$(MAKE) -C xbmc/lib/libRTV
+ libxdaap:
+@@ -188,13 +173,10 @@
+ 	$(MAKE) -C xbmc/lib/libhdhomerun
+ libshout:
+ 	$(MAKE) -C xbmc/lib/libshout
+-libid3tag: dllloader
+-	$(MAKE) -C xbmc/lib/libid3tag
+ papcodecs: dllloader linux dvdpcodecs
+ 	$(MAKE) -C xbmc/cores/paplayer/AACCodec
+ 	$(MAKE) -C xbmc/cores/paplayer/AC3Codec
+ 	$(MAKE) -C xbmc/cores/paplayer/ADPCMCodec
+-	$(MAKE) -C xbmc/cores/paplayer/flac-1.2.1
+ 	$(MAKE) -C xbmc/cores/paplayer/GYMCodec
+ 	$(MAKE) -C xbmc/cores/paplayer/MACDll
+ 	$(MAKE) -C xbmc/cores/paplayer/vgmstream
+@@ -203,11 +185,8 @@
+ 	$(MAKE) -C xbmc/cores/paplayer/SPCCodec/SNES/SNESAPU	
+ endif
+ 	$(MAKE) -C xbmc/cores/paplayer/MIDCodec
+-	$(MAKE) -C xbmc/cores/paplayer/MPCCodec
+ 	$(MAKE) -C xbmc/cores/paplayer/MP3Codec
+ 	$(MAKE) -C xbmc/cores/paplayer/NSFCodec
+-	$(MAKE) -C xbmc/cores/paplayer/SIDCodec
+-	$(MAKE) -C xbmc/cores/paplayer/vorbisfile
+ 	$(MAKE) -C xbmc/cores/paplayer/WavPackCodec
+ 	$(MAKE) -C xbmc/cores/paplayer/YMCodec/StSoundLibrary	
+ imagelib: dllloader
+@@ -215,9 +194,9 @@
+ 
+ codecs: papcodecs dvdpcodecs
+ 
+-libs: libhdhomerun libid3tag imagelib libexif python
++libs: libhdhomerun imagelib
+ 	
+-externals: codecs libs python visualizations screensavers
++externals: codecs libs visualizations screensavers
+ compile: guilib xbmc filesystem musicdatabase videodatabase cores cdrip \
+ 	paplayer dllloader exports xbox linux utils common tinyxml sqllite \
+ 	libscrobbler libgoahead unrarxlib libpython dvdplayer libupnp libcmyth \
+@@ -241,7 +220,7 @@
+ 	xbmc/FileSystem/*.o \
+ 	xbmc/FileSystem/MusicDatabaseDirectory/*.o \
+ 	xbmc/FileSystem/VideoDatabaseDirectory/*.o \
+-	xbmc/lib/libcdio/libcdio-@ARCH@.a \
++	`pkg-config --libs libcdio` \
+ 	xbmc/lib/libcmyth/*.o \
+ 	xbmc/lib/libGoAhead/libGoAhead-@ARCH@.a \
+ 	xbmc/lib/libPython/*.o \
+diff -Naur XBMC.orig/xbmc/Application.cpp XBMC/xbmc/Application.cpp
+--- XBMC.orig/xbmc/Application.cpp	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/Application.cpp	2009-01-08 23:33:32.000000000 +0200
+@@ -217,7 +217,7 @@
+ #include "utils/EventServer.h"
+ #endif
+ 
+-#include "lib/libcdio/logging.h"
++#include <cdio/logging.h>
+ 
+ using namespace std;
+ using namespace XFILE;
+diff -Naur XBMC.orig/xbmc/cdrip/CDDAReader.h XBMC/xbmc/cdrip/CDDAReader.h
+--- XBMC.orig/xbmc/cdrip/CDDAReader.h	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/cdrip/CDDAReader.h	2009-01-08 23:33:44.000000000 +0200
+@@ -27,7 +27,7 @@
+ #define CDDARIP_DONE  2
+ 
+ #include "utils/Thread.h"
+-#include "lib/libcdio/cdio.h"
++#include <cdio/cdio.h>
+ #include "FileSystem/File.h"
+ 
+ #include "FileItem.h"
+diff -Naur XBMC.orig/xbmc/cdrip/DllLameenc.h XBMC/xbmc/cdrip/DllLameenc.h
+--- XBMC.orig/xbmc/cdrip/DllLameenc.h	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/cdrip/DllLameenc.h	2009-01-08 23:33:44.000000000 +0200
+@@ -22,7 +22,7 @@
+  */
+ 
+ #include "DynamicDll.h"
+-#include "lame/lame.h"
++#include <lame/lame.h>
+ 
+ class DllLameEncInterface
+ {
+diff -Naur XBMC.orig/xbmc/cdrip/DllOgg.h XBMC/xbmc/cdrip/DllOgg.h
+--- XBMC.orig/xbmc/cdrip/DllOgg.h	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/cdrip/DllOgg.h	2009-01-08 23:33:44.000000000 +0200
+@@ -22,7 +22,7 @@
+  */
+ 
+ #include "DynamicDll.h"
+-#include "oggvorbis/vorbisenc.h"
++#include <vorbis/vorbisenc.h>
+ 
+ class DllOggInterface
+ {
+diff -Naur XBMC.orig/xbmc/cdrip/DllVorbisEnc.h XBMC/xbmc/cdrip/DllVorbisEnc.h
+--- XBMC.orig/xbmc/cdrip/DllVorbisEnc.h	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/cdrip/DllVorbisEnc.h	2009-01-08 23:33:44.000000000 +0200
+@@ -22,7 +22,7 @@
+  */
+ 
+ #include "DynamicDll.h"
+-#include "cdrip/oggvorbis/vorbisenc.h"
++#include <vorbis/vorbisenc.h>
+ 
+ class DllVorbisEncInterface
+ {
+diff -Naur XBMC.orig/xbmc/cdrip/DllVorbis.h XBMC/xbmc/cdrip/DllVorbis.h
+--- XBMC.orig/xbmc/cdrip/DllVorbis.h	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/cdrip/DllVorbis.h	2009-01-08 23:33:44.000000000 +0200
+@@ -22,7 +22,7 @@
+  */
+ 
+ #include "DynamicDll.h"
+-#include "cdrip/oggvorbis/vorbisenc.h"
++#include <vorbis/vorbisenc.h>
+ 
+ class DllVorbisInterface
+ {
+diff -Naur XBMC.orig/xbmc/cores/dvdplayer/DVDAudio.h XBMC/xbmc/cores/dvdplayer/DVDAudio.h
+--- XBMC.orig/xbmc/cores/dvdplayer/DVDAudio.h	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/cores/dvdplayer/DVDAudio.h	2009-01-08 23:33:43.000000000 +0200
+@@ -29,7 +29,7 @@
+ enum CodecID;
+ #else
+ extern "C" {
+-#include "ffmpeg/avcodec.h"
++#include <libavcodec/avcodec.h>
+ }
+ #endif
+ typedef struct stDVDAudioFrame DVDAudioFrame;
+diff -Naur XBMC.orig/xbmc/cores/dvdplayer/DVDCodecs/Audio/DVDAudioCodec.h XBMC/xbmc/cores/dvdplayer/DVDCodecs/Audio/DVDAudioCodec.h
+--- XBMC.orig/xbmc/cores/dvdplayer/DVDCodecs/Audio/DVDAudioCodec.h	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/cores/dvdplayer/DVDCodecs/Audio/DVDAudioCodec.h	2009-01-08 23:33:43.000000000 +0200
+@@ -27,7 +27,7 @@
+ enum CodecID;
+ #else
+ extern "C" {
+-#include "ffmpeg/avcodec.h"
++#include <libavcodec/avcodec.h>
+ }
+ #endif
+ 
+diff -Naur XBMC.orig/xbmc/cores/dvdplayer/DVDCodecs/DVDCodecs.h XBMC/xbmc/cores/dvdplayer/DVDCodecs/DVDCodecs.h
+--- XBMC.orig/xbmc/cores/dvdplayer/DVDCodecs/DVDCodecs.h	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/cores/dvdplayer/DVDCodecs/DVDCodecs.h	2009-01-08 23:33:43.000000000 +0200
+@@ -36,7 +36,7 @@
+ #ifndef __GNUC__
+ #pragma warning(disable:4244)
+ #endif
+-#include "../../ffmpeg/avcodec.h"
++#include <libavcodec/avcodec.h>
+ }
+ 
+ // 0x100000 is the video starting range
+diff -Naur XBMC.orig/xbmc/cores/dvdplayer/DVDDemuxers/DVDDemux.h XBMC/xbmc/cores/dvdplayer/DVDDemuxers/DVDDemux.h
+--- XBMC.orig/xbmc/cores/dvdplayer/DVDDemuxers/DVDDemux.h	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/cores/dvdplayer/DVDDemuxers/DVDDemux.h	2009-01-08 23:33:43.000000000 +0200
+@@ -27,7 +27,7 @@
+ enum CodecID;
+ #else
+ extern "C" {
+-#include "../../ffmpeg/avcodec.h"
++#include <libavcodec/avcodec.h>
+ }
+ #endif
+ enum AVDiscard;
+diff -Naur XBMC.orig/xbmc/cores/dvdplayer/DVDDemuxers/DVDDemuxUtils.cpp XBMC/xbmc/cores/dvdplayer/DVDDemuxers/DVDDemuxUtils.cpp
+--- XBMC.orig/xbmc/cores/dvdplayer/DVDDemuxers/DVDDemuxUtils.cpp	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/cores/dvdplayer/DVDDemuxers/DVDDemuxUtils.cpp	2009-01-08 23:33:31.000000000 +0200
+@@ -22,7 +22,7 @@
+ #include "stdafx.h"
+ #include "DVDDemuxUtils.h"
+ extern "C" {
+-#include "../../ffmpeg/avcodec.h"
++#include <libavcodec/avcodec.h>
+ }
+ 
+ void CDVDDemuxUtils::FreeDemuxPacket(DemuxPacket* pPacket)
+diff -Naur XBMC.orig/xbmc/cores/dvdplayer/DVDStreamInfo.h XBMC/xbmc/cores/dvdplayer/DVDStreamInfo.h
+--- XBMC.orig/xbmc/cores/dvdplayer/DVDStreamInfo.h	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/cores/dvdplayer/DVDStreamInfo.h	2009-01-08 23:33:43.000000000 +0200
+@@ -27,7 +27,7 @@
+ #else
+ #include "DVDDemuxers/DVDDemux.h"
+ extern "C" { 
+-#include "../ffmpeg/avcodec.h"
++#include <libavcodec/avcodec.h>
+ }
+ #endif
+ 
+diff -Naur XBMC.orig/xbmc/cores/ffmpeg/DllAvCodec.h XBMC/xbmc/cores/ffmpeg/DllAvCodec.h
+--- XBMC.orig/xbmc/cores/ffmpeg/DllAvCodec.h	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/cores/ffmpeg/DllAvCodec.h	2009-01-08 23:33:44.000000000 +0200
+@@ -17,7 +17,7 @@
+ #pragma warning(disable:4244)
+ #endif
+ 
+-#include "avcodec.h"
++#include <libavcodec/avcodec.h>
+ }
+ 
+ class DllAvCodecInterface
+diff -Naur XBMC.orig/xbmc/cores/ffmpeg/DllAvFormat.h XBMC/xbmc/cores/ffmpeg/DllAvFormat.h
+--- XBMC.orig/xbmc/cores/ffmpeg/DllAvFormat.h	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/cores/ffmpeg/DllAvFormat.h	2009-01-08 23:33:44.000000000 +0200
+@@ -12,7 +12,7 @@
+ #ifndef __GNUC__
+ #pragma warning(disable:4244)
+ #endif
+-#include "avformat.h"
++#include <libavformat/avformat.h>
+ }
+ 
+ 
+diff -Naur XBMC.orig/xbmc/cores/ffmpeg/DllPostProc.h XBMC/xbmc/cores/ffmpeg/DllPostProc.h
+--- XBMC.orig/xbmc/cores/ffmpeg/DllPostProc.h	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/cores/ffmpeg/DllPostProc.h	2009-01-08 23:33:44.000000000 +0200
+@@ -13,8 +13,8 @@
+ #pragma warning(disable:4244)
+ #endif
+   
+-#include "avutil.h"
+-#include "postprocess.h"
++#include <libavutil/avutil.h>
++#include <libpostproc/postprocess.h>
+ }
+ 
+ class DllPostProcInterface
+diff -Naur XBMC.orig/xbmc/cores/ffmpeg/DllSwScale.h XBMC/xbmc/cores/ffmpeg/DllSwScale.h
+--- XBMC.orig/xbmc/cores/ffmpeg/DllSwScale.h	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/cores/ffmpeg/DllSwScale.h	2009-01-08 23:33:44.000000000 +0200
+@@ -18,9 +18,9 @@
+ #pragma warning(disable:4244)
+ #endif
+ 
+-#include "avutil.h"
+-#include "swscale.h"
+-#include "rgb2rgb.h"
++#include <libavutil/avutil.h>
++#include <libswscale/swscale.h>
++#include <libswscale/rgb2rgb.h>
+ }
+ 
+ class DllSwScaleInterface
+diff -Naur XBMC.orig/xbmc/cores/paplayer/AACCodec/Makefile.in XBMC/xbmc/cores/paplayer/AACCodec/Makefile.in
+--- XBMC.orig/xbmc/cores/paplayer/AACCodec/Makefile.in	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/cores/paplayer/AACCodec/Makefile.in	2009-01-08 20:44:39.000000000 +0200
+@@ -14,4 +14,4 @@
+ 
+ $(LIB): $(OBJS)
+ 	make -C alac_decoder
+-	$(CC) -shared -o $@ *.o alac_decoder/*.o ../../dvdplayer/Codecs/libfaad2/libfaad/.libs/*.o ../../dvdplayer/Codecs/libfaad2/common/mp4ff/.libs/*.o `cat ../../DllLoader/exports/wrapper.def` ../../DllLoader/exports/wrapper.o
++	$(CC) -shared -o $@ *.o alac_decoder/*.o -lfaad -lmp4ff `cat ../../DllLoader/exports/wrapper.def` ../../DllLoader/exports/wrapper.o
+diff -Naur XBMC.orig/xbmc/cores/paplayer/CDDAcodec.cpp XBMC/xbmc/cores/paplayer/CDDAcodec.cpp
+--- XBMC.orig/xbmc/cores/paplayer/CDDAcodec.cpp	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/cores/paplayer/CDDAcodec.cpp	2009-01-08 23:33:31.000000000 +0200
+@@ -21,7 +21,7 @@
+ 
+ #include "stdafx.h"
+ #include "CDDAcodec.h"
+-#include "lib/libcdio/sector.h"
++#include <cdio/sector.h>
+ 
+ #define SECTOR_COUNT 55 // max. sectors that can be read at once
+ #define MAX_BUFFER_SIZE 2*SECTOR_COUNT*CDIO_CD_FRAMESIZE_RAW
+diff -Naur XBMC.orig/xbmc/cores/paplayer/DllAc3codec.h XBMC/xbmc/cores/paplayer/DllAc3codec.h
+--- XBMC.orig/xbmc/cores/paplayer/DllAc3codec.h	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/cores/paplayer/DllAc3codec.h	2009-01-09 15:23:45.000000000 +0200
+@@ -31,7 +31,7 @@
+ typedef __int32 int32_t;
+ #endif
+ 
+-#include "cores/dvdplayer/DVDCodecs/Audio/liba52/a52.h"
++#include <a52dec/a52.h>
+ 
+ #ifdef LIBA52_DOUBLE
+ typedef float convert_t;
+@@ -46,8 +46,8 @@
+   virtual a52_state_t * a52_init (uint32_t mm_accel)=0;
+   virtual sample_t * a52_samples (a52_state_t * state)=0;
+   virtual int a52_syncinfo (a52_state_t * state, uint8_t * buf, int * flags, int * sample_rate, int * bit_rate)=0;
+-  virtual int a52_frame (a52_state_t * state, uint8_t * buf, int * flags, level_t * level, sample_t bias)=0;
+-  virtual void a52_dynrng (a52_state_t * state, level_t (* call) (level_t, void *), void * data)=0;
++  virtual int a52_frame (a52_state_t * state, uint8_t * buf, int * flags, sample_t * level, sample_t bias)=0;
++  virtual void a52_dynrng (a52_state_t * state, sample_t (* call) (sample_t, void *), void * data)=0;
+   virtual int a52_block (a52_state_t * state)=0;
+   virtual void a52_free (a52_state_t * state)=0;
+ };
+@@ -58,8 +58,8 @@
+   DEFINE_METHOD1(a52_state_t *, a52_init, (uint32_t p1))
+   DEFINE_METHOD1(sample_t *, a52_samples, (a52_state_t *p1))
+   DEFINE_METHOD5(int, a52_syncinfo, (a52_state_t * p1, uint8_t * p2, int * p3, int * p4, int * p5))
+-  DEFINE_METHOD5(int, a52_frame, (a52_state_t * p1, uint8_t * p2, int * p3, level_t * p4, sample_t p5))
+-  DEFINE_METHOD3(void, a52_dynrng, (a52_state_t * p1, level_t (* p2) (level_t, void *), void * p3))
++  DEFINE_METHOD5(int, a52_frame, (a52_state_t * p1, uint8_t * p2, int * p3, sample_t * p4, sample_t p5))
++  DEFINE_METHOD3(void, a52_dynrng, (a52_state_t * p1, sample_t (* p2) (sample_t, void *), void * p3))
+   DEFINE_METHOD1(int, a52_block, (a52_state_t * p1))
+   DEFINE_METHOD1(void, a52_free, (a52_state_t * p1))
+   BEGIN_METHOD_RESOLVE()
+diff -Naur XBMC.orig/xbmc/cores/paplayer/DllLibFlac.h XBMC/xbmc/cores/paplayer/DllLibFlac.h
+--- XBMC.orig/xbmc/cores/paplayer/DllLibFlac.h	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/cores/paplayer/DllLibFlac.h	2009-01-08 23:33:43.000000000 +0200
+@@ -22,7 +22,7 @@
+  */
+ 
+ #include "DynamicDll.h"
+-#include "flac-1.2.1/include/FLAC/stream_decoder.h"
++#include <FLAC/stream_decoder.h>
+ 
+ class DllLibFlacInterface
+ {
+diff -Naur XBMC.orig/xbmc/cores/paplayer/DllMpcCodec.h XBMC/xbmc/cores/paplayer/DllMpcCodec.h
+--- XBMC.orig/xbmc/cores/paplayer/DllMpcCodec.h	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/cores/paplayer/DllMpcCodec.h	2009-01-09 03:34:55.000000000 +0200
+@@ -23,9 +23,9 @@
+ 
+ #include "DynamicDll.h"
+ 
+-#include "MPCCodec/include/mpcdec/config_win32.h"
+-#include "MPCCodec/include/mpcdec/reader.h"
+-#include "MPCCodec/include/mpcdec/streaminfo.h"
++#include <mpcdec/config_types.h>
++#include <mpcdec/reader.h>
++#include <mpcdec/streaminfo.h>
+ 
+ struct mpc_decoder;
+ 
+diff -Naur XBMC.orig/xbmc/cores/paplayer/DllVorbisfile.h XBMC/xbmc/cores/paplayer/DllVorbisfile.h
+--- XBMC.orig/xbmc/cores/paplayer/DllVorbisfile.h	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/cores/paplayer/DllVorbisfile.h	2009-01-08 23:33:43.000000000 +0200
+@@ -22,7 +22,7 @@
+  */
+ 
+ #include "DynamicDll.h"
+-#include "ogg/vorbisfile.h"
++#include <vorbis/vorbisfile.h>
+ 
+ //  Note: the vorbisfile.dll has the ogg.dll and vorbis.dll statically linked 
+ 
+diff -Naur XBMC.orig/xbmc/cores/paplayer/MP3Codec/Makefile.in XBMC/xbmc/cores/paplayer/MP3Codec/Makefile.in
+--- XBMC.orig/xbmc/cores/paplayer/MP3Codec/Makefile.in	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/cores/paplayer/MP3Codec/Makefile.in	2009-01-08 20:48:29.000000000 +0200
+@@ -8,4 +8,4 @@
+ lib: $(LIB)
+ 
+ $(LIB): $(OBJS)
+-	gcc -shared -o $@  MADCodec/MadMp3Decoder.o ../../dvdplayer/Codecs/libmad/.libs/libmad.a `cat ../../DllLoader/exports/wrapper.def` ../../DllLoader/exports/wrapper.o -fPIC -O3
++	gcc -shared -o $@  MADCodec/MadMp3Decoder.o -lmad `cat ../../DllLoader/exports/wrapper.def` ../../DllLoader/exports/wrapper.o -fPIC -O3
+diff -Naur XBMC.orig/xbmc/DetectDVDType.cpp XBMC/xbmc/DetectDVDType.cpp
+--- XBMC.orig/xbmc/DetectDVDType.cpp	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/DetectDVDType.cpp	2009-01-08 23:33:32.000000000 +0200
+@@ -36,7 +36,7 @@
+ #include "Picture.h"
+ #if defined (LIBCDIO_VERSION_NUM) && (LIBCDIO_VERSION_NUM > 77) || defined (__APPLE__)
+ #define USING_CDIO78
+-#include "lib/libcdio/mmc.h"
++#include <cdio/mmc.h>
+ #endif
+ #include "GUIWindowManager.h"
+ #include "FileSystem/File.h"
+diff -Naur XBMC.orig/xbmc/FileSystem/cdioSupport.cpp XBMC/xbmc/FileSystem/cdioSupport.cpp
+--- XBMC.orig/xbmc/FileSystem/cdioSupport.cpp	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/FileSystem/cdioSupport.cpp	2009-01-08 23:33:33.000000000 +0200
+@@ -21,11 +21,11 @@
+ 
+ #include "stdafx.h"
+ #include "cdioSupport.h"
+-#include "lib/libcdio/cdio.h"
+-#include "lib/libcdio/logging.h"
+-#include "../lib/libcdio/util.h"
++#include <cdio/cdio.h>
++#include <cdio/logging.h>
++#include <cdio/util.h>
+ #ifdef _LINUX
+-#include "../lib/libcdio/cd_types.h"
++#include <cdio/cd_types.h>
+ #endif
+ 
+ using namespace MEDIA_DETECT;
+diff -Naur XBMC.orig/xbmc/FileSystem/cdioSupport.h XBMC/xbmc/FileSystem/cdioSupport.h
+--- XBMC.orig/xbmc/FileSystem/cdioSupport.h	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/FileSystem/cdioSupport.h	2009-01-08 23:33:44.000000000 +0200
+@@ -35,11 +35,11 @@
+ 
+ #ifndef _LINUX
+ //#include "../lib/libcdio/intTypes.h"
+-#include "lib/libcdio/cdio.h"
+-#include "lib/libcdio/cd_Types.h"
+-#include "lib/libcdio/cdtext.h"
++#include <cdio/cdio.h>
++#include <cdio/cd_types.h>
++#include <cdio/cdtext.h>
+ #else
+-#include "../lib/libcdio/cdio.h"
++#include <cdio/cdio.h>
+ #endif
+ 
+ namespace MEDIA_DETECT
+diff -Naur XBMC.orig/xbmc/FileSystem/FileCDDA.cpp XBMC/xbmc/FileSystem/FileCDDA.cpp
+--- XBMC.orig/xbmc/FileSystem/FileCDDA.cpp	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/FileSystem/FileCDDA.cpp	2009-01-08 23:33:33.000000000 +0200
+@@ -23,7 +23,7 @@
+ #include "FileCDDA.h"
+ #include <sys/stat.h>
+ #include "Util.h"
+-#include "../lib/libcdio/util.h"
++#include <cdio/util.h>
+ #include "DetectDVDType.h"
+ #include "URL.h"
+ 
+diff -Naur XBMC.orig/xbmc/FileSystem/FileCDDA.h XBMC/xbmc/FileSystem/FileCDDA.h
+--- XBMC.orig/xbmc/FileSystem/FileCDDA.h	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/FileSystem/FileCDDA.h	2009-01-08 23:33:44.000000000 +0200
+@@ -21,7 +21,7 @@
+  */
+ 
+ #include "IFile.h"
+-#include "lib/libcdio/cdio.h"
++#include <cdio/cdio.h>
+ 
+ namespace XFILE
+ {
+diff -Naur XBMC.orig/xbmc/FileSystem/FileZip.h XBMC/xbmc/FileSystem/FileZip.h
+--- XBMC.orig/xbmc/FileSystem/FileZip.h	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/FileSystem/FileZip.h	2009-01-08 23:33:44.000000000 +0200
+@@ -23,7 +23,7 @@
+ 
+ 
+ #include "IFile.h"
+-#include "lib/zlib/zlib.h"
++#include <zlib.h>
+ #include "utils/log.h"
+ #include "GUIWindowManager.h"
+ #include "FileSystem/File.h"
+diff -Naur XBMC.orig/xbmc/FileSystem/ZipDirectory.cpp XBMC/xbmc/FileSystem/ZipDirectory.cpp
+--- XBMC.orig/xbmc/FileSystem/ZipDirectory.cpp	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/FileSystem/ZipDirectory.cpp	2009-01-08 23:33:33.000000000 +0200
+@@ -23,7 +23,7 @@
+ #include "ZipDirectory.h"
+ #include "utils/log.h"
+ #include "Util.h"
+-#include "lib/zlib/zlib.h"
++#include <zlib.h>
+ #include "URL.h"
+ #include "ZipManager.h"
+ #include "FileItem.h"
+diff -Naur XBMC.orig/xbmc/lib/cximage-6.0/CxImage/ximatif.h XBMC/xbmc/lib/cximage-6.0/CxImage/ximatif.h
+--- XBMC.orig/xbmc/lib/cximage-6.0/CxImage/ximatif.h	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/lib/cximage-6.0/CxImage/ximatif.h	2009-01-09 16:16:48.000000000 +0200
+@@ -23,7 +23,7 @@
+ 
+ #if CXIMAGE_SUPPORT_TIF
+ 
+-#include "../tiff/tiffio.h"
++#include <tiffio.h>
+ 
+ class DLL_EXP CxImageTIF: public CxImage
+ {
+diff -Naur XBMC.orig/xbmc/lib/cximage-6.0/Makefile.in XBMC/xbmc/lib/cximage-6.0/Makefile.in
+--- XBMC.orig/xbmc/lib/cximage-6.0/Makefile.in	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/lib/cximage-6.0/Makefile.in	2009-01-09 14:02:28.000000000 +0200
+@@ -4,13 +4,8 @@
+ ARCHIVE=$(SO:.so=.a)
+ SYSDIR=../../../system
+ LIB=$(SYSDIR)/$(SO)
+-DIRS=CxImage raw jbig tiff zlib
+-LIBS=CxImage/cximage.a raw/raw.a jbig/jbig.a tiff/tiff.a zlib/libz.a
+-
+-ifeq ($(ARCH), x86-osx)
+-DIRS+=jasper jpeg
+-LIBS+=jasper/jasper.a jpeg/jpeg.a
+-endif
++DIRS=CxImage raw
++LIBS=CxImage/cximage.a raw/raw.a -ltiff -lz -ljbig
+ 
+ .PHONY: compile
+ 
+@@ -30,28 +25,9 @@
+ CxImage/cximage.a:
+ 	$(MAKE) -C CxImage ARCH=$(ARCH)
+ 
+-jbig/jbig.a:
+-	$(MAKE) -C jbig
+-
+ raw/raw.a:
+ 	$(MAKE) -C raw
+ 
+-zlib/libz.a:
+-	$(MAKE) -C zlib
+-
+-jasper/jasper.a:
+-	$(MAKE) -C jasper
+-
+-jpeg/jpeg.a:
+-	$(MAKE) -C jpeg
+-
+-tiff/tiff.a:
+-ifeq ($(ARCH), x86-osx)
+-	$(MAKE) -C tiff -fMakefile.osx
+-else
+-	$(MAKE) -C tiff
+-endif
+-
+ clean:
+ 	for d in $(DIRS); do (cd $$d; $(MAKE) clean ); done
+ 	rm -f $(LIB)
+diff -Naur XBMC.orig/xbmc/lib/cximage-6.0/raw/.directory XBMC/xbmc/lib/cximage-6.0/raw/.directory
+--- XBMC.orig/xbmc/lib/cximage-6.0/raw/.directory	1970-01-01 02:00:00.000000000 +0200
++++ XBMC/xbmc/lib/cximage-6.0/raw/.directory	2009-01-09 13:47:27.000000000 +0200
+@@ -0,0 +1,2 @@
++[URL properties]
++ShowDotFiles=false
+diff -Naur XBMC.orig/xbmc/lib/libPython/xbmcmodule/action.h XBMC/xbmc/lib/libPython/xbmcmodule/action.h
+--- XBMC.orig/xbmc/lib/libPython/xbmcmodule/action.h	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/lib/libPython/xbmcmodule/action.h	2009-01-09 00:12:51.000000000 +0200
+@@ -19,7 +19,7 @@
+  *
+  */
+ 
+-#include "lib/libPython/Python/Include/Python.h"
++#include <python2.5/Python.h>>
+ #ifdef _LINUX
+ #include "../XBPythonDll.h"
+ #endif
+diff -Naur XBMC.orig/xbmc/lib/libPython/xbmcmodule/controlbutton.cpp XBMC/xbmc/lib/libPython/xbmcmodule/controlbutton.cpp
+--- XBMC.orig/xbmc/lib/libPython/xbmcmodule/controlbutton.cpp	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/lib/libPython/xbmcmodule/controlbutton.cpp	2009-01-09 00:12:51.000000000 +0200
+@@ -20,7 +20,7 @@
+  */
+ 
+ #include "stdafx.h"
+-#include "lib/libPython/Python/Include/Python.h"
++#include <python2.5/Python.h>
+ #ifdef _LINUX
+ #include "../XBPythonDll.h"
+ #endif
+diff -Naur XBMC.orig/xbmc/lib/libPython/xbmcmodule/controlcheckmark.cpp XBMC/xbmc/lib/libPython/xbmcmodule/controlcheckmark.cpp
+--- XBMC.orig/xbmc/lib/libPython/xbmcmodule/controlcheckmark.cpp	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/lib/libPython/xbmcmodule/controlcheckmark.cpp	2009-01-09 00:12:51.000000000 +0200
+@@ -20,7 +20,7 @@
+  */
+ 
+ #include "stdafx.h"
+-#include "lib/libPython/Python/Include/Python.h"
++#include <python2.5/Python.h>>
+ #ifdef _LINUX
+ #include "../XBPythonDll.h"
+ #endif
+diff -Naur XBMC.orig/xbmc/lib/libPython/xbmcmodule/controlfadelabel.cpp XBMC/xbmc/lib/libPython/xbmcmodule/controlfadelabel.cpp
+--- XBMC.orig/xbmc/lib/libPython/xbmcmodule/controlfadelabel.cpp	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/lib/libPython/xbmcmodule/controlfadelabel.cpp	2009-01-09 00:12:51.000000000 +0200
+@@ -20,7 +20,7 @@
+  */
+ 
+ #include "stdafx.h"
+-#include "lib/libPython/Python/Include/Python.h"
++#include <python2.5/Python.h>
+ #ifdef _LINUX
+ #include "../XBPythonDll.h"
+ #endif
+diff -Naur XBMC.orig/xbmc/lib/libPython/xbmcmodule/controlgroup.cpp XBMC/xbmc/lib/libPython/xbmcmodule/controlgroup.cpp
+--- XBMC.orig/xbmc/lib/libPython/xbmcmodule/controlgroup.cpp	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/lib/libPython/xbmcmodule/controlgroup.cpp	2009-01-09 00:12:51.000000000 +0200
+@@ -20,7 +20,7 @@
+  */
+ 
+ #include "stdafx.h"
+-#include "lib/libPython/Python/Include/Python.h"
++#include <python2.5/Python.h>
+ #include "GUIControlGroup.h"
+ #include "GUIFontManager.h"
+ #include "control.h"
+diff -Naur XBMC.orig/xbmc/lib/libPython/xbmcmodule/control.h XBMC/xbmc/lib/libPython/xbmcmodule/control.h
+--- XBMC.orig/xbmc/lib/libPython/xbmcmodule/control.h	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/lib/libPython/xbmcmodule/control.h	2009-01-09 00:12:51.000000000 +0200
+@@ -19,7 +19,7 @@
+  *
+  */
+ 
+-#include "lib/libPython/Python/Include/Python.h"
++#include <python2.5/Python.h>>
+ #ifdef _LINUX
+ #include "../XBPythonDll.h"
+ #endif
+diff -Naur XBMC.orig/xbmc/lib/libPython/xbmcmodule/controlimage.cpp XBMC/xbmc/lib/libPython/xbmcmodule/controlimage.cpp
+--- XBMC.orig/xbmc/lib/libPython/xbmcmodule/controlimage.cpp	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/lib/libPython/xbmcmodule/controlimage.cpp	2009-01-09 00:12:51.000000000 +0200
+@@ -20,7 +20,7 @@
+  */
+ 
+ #include "stdafx.h"
+-#include "lib/libPython/Python/Include/Python.h"
++#include <python2.5/Python.h>
+ #ifdef _LINUX
+ #include "../XBPythonDll.h"
+ #endif
+diff -Naur XBMC.orig/xbmc/lib/libPython/xbmcmodule/controllabel.cpp XBMC/xbmc/lib/libPython/xbmcmodule/controllabel.cpp
+--- XBMC.orig/xbmc/lib/libPython/xbmcmodule/controllabel.cpp	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/lib/libPython/xbmcmodule/controllabel.cpp	2009-01-09 00:12:51.000000000 +0200
+@@ -20,7 +20,7 @@
+  */
+ 
+ #include "stdafx.h"
+-#include "lib/libPython/Python/Include/Python.h"
++#include <python2.5/Python.h>
+ #ifdef _LINUX
+ #include "../XBPythonDll.h"
+ #endif
+diff -Naur XBMC.orig/xbmc/lib/libPython/xbmcmodule/controllist.cpp XBMC/xbmc/lib/libPython/xbmcmodule/controllist.cpp
+--- XBMC.orig/xbmc/lib/libPython/xbmcmodule/controllist.cpp	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/lib/libPython/xbmcmodule/controllist.cpp	2009-01-09 00:12:51.000000000 +0200
+@@ -20,7 +20,7 @@
+  */
+  
+ #include "stdafx.h"
+-#include "lib/libPython/Python/Include/Python.h"
++#include <python2.5/Python.h>
+ #ifdef _LINUX
+ #include "../XBPythonDll.h"
+ #endif
+diff -Naur XBMC.orig/xbmc/lib/libPython/xbmcmodule/controlprogress.cpp XBMC/xbmc/lib/libPython/xbmcmodule/controlprogress.cpp
+--- XBMC.orig/xbmc/lib/libPython/xbmcmodule/controlprogress.cpp	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/lib/libPython/xbmcmodule/controlprogress.cpp	2009-01-09 00:12:51.000000000 +0200
+@@ -20,7 +20,7 @@
+  */
+ 
+ #include "stdafx.h"
+-#include "lib/libPython/Python/Include/Python.h"
++#include <python2.5/Python.h>
+ #include "GUIProgressControl.h"
+ #include "control.h"
+ #include "pyutil.h"
+diff -Naur XBMC.orig/xbmc/lib/libPython/xbmcmodule/controlradiobutton.cpp XBMC/xbmc/lib/libPython/xbmcmodule/controlradiobutton.cpp
+--- XBMC.orig/xbmc/lib/libPython/xbmcmodule/controlradiobutton.cpp	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/lib/libPython/xbmcmodule/controlradiobutton.cpp	2009-01-09 00:12:51.000000000 +0200
+@@ -20,7 +20,7 @@
+  */
+ 
+ #include "stdafx.h"
+-#include "lib/libPython/Python/Include/Python.h"
++#include <python2.5/Python.h>
+ #ifdef _LINUX
+ #include "../XBPythonDll.h"
+ #endif
+diff -Naur XBMC.orig/xbmc/lib/libPython/xbmcmodule/controlspin.cpp XBMC/xbmc/lib/libPython/xbmcmodule/controlspin.cpp
+--- XBMC.orig/xbmc/lib/libPython/xbmcmodule/controlspin.cpp	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/lib/libPython/xbmcmodule/controlspin.cpp	2009-01-09 00:12:51.000000000 +0200
+@@ -20,7 +20,7 @@
+  */
+ 
+ #include "stdafx.h"
+-#include "lib/libPython/Python/Include/Python.h"
++#include <python2.5/Python.h>
+ #ifdef _LINUX
+ #include "../XBPythonDll.h"
+ #endif
+diff -Naur XBMC.orig/xbmc/lib/libPython/xbmcmodule/controltextbox.cpp XBMC/xbmc/lib/libPython/xbmcmodule/controltextbox.cpp
+--- XBMC.orig/xbmc/lib/libPython/xbmcmodule/controltextbox.cpp	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/lib/libPython/xbmcmodule/controltextbox.cpp	2009-01-09 00:12:51.000000000 +0200
+@@ -20,7 +20,7 @@
+  */
+ 
+ #include "stdafx.h"
+-#include "lib/libPython/Python/Include/Python.h"
++#include <python2.5/Python.h>
+ #ifdef _LINUX
+ #include "../XBPythonDll.h"
+ #endif
+diff -Naur XBMC.orig/xbmc/lib/libPython/xbmcmodule/dialog.cpp XBMC/xbmc/lib/libPython/xbmcmodule/dialog.cpp
+--- XBMC.orig/xbmc/lib/libPython/xbmcmodule/dialog.cpp	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/lib/libPython/xbmcmodule/dialog.cpp	2009-01-09 00:12:51.000000000 +0200
+@@ -21,7 +21,7 @@
+ 
+ #include "stdafx.h"
+ #include "dialog.h"
+-#include "lib/libPython/Python/Include/Python.h"
++#include <python2.5/Python.h>
+ #ifdef _LINUX
+ #include "../XBPythonDll.h"
+ #endif
+diff -Naur XBMC.orig/xbmc/lib/libPython/xbmcmodule/dialog.h XBMC/xbmc/lib/libPython/xbmcmodule/dialog.h
+--- XBMC.orig/xbmc/lib/libPython/xbmcmodule/dialog.h	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/lib/libPython/xbmcmodule/dialog.h	2009-01-09 00:12:51.000000000 +0200
+@@ -19,7 +19,7 @@
+  *
+  */
+ 
+-#include "lib/libPython/Python/Include/Python.h"
++#include <python2.5/Python.h>>
+ #include "window.h"
+ #pragma once
+ 
+diff -Naur XBMC.orig/xbmc/lib/libPython/xbmcmodule/GUIPythonWindow.h XBMC/xbmc/lib/libPython/xbmcmodule/GUIPythonWindow.h
+--- XBMC.orig/xbmc/lib/libPython/xbmcmodule/GUIPythonWindow.h	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/lib/libPython/xbmcmodule/GUIPythonWindow.h	2009-01-09 00:12:51.000000000 +0200
+@@ -22,7 +22,7 @@
+  */
+ 
+ #include "GUIWindow.h"
+-#include "lib/libPython/Python/Include/Python.h"
++#include <python2.5/Python.h>>
+ 
+ class PyXBMCAction
+ {
+diff -Naur XBMC.orig/xbmc/lib/libPython/xbmcmodule/infotagmusic.h XBMC/xbmc/lib/libPython/xbmcmodule/infotagmusic.h
+--- XBMC.orig/xbmc/lib/libPython/xbmcmodule/infotagmusic.h	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/lib/libPython/xbmcmodule/infotagmusic.h	2009-01-09 00:12:51.000000000 +0200
+@@ -19,7 +19,7 @@
+  *
+  */
+ 
+-#include "lib/libPython/Python/Include/Python.h"
++#include <python2.5/Python.h>>
+ 
+ #include "MusicInfoTag.h"
+ 
+diff -Naur XBMC.orig/xbmc/lib/libPython/xbmcmodule/infotagvideo.h XBMC/xbmc/lib/libPython/xbmcmodule/infotagvideo.h
+--- XBMC.orig/xbmc/lib/libPython/xbmcmodule/infotagvideo.h	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/lib/libPython/xbmcmodule/infotagvideo.h	2009-01-09 00:12:51.000000000 +0200
+@@ -19,7 +19,7 @@
+  *
+  */
+ 
+-#include "lib/libPython/Python/Include/Python.h"
++#include <python2.5/Python.h>>
+ #include "VideoInfoTag.h"
+ #include "../../../utils/IMDB.h"
+ 
+diff -Naur XBMC.orig/xbmc/lib/libPython/xbmcmodule/keyboard.h XBMC/xbmc/lib/libPython/xbmcmodule/keyboard.h
+--- XBMC.orig/xbmc/lib/libPython/xbmcmodule/keyboard.h	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/lib/libPython/xbmcmodule/keyboard.h	2009-01-09 00:12:51.000000000 +0200
+@@ -19,7 +19,7 @@
+  *
+  */
+ 
+-#include "lib/libPython/Python/Include/Python.h"
++#include <python2.5/Python.h>>
+ #ifdef _LINUX
+ #include "../XBPythonDll.h"
+ #endif
+diff -Naur XBMC.orig/xbmc/lib/libPython/xbmcmodule/language.h XBMC/xbmc/lib/libPython/xbmcmodule/language.h
+--- XBMC.orig/xbmc/lib/libPython/xbmcmodule/language.h	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/lib/libPython/xbmcmodule/language.h	2009-01-09 00:12:51.000000000 +0200
+@@ -21,7 +21,7 @@
+  *
+  */
+ 
+-#include "lib/libPython/Python/Include/Python.h"
++#include <python2.5/Python.h>>
+ 
+ #ifdef __cplusplus
+ extern "C" {
+diff -Naur XBMC.orig/xbmc/lib/libPython/xbmcmodule/listitem.cpp XBMC/xbmc/lib/libPython/xbmcmodule/listitem.cpp
+--- XBMC.orig/xbmc/lib/libPython/xbmcmodule/listitem.cpp	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/lib/libPython/xbmcmodule/listitem.cpp	2009-01-09 00:12:51.000000000 +0200
+@@ -20,7 +20,7 @@
+  */
+ 
+ #include "stdafx.h"
+-#include "lib/libPython/Python/Include/Python.h"
++#include <python2.5/Python.h>
+ #ifdef _LINUX
+ #include "../XBPythonDll.h"
+ #endif
+diff -Naur XBMC.orig/xbmc/lib/libPython/xbmcmodule/listitem.h XBMC/xbmc/lib/libPython/xbmcmodule/listitem.h
+--- XBMC.orig/xbmc/lib/libPython/xbmcmodule/listitem.h	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/lib/libPython/xbmcmodule/listitem.h	2009-01-09 00:12:51.000000000 +0200
+@@ -21,7 +21,7 @@
+  *
+  */
+  
+-#include "lib/libPython/Python/Include/Python.h"
++#include <python2.5/Python.h>>
+ #include "FileItem.h"
+ 
+ #define ListItem_Check(op) PyObject_TypeCheck(op, &ListItem_Type)
+diff -Naur XBMC.orig/xbmc/lib/libPython/xbmcmodule/player.h XBMC/xbmc/lib/libPython/xbmcmodule/player.h
+--- XBMC.orig/xbmc/lib/libPython/xbmcmodule/player.h	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/lib/libPython/xbmcmodule/player.h	2009-01-09 00:12:51.000000000 +0200
+@@ -19,7 +19,7 @@
+  *
+  */
+ 
+-#include "lib/libPython/Python/Include/Python.h"
++#include <python2.5/Python.h>>
+ #ifdef _LINUX
+ #include "../XBPythonDll.h"
+ #endif
+diff -Naur XBMC.orig/xbmc/lib/libPython/xbmcmodule/pyplaylist.cpp XBMC/xbmc/lib/libPython/xbmcmodule/pyplaylist.cpp
+--- XBMC.orig/xbmc/lib/libPython/xbmcmodule/pyplaylist.cpp	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/lib/libPython/xbmcmodule/pyplaylist.cpp	2009-01-09 00:12:51.000000000 +0200
+@@ -23,7 +23,7 @@
+ #include "PlayListPlayer.h"
+ #include "Util.h"
+ #include "pyplaylist.h"
+-#include "lib/libPython/Python/Include/structmember.h"
++#include <python2.5/structmember.h>
+ #ifdef _LINUX
+ #include "../XBPythonDll.h"
+ #endif
+diff -Naur XBMC.orig/xbmc/lib/libPython/xbmcmodule/pyplaylist.h XBMC/xbmc/lib/libPython/xbmcmodule/pyplaylist.h
+--- XBMC.orig/xbmc/lib/libPython/xbmcmodule/pyplaylist.h	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/lib/libPython/xbmcmodule/pyplaylist.h	2009-01-09 00:12:51.000000000 +0200
+@@ -21,7 +21,7 @@
+  *
+  */
+ 
+-#include "lib/libPython/Python/Include/Python.h"
++#include <python2.5/Python.h>>
+ #include "FileItem.h"
+ 
+ #define PlayList_Check(op) PyObject_TypeCheck(op, &PlayList_Type)
+diff -Naur XBMC.orig/xbmc/lib/libPython/xbmcmodule/PythonPlayer.h XBMC/xbmc/lib/libPython/xbmcmodule/PythonPlayer.h
+--- XBMC.orig/xbmc/lib/libPython/xbmcmodule/PythonPlayer.h	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/lib/libPython/xbmcmodule/PythonPlayer.h	2009-01-09 00:12:51.000000000 +0200
+@@ -21,7 +21,7 @@
+ 
+ #pragma once
+ 
+-#include "lib/libPython/Python/Include/Python.h"
++#include <python2.5/Python.h>>
+ #include "cores/IPlayer.h"
+ 
+ 
+diff -Naur XBMC.orig/xbmc/lib/libPython/xbmcmodule/pyutil.h XBMC/xbmc/lib/libPython/xbmcmodule/pyutil.h
+--- XBMC.orig/xbmc/lib/libPython/xbmcmodule/pyutil.h	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/lib/libPython/xbmcmodule/pyutil.h	2009-01-09 00:12:51.000000000 +0200
+@@ -19,7 +19,7 @@
+  *
+  */
+ 
+-#include "lib/libPython/Python/Include/Python.h"
++#include <python2.5/Python.h>>
+ #ifdef _LINUX
+ #include "../XBPythonDll.h"
+ #endif
+diff -Naur XBMC.orig/xbmc/lib/libPython/xbmcmodule/window.h XBMC/xbmc/lib/libPython/xbmcmodule/window.h
+--- XBMC.orig/xbmc/lib/libPython/xbmcmodule/window.h	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/lib/libPython/xbmcmodule/window.h	2009-01-09 00:12:51.000000000 +0200
+@@ -19,7 +19,7 @@
+  *
+  */
+ 
+-#include "lib/libPython/Python/Include/Python.h"
++#include <python2.5/Python.h>>
+ #ifdef _LINUX
+ #include "../XBPythonDll.h"
+ #endif
+diff -Naur XBMC.orig/xbmc/lib/libPython/xbmcmodule/winxml.cpp XBMC/xbmc/lib/libPython/xbmcmodule/winxml.cpp
+--- XBMC.orig/xbmc/lib/libPython/xbmcmodule/winxml.cpp	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/lib/libPython/xbmcmodule/winxml.cpp	2009-01-09 00:12:51.000000000 +0200
+@@ -21,7 +21,7 @@
+ 
+ #include "stdafx.h"
+ #include "winxml.h"
+-#include "lib/libPython/Python/Include/Python.h"
++#include <python2.5/Python.h>
+ #ifdef _LINUX
+ #include "../XBPythonDll.h"
+ #endif
+diff -Naur XBMC.orig/xbmc/lib/libPython/xbmcmodule/winxmldialog.cpp XBMC/xbmc/lib/libPython/xbmcmodule/winxmldialog.cpp
+--- XBMC.orig/xbmc/lib/libPython/xbmcmodule/winxmldialog.cpp	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/lib/libPython/xbmcmodule/winxmldialog.cpp	2009-01-09 00:12:51.000000000 +0200
+@@ -21,7 +21,7 @@
+ 
+ #include "stdafx.h"
+ #include "winxml.h"
+-#include "lib/libPython/Python/Include/Python.h"
++#include <python2.5/Python.h>
+ #ifdef _LINUX
+ #include "../XBPythonDll.h"
+ #endif
+diff -Naur XBMC.orig/xbmc/lib/libPython/xbmcmodule/winxml.h XBMC/xbmc/lib/libPython/xbmcmodule/winxml.h
+--- XBMC.orig/xbmc/lib/libPython/xbmcmodule/winxml.h	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/lib/libPython/xbmcmodule/winxml.h	2009-01-09 00:12:51.000000000 +0200
+@@ -19,7 +19,7 @@
+  *
+  */
+ 
+-#include "lib/libPython/Python/Include/Python.h"
++#include <python2.5/Python.h>>
+ #include "window.h"
+ #pragma once
+ 
+diff -Naur XBMC.orig/xbmc/lib/libPython/xbmcmodule/xbmcguimodule.cpp XBMC/xbmc/lib/libPython/xbmcmodule/xbmcguimodule.cpp
+--- XBMC.orig/xbmc/lib/libPython/xbmcmodule/xbmcguimodule.cpp	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/lib/libPython/xbmcmodule/xbmcguimodule.cpp	2009-01-09 00:12:51.000000000 +0200
+@@ -20,8 +20,8 @@
+  */
+ 
+ #include "stdafx.h"
+-#include "lib/libPython/Python/Include/Python.h"
+-#include "lib/libPython/Python/Include/structmember.h"
++#include <python2.5/Python.h>
++#include <python2.5/structmember.h>
+ #ifdef _LINUX
+ #include "../XBPythonDll.h"
+ #endif
+diff -Naur XBMC.orig/xbmc/lib/libPython/xbmcmodule/xbmcmodule.cpp XBMC/xbmc/lib/libPython/xbmcmodule/xbmcmodule.cpp
+--- XBMC.orig/xbmc/lib/libPython/xbmcmodule/xbmcmodule.cpp	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/lib/libPython/xbmcmodule/xbmcmodule.cpp	2009-01-09 00:12:51.000000000 +0200
+@@ -20,7 +20,7 @@
+  */
+ 
+ #include "stdafx.h"
+-#include "lib/libPython/Python/Include/Python.h"
++#include <python2.5/Python.h>
+ #ifdef _LINUX
+ #include "../XBPythonDll.h"
+ #endif
+diff -Naur XBMC.orig/xbmc/lib/libPython/XBPython.cpp XBMC/xbmc/lib/libPython/XBPython.cpp
+--- XBMC.orig/xbmc/lib/libPython/XBPython.cpp	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/lib/libPython/XBPython.cpp	2009-01-08 23:36:55.000000000 +0200
+@@ -28,7 +28,7 @@
+ 
+ // python.h should always be included first before any other includes
+ #include "stdafx.h"
+-#include "Python/Include/Python.h"
++#include <python2.5/Python.h>
+ #include "cores/DllLoader/DllLoaderContainer.h"
+ #include "GUIPassword.h"
+ 
+diff -Naur XBMC.orig/xbmc/lib/libPython/XBPyThread.cpp XBMC/xbmc/lib/libPython/XBPyThread.cpp
+--- XBMC.orig/xbmc/lib/libPython/XBPyThread.cpp	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/lib/libPython/XBPyThread.cpp	2009-01-08 23:37:18.000000000 +0200
+@@ -21,8 +21,8 @@
+ 
+ // python.h should always be included first before any other includes
+ #include "stdafx.h"
+-#include "Python/Include/Python.h"
+-#include "Python/Include/osdefs.h"
++#include <python2.5/Python.h>
++#include <python2.5/osdefs.h>
+ #ifdef _LINUX
+ #include "XBPythonDll.h"
+ #endif
+diff -Naur XBMC.orig/xbmc/lib/libPython/XBPyThread.h XBMC/xbmc/lib/libPython/XBPyThread.h
+--- XBMC.orig/xbmc/lib/libPython/XBPyThread.h	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/lib/libPython/XBPyThread.h	2009-01-08 23:36:47.000000000 +0200
+@@ -22,7 +22,7 @@
+ #ifndef XBPYTHREAD_H_
+ #define XBPYTHREAD_H_
+ 
+-#include "Python/Include/Python.h"
++#include <python2.5/Python.h>
+ #include "utils/Thread.h"
+ 
+ class XBPython;
+diff -Naur XBMC.orig/xbmc/utils/ArabicShaping.h XBMC/xbmc/utils/ArabicShaping.h
+--- XBMC.orig/xbmc/utils/ArabicShaping.h	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/utils/ArabicShaping.h	2009-01-09 02:33:12.000000000 +0200
+@@ -30,7 +30,7 @@
+ #include "lib/libfribidi/fribidi.h"
+ #else
+ #include <fribidi/fribidi.h>
+-#include <fribidi/fribidi_char_sets.h>
++#include <fribidi/fribidi-char-sets.h>
+ #endif
+ 
+ /**
+diff -Naur XBMC.orig/xbmc/utils/CharsetConverter.h XBMC/xbmc/utils/CharsetConverter.h
+--- XBMC.orig/xbmc/utils/CharsetConverter.h	2008-11-10 05:58:15.000000000 +0200
++++ XBMC/xbmc/utils/CharsetConverter.h	2009-01-09 01:55:48.000000000 +0200
+@@ -28,7 +28,7 @@
+ #else
+ #include <iconv.h>
+ #include <fribidi/fribidi.h>
+-#include <fribidi/fribidi_char_sets.h>
++#include <fribidi/fribidi-char-sets.h>
+ #endif
+ #include "CriticalSection.h"
+ 

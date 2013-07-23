@@ -1,0 +1,77 @@
+diff -r daa7270178d4 tools/vtpm_manager/manager/vtpm_manager.c
+--- a/tools/vtpm_manager/manager/vtpm_manager.c	Tue Feb 26 22:34:53 2008 +0200
++++ b/tools/vtpm_manager/manager/vtpm_manager.c	Tue Feb 26 22:39:34 2008 +0200
+@@ -95,17 +95,14 @@ TPM_RESULT VTPM_Create_Manager(){
+   // We use the abilty to read the pubEK to flag that the TPM is owned.
+   // FIXME: Change to just trying to take ownership and react to the status
+   if (status == TPM_SUCCESS) { 
+-    TPMTRYRETURN(VTSP_TakeOwnership(vtpm_globals->manager_tcs_handle,
+-				    (const TPM_AUTHDATA*)&vtpm_globals->owner_usage_auth, 
+-				    &SRK_AUTH,
+-				    &ek_cryptoInfo,
+-				    &vtpm_globals->keyAuth)); 
+-  
+-    TPMTRYRETURN(VTSP_DisablePubekRead(vtpm_globals->manager_tcs_handle,
+-                                       (const TPM_AUTHDATA*)&vtpm_globals->owner_usage_auth,  
+-                                       &vtpm_globals->keyAuth));     
+-  } else {
+-    vtpmloginfo(VTPM_LOG_VTPM, "Failed to readEK meaning TPM has an owner. Creating Keys off existing SRK.\n");
++    status = VTSP_TakeOwnership(vtpm_globals->manager_tcs_handle,
++                                       (const TPM_AUTHDATA*)&vtpm_globals->owner_usage_auth, 
++                                       &SRK_AUTH,
++                                       &ek_cryptoInfo,
++                                       &vtpm_globals->keyAuth);
++  }
++  if (status != TPM_SUCCESS) { 
++        vtpmloginfo(VTPM_LOG_VTPM, "TPM has an owner. Creating Keys off existing SRK.\n");
+   }
+   
+   // Generate storage key's auth
+diff -r daa7270178d4 tools/vtpm_manager/manager/vtsp.c
+--- a/tools/vtpm_manager/manager/vtsp.c	Tue Feb 26 22:34:53 2008 +0200
++++ b/tools/vtpm_manager/manager/vtsp.c	Tue Feb 26 22:39:34 2008 +0200
+@@ -596,7 +596,7 @@ TPM_RESULT VTSP_LoadKey(const TCS_CONTEX
+   vtpmloginfo(VTPM_LOG_VTSP, "Loading Key %s.\n", (!skipTPMLoad ? "into TPM" : "only into memory"));
+   
+   TPM_RESULT status = TPM_SUCCESS;
+-  TPM_COMMAND_CODE command = TPM_ORD_LoadKey;
++  TPM_COMMAND_CODE command = TPM_ORD_LoadKey2;
+ 
+   BYTE *paramText=NULL;        // Digest to make Auth.
+   UINT32 paramTextSize;
+@@ -634,10 +634,9 @@ TPM_RESULT VTSP_LoadKey(const TCS_CONTEX
+ 				       &phKeyHMAC) );
+   
+     // Verify Auth
+-    paramTextSize = BSG_PackList(paramText, 3,
++    paramTextSize = BSG_PackList(paramText, 2,
+ 			         BSG_TPM_RESULT, &status,
+-			         BSG_TPM_COMMAND_CODE, &command,
+-			         BSG_TPM_HANDLE, newKeyHandle);
++			         BSG_TPM_COMMAND_CODE, &command);
+   
+     TPMTRYRETURN( VerifyAuth( paramText, paramTextSize,
+ 			      parentAuth, auth, 
+diff -r daa7270178d4 tools/vtpm_manager/tcs/tcs.c
+--- a/tools/vtpm_manager/tcs/tcs.c	Tue Feb 26 22:34:53 2008 +0200
++++ b/tools/vtpm_manager/tcs/tcs.c	Tue Feb 26 22:39:34 2008 +0200
+@@ -901,7 +901,7 @@ TPM_RESULT TCSP_LoadKeyByBlob(TCS_CONTEX
+   // setup input/output parameters block
+   TPM_TAG tag = TPM_TAG_RQU_AUTH1_COMMAND;
+   UINT32 paramSize = 0;
+-  TPM_COMMAND_CODE ordinal = TPM_ORD_LoadKey;
++  TPM_COMMAND_CODE ordinal = TPM_ORD_LoadKey2;
+   TPM_RESULT returnCode = TPM_SUCCESS;
+   
+   // setup the TPM driver input and output buffers
+diff -r daa7270178d4 tools/vtpm_manager/util/tcg.h
+--- a/tools/vtpm_manager/util/tcg.h	Tue Feb 26 22:34:53 2008 +0200
++++ b/tools/vtpm_manager/util/tcg.h	Tue Feb 26 22:39:34 2008 +0200
+@@ -250,6 +250,7 @@ typedef struct pack_constbuf_t {
+ #define TPM_ORD_ReadManuMaintPub         (48UL + TPM_PROTECTED_ORDINAL)
+ #define TPM_ORD_CertifyKey               (50UL + TPM_PROTECTED_ORDINAL)
+ #define TPM_ORD_Sign                     (60UL + TPM_PROTECTED_ORDINAL)
++#define TPM_ORD_LoadKey2                 (65UL + TPM_PROTECTED_ORDINAL)
+ #define TPM_ORD_GetRandom                (70UL + TPM_PROTECTED_ORDINAL)
+ #define TPM_ORD_StirRandom               (71UL + TPM_PROTECTED_ORDINAL)
+ #define TPM_ORD_SelfTestFull             (80UL + TPM_PROTECTED_ORDINAL)

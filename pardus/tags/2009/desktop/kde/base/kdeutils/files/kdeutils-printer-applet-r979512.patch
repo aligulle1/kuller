@@ -1,0 +1,3293 @@
+diff -Naur /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/authconn.py kdeutils-trunk/printer-applet/authconn.py
+--- /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/authconn.py	1970-01-01 02:00:00.000000000 +0200
++++ kdeutils-trunk/printer-applet/authconn.py	2009-01-27 01:22:42.000000000 +0200
+@@ -0,0 +1,262 @@
++#!/usr/bin/env python
++# -*- coding: utf-8 -*-
++
++## Copyright (C) 2007, 2008 Tim Waugh <twaugh@redhat.com>
++## Copyright (C) 2007, 2008 Red Hat, Inc.
++
++## This program is free software; you can redistribute it and/or modify
++## it under the terms of the GNU General Public License as published by
++## the Free Software Foundation; either version 2 of the License, or
++## (at your option) any later version.
++
++## This program is distributed in the hope that it will be useful,
++## but WITHOUT ANY WARRANTY; without even the implied warranty of
++## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++## GNU General Public License for more details.
++
++## You should have received a copy of the GNU General Public License
++## along with this program; if not, write to the Free Software
++## Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
++
++import cups
++from debug import *
++
++class AuthDialog():
++    def __init__(self):
++        pass
++"""
++class AuthDialog(gtk.Dialog):
++    AUTH_FIELD={'username': _("Username:"),
++                'password': _("Password:"),
++                'domain': _("Domain:")}
++
++    def __init__ (self, title=_("Authentication"), parent=None,
++                  flags=gtk.DIALOG_MODAL | gtk.DIALOG_NO_SEPARATOR,
++                  buttons=(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,
++                           gtk.STOCK_OK, gtk.RESPONSE_OK),
++                  auth_info_required=['username', 'password']):
++        gtk.Dialog.__init__ (self, title, parent, flags, buttons)
++        self.auth_info_required = auth_info_required
++        self.set_default_response (gtk.RESPONSE_OK)
++        self.set_border_width (6)
++        self.set_resizable (False)
++        hbox = gtk.HBox (False, 12)
++        hbox.set_border_width (6)
++        image = gtk.Image ()
++        image.set_from_stock (gtk.STOCK_DIALOG_AUTHENTICATION,
++                              gtk.ICON_SIZE_DIALOG)
++        image.set_alignment (0.0, 0.0)
++        hbox.pack_start (image, False, False, 0)
++        vbox = gtk.VBox (False, 12)
++        self.prompt_label = gtk.Label ()
++        vbox.pack_start (self.prompt_label, False, False, 0)
++
++        num_fields = len (auth_info_required)
++        table = gtk.Table (num_fields, 2)
++        table.set_row_spacings (6)
++        table.set_col_spacings (6)
++
++        self.field_entry = []
++        for i in range (num_fields):
++            field = auth_info_required[i]
++            label = gtk.Label (self.AUTH_FIELD.get (field, field))
++            label.set_alignment (0, 0.5)
++            table.attach (label, 0, 1, i, i + 1)
++            entry = gtk.Entry ()
++            entry.set_visibility (field != 'password')
++            table.attach (entry, 1, 2, i, i + 1, 0, 0)
++            self.field_entry.append (entry)
++
++        self.field_entry[num_fields - 1].set_activates_default (True)
++        vbox.pack_start (table, False, False, 0)
++        hbox.pack_start (vbox, False, False, 0)
++        self.vbox.pack_start (hbox)
++        self.vbox.show_all ()
++
++    def set_prompt (self, prompt):
++        self.prompt_label.set_markup ('<span weight="bold" size="larger">' +
++                                      prompt + '</span>')
++        self.prompt_label.set_use_markup (True)
++        self.prompt_label.set_alignment (0, 0)
++        self.prompt_label.set_line_wrap (True)
++
++    def set_auth_info (self, auth_info):
++        for i in range (len (self.field_entry)):
++            self.field_entry[i].set_text (auth_info[i])
++
++    def get_auth_info (self):
++        return map (lambda x: x.get_text (), self.field_entry)
++
++    def field_grab_focus (self, field):
++        i = self.auth_info_required.index (field)
++        self.field_entry[i].grab_focus ()
++"""
++
++class Connection:
++    def __init__ (self, parent=None, try_as_root=True):
++        self._use_password = ''
++        self._parent = parent
++        self._try_as_root = try_as_root
++        self._use_user = cups.getUser ()
++        self._server = cups.getServer ()
++        self._port = cups.getPort()
++        self._connect ()
++        self._prompt_allowed = True
++
++    def _get_prompt_allowed (self, ):
++        return self._prompt_allowed
++
++    def _set_prompt_allowed (self, allowed):
++        self._prompt_allowed = allowed
++
++    def _connect (self):
++        cups.setUser (self._use_user)
++        cups.setServer (self._server)
++        cups.setPort (self._port)
++        self._connection = cups.Connection ()
++        self._user = self._use_user
++        debugprint ("Connected as user %s" % self._user)
++        methodtype = type (self._connection.getPrinters)
++        for fname in dir (self._connection):
++            if fname[0] == '_':
++                continue
++            fn = getattr (self._connection, fname)
++            if type (fn) != methodtype:
++                continue
++            setattr (self, fname, self._make_binding (fname, fn))
++
++    def _make_binding (self, fname, fn):
++        return lambda *args, **kwds: self._authloop (fname, fn, *args, **kwds)
++
++    def _authloop (self, fname, fn, *args, **kwds):
++        self._passes = 0
++        c = self._connection
++        while self._perform_authentication () != 0:
++            if c != self._connection:
++                # We have reconnected.
++                fn = getattr (self._connection, fname)
++                c = self._connection
++
++            try:
++                result = fn.__call__ (*args, **kwds)
++
++                if fname == 'adminGetServerSettings':
++                    # Special case for a rubbish bit of API.
++                    if result == {}:
++                        # Authentication failed, but we aren't told that.
++                        raise cups.IPPError (cups.IPP_NOT_AUTHORIZED, '')
++                break
++            except cups.IPPError, (e, m):
++                if not self._cancel and e == cups.IPP_NOT_AUTHORIZED:
++                    self._failed ()
++                else:
++                    raise
++            except cups.HTTPError, (s,):
++                if not self._cancel and (s == cups.HTTP_UNAUTHORIZED or
++                                         s == cups.HTTP_FORBIDDEN):
++                    self._failed (s == cups.HTTP_FORBIDDEN)
++                else:
++                    raise
++
++        return result
++
++    def _failed (self, forbidden=False):
++        self._has_failed = True
++        self._forbidden = forbidden
++
++    def _password_callback (self, prompt):
++        debugprint ("Got password callback")
++        if self._cancel or self._auth_called:
++            return ''
++
++        self._auth_called = True
++        self._prompt = prompt
++        return self._use_password
++
++    def _perform_authentication (self):
++        self._passes += 1
++
++        debugprint ("Authentication pass: %d" % self._passes)
++        if self._passes == 1:
++            # Haven't yet tried the operation.  Set the password
++            # callback and return > 0 so we try it for the first time.
++            self._has_failed = False
++            self._forbidden = False
++            self._auth_called = False
++            self._cancel = False
++            cups.setPasswordCB (self._password_callback)
++            debugprint ("Authentication: password callback set")
++            return 1
++
++        if not self._has_failed:
++            # Tried the operation and it worked.  Return 0 to signal to
++            # break out of the loop.
++            debugprint ("Authentication: Operation successful")
++            return 0
++
++        # Reset failure flag.
++        self._has_failed = False
++
++        if self._passes == 2:
++            # Tried the operation without a password and it failed.
++            if (self._try_as_root and
++                self._user != 'root' and
++                (self._server[0] == '/' or self._forbidden)):
++                # This is a UNIX domain socket connection so we should
++                # not have needed a password (or it is not a UDS but
++                # we got an HTTP_FORBIDDEN response), and so the
++                # operation must not be something that the current
++                # user is authorised to do.  They need to try as root,
++                # and supply the password.  However, to get the right
++                # prompt, we need to try as root but with no password
++                # first.
++                debugprint ("Authentication: Try as root")
++                self._use_user = 'root'
++                self._auth_called = False
++                self._connect ()
++                return 1
++
++        if not self._prompt_allowed:
++            debugprint ("Authentication: prompting not allowed")
++            self._cancel = True
++            return 1
++
++        if not self._auth_called:
++            # We aren't even getting a chance to supply credentials.
++            debugprint ("Authentication: giving up")
++            self._cancel = True
++            return 1
++
++        # Reset the flag indicating whether we were given an auth callback.
++        self._auth_called = False
++
++        # Prompt.
++        """FIXME port dialogue
++        d = AuthDialog (parent=self._parent)
++        d.set_prompt (self._prompt)
++        d.set_auth_info ([self._use_user, ''])
++        d.field_grab_focus ('password')
++        response = d.run ()
++        d.hide ()
++        """
++        response = False
++
++        #if response == gtk.RESPONSE_CANCEL:
++        if response:
++            self._cancel = True
++            return -1
++
++        (self._use_user,
++         self._use_password) = d.get_auth_info ()
++
++        cups.setUser (self._use_user)
++        debugprint ("Authentication: Reconnect")
++        self._connect ()
++
++        return 1
++
++if __name__ == '__main__':
++    # Test it out.
++    set_debugging (True)
++    c = Connection (None)
++    print c.getFile ('/admin/conf/cupsd.conf', '/dev/stdout')
+diff -Naur /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/CMakeLists.txt kdeutils-trunk/printer-applet/CMakeLists.txt
+--- /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/CMakeLists.txt	2008-08-20 22:52:58.000000000 +0300
++++ kdeutils-trunk/printer-applet/CMakeLists.txt	2009-04-20 21:59:31.000000000 +0300
+@@ -1,9 +1,6 @@
++project(printer-applet)
+ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH}  ${CMAKE_CURRENT_SOURCE_DIR}/cmake-modules )
+ 
+-MACRO(PYKDE4_ADD_EXECUTABLE _pyname _exename)
+-    INSTALL(CODE "EXECUTE_PROCESS(COMMAND ${CMAKE_COMMAND} -DTARGET=${DATA_INSTALL_DIR}/printer-applet/${_pyname} -DLINK_NAME=${BIN_INSTALL_DIR}/${_exename} -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake-modules/create_exe_symlink.cmake)" )
+-ENDMACRO(PYKDE4_ADD_EXECUTABLE)
+-
+ macro_optional_find_package(PythonLibrary)
+ macro_optional_find_package(SIP)
+ 
+@@ -12,19 +9,19 @@
+     macro_log_feature(PYQT4_FOUND "PyQt4" "PyQt4 was not found.  It is needed by printer-applet to run. (Use -DINSTALL_PRINTER_APPLET=TRUE to install anyway)" "http://www.riverbankcomputing.co.uk/software/pyqt/intro" FALSE)
+ ENDIF(NOT PYQT4_FOUND)
+ 
+-find_package(PyKDE)
+-IF(NOT PYKDE_FOUND)
+-    macro_log_feature(PYKDE_FOUND "PyKDE" "PyKDE was not found.  It is needed by printer-applet to run.  (Use -DINSTALL_PRINTER_APPLET=TRUE to install anyway)" "http://websvn.kde.org/trunk/KDE/kdebindings/python/pykde4/" FALSE)
+-ENDIF(NOT PYKDE_FOUND)
++find_package(PyKDE4)
++IF(NOT PYKDE4_FOUND)
++    macro_log_feature(PYKDE4_FOUND "PyKDE4" "PyKDE4 was not found.  It is needed by printer-applet to run.  (Use -DINSTALL_PRINTER_APPLET=TRUE to install anyway)" "http://websvn.kde.org/trunk/KDE/kdebindings/python/pykde4/" FALSE)
++ENDIF(NOT PYKDE4_FOUND)
+ 
+ find_package(PyCups)
+ IF(NOT PYCUPS_FOUND)
+     macro_log_feature(PYCUPS_FOUND "PyCups" "PyCups was not found.  It is needed by printer-applet to run.  (Use -DINSTALL_PRINTER_APPLET=TRUE to install anyway)" "http://cyberelk.net/tim/software/pycups/" FALSE)
+ ENDIF(NOT PYCUPS_FOUND)
+ 
+-IF(PYQT4_FOUND AND PYKDE_FOUND AND PYCUPS_FOUND)
++IF(PYQT4_FOUND AND PYKDE4_FOUND AND PYCUPS_FOUND)
+     SET(INSTALL_PRINTER_APPLET TRUE)
+-ENDIF(PYQT4_FOUND AND PYKDE_FOUND AND PYCUPS_FOUND)
++ENDIF(PYQT4_FOUND AND PYKDE4_FOUND AND PYCUPS_FOUND)
+ 
+ IF(INSTALL_PRINTER_APPLET)
+     install( FILES
+@@ -32,6 +29,11 @@
+         printer-applet.py
+         printer-applet.ui
+         printer-appletui.rc
++        printer-applet.notifyrc
++        statereason.py
++        monitor.py
++        authconn.py
++        debug.py
+         DESTINATION ${DATA_INSTALL_DIR}/printer-applet )
+     PYKDE4_ADD_EXECUTABLE(printer-applet.py printer-applet)
+     install(FILES printer-applet.desktop DESTINATION ${AUTOSTART_INSTALL_DIR})
+@@ -39,5 +41,5 @@
+ 
+ find_package(SystemConfigPrinter)
+ IF(NOT SYSTEMCONFIGPRINTER_FOUND)
+-    macro_log_feature(SYSTEMCONFIGPRINTER_FOUND "system-config-printer" "system-config-printer was not found.  Some of its modules (cupshelpers.py and ppds.py) are optionally used by printer-applet for auto configure of new printers.  You should also install hal-cups-utils <svn co http://svn.fedorahosted.org/svn/hal-cups-utils/trunk/>" "http://cyberelk.net/tim/software/system-config-printer/" FALSE)
++    macro_log_feature(SYSTEMCONFIGPRINTER_FOUND "system-config-printer" "system-config-printer was not found.  Some of its modules (cupshelpers.py and ppds.py) are optionally used by printer-applet for auto configure of new printers.  You should also install hal-cups-utils <https://fedorahosted.org/hal-cups-utils/>" "http://cyberelk.net/tim/software/system-config-printer/" FALSE)
+ ENDIF(NOT SYSTEMCONFIGPRINTER_FOUND)
+diff -Naur /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/cmake-modules/create_exe_symlink.cmake kdeutils-trunk/printer-applet/cmake-modules/create_exe_symlink.cmake
+--- /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/cmake-modules/create_exe_symlink.cmake	2008-05-29 14:18:38.000000000 +0300
++++ kdeutils-trunk/printer-applet/cmake-modules/create_exe_symlink.cmake	1970-01-01 02:00:00.000000000 +0200
+@@ -1,16 +0,0 @@
+-# Create an executable symlink to a Python script.
+-# This also sets the target script's permission bits.
+-
+-MESSAGE(STATUS "Symlinking $ENV{DESTDIR}${LINK_NAME} to ${TARGET}")
+-
+-GET_FILENAME_COMPONENT(abs_link_name $ENV{DESTDIR}/${LINK_NAME} ABSOLUTE)
+-GET_FILENAME_COMPONENT(link_path $ENV{DESTDIR}/${LINK_NAME} PATH)
+-GET_FILENAME_COMPONENT(abs_link_path ${link_path} ABSOLUTE)
+-FILE(MAKE_DIRECTORY ${abs_link_path})
+-
+-GET_FILENAME_COMPONENT(abs_target ${TARGET} ABSOLUTE)
+-IF(UNIX)
+-    EXECUTE_PROCESS(COMMAND ${CMAKE_COMMAND} -E create_symlink ${abs_target} ${abs_link_name})
+-    EXECUTE_PROCESS(COMMAND chmod 755 $ENV{DESTDIR}/${abs_target})
+-ENDIF(UNIX)
+-# FIXME: WIN32 support
+diff -Naur /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/cmake-modules/FindLibPython.py kdeutils-trunk/printer-applet/cmake-modules/FindLibPython.py
+--- /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/cmake-modules/FindLibPython.py	2008-05-07 12:05:17.000000000 +0300
++++ kdeutils-trunk/printer-applet/cmake-modules/FindLibPython.py	1970-01-01 02:00:00.000000000 +0200
+@@ -1,11 +0,0 @@
+-# Copyright (c) 2007, Simon Edwards <simon@simonzone.com>
+-# Redistribution and use is allowed according to the terms of the BSD license.
+-# For details see the accompanying COPYING-CMAKE-SCRIPTS file.
+-import sys
+-import distutils.sysconfig
+-
+-print("exec_prefix:%s" % sys.exec_prefix)
+-print("short_version:%s" % sys.version[:3])
+-print("long_version:%s" % sys.version.split()[0])
+-print("py_inc_dir:%s" % distutils.sysconfig.get_python_inc())
+-print("site_packages_dir:%s" % distutils.sysconfig.get_python_lib(plat_specific=1))
+diff -Naur /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/cmake-modules/FindPyKDE.cmake kdeutils-trunk/printer-applet/cmake-modules/FindPyKDE.cmake
+--- /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/cmake-modules/FindPyKDE.cmake	2008-05-07 12:05:17.000000000 +0300
++++ kdeutils-trunk/printer-applet/cmake-modules/FindPyKDE.cmake	1970-01-01 02:00:00.000000000 +0200
+@@ -1,33 +0,0 @@
+-# Find PyKde
+-# ~~~~~~~~~~
+-# Copyright (c) 2008, Jonathan Riddell <jriddell@ubuntu.com>
+-# Redistribution and use is allowed according to the terms of the BSD license.
+-# For details see the accompanying COPYING-CMAKE-SCRIPTS file.
+-#
+-# PyKde website: http://www.riverbankcomputing.co.uk/pykde/index.php
+-#
+-# Find the installed version of PyKDE.
+-
+-IF(PYKDE_FOUND)
+-  # Already in cache, be silent
+-  SET(PYKDE_FOUND TRUE)
+-ELSE(PYKDE_FOUND)
+-
+-  GET_FILENAME_COMPONENT(_cmake_module_path ${CMAKE_CURRENT_LIST_FILE}  PATH)
+-
+-  EXECUTE_PROCESS(COMMAND ${PYTHON_EXECUTABLE} ${_cmake_module_path}/FindPyKDE.py OUTPUT_VARIABLE pykde ERROR_QUIET)
+-  IF(pykde)
+-    SET(PYKDE_FOUND TRUE)
+-  ENDIF(pykde)
+-
+-  IF(PYKDE_FOUND)
+-    IF(NOT PYKDE_FIND_QUIETLY)
+-      MESSAGE(STATUS "Found PyKde")
+-    ENDIF(NOT PYKDE_FIND_QUIETLY)
+-  ELSE(PYKDE_FOUND)
+-    IF(PYKDE_FIND_REQUIRED)
+-      MESSAGE(FATAL_ERROR "Could not find PyKDE")
+-    ENDIF(PYKDE_FIND_REQUIRED)
+-  ENDIF(PYKDE_FOUND)
+-
+-ENDIF(PYKDE_FOUND)
+diff -Naur /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/cmake-modules/FindPyKDE.py kdeutils-trunk/printer-applet/cmake-modules/FindPyKDE.py
+--- /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/cmake-modules/FindPyKDE.py	2008-05-07 12:05:17.000000000 +0300
++++ kdeutils-trunk/printer-applet/cmake-modules/FindPyKDE.py	1970-01-01 02:00:00.000000000 +0200
+@@ -1,9 +0,0 @@
+-# Copyright (c) 2008, Jonathan Riddell <jriddell@ubuntu.com>
+-# Redistribution and use is allowed according to the terms of the BSD license.
+-# For details see the accompanying COPYING-CMAKE-SCRIPTS file.
+-
+-try:
+-    from PyKDE4.kdeui import KApplication
+-except:
+-    exit(1)
+-print "Groovy"
+diff -Naur /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/cmake-modules/FindPyQt4.cmake kdeutils-trunk/printer-applet/cmake-modules/FindPyQt4.cmake
+--- /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/cmake-modules/FindPyQt4.cmake	2008-05-07 12:05:17.000000000 +0300
++++ kdeutils-trunk/printer-applet/cmake-modules/FindPyQt4.cmake	1970-01-01 02:00:00.000000000 +0200
+@@ -1,46 +0,0 @@
+-# Find PyQt4
+-# ~~~~~~~~~~
+-# Copyright (c) 2007, Simon Edwards <simon@simonzone.com>
+-# Redistribution and use is allowed according to the terms of the BSD license.
+-# For details see the accompanying COPYING-CMAKE-SCRIPTS file.
+-#
+-# PyQt4 website: http://www.riverbankcomputing.co.uk/pyqt/index.php
+-#
+-# Find the installed version of PyQt4. FindPyQt4 should only be called after
+-# Python has been found.
+-#
+-# This file defines the following variables:
+-#
+-# PYQT4_VERSION - The version of PyQt4 found expressed as a 6 digit hex number
+-#     suitable for comparision as a string
+-#
+-# PYQT4_VERSION_STR - The version of PyQt4 as a human readable string.
+-#
+-# PYQT4_SIP_DIR - The directory holding the PyQt4 .sip files.
+-
+-IF(PYQT4_VERSION)
+-  # Already in cache, be silent
+-  SET(PYQT4_FOUND TRUE)
+-ELSE(PYQT4_VERSION)
+-
+-  GET_FILENAME_COMPONENT(_cmake_module_path ${CMAKE_CURRENT_LIST_FILE}  PATH)
+-
+-  EXECUTE_PROCESS(COMMAND ${PYTHON_EXECUTABLE} ${_cmake_module_path}/FindPyQt.py OUTPUT_VARIABLE pyqt_config ERROR_QUIET)
+-  IF(pyqt_config)
+-    STRING(REGEX REPLACE "^pyqt_version:([^\n]+).*$" "\\1" PYQT4_VERSION ${pyqt_config})
+-    STRING(REGEX REPLACE ".*\npyqt_version_str:([^\n]+).*$" "\\1" PYQT4_VERSION_STR ${pyqt_config})
+-    STRING(REGEX REPLACE ".*\npyqt_sip_dir:([^\n]+).*$" "\\1" PYQT4_SIP_DIR ${pyqt_config})
+-    SET(PYQT4_FOUND TRUE)
+-  ENDIF(pyqt_config)
+-
+-  IF(PYQT4_FOUND)
+-    IF(NOT PYQT4_FIND_QUIETLY)
+-      MESSAGE(STATUS "Found PyQt4 version: ${PYQT4_VERSION_STR}")
+-    ENDIF(NOT PYQT4_FIND_QUIETLY)
+-  ELSE(PYQT4_FOUND)
+-    IF(PYQT4_FIND_REQUIRED)
+-      MESSAGE(FATAL_ERROR "Could not find Python")
+-    ENDIF(PYQT4_FIND_REQUIRED)
+-  ENDIF(PYQT4_FOUND)
+-
+-ENDIF(PYQT4_VERSION)
+diff -Naur /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/cmake-modules/FindPyQt.py kdeutils-trunk/printer-applet/cmake-modules/FindPyQt.py
+--- /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/cmake-modules/FindPyQt.py	2008-05-07 12:05:17.000000000 +0300
++++ kdeutils-trunk/printer-applet/cmake-modules/FindPyQt.py	1970-01-01 02:00:00.000000000 +0200
+@@ -1,17 +0,0 @@
+-# Copyright (c) 2007, Simon Edwards <simon@simonzone.com>
+-# Redistribution and use is allowed according to the terms of the BSD license.
+-# For details see the accompanying COPYING-CMAKE-SCRIPTS file.
+-
+-f=open('/tmp/workfile', 'w')
+-f.write("finding Qt")
+-f.close()
+-
+-try:
+-    import PyQt4.pyqtconfig
+-except:
+-    exit(1)
+-
+-pyqtcfg = PyQt4.pyqtconfig.Configuration()
+-print("pyqt_version:%06.0x" % pyqtcfg.pyqt_version)
+-print("pyqt_version_str:%s" % pyqtcfg.pyqt_version_str)
+-print("pyqt_sip_dir:%s" % pyqtcfg.pyqt_sip_dir)
+diff -Naur /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/cmake-modules/FindPythonLibrary.cmake kdeutils-trunk/printer-applet/cmake-modules/FindPythonLibrary.cmake
+--- /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/cmake-modules/FindPythonLibrary.cmake	2008-05-07 12:05:17.000000000 +0300
++++ kdeutils-trunk/printer-applet/cmake-modules/FindPythonLibrary.cmake	1970-01-01 02:00:00.000000000 +0200
+@@ -1,82 +0,0 @@
+-# Find Python
+-# ~~~~~~~~~~~
+-# Copyright (c) 2007, Simon Edwards <simon@simonzone.com>
+-# Redistribution and use is allowed according to the terms of the BSD license.
+-# For details see the accompanying COPYING-CMAKE-SCRIPTS file.
+-#
+-# Find the Python interpreter and related Python directories.
+-#
+-# This file defines the following variables:
+-# 
+-# PYTHON_EXECUTABLE - The path and filename of the Python interpreter.
+-#
+-# PYTHON_SHORT_VERSION - The version of the Python interpreter found,
+-#     excluding the patch version number. (e.g. 2.5 and not 2.5.1))
+-# 
+-# PYTHON_LONG_VERSION - The version of the Python interpreter found as a human
+-#     readable string.
+-#
+-# PYTHON_SITE_PACKAGES_DIR - Location of the Python site-packages directory.
+-#
+-# PYTHON_INCLUDE_PATH - Directory holding the python.h include file.
+-#
+-# PYTHON_LIBRARY, PYTHON_LIBRARIES- Location of the Python library.
+-
+-INCLUDE(CMakeFindFrameworks)
+-
+-IF(EXISTS PYTHON_LIBRARY)
+-   # Already in cache, be silent
+-   SET(PYTHONLIBRARY_FOUND TRUE)
+-ELSE(EXISTS PYTHON_LIBRARY)
+-
+-  FIND_PACKAGE(PythonInterp)
+-  GET_FILENAME_COMPONENT(_cmake_module_path ${CMAKE_CURRENT_LIST_FILE}  PATH)
+-
+-  EXECUTE_PROCESS(COMMAND ${PYTHON_EXECUTABLE}  ${_cmake_module_path}/FindLibPython.py OUTPUT_VARIABLE python_config)
+-  IF(python_config)
+-    STRING(REGEX REPLACE ".*exec_prefix:([^\n]+).*$" "\\1" PYTHON_PREFIX ${python_config})
+-    STRING(REGEX REPLACE ".*\nshort_version:([^\n]+).*$" "\\1" PYTHON_SHORT_VERSION ${python_config})
+-    STRING(REGEX REPLACE ".*\nlong_version:([^\n]+).*$" "\\1" PYTHON_LONG_VERSION ${python_config})
+-    STRING(REGEX REPLACE ".*\npy_inc_dir:([^\n]+).*$" "\\1" PYTHON_INCLUDE_PATH ${python_config})
+-    STRING(REGEX REPLACE ".*\nsite_packages_dir:([^\n]+).*$" "\\1" PYTHON_SITE_PACKAGES_DIR ${python_config})
+-    STRING(REGEX REPLACE "([0-9]+).([0-9]+)" "\\1\\2" PYTHON_SHORT_VERSION_NO_DOT ${PYTHON_SHORT_VERSION})
+-    set(PYTHON_LIBRARY_NAMES python${PYTHON_SHORT_VERSION} python${PYTHON_SHORT_VERSION_NO_DOT})
+-    if(WIN32)
+-        STRING(REPLACE "\\" "/" PYTHON_SITE_PACKAGES_DIR ${PYTHON_SITE_PACKAGES_DIR})
+-    endif(WIN32)
+-    FIND_LIBRARY(PYTHON_LIBRARY NAMES ${PYTHON_LIBRARY_NAMES} PATHS ${PYTHON_PREFIX}/lib ${PYTHON_PREFIX}/libs NO_DEFAULT_PATH)
+-    SET(PYTHONLIBRARY_FOUND TRUE)
+-  ENDIF(python_config)
+-
+-  # adapted from cmake's builtin FindPythonLibs
+-  if(APPLE)
+-    CMAKE_FIND_FRAMEWORKS(Python)
+-    SET(PYTHON_FRAMEWORK_INCLUDES)
+-    IF(Python_FRAMEWORKS)
+-      # If a framework has been selected for the include path,
+-      # make sure "-framework" is used to link it.
+-      IF("${PYTHON_INCLUDE_PATH}" MATCHES "Python\\.framework")
+-        SET(PYTHON_LIBRARY "")
+-        SET(PYTHON_DEBUG_LIBRARY "")
+-      ENDIF("${PYTHON_INCLUDE_PATH}" MATCHES "Python\\.framework")
+-      IF(NOT PYTHON_LIBRARY)
+-        SET (PYTHON_LIBRARY "-framework Python" CACHE FILEPATH "Python Framework" FORCE)
+-      ENDIF(NOT PYTHON_LIBRARY)
+-      SET(PYTHONLIBRARY_FOUND TRUE)
+-    ENDIF(Python_FRAMEWORKS)
+-  ENDIF(APPLE)
+-
+-  IF(PYTHONLIBRARY_FOUND)
+-    SET(PYTHON_LIBRARIES ${PYTHON_LIBRARY})
+-    IF(NOT PYTHONLIBRARY_FIND_QUIETLY)
+-      MESSAGE(STATUS "Found Python executable: ${PYTHON_EXECUTABLE}")
+-      MESSAGE(STATUS "Found Python version: ${PYTHON_LONG_VERSION}")
+-      MESSAGE(STATUS "Found Python library: ${PYTHON_LIBRARY}")
+-    ENDIF(NOT PYTHONLIBRARY_FIND_QUIETLY)
+-  ELSE(PYTHONLIBRARY_FOUND)
+-    IF(PYTHONLIBRARY_FIND_REQUIRED)
+-      MESSAGE(FATAL_ERROR "Could not find Python")
+-    ENDIF(PYTHONLIBRARY_FIND_REQUIRED)
+-  ENDIF(PYTHONLIBRARY_FOUND)
+-
+-ENDIF (EXISTS PYTHON_LIBRARY)
+diff -Naur /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/cmake-modules/FindSIP.cmake kdeutils-trunk/printer-applet/cmake-modules/FindSIP.cmake
+--- /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/cmake-modules/FindSIP.cmake	2008-05-07 12:05:17.000000000 +0300
++++ kdeutils-trunk/printer-applet/cmake-modules/FindSIP.cmake	1970-01-01 02:00:00.000000000 +0200
+@@ -1,53 +0,0 @@
+-# Find SIP
+-# ~~~~~~~~
+-# Copyright (c) 2007, Simon Edwards <simon@simonzone.com>
+-# Redistribution and use is allowed according to the terms of the BSD license.
+-# For details see the accompanying COPYING-CMAKE-SCRIPTS file.
+-#
+-# SIP website: http://www.riverbankcomputing.co.uk/sip/index.php
+-#
+-# Find the installed version of SIP. FindSIP should be called after Python
+-# has been found.
+-#
+-# This file defines the following variables:
+-#
+-# SIP_VERSION - The version of SIP found expressed as a 6 digit hex number
+-#     suitable for comparision as a string.
+-#
+-# SIP_VERSION_STR - The version of SIP found as a human readable string.
+-#
+-# SIP_EXECUTABLE - Path and filename of the SIP command line executable.
+-#
+-# SIP_INCLUDE_DIR - Directory holding the SIP C++ header file.
+-#
+-# SIP_DEFAULT_SIP_DIR - Default directory where .sip files should be installed
+-#     into.
+-
+-IF(SIP_VERSION)
+-  # Already in cache, be silent
+-  SET(SIP_FOUND TRUE)
+-ELSE(SIP_VERSION)
+-
+-  GET_FILENAME_COMPONENT(_cmake_module_path ${CMAKE_CURRENT_LIST_FILE}  PATH)
+-
+-  EXECUTE_PROCESS(COMMAND ${PYTHON_EXECUTABLE} ${_cmake_module_path}/FindSIP.py OUTPUT_VARIABLE sip_config)
+-  IF(sip_config)
+-    STRING(REGEX REPLACE "^sip_version:([^\n]+).*$" "\\1" SIP_VERSION ${sip_config})
+-    STRING(REGEX REPLACE ".*\nsip_version_str:([^\n]+).*$" "\\1" SIP_VERSION_STR ${sip_config})
+-    STRING(REGEX REPLACE ".*\nsip_bin:([^\n]+).*$" "\\1" SIP_EXECUTABLE ${sip_config})
+-    STRING(REGEX REPLACE ".*\ndefault_sip_dir:([^\n]+).*$" "\\1" SIP_DEFAULT_SIP_DIR ${sip_config})
+-    STRING(REGEX REPLACE ".*\nsip_inc_dir:([^\n]+).*$" "\\1" SIP_INCLUDE_DIR ${sip_config})
+-    SET(SIP_FOUND TRUE)
+-  ENDIF(sip_config)
+-
+-  IF(SIP_FOUND)
+-    IF(NOT SIP_FIND_QUIETLY)
+-      MESSAGE(STATUS "Found SIP version: ${SIP_VERSION_STR}")
+-    ENDIF(NOT SIP_FIND_QUIETLY)
+-  ELSE(SIP_FOUND)
+-    IF(SIP_FIND_REQUIRED)
+-      MESSAGE(FATAL_ERROR "Could not find SIP")
+-    ENDIF(SIP_FIND_REQUIRED)
+-  ENDIF(SIP_FOUND)
+-
+-ENDIF(SIP_VERSION)
+diff -Naur /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/cmake-modules/FindSIP.py kdeutils-trunk/printer-applet/cmake-modules/FindSIP.py
+--- /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/cmake-modules/FindSIP.py	2008-05-07 12:05:17.000000000 +0300
++++ kdeutils-trunk/printer-applet/cmake-modules/FindSIP.py	1970-01-01 02:00:00.000000000 +0200
+@@ -1,14 +0,0 @@
+-# FindSIP.py
+-#
+-# Copyright (c) 2007, Simon Edwards <simon@simonzone.com>
+-# Redistribution and use is allowed according to the terms of the BSD license.
+-# For details see the accompanying COPYING-CMAKE-SCRIPTS file.
+-import sys
+-import sipconfig
+-
+-sipcfg = sipconfig.Configuration()
+-print("sip_version:%06.0x" % sipcfg.sip_version)
+-print("sip_version_str:%s" % sipcfg.sip_version_str)
+-print("sip_bin:%s" % sipcfg.sip_bin)
+-print("default_sip_dir:%s" % sipcfg.default_sip_dir)
+-print("sip_inc_dir:%s" % sipcfg.sip_inc_dir)
+diff -Naur /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/cmake-modules/print_status.cmake kdeutils-trunk/printer-applet/cmake-modules/print_status.cmake
+--- /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/cmake-modules/print_status.cmake	2008-05-07 12:05:17.000000000 +0300
++++ kdeutils-trunk/printer-applet/cmake-modules/print_status.cmake	1970-01-01 02:00:00.000000000 +0200
+@@ -1,2 +0,0 @@
+-# Print a status message. Useful when you want to say something from a command in cmake.
+-MESSAGE(STATUS ${MESSAGE})
+diff -Naur /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/cmake-modules/PythonCompile.py kdeutils-trunk/printer-applet/cmake-modules/PythonCompile.py
+--- /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/cmake-modules/PythonCompile.py	2008-05-07 12:05:17.000000000 +0300
++++ kdeutils-trunk/printer-applet/cmake-modules/PythonCompile.py	1970-01-01 02:00:00.000000000 +0200
+@@ -1,4 +0,0 @@
+-# By Simon Edwards <simon@simonzone.com>
+-# This file is in the public domain.
+-import py_compile
+-py_compile.main()
+diff -Naur /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/cmake-modules/PythonMacros.cmake kdeutils-trunk/printer-applet/cmake-modules/PythonMacros.cmake
+--- /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/cmake-modules/PythonMacros.cmake	2008-05-07 12:05:17.000000000 +0300
++++ kdeutils-trunk/printer-applet/cmake-modules/PythonMacros.cmake	1970-01-01 02:00:00.000000000 +0200
+@@ -1,54 +0,0 @@
+-# Python macros
+-# ~~~~~~~~~~~~~
+-# Copyright (c) 2007, Simon Edwards <simon@simonzone.com>
+-#
+-# Redistribution and use is allowed according to the terms of the BSD license.
+-# For details see the accompanying COPYING-CMAKE-SCRIPTS file.
+-#
+-# This file defines the following macros:
+-#
+-# PYTHON_INSTALL (SOURCE_FILE DESINATION_DIR)
+-#     Install the SOURCE_FILE, which is a Python .py file, into the
+-#     destination directory during install. The file will be byte compiled
+-#     and both the .py file and .pyc file will be installed.
+-
+-GET_FILENAME_COMPONENT(PYTHON_MACROS_MODULE_PATH ${CMAKE_CURRENT_LIST_FILE}  PATH)
+-
+-MACRO(PYTHON_INSTALL SOURCE_FILE DESINATION_DIR)
+-  ADD_CUSTOM_TARGET(compile_python_files ALL)
+-
+-  # Install the source file.
+-  INSTALL(FILES ${SOURCE_FILE} DESTINATION ${DESINATION_DIR})
+-
+-  # Byte compile and install the .pyc file.        
+-  GET_FILENAME_COMPONENT(_absfilename ${SOURCE_FILE} ABSOLUTE)
+-  GET_FILENAME_COMPONENT(_filename ${SOURCE_FILE} NAME)
+-  GET_FILENAME_COMPONENT(_filenamebase ${SOURCE_FILE} NAME_WE)
+-  GET_FILENAME_COMPONENT(_basepath ${SOURCE_FILE} PATH)
+-  SET(_bin_py ${CMAKE_CURRENT_BINARY_DIR}/${_basepath}/${_filename})
+-  SET(_bin_pyc ${CMAKE_CURRENT_BINARY_DIR}/${_basepath}/${_filenamebase}.pyc)
+-
+-  FILE(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${_basepath})
+-
+-  SET(_message "-DMESSAGE=Byte-compiling ${_bin_py}")
+-
+-  GET_FILENAME_COMPONENT(_abs_bin_py ${_bin_py} ABSOLUTE)
+-  IF(_abs_bin_py STREQUAL ${_absfilename})    # Don't copy the file onto itself.
+-    ADD_CUSTOM_COMMAND(
+-      TARGET compile_python_files
+-      COMMAND ${CMAKE_COMMAND} ${_message} -P ${PYTHON_MACROS_MODULE_PATH}/print_status.cmake
+-      COMMAND ${PYTHON_EXECUTABLE} ${PYTHON_MACROS_MODULE_PATH}/PythonCompile.py ${_bin_py}
+-      DEPENDS ${_absfilename}
+-    )
+-  ELSE(_abs_bin_py STREQUAL ${_absfilename})
+-    ADD_CUSTOM_COMMAND(
+-      TARGET compile_python_files
+-      COMMAND ${CMAKE_COMMAND} ${_message} -P ${PYTHON_MACROS_MODULE_PATH}/print_status.cmake
+-      COMMAND ${CMAKE_COMMAND} -E copy ${_absfilename} ${_bin_py}
+-      COMMAND ${PYTHON_EXECUTABLE} ${PYTHON_MACROS_MODULE_PATH}/PythonCompile.py ${_bin_py}
+-      DEPENDS ${_absfilename}
+-    )
+-  ENDIF(_abs_bin_py STREQUAL ${_absfilename})
+-
+-  INSTALL(FILES ${_bin_pyc} DESTINATION ${DESINATION_DIR})
+-ENDMACRO(PYTHON_INSTALL)
+diff -Naur /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/cmake-modules/SIPMacros.cmake kdeutils-trunk/printer-applet/cmake-modules/SIPMacros.cmake
+--- /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/cmake-modules/SIPMacros.cmake	2008-05-07 12:05:17.000000000 +0300
++++ kdeutils-trunk/printer-applet/cmake-modules/SIPMacros.cmake	1970-01-01 02:00:00.000000000 +0200
+@@ -1,105 +0,0 @@
+-# Macros for SIP
+-# ~~~~~~~~~~~~~~
+-# Copyright (c) 2007, Simon Edwards <simon@simonzone.com>
+-# Redistribution and use is allowed according to the terms of the BSD license.
+-# For details see the accompanying COPYING-CMAKE-SCRIPTS file.
+-#
+-# SIP website: http://www.riverbankcomputing.co.uk/sip/index.php
+-#
+-# This file defines the following macros:
+-#
+-# ADD_SIP_PYTHON_MODULE (MODULE_NAME MODULE_SIP [library1, libaray2, ...])
+-#     Specifies a SIP file to be built into a Python module and installed.
+-#     MODULE_NAME is the name of Python module including any path name. (e.g.
+-#     os.sys, Foo.bar etc). MODULE_SIP the path and filename of the .sip file
+-#     to process and compile. libraryN are libraries that the Python module,
+-#     which is typically a shared library, should be linked to. The built
+-#     module will also be install into Python's site-packages directory.
+-#
+-# The behaviour of the ADD_SIP_PYTHON_MODULE macro can be controlled by a
+-# number of variables:
+-#
+-# SIP_INCLUDES - List of directories which SIP will scan through when looking
+-#     for included .sip files. (Corresponds to the -I option for SIP.)
+-#
+-# SIP_TAGS - List of tags to define when running SIP. (Corresponds to the -t
+-#     option for SIP.)
+-#
+-# SIP_CONCAT_PARTS - An integer which defines the number of parts the C++ code
+-#     of each module should be split into. Defaults to 8. (Corresponds to the
+-#     -j option for SIP.)
+-#
+-# SIP_DISABLE_FEATURES - List of feature names which should be disabled
+-#     running SIP. (Corresponds to the -x option for SIP.)
+-#
+-# SIP_EXTRA_OPTIONS - Extra command line options which should be passed on to
+-#     SIP.
+-
+-SET(SIP_INCLUDES)
+-SET(SIP_TAGS)
+-SET(SIP_CONCAT_PARTS 8)
+-SET(SIP_DISABLE_FEATURES)
+-SET(SIP_EXTRA_OPTIONS)
+-
+-MACRO(ADD_SIP_PYTHON_MODULE MODULE_NAME MODULE_SIP)
+-
+-    # FIXME this removes -fvisibility=hidden from the compiler flags and has global affect.
+-    STRING(REPLACE "-fvisibility=hidden" "" CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
+-
+-    SET(EXTRA_LINK_LIBRARIES ${ARGN})
+-
+-    STRING(REPLACE "." "/" _x ${MODULE_NAME})
+-    GET_FILENAME_COMPONENT(_parent_module_path ${_x}  PATH)
+-    GET_FILENAME_COMPONENT(_child_module_name ${_x} NAME)
+-
+-    GET_FILENAME_COMPONENT(_module_path ${MODULE_SIP} PATH)
+-    GET_FILENAME_COMPONENT(_abs_module_sip ${MODULE_SIP} ABSOLUTE)
+-
+-    # We give this target a long logical target name.
+-    # (This is to avoid having the library name clash with any already
+-    # install library names. If that happens then cmake dependancy
+-    # tracking get confused.)
+-    STRING(REPLACE "." "_" _logical_name ${MODULE_NAME})
+-    SET(_logical_name "python_module_${_logical_name}")
+-
+-    FILE(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${_module_path})    # Output goes in this dir.
+-
+-    SET(_sip_includes)
+-    FOREACH (_inc ${SIP_INCLUDES})
+-        GET_FILENAME_COMPONENT(_abs_inc ${_inc} ABSOLUTE)
+-        LIST(APPEND _sip_includes -I ${_abs_inc})
+-    ENDFOREACH (_inc )
+-
+-    SET(_sip_tags)
+-    FOREACH (_tag ${SIP_TAGS})
+-        LIST(APPEND _sip_tags -t ${_tag})
+-    ENDFOREACH (_tag)
+-
+-    SET(_sip_x)
+-    FOREACH (_x ${SIP_DISABLE_FEATURES})
+-        LIST(APPEND _sip_x -x ${_x})
+-    ENDFOREACH (_x ${SIP_DISABLE_FEATURES})
+-
+-    SET(_message "-DMESSAGE=Generating CPP code for module ${MODULE_NAME}")
+-    SET(_sip_output_files)
+-    FOREACH(CONCAT_NUM RANGE 0 ${SIP_CONCAT_PARTS} )
+-        IF( ${CONCAT_NUM} LESS ${SIP_CONCAT_PARTS} )
+-            SET(_sip_output_files ${_sip_output_files} ${CMAKE_CURRENT_BINARY_DIR}/${_module_path}/sip${_child_module_name}part${CONCAT_NUM}.cpp )
+-        ENDIF( ${CONCAT_NUM} LESS ${SIP_CONCAT_PARTS} )
+-    ENDFOREACH(CONCAT_NUM RANGE 0 ${SIP_CONCAT_PARTS} )
+-
+-    ADD_CUSTOM_COMMAND(
+-        OUTPUT ${_sip_output_files} 
+-        COMMAND ${CMAKE_COMMAND} ${_message} -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules/print_status.cmake
+-        COMMAND touch ${_sip_output_files} 
+-        COMMAND ${SIP_EXECUTABLE} ${_sip_tags} ${_sip_x} ${SIP_EXTRA_OPTIONS} -j ${SIP_CONCAT_PARTS} -c ${CMAKE_CURRENT_BINARY_DIR}/${_module_path} ${_sip_includes} ${_abs_module_sip}
+-        DEPENDS ${_abs_module_sip}
+-    )
+-    ADD_LIBRARY(${_logical_name} SHARED ${_sip_output_files} )
+-    TARGET_LINK_LIBRARIES(${_logical_name} ${PYTHON_LIBRARY})
+-    TARGET_LINK_LIBRARIES(${_logical_name} ${EXTRA_LINK_LIBRARIES})
+-    SET_TARGET_PROPERTIES(${_logical_name} PROPERTIES PREFIX "" OUTPUT_NAME ${_child_module_name})
+-
+-    INSTALL(TARGETS ${_logical_name} DESTINATION "${PYTHON_SITE_PACKAGES_DIR}/${_parent_module_path}")
+-
+-ENDMACRO(ADD_SIP_PYTHON_MODULE)
+diff -Naur /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/debug.py kdeutils-trunk/printer-applet/debug.py
+--- /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/debug.py	1970-01-01 02:00:00.000000000 +0200
++++ kdeutils-trunk/printer-applet/debug.py	2009-01-27 01:24:04.000000000 +0200
+@@ -0,0 +1,55 @@
++#!/usr/bin/env python
++
++## Copyright (C) 2008 Red Hat, Inc.
++## Copyright (C) 2008 Tim Waugh <twaugh@redhat.com>
++
++## This program is free software; you can redistribute it and/or modify
++## it under the terms of the GNU General Public License as published by
++## the Free Software Foundation; either version 2 of the License, or
++## (at your option) any later version.
++
++## This program is distributed in the hope that it will be useful,
++## but WITHOUT ANY WARRANTY; without even the implied warranty of
++## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++## GNU General Public License for more details.
++
++## You should have received a copy of the GNU General Public License
++## along with this program; if not, write to the Free Software
++## Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
++
++import sys
++import traceback
++
++_debug=False
++def debugprint (x):
++    if _debug:
++        try:
++            print x
++        except:
++            pass
++
++def get_debugging ():
++    return _debug
++
++def set_debugging (d):
++    global _debug
++    _debug = d
++
++def fatalException (exitcode=1):
++    nonfatalException (type="fatal", end="Exiting")
++    sys.exit (exitcode)
++
++def nonfatalException (type="non-fatal", end="Continuing anyway.."):
++    d = get_debugging ()
++    set_debugging (True)
++    debugprint ("Caught %s exception.  Traceback:" % type)
++    (type, value, tb) = sys.exc_info ()
++    tblast = traceback.extract_tb (tb, limit=None)
++    if len (tblast):
++        tblast = tblast[:len (tblast) - 1]
++    extxt = traceback.format_exception_only (type, value)
++    for line in traceback.format_tb(tb):
++        debugprint (line.strip ())
++    debugprint (extxt[0].strip ())
++    debugprint (end)
++    set_debugging (d)
+diff -Naur /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/monitor.py kdeutils-trunk/printer-applet/monitor.py
+--- /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/monitor.py	1970-01-01 02:00:00.000000000 +0200
++++ kdeutils-trunk/printer-applet/monitor.py	2009-01-27 01:22:42.000000000 +0200
+@@ -0,0 +1,521 @@
++#!/usr/bin/env python
++# -*- coding: utf-8 -*-
++
++## Copyright (C) 2007, 2008 Tim Waugh <twaugh@redhat.com>
++## Copyright (C) 2007, 2008 Red Hat, Inc.
++
++## This program is free software; you can redistribute it and/or modify
++## it under the terms of the GNU General Public License as published by
++## the Free Software Foundation; either version 2 of the License, or
++## (at your option) any later version.
++
++## This program is distributed in the hope that it will be useful,
++## but WITHOUT ANY WARRANTY; without even the implied warranty of
++## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++## GNU General Public License for more details.
++
++## You should have received a copy of the GNU General Public License
++## along with this program; if not, write to the Free Software
++## Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
++
++import cups
++import dbus
++import time
++from debug import *
++import pprint
++from PyQt4.QtCore import *
++
++#global _
++#_ = lambda x: x
++#def set_gettext_function (x):
++#    _ = x
++import statereason
++from statereason import StateReason
++#statereason.set_gettext_function (_)
++
++CONNECTING_TIMEOUT = 60 # seconds
++MIN_REFRESH_INTERVAL = 1 # seconds
++
++def state_reason_is_harmless (reason):
++    if (reason.startswith ("moving-to-paused") or
++        reason.startswith ("paused") or
++        reason.startswith ("shutdown") or
++        reason.startswith ("stopping") or
++        reason.startswith ("stopped-partly")):
++        return True
++    return False
++
++def collect_printer_state_reasons (connection):
++    result = {}
++    try:
++        printers = connection.getPrinters ()
++    except cups.IPPError:
++        return result
++
++    for name, printer in printers.iteritems ():
++        reasons = printer["printer-state-reasons"]
++        if type (reasons) != list:
++            # Work around a bug that was fixed in pycups-1.9.20.
++            reasons = [reasons]
++        for reason in reasons:
++            if reason == "none":
++                break
++            if state_reason_is_harmless (reason):
++                continue
++            if not result.has_key (name):
++                result[name] = []
++            result[name].append (StateReason (name, reason))
++    return result
++
++class Watcher:
++    # Interface definition
++    def monitor_exited (self, monitor):
++        debugprint (repr (monitor) + " exited")
++
++    def state_reason_added (self, monitor, reason):
++        debugprint (repr (monitor) + ": +" + repr (reason))
++
++    def state_reason_removed (self, monitor, reason):
++        debugprint (repr (monitor) + ": -" + repr (reason))
++
++    def still_connecting (self, monitor, reason):
++        debugprint (repr (monitor) + ": `%s' still connecting" %
++                    reason.get_printer ())
++
++    def now_connected (self, monitor, printer):
++        debugprint (repr (monitor) + ": `%s' now connected" % printer)
++
++    def current_printers_and_jobs (self, monitor, printers, jobs):
++        debugprint (repr (monitor) + ": printers and jobs lists provided")
++
++    def job_added (self, monitor, jobid, eventname, event, jobdata):
++        debugprint (repr (monitor) + ": job %d added" % jobid)
++
++    def job_event (self, monitor, jobid, eventname, event, jobdata):
++        debugprint (repr (monitor) + ": job %d has event `%s'" %
++                    (jobid, eventname))
++
++    def job_removed (self, monitor, jobid, eventname, event):
++        debugprint (repr (monitor) + ": job %d removed" % jobid)
++
++    def printer_added (self, monitor, printer):
++        debugprint (repr (monitor) + ": printer `%s' added" % printer)
++
++    def printer_event (self, monitor, printer, eventname, event):
++        debugprint (repr (monitor) + ": printer `%s' has event `%s'" %
++                    (printer, eventname))
++
++    def printer_removed (self, monitor, printer):
++        debugprint (repr (monitor) + ": printer `%s' removed" % printer)
++
++    def cups_connection_error (self, monitor):
++        debugprint (repr (monitor) + ": CUPS connection error")
++
++    def cups_ipp_error (self, monitor, e, m):
++        debugprint (repr (monitor) + ": CUPS IPP error (%d, %s)" %
++                    (e, repr (m)))
++
++class Monitor:
++    # Monitor jobs and printers.
++    DBUS_PATH="/com/redhat/PrinterSpooler"
++    DBUS_IFACE="com.redhat.PrinterSpooler"
++
++    def __init__(self, watcher, bus=None, my_jobs=True, specific_dests=None,
++                 monitor_jobs=True):
++        self.watcher = watcher
++        self.my_jobs = my_jobs
++        self.specific_dests = specific_dests
++        self.monitor_jobs = monitor_jobs
++        self.jobs = {}
++        self.printer_state_reasons = {}
++        self.printers = set()
++
++        self.which_jobs = "not-completed"
++        self.reasons_seen = {}
++        self.connecting_timers = {}
++        self.still_connecting = set()
++        self.connecting_to_device = {}
++        self.received_any_dbus_signals = False
++
++        if bus == None:
++            bus = dbus.SystemBus ()
++
++        bus.add_signal_receiver (self.handle_dbus_signal,
++                                 path=self.DBUS_PATH,
++                                 dbus_interface=self.DBUS_IFACE)
++        self.bus = bus
++
++        self.sub_id = -1
++        self.refresh ()
++
++    def get_jobs (self):
++        return self.jobs.copy ()
++
++    def cleanup (self):
++        if self.sub_id != -1:
++            try:
++                c = cups.Connection ()
++                c.cancelSubscription (self.sub_id)
++                debugprint ("Canceled subscription %d" % self.sub_id)
++            except:
++                pass
++
++        self.bus.remove_signal_receiver (self.handle_dbus_signal,
++                                         path=self.DBUS_PATH,
++                                         dbus_interface=self.DBUS_IFACE)
++
++        self.watcher.monitor_exited (self)
++
++    def check_still_connecting(self):
++        """Timer callback to check on connecting-to-device reasons."""
++        #del self.connecting_timers[printer]
++        #debugprint ("Still-connecting timer fired for `%s'" % printer)
++        (printer_jobs, my_printers) = self.sort_jobs_by_printer ()
++        self.update_connecting_devices (printer_jobs)
++
++        # Don't run this callback again.
++        return False
++
++    def update_connecting_devices(self, printer_jobs={}):
++        """Updates connecting_to_device dict and still_connecting set."""
++        time_now = time.time ()
++        connecting_to_device = {}
++        trouble = False
++        for printer, reasons in self.printer_state_reasons.iteritems ():
++            connected = True
++            for reason in reasons:
++                if reason.get_reason () == "connecting-to-device":
++                    have_processing_job = False
++                    for job, data in \
++                            printer_jobs.get (printer, {}).iteritems ():
++                        state = data.get ('job-state',
++                                          cups.IPP_JOB_CANCELED)
++                        if state == cups.IPP_JOB_PROCESSING:
++                            have_processing_job = True
++                            break
++
++                    if not have_processing_job:
++                        debugprint ("Ignoring stale connecting-to-device x")
++                        continue
++
++                    # Build a new connecting_to_device dict.  If our existing
++                    # dict already has an entry for this printer, use that.
++                    printer = reason.get_printer ()
++                    t = self.connecting_to_device.get (printer, time_now)
++                    connecting_to_device[printer] = t
++                    debugprint ("Connecting time: %d" % (time_now - t))
++                    if time_now - t >= CONNECTING_TIMEOUT:
++                        if have_processing_job:
++                            self.still_connecting.add (printer)
++                            self.watcher.still_connecting (self, reason)
++
++                    connected = False
++                    break
++
++        # Clear any previously-notified errors that are now fine.
++        remove = set()
++        for printer in self.still_connecting:
++            if not connecting_to_device.has_key (printer):
++                remove.add (printer)
++                self.watcher.now_connected (self, printer)
++
++        self.still_connecting = self.still_connecting.difference (remove)
++        self.connecting_to_device = connecting_to_device
++
++    def check_state_reasons(self, my_printers=set(), printer_jobs={}):
++        # Look for any new reasons since we last checked.
++        old_reasons_seen_keys = self.reasons_seen.keys ()
++        reasons_now = set()
++        for printer, reasons in self.printer_state_reasons.iteritems ():
++            for reason in reasons:
++                tuple = reason.get_tuple ()
++                printer = reason.get_printer ()
++                reasons_now.add (tuple)
++                if not self.reasons_seen.has_key (tuple):
++                    # New reason.
++                    self.watcher.state_reason_added (self, reason)
++                    self.reasons_seen[tuple] = reason
++
++                if (reason.get_reason () == "connecting-to-device" and
++                    not self.connecting_to_device.has_key (printer)):
++                    # First time we've seen this.
++
++                    have_processing_job = False
++                    for job, data in \
++                            printer_jobs.get (printer, {}).iteritems ():
++                        state = data.get ('job-state',
++                                          cups.IPP_JOB_CANCELED)
++                        if state == cups.IPP_JOB_PROCESSING:
++                            have_processing_job = True
++                            break
++
++                    if have_processing_job:
++                        QTimer.singleShot((1 + CONNECTING_TIMEOUT) * 1000, self.check_still_connecting)
++                        debugprint ("Start connecting timer for `%s'" %
++                                    printer)
++                    else:
++                        # Don't notify about this, as it must be stale.
++                        debugprint ("Ignoring stale connecting-to-device")
++                        debugprint (pprint.pformat (printer_jobs))
++
++        self.update_connecting_devices (printer_jobs)
++        items = self.reasons_seen.keys ()
++        for tuple in items:
++            if not tuple in reasons_now:
++                # Reason no longer present.
++                reason = self.reasons_seen[tuple]
++                del self.reasons_seen[tuple]
++                self.watcher.state_reason_removed (self, reason)
++
++    def get_notifications(self):
++        debugprint ("get_notifications")
++        try:
++            c = cups.Connection ()
++
++            try:
++                try:
++                    notifications = c.getNotifications ([self.sub_id],
++                                                        [self.sub_seq + 1])
++                except AttributeError:
++                    notifications = c.getNotifications ([self.sub_id])
++            except cups.IPPError, (e, m):
++                if e == cups.IPP_NOT_FOUND:
++                    # Subscription lease has expired.
++                    self.sub_id = -1
++                    self.refresh ()
++                    return False
++
++                self.watcher.cups_ipp_error (self, e, m)
++                return True
++        except RuntimeError:
++            self.watcher.cups_connection_error (self)
++            return True
++
++        deferred_calls = []
++        jobs = self.jobs.copy ()
++        for event in notifications['events']:
++            seq = event['notify-sequence-number']
++            try:
++                if seq <= self.sub_seq:
++                    # Work around a bug in pycups < 1.9.34
++                    continue
++            except AttributeError:
++                pass
++            self.sub_seq = seq
++            nse = event['notify-subscribed-event']
++            debugprint ("%d %s %s" % (seq, nse, event['notify-text']))
++            debugprint (pprint.pformat (event))
++            if nse.startswith ('printer-'):
++                # Printer events
++                name = event['printer-name']
++                if nse == 'printer-added' and name not in self.printers:
++                    self.printers.add (name)
++                    deferred_calls.append ((self.watcher.printer_added,
++                                            (self, name)))
++
++                elif nse == 'printer-deleted' and name in self.printers:
++                    self.printers.remove (name)
++                    items = self.reasons_seen.keys ()
++                    for tuple in items:
++                        if tuple[1] == name:
++                            reason = self.reasons_seen[tuple]
++                            del self.reasons_seen[tuple]
++                            deferred_calls.append ((self.watcher.state_reason_removed,
++                                                    (self, reason)))
++                            
++                    if self.printer_state_reasons.has_key (name):
++                        del self.printer_state_reasons[name]
++
++                    deferred_calls.append ((self.watcher.printer_removed,
++                                            (self, name)))
++                elif name in self.printers:
++                    printer_state_reasons = event['printer-state-reasons']
++                    if type (printer_state_reasons) != list:
++                        # Work around a bug in pycups < 1.9.36
++                        printer_state_reasons = [printer_state_reasons]
++
++                    reasons = []
++                    for reason in printer_state_reasons:
++                        if reason == "none":
++                            break
++                        if state_reason_is_harmless (reason):
++                            continue
++                        reasons.append (StateReason (name, reason))
++                    self.printer_state_reasons[name] = reasons
++
++                    deferred_calls.append ((self.watcher.printer_event,
++                                            (self, name, nse, event)))
++                continue
++
++            # Job events
++            jobid = event['notify-job-id']
++            if (nse == 'job-created' or
++                (nse == 'job-state-changed' and
++                 not jobs.has_key (jobid) and
++                 event['job-state'] == cups.IPP_JOB_PROCESSING)):
++                if (self.specific_dests != None and
++                    event['printer-name'] not in self.specific_dests):
++                    continue
++
++                try:
++                    attrs = c.getJobAttributes (jobid)
++                    if (self.my_jobs and
++                        attrs['job-originating-user-name'] != cups.getUser ()):
++                        continue
++
++                    jobs[jobid] = attrs
++                except AttributeError:
++                    jobs[jobid] = {'job-k-octets': 0}
++                except cups.IPPError, (e, m):
++                    self.watcher.cups_ipp_error (self, e, m)
++                    jobs[jobid] = {'job-k-octets': 0}
++
++                deferred_calls.append ((self.watcher.job_added,
++                                        (self, jobid, nse, event,
++                                         jobs[jobid].copy ())))
++            elif nse == 'job-completed':
++                try:
++                    del jobs[jobid]
++                    deferred_calls.append ((self.watcher.job_removed,
++                                            (self, jobid, nse, event)))
++                except KeyError:
++                    pass
++                continue
++
++            try:
++                job = jobs[jobid]
++            except KeyError:
++                continue
++
++            for attribute in ['job-state',
++                              'job-name']:
++                job[attribute] = event[attribute]
++            if event.has_key ('notify-printer-uri'):
++                job['job-printer-uri'] = event['notify-printer-uri']
++
++            deferred_calls.append ((self.watcher.job_event,
++                                   (self, jobid, nse, event, job.copy ())))
++
++        self.update (jobs)
++        self.jobs = jobs
++
++        for (fn, args) in deferred_calls:
++            fn (*args)
++
++        # Update again when we're told to.  If we're getting CUPS
++        # D-Bus signals, however, rely on those instead.
++        if not self.received_any_dbus_signals:
++            interval = 1000 * notifications['notify-get-interval']
++            QTimer.singleShot(interval, self.get_notifications)
++
++        return False
++
++    def refresh(self):
++        debugprint ("refresh")
++
++        try:
++            c = cups.Connection ()
++        except RuntimeError:
++            self.watcher.cups_connection_error (self)
++            return
++
++        if self.sub_id != -1:
++            try:
++                c.cancelSubscription (self.sub_id)
++            except cups.IPPError, (e, m):
++                self.watcher.cups_ipp_error (self, e, m)
++
++            debugprint ("Canceled subscription %d" % self.sub_id)
++
++        try:
++            del self.sub_seq
++        except AttributeError:
++            pass
++
++        events = ["printer-added",
++                  "printer-deleted",
++                  "printer-state-changed"]
++        if self.monitor_jobs:
++            events.extend (["job-created",
++                            "job-completed",
++                            "job-stopped",
++                            "job-progress",
++                            "job-state-changed"])
++
++        try:
++            self.sub_id = c.createSubscription ("/", events=events)
++        except cups.IPPError, (e, m):
++            self.watcher.cups_ipp_error (self, e, m)
++
++        QTimer.singleShot(MIN_REFRESH_INTERVAL * 1000, self.get_notifications)
++        debugprint ("Created subscription %d" % self.sub_id)
++
++        try:
++            if self.monitor_jobs:
++                jobs = c.getJobs (which_jobs=self.which_jobs,
++                                  my_jobs=self.my_jobs)
++            else:
++                jobs = {}
++            self.printer_state_reasons = collect_printer_state_reasons (c)
++            dests = c.getDests ()
++            printers = set()
++            for (printer, instance) in dests.keys ():
++                if printer == None:
++                    continue
++                if instance != None:
++                    continue
++                printers.add (printer)
++            self.printers = printers
++        except cups.IPPError, (e, m):
++            self.watcher.cups_ipp_error (self, e, m)
++            return
++        except RuntimeError:
++            self.watcher.cups_connection_error (self)
++            return
++
++        if self.specific_dests != None:
++            for jobid in jobs.keys ():
++                uri = jobs[jobid].get('job-printer-uri', '/')
++                i = uri.rfind ('/')
++                printer = uri[i + 1:]
++                if printer not in self.specific_dests:
++                    del jobs[jobid]
++
++        self.watcher.current_printers_and_jobs (self, self.printers.copy (),
++                                                jobs.copy ())
++        self.update (jobs)
++
++        self.jobs = jobs
++        return False
++
++    def sort_jobs_by_printer (self, jobs=None):
++        if jobs == None:
++            jobs = self.jobs
++
++        my_printers = set()
++        printer_jobs = {}
++        for job, data in jobs.iteritems ():
++            state = data.get ('job-state', cups.IPP_JOB_CANCELED)
++            if state >= cups.IPP_JOB_CANCELED:
++                continue
++            uri = data.get ('job-printer-uri', '')
++            i = uri.rfind ('/')
++            if i == -1:
++                continue
++            printer = uri[i + 1:]
++            my_printers.add (printer)
++            if not printer_jobs.has_key (printer):
++                printer_jobs[printer] = {}
++            printer_jobs[printer][job] = data
++
++        return (printer_jobs, my_printers)
++
++    def update(self, jobs):
++        debugprint ("update")
++        (printer_jobs, my_printers) = self.sort_jobs_by_printer (jobs)
++        self.check_state_reasons (my_printers, printer_jobs)
++
++    def handle_dbus_signal(self, *args):
++        QTimer.singleShot(200, self.get_notifications)
++        if not self.received_any_dbus_signals:
++            self.received_any_dbus_signals = True
+diff -Naur /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/printer-applet.desktop kdeutils-trunk/printer-applet/printer-applet.desktop
+--- /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/printer-applet.desktop	2009-04-30 12:11:48.000000000 +0300
++++ kdeutils-trunk/printer-applet/printer-applet.desktop	2009-05-11 20:13:51.000000000 +0300
+@@ -14,8 +14,6 @@
+ Name[ga]=Feidhmchláirín Printéara
+ Name[gl]=Applet de impresora
+ Name[hne]=प्रिंटर ऐप्लेट
+-Name[hu]=Nyomtatókezelő
+-Name[is]=Prentarasmáforrit
+ Name[it]=Applet di stampa
+ Name[ja]=プリンタアプレット
+ Name[km]=អាប់ភ្លេត​ម៉ាស៊ីន​បោះពុម្ព
+@@ -55,8 +53,6 @@
+ Comment[fr]=Miniature pour la gestion des travaux d'impression
+ Comment[ga]=Deilbhín i dtráidire an chórais a bhainistíonn jabanna priontála
+ Comment[gl]=Ícone na bandexa do sistema para xestionar as tarefas de impresión
+-Comment[hu]=A paneltálcából elérhető nyomtatókezelő
+-Comment[is]=Kerfisbakkatáknmynd til stýringar á prentun
+ Comment[it]=Icona del vassoio di sistema per gestire i lavori di stampa
+ Comment[ja]=印刷ジョブを管理するためのシステムトレイアイコン
+ Comment[km]=រូបតំណាង​ថាស​ប្រព័ន្ធ​សម្រាប់​គ្រប់គ្រង​ការងារ​បោះពុម្ព
+@@ -87,3 +83,4 @@
+ Type=Application
+ Icon=printer
+ OnlyShowIn=KDE;
++X-KDE-autostart-phase=2
+diff -Naur /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/printer-applet.notifyrc kdeutils-trunk/printer-applet/printer-applet.notifyrc
+--- /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/printer-applet.notifyrc	1970-01-01 02:00:00.000000000 +0200
++++ kdeutils-trunk/printer-applet/printer-applet.notifyrc	2009-06-09 17:47:47.000000000 +0300
+@@ -0,0 +1,269 @@
++[Global]
++IconName=printer
++Name=Printer Applet
++Name[ar]=بريمج الطباعة
++Name[bg]=Аплет на принтер
++Name[ca]=Miniaplicació d'impressió
++Name[cs]=Tiskový applet
++Name[da]=Printerapplet
++Name[de]=Drucker-Miniprogramm
++Name[el]=Μικροεφαρμογή εκτυπωτή
++Name[es]=Miniaplicación de impresora
++Name[et]=Trükkimisaplett
++Name[eu]=Inprimagailu appleta
++Name[fr]=Applet d'imprimante
++Name[ga]=Feidhmchláirín Printéara
++Name[gl]=Applet de impresora
++Name[hne]=प्रिंटर ऐप्लेट
++Name[it]=Applet di stampa
++Name[ja]=プリンタアプレット
++Name[km]=អាប់ភ្លេត​ម៉ាស៊ីន​បោះពុម្ព
++Name[ko]=프린터 애플릿
++Name[lt]=Spausdintuvas
++Name[lv]=Drukas sīkrīks
++Name[nb]=Miniprogram for utskrift
++Name[nds]=Drucker-Lüttprogram
++Name[pa]=ਪਰਿੰਟਰ ਐਪਲਿਟ
++Name[pl]=Aplet drukarki
++Name[pt]='Applet' de Impressoras
++Name[pt_BR]=Miniaplicativo de impressora
++Name[ro]=Miniaplicație Imprimantă
++Name[ru]=Задания печати
++Name[sk]=Tlačový applet
++Name[sl]=Nadzorovalnik tiskanja
++Name[sr]=Аплет штампача
++Name[sr@latin]=Aplet štampača
++Name[sv]=Skrivarminiprogram
++Name[th]=แอพเพล็ตเครื่องพิมพ์
++Name[tr]=Yazıcı Programcığı
++Name[uk]=Аплет принтера
++Name[x-test]=xxPrinter Appletxx
++Name[zh_CN]=打印机小程序
++Name[zh_TW]=印表機小程式
++Comment=Printer Applet
++Comment[de]=Drucker-Miniprogramm
++Comment[el]=Μικροεφαρμογή εκτυπωτή
++Comment[es]=Miniaplicación de impresora
++Comment[et]=Trükkimisaplett
++Comment[eu]=Inprimagailu appleta
++Comment[ga]=Feidhmchláirín Printéara
++Comment[ja]=プリンタアプレット
++Comment[km]=អាប់ភ្លេត​ម៉ាស៊ីន​បោះពុម្ព
++Comment[lv]=Drukas sīkrīks
++Comment[nb]=Miniprogram for skriver
++Comment[nds]=Drucker-Lüttprogram
++Comment[pt]='Applet' de Impressoras
++Comment[pt_BR]=Miniaplicativo de impressora
++Comment[ru]=Аплет «Задания печати»
++Comment[sk]=Tlačový applet
++Comment[sr]=Аплет штампача
++Comment[sr@latin]=Aplet štampača
++Comment[sv]=Skrivarminiprogram
++Comment[tr]=Yazıcı Programcığı
++Comment[uk]=Аплет принтера
++Comment[x-test]=xxPrinter Appletxx
++Comment[zh_CN]=打印机小程序
++Comment[zh_TW]=印表機小程式
++
++[Event/New Printer]
++Name=New Printer
++Name[de]=Neuer Drucker
++Name[el]=Νέος εκτυπωτής
++Name[es]=Nueva impresora
++Name[et]=Uus printer
++Name[eu]=Inprimagailu berria
++Name[ga]=Printéir Nua
++Name[ja]=新しいプリンタ
++Name[km]=ម៉ាស៊ីន​បោះពុម្ព​ថ្មី
++Name[lv]=Jauns printeris
++Name[nb]=Ny skriver
++Name[nds]=Nieg Drucker
++Name[pt]=Nova Impressora
++Name[pt_BR]=Nova impressora
++Name[ru]=Новый принтер
++Name[sk]=Nová tlačiareň
++Name[sr]=Нови штампач
++Name[sr@latin]=Novi štampač
++Name[sv]=Ny skrivare
++Name[tr]=Yeni Yazıcı
++Name[uk]=Новий принтер
++Name[x-test]=xxNew Printerxx
++Name[zh_CN]=新打印机
++Name[zh_TW]=新增印表機
++Comment=Configuring New Printer
++Comment[de]=Neuen Drucker einrichten
++Comment[el]=Ρύθμιση νέου εκτυπωτή
++Comment[es]=Configuración de la nueva impresora
++Comment[et]=Uue printeri seadistamine
++Comment[eu]=Inprimagailu berria konfiguratzen
++Comment[ga]=Printéir Nua á Chumrú
++Comment[ja]=新しいプリンタの設定
++Comment[km]=កំណត់​រចនាសម្ព័ន្ធ​ម៉ាស៊ីន​បោះពុម្ព​ថ្មី
++Comment[lv]=Konfigurē jaunu printeri
++Comment[nb]=Setter opp ny skriver
++Comment[nds]=Nieg Drucker inrichten
++Comment[pt]=A Configurar a Impressora Nova
++Comment[pt_BR]=Configurando nova impressora
++Comment[ru]=Настроить новый принтер
++Comment[sk]=Nastavuje sa nová tlačiareň
++Comment[sr]=Подешавање новог штампача
++Comment[sr@latin]=Podešavanje novog štampača
++Comment[sv]=Anpassar ny skrivare
++Comment[tr]=Yeni Yazıcı Yapılandırılıyor
++Comment[uk]=Налаштування нового принтера
++Comment[x-test]=xxConfiguring New Printerxx
++Comment[zh_CN]=配置新打印机
++Comment[zh_TW]=設定新印表機
++Action=Popup
++
++[Event/Printer Added]
++Name=Printer Added
++Name[el]=Προστέθηκε εκτυπωτής
++Name[es]=Impresora añadida
++Name[et]=Printer on lisatud
++Name[eu]=Inprimagailua erantsita
++Name[ga]=Cuireadh Printéir Leis
++Name[ja]=プリンタが追加されました
++Name[km]=បាន​បន្ថែម​ម៉ាស៊ីន​បោះពុម្ព
++Name[lv]=Printeris pievienots
++Name[nb]=Skriver lagt til
++Name[nds]=Drucker toföögt
++Name[pt]=Impressora Adicionada
++Name[pt_BR]=Impressora adicionada
++Name[ru]=Принтер добавлен
++Name[sk]=Tlačiareň pridaná
++Name[sr]=Штампач додат
++Name[sr@latin]=Štampač dodat
++Name[sv]=Skrivare tillagd
++Name[tr]=Yazıcı Eklendi
++Name[uk]=Додано принтер
++Name[x-test]=xxPrinter Addedxx
++Name[zh_CN]=已添加打印机
++Name[zh_TW]=已新增印表機
++Comment=Printer Added
++Comment[de]=Drucker hinzugefügt
++Comment[el]=Προστέθηκε εκτυπωτής
++Comment[es]=Impresora añadida
++Comment[et]=Printer on lisatud
++Comment[eu]=Inprimagailua erantsita
++Comment[ga]=Cuireadh Printéir Leis
++Comment[ja]=プリンタが追加されました
++Comment[km]=បានបន្ថែម​ម៉ាស៊ីន​បោះពុម្ព
++Comment[lv]=Printeris pievienots
++Comment[nb]=Skriver lagt til
++Comment[nds]=Drucker toföögt
++Comment[pt]=Impressora Adicionada
++Comment[pt_BR]=Impressora adicionada
++Comment[ru]=Принтер добавлен
++Comment[sk]=Tlačiareň bola pridaná
++Comment[sr]=Штампач додат
++Comment[sr@latin]=Štampač dodat
++Comment[sv]=Skrivare tillagd
++Comment[tr]=Yazıcı Eklendi
++Comment[uk]=Додано принтер
++Comment[x-test]=xxPrinter Addedxx
++Comment[zh_CN]=已添加打印机
++Comment[zh_TW]=已新增印表機
++Action=Popup
++
++[Event/Missing Printer Driver]
++Name=Missing Printer Driver
++Name[de]=Fehlender Druckertreiber
++Name[el]=Λείπει οδηγός εκτυπωτή
++Name[es]=Falta el controlador de la impresora
++Name[et]=Printeri draiver puudub
++Name[eu]=Inprimagailuaren gidaria falta da
++Name[ga]=Tiománaí Printéara Ar Iarraidh
++Name[ja]=プリンタドライバがありません
++Name[km]=បាត់​កម្មវិធី​បញ្ជា​របស់ម៉ាស៊ីនបោះពុម្ព
++Name[lv]=Trūkst printera draivera
++Name[nb]=Manglende skriverdriver
++Name[nds]=Druckerdriever fehlt
++Name[pt]=Falta o Controlador da Impressora
++Name[pt_BR]=Falta o driver da impressora
++Name[ru]=Отсутствует драйвер принтера
++Name[sk]=Chýba ovládač tlačiarne
++Name[sr]=Недостаје драјвер штампача
++Name[sr@latin]=Nedostaje drajver štampača
++Name[sv]=Saknar drivrutin för skrivare
++Name[tr]=Yazıcı Sürücüsü Yok
++Name[uk]=Немає драйвера принтера
++Name[x-test]=xxMissing Printer Driverxx
++Name[zh_CN]=缺失打印机驱动
++Name[zh_TW]=遺失印表機驅動程式
++Comment=Missing Printer Driver
++Comment[de]=Fehlender Druckertreiber
++Comment[el]=Λείπει οδηγός εκτυπωτή
++Comment[es]=Falta el controlador de la impresora
++Comment[et]=Printeri draiver puudub
++Comment[eu]=Inprimagailuaren gidaria falta da
++Comment[ga]=Tiománaí Printéara Ar Iarraidh
++Comment[ja]=プリンタドライバがありません
++Comment[km]=បាត់​កម្មវិធី​បញ្ជា​របស់ម៉ាស៊ីនបោះពុម្ព
++Comment[lv]=Trūkst printera draivera
++Comment[nb]=Manglende skriverdriver
++Comment[nds]=Druckerdriever fehlt
++Comment[pt]=Falta o Controlador da Impressora
++Comment[pt_BR]=Falta o driver da impressora
++Comment[ru]=Отсутствует драйвер принтера
++Comment[sk]=Chýba ovládač tlačiarne
++Comment[sr]=Недостаје драјвер штампача
++Comment[sr@latin]=Nedostaje drajver štampača
++Comment[sv]=Saknar drivrutin för skrivare
++Comment[tr]=Yazıcı Sürücüsü Yok
++Comment[uk]=Немає драйвера принтера
++Comment[x-test]=xxMissing Printer Driverxx
++Comment[zh_CN]=缺失打印机驱动
++Comment[zh_TW]=遺失印表機驅動程式
++Action=Popup
++
++[Event/Other]
++Name=Other
++Name[de]=Andere
++Name[el]=Άλλο
++Name[es]=Otros
++Name[et]=Muu
++Name[eu]=Beste bat
++Name[ga]=Eile
++Name[ja]=その他
++Name[km]=ផ្សេងៗ
++Name[lv]=Cits
++Name[nb]=Andre
++Name[nds]=Anner
++Name[pt]=Outra
++Name[pt_BR]=Outros
++Name[ru]=Другое
++Name[sk]=Ostatné
++Name[sr]=Друго
++Name[sr@latin]=Drugo
++Name[sv]=Annan
++Name[tr]=Diğer
++Name[uk]=Інше
++Name[x-test]=xxOtherxx
++Name[zh_CN]=其它
++Name[zh_TW]=其他
++Comment=Other
++Comment[de]=Andere
++Comment[el]=Άλλο
++Comment[es]=Otros
++Comment[et]=Muu
++Comment[eu]=Beste bat
++Comment[ga]=Eile
++Comment[ja]=その他
++Comment[km]=ផ្សេងៗ
++Comment[lv]=Cits
++Comment[nb]=Andre
++Comment[nds]=Anner
++Comment[pt]=Outra
++Comment[pt_BR]=Outros
++Comment[ru]=Другое
++Comment[sk]=Ostatné
++Comment[sr]=Друго
++Comment[sr@latin]=Drugo
++Comment[sv]=Annan
++Comment[tr]=Diğer
++Comment[uk]=Інше
++Comment[x-test]=xxOtherxx
++Comment[zh_CN]=其它
++Comment[zh_TW]=其他
++Action=Popup
+diff -Naur /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/printer-applet.py kdeutils-trunk/printer-applet/printer-applet.py
+--- /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/printer-applet.py	2008-10-09 12:46:28.000000000 +0300
++++ kdeutils-trunk/printer-applet/printer-applet.py	2009-04-09 23:41:47.000000000 +0300
+@@ -1,4 +1,5 @@
+ #!/usr/bin/env python
++# -*- coding: utf-8 -*-
+ 
+ #############################################################################
+ ##
+@@ -36,23 +37,13 @@
+ import subprocess
+ import sys
+ 
+-SYSTEM_CONFIG_PRINTER_DIR = "/usr/share/system-config-printer"
+-
+-MIN_REFRESH_INTERVAL = 1 # seconds
+-CONNECTING_TIMEOUT = 60 # seconds
+-
+ import time
+ 
+ from PyQt4.QtCore import *
+ from PyQt4.QtGui import *
+ from PyQt4 import uic
+ from PyKDE4.kdecore import i18n, i18nc, i18np, i18ncp, ki18n, KAboutData, KCmdLineArgs, KCmdLineOptions, KStandardDirs, KLocalizedString
+-from PyKDE4.kdeui import KApplication, KXmlGuiWindow, KStandardAction, KIcon, KToggleAction
+-
+-if QFile.exists(SYSTEM_CONFIG_PRINTER_DIR + "/ppds.py"):
+-    AUTOCONFIGURE = True
+-else:
+-    AUTOCONFIGURE = False
++from PyKDE4.kdeui import KApplication, KXmlGuiWindow, KStandardAction, KIcon, KToggleAction, KNotification, KMessageBox
+ 
+ def translate(self, prop):
+     """reimplement method from uic to change it to use gettext"""
+@@ -72,6 +63,95 @@
+ import dbus.mainloop.qt
+ import dbus.service
+ 
++from statereason import StateReason
++import monitor
++import authconn
++from debug import *
++
++class PrinterURIIndex:
++    def __init__ (self, names=None):
++        self.printer = {}
++        self.names = names
++
++    def update_from_attrs (self, printer, attrs):
++        uris = []
++        if attrs.has_key ('printer-uri-supported'):
++            uri_supported = attrs['printer-uri-supported']
++            if type (uri_supported) != list:
++                uri_supported = [uri_supported]
++            uris.extend (uri_supported)
++        if attrs.has_key ('notify-printer-uri'):
++            uris.append (attrs['notify-printer-uri'])
++        if attrs.has_key ('printer-more-info'):
++            uris.append (attrs['printer-more-info'])
++
++        for uri in uris:
++            self.printer[uri] = printer
++
++    def remove_printer (self, printer):
++        # Remove references to this printer in the URI map.
++        uris = self.printer.keys ()
++        for uri in uris:
++            if self.printer[uri] == printer:
++                del self.printer[uri]
++
++    def lookup (self, uri, connection=None):
++        try:
++            return self.printer[uri]
++        except KeyError:
++            if connection == None:
++                connection = cups.Connection ()
++
++            r = ['printer-name', 'printer-uri-supported', 'printer-more-info']
++            try:
++                attrs = connection.getPrinterAttributes (uri=uri,
++                                                         requested_attributes=r)
++            except TypeError:
++                # requested_attributes argument is new in pycups 1.9.40.
++                attrs = connection.getPrinterAttributes (uri=uri)
++            except TypeError:
++                # uri argument is new in pycups 1.9.32.  We'll have to try
++                # each named printer.
++                debugprint ("PrinterURIIndex: using slow method")
++                if self.names == None:
++                    dests = connection.getDests ()
++                    names = set()
++                    for (printer, instance) in dests.keys ():
++                        if printer == None:
++                            continue
++                        if instance != None:
++                            continue
++                        names.add (printer)
++                    self.names = names
++
++                r = ['printer-uri-supported', 'printer-more-info']
++                for name in self.names:
++                    try:
++                        attrs = connection.getPrinterAttributes (name,
++                                                                 requested_attributes=r)
++                    except TypeError:
++                        # requested_attributes argument is new in pycups 1.9.40.
++                        attrs = connection.getPrinterAttributes (name)
++
++                    self.update_from_attrs (name, attrs)
++                    try:
++                        return self.printer[uri]
++                    except KeyError:
++                        pass
++                raise KeyError
++            except cups.IPPError:
++                # URI not known.
++                raise KeyError
++
++            name = attrs['printer-name']
++            self.update_from_attrs (name, attrs)
++            self.printer[uri] = name
++            try:
++                return self.printer[uri]
++            except KeyError:
++                pass
++        raise KeyError
++
+ class MainWindow(KXmlGuiWindow):
+     """Our main GUI dialogue, overridden so that closing it doesn't quit the app"""
+ 
+@@ -91,98 +171,6 @@
+         self.applet.on_printer_status_delete_event()
+         self.hide()
+ 
+-class StateReason:
+-    REPORT=1
+-    WARNING=2
+-    ERROR=3
+-
+-    LEVEL_ICON={
+-        REPORT: "dialog-info",
+-        WARNING: "dialog-warning",
+-        ERROR: "dialog-error"
+-        }
+-
+-    def __init__(self, printer, reason):
+-        self.printer = printer
+-        self.reason = reason
+-        self.level = None
+-        self.canonical_reason = None
+-
+-    def get_printer (self):
+-        return self.printer
+-
+-    def get_level (self):
+-        if self.level != None:
+-            return self.level
+-
+-        if (self.reason.endswith ("-report") or
+-            self.reason == "connecting-to-device"):
+-            self.level = self.REPORT
+-        elif self.reason.endswith ("-warning"):
+-            self.level = self.WARNING
+-        else:
+-            self.level = self.ERROR
+-        return self.level
+-
+-    def get_reason (self):
+-        if self.canonical_reason:
+-            return self.canonical_reason
+-
+-        level = self.get_level ()
+-        reason = self.reason
+-        if level == self.WARNING and reason.endswith ("-warning"):
+-            reason = reason[:-8]
+-        elif level == self.ERROR and reason.endswith ("-error"):
+-            reason = reason[:-6]
+-        self.canonical_reason = reason
+-        return self.canonical_reason
+-
+-    def get_description (self):
+-        messages = {
+-            'toner-low': (i18n("Toner low"),
+-                          ki18n("Printer '%1' is low on toner.")),
+-            'toner-empty': (i18n("Toner empty"),
+-                            ki18n("Printer '%1' has no toner left.")),
+-            'cover-open': (i18n("Cover open"),
+-                           ki18n("The cover is open on printer '%1'.")),
+-            'door-open': (i18n("Door open"),
+-                          ki18n("The door is open on printer '%1'.")),
+-            'media-low': (i18n("Paper low"),
+-                          ki18n("Printer '%1' is low on paper.")),
+-            'media-empty': (i18n("Out of paper"),
+-                            ki18n("Printer '%1' is out of paper.")),
+-            'marker-supply-low': (i18n("Ink low"),
+-                                  ki18n("Printer '%1' is low on ink.")),
+-            'marker-supply-empty': (i18n("Ink empty"),
+-                                    ki18n("Printer '%1' has no ink left.")),
+-            'connecting-to-device': (i18n("Not connected?"),
+-                                     ki18n("Printer '%1' may not be connected.")),
+-            }
+-        try:
+-            (title, text) = messages[self.get_reason ()]
+-            text = text.subs (self.get_printer ()).toString ()
+-        except KeyError:
+-            if self.get_level () == self.REPORT:
+-                title = i18n("Printer report")
+-            elif self.get_level () == self.WARNING:
+-                title = i18n("Printer warning")
+-            elif self.get_level () == self.ERROR:
+-                title = i18n("Printer error")
+-            text = i18n("Printer '%1': '%2'.", self.get_printer (), self.get_reason ())
+-        return (title, text)
+-
+-    def get_tuple (self):
+-        return (self.get_level (), self.get_printer (), self.get_reason ())
+-
+-    def __cmp__(self, other):
+-        if other == None:
+-            return 1
+-        if other.get_level () != self.get_level ():
+-            return self.get_level () < other.get_level ()
+-        if other.get_printer () != self.get_printer ():
+-            return other.get_printer () < self.get_printer ()
+-        return other.get_reason () < self.get_reason ()
+-
+ def collect_printer_state_reasons (connection):
+     result = []
+     printers = connection.getPrinters ()
+@@ -220,27 +208,26 @@
+     return worst_reason
+ 
+ 
+-class JobManager(QObject):
++class JobManager(QObject, monitor.Watcher):
+     """our main class creates the systray icon and the dialogues and refreshes the dialogues for new information"""
+     def __init__(self, parent = None):
+         QObject.__init__(self)
+ 
+-        self.will_refresh = False # whether timeout is set
+-        self.last_refreshed = 0
+         self.trayicon = True
+         self.suppress_icon_hide = False
+-        self.which_jobs = "not-completed"
+-        self.hidden = False
++        self.stopped_job_prompts = set() # of job IDs
++        self.printer_state_reasons = {}
++        self.num_jobs_when_hidden = 0
+         self.jobs = {}
+         self.jobiters = {}
+-        self.will_update_job_creation_times = False # whether timeout is set
++        self.will_update_job_creation_times = False # whether timeout is set FIXME now job_creation_times_timer
+         self.update_job_creation_times_timer = QTimer(self)
+         self.connect(self.update_job_creation_times_timer, SIGNAL("timeout()"), self.update_job_creation_times)
+         self.statusbar_set = False
+-        self.reasons_seen = {}
+         self.connecting_to_device = {} # dict of printer->time first seen
+-        self.still_connecting = set()
++        self.state_reason_notifications = {}
+         self.special_status_icon = False
++        self.reasoniters = {}
+ 
+         #Use local files if in current directory
+         if os.path.exists("printer-applet.ui"):
+@@ -257,7 +244,7 @@
+ 
+         self.sysTray = QSystemTrayIcon(KIcon("printer"), self.mainWindow)
+         #self.sysTray.show()
+-        self.connect(self.sysTray, SIGNAL("activated( QSystemTrayIcon::ActivationReason )"), self.showMainWindow)
++        self.connect(self.sysTray, SIGNAL("activated( QSystemTrayIcon::ActivationReason )"), self.toggle_window_display)
+ 
+         self.menu = QMenu()
+         self.menu.addAction(i18n("_Hide").replace("_", ""), self.on_icon_hide_activate)
+@@ -265,7 +252,7 @@
+         self.sysTray.setContextMenu(self.menu)
+ 
+         self.mainWindow.treeWidget.setContextMenuPolicy(Qt.CustomContextMenu)
+-        self.connect(self.mainWindow.treeWidget, SIGNAL("customContextMenuRequested(const QPoint&)"), self.on_treeview_button_press_event)
++        self.connect(self.mainWindow.treeWidget, SIGNAL("customContextMenuRequested(const QPoint&)"), self.show_treeview_popup_menu)
+         #self.connect(self.mainWindow.treeWidget, SIGNAL("itemClicked(QTreeWidgetItem*, int)"), self.printItemClicked)
+         self.rightClickMenu = QMenu(self.mainWindow.treeWidget)
+         self.cancel = self.rightClickMenu.addAction(i18n("Cancel"), self.on_job_cancel_activate)
+@@ -279,7 +266,7 @@
+         refreshAction.setIcon( KIcon("view-refresh") )
+         refreshAction.setText( i18n( "&Refresh" ) )
+         refreshAction.setShortcut(QKeySequence(Qt.Key_F5))
+-        self.connect(refreshAction, SIGNAL("triggered(bool)"), self.refresh);
++        self.connect(refreshAction, SIGNAL("triggered(bool)"), self.on_refresh_activate);
+ 
+         showCompletedJobsAction = KToggleAction("Show Completed Jobs", self.mainWindow)
+         self.mainWindow.actionCollection().addAction("show_completed_jobs", showCompletedJobsAction)
+@@ -288,11 +275,12 @@
+         showPrinterStatusAction = KToggleAction("Show Printer Status", self.mainWindow)
+         self.mainWindow.actionCollection().addAction("show_printer_status", showPrinterStatusAction)
+         self.connect(showPrinterStatusAction, SIGNAL("triggered(bool)"), self.on_show_printer_status_activate);
++        
++        self.mainWindow.treeWidget.header().setResizeMode(QHeaderView.ResizeToContents)
++        self.printersWindow.treeWidget.header().setResizeMode(QHeaderView.ResizeToContents)
+ 
+         self.mainWindow.createGUI(APPDIR + "/printer-appletui.rc")
+ 
+-        cups.setPasswordCB(self.cupsPasswdCallback)
+-
+         dbus.mainloop.qt.DBusQtMainLoop(set_as_default=True)
+ 
+         try:
+@@ -301,16 +289,21 @@
+             print >> sys.stderr, "%s: printer-applet failed to connect to system D-Bus"
+             sys.exit (1)
+ 
+-        if AUTOCONFIGURE:
++        self.monitor = monitor.Monitor (self, bus=bus, my_jobs=True,
++                                        specific_dests=None)
++
++        try:
++            import cupshelpers.ppds
+             notification = NewPrinterNotification(bus, self)
++        except ImportError:
++            pass  # cupshelpers not installed, no new printer notification will be shown
+ 
+-        # D-Bus
+-        bus.add_signal_receiver (self.handle_dbus_signal,
+-                                 path="/com/redhat/PrinterSpooler",
+-                                 dbus_interface="com.redhat.PrinterSpooler")
+-        self.refresh()
++    def cleanup (self):
++        self.monitor.cleanup ()
++        if self.exit_handler:
++            self.exit_handler (self)
+ 
+-    """Used in gtk frontend to set magnifing glass icon when configuring printer, I don't have a suitable icon so using bubbles instead
++    """Used in gtk frontend to set magnifing glass icon when configuring printer, I don't have a suitable icon so using notifications instead
+     # Handle "special" status icon
+     def set_special_statusicon (self, iconname):
+         self.special_status_icon = True
+@@ -323,19 +316,8 @@
+     """
+ 
+     def notify_new_printer (self, printer, title, text):
+-        self.hidden = False
+-        self.showMessage(title, text)
+-
+-    def showMessage(self, title, message):
+-        """show a message, delayed slightly to ensure the systray is visible else it appears in the wrong place
+-        Gtk uses libnotify, for Qt we just show the message directly"""
+         self.sysTray.show()
+-        self.sysTrayTitle = title
+-        self.sysTrayMessage = message
+-        QTimer.singleShot(1000, self.showSysTrayMessage)
+-
+-    def showSysTrayMessage(self):
+-        self.sysTray.showMessage(self.sysTrayTitle, self.sysTrayMessage)
++        KNotification.event(title, text, KIcon("konqueror").pixmap(QSize(22,22)))
+ 
+     """unused, see set_special_statusicon
+     def set_statusicon_from_pixbuf (self, pb):
+@@ -358,13 +340,6 @@
+     def on_printer_status_delete_event(self):
+         self.mainWindow.actionShow_Printer_Status.setChecked(False)
+ 
+-    def cupsPasswdCallback(self, querystring):
+-        (text, ok) = QInputDialog.getText(self.mainWindow, i18n("Password required"), querystring, QLineEdit.Password)
+-        if ok:
+-            print "ok"
+-            return text
+-        return ''
+-
+     def show_IPP_Error(self, exception, message):
+         if exception == cups.IPP_NOT_AUTHORIZED:
+             error_text = ('<span weight="bold" size="larger">' +
+@@ -378,29 +353,26 @@
+         #fix Gtk's non-HTML for Qt
+         error_text = error_text.replace("\n", "<br />")
+         error_text = error_text.replace("span", "strong")
+-        QMessageBox.critical(self.mainWindow, i18n("Error"), error_text)
++        KMessageBox.error(self.mainWindow, error_text, i18n("Error"))
+ 
+-    """
+-    def toggle_window_display(self, icon):
+-    """
+-    #FIXME, hide printer status window?
+-    def hideMainWindow(self):
+-        self.mainWindow.hide()
+-
+-    def showMainWindow(self, activationReason):
++    def toggle_window_display(self, activationReason):
+         if activationReason == QSystemTrayIcon.Trigger:
+             if self.mainWindow.isVisible():
+                 self.mainWindow.hide()
+             else:
+                 self.mainWindow.show()
+-                self.refresh()
++                self.monitor.refresh()
++    
++    #FIXME, hide printer status window?
++    def hideMainWindow(self):
++        self.mainWindow.hide()
+ 
+     def on_show_completed_jobs_activate(self, activated):
+         if activated:
+-            self.which_jobs = "all"
++            self.monitor.which_jobs = "all"
+         else:
+-            self.which_jobs = "not-completed"
+-        self.refresh()
++            self.monitor.which_jobs = "not-completed"
++        self.monitor.refresh()
+ 
+     def on_show_printer_status_activate(self, activated):
+         if activated:
+@@ -408,113 +380,6 @@
+         else:
+             self.printersWindow.hide()
+ 
+-    def check_still_connecting(self):
+-        """Timer callback to check on connecting-to-device reasons."""
+-        c = cups.Connection ()
+-        printer_reasons = collect_printer_state_reasons (c)
+-        del c
+-
+-        if self.update_connecting_devices (printer_reasons):
+-            self.refresh ()
+-
+-        # Don't run this callback again.
+-        return False
+-
+-    def update_connecting_devices(self, printer_reasons=[]):
+-        """Updates connecting_to_device dict and still_connecting set.
+-        Returns True if a device has been connecting too long."""
+-        time_now = time.time ()
+-        connecting_to_device = {}
+-        trouble = False
+-        for reason in printer_reasons:
+-            if reason.get_reason () == "connecting-to-device":
+-                # Build a new connecting_to_device dict.  If our existing
+-                # dict already has an entry for this printer, use that.
+-                printer = reason.get_printer ()
+-                t = self.connecting_to_device.get (printer, time_now)
+-                connecting_to_device[printer] = t
+-                if time_now - t >= CONNECTING_TIMEOUT:
+-                    trouble = True
+-
+-        # Clear any previously-notified errors that are now fine.
+-        remove = set()
+-        for printer in self.still_connecting:
+-            if not self.connecting_to_device.has_key (printer):
+-                remove.add (printer)
+-
+-        self.still_connecting = self.still_connecting.difference (remove)
+-
+-        self.connecting_to_device = connecting_to_device
+-        return trouble
+-
+-    def check_state_reasons(self, connection, my_printers=set()):
+-        printer_reasons = collect_printer_state_reasons (connection)
+-
+-        # Look for any new reasons since we last checked.
+-        old_reasons_seen_keys = self.reasons_seen.keys ()
+-        reasons_now = set()
+-        need_recheck = False
+-        for reason in printer_reasons:
+-            tuple = reason.get_tuple ()
+-            printer = reason.get_printer ()
+-            reasons_now.add (tuple)
+-            if not self.reasons_seen.has_key (tuple):
+-                # New reason.
+-                iter = QTreeWidgetItem(self.printersWindow.treeWidget)
+-                #iter.setText(0, reason.get_level ())
+-                iter.setText(0, reason.get_printer ())
+-                title, text = reason.get_description ()
+-                iter.setText(1, text)
+-                self.printersWindow.treeWidget.addTopLevelItem(iter)
+-
+-                self.reasons_seen[tuple] = iter
+-                if (reason.get_reason () == "connecting-to-device" and
+-                    not self.connecting_to_device.has_key (printer)):
+-                    # First time we've seen this.
+-                    need_recheck = True
+-
+-        if need_recheck:
+-            # Check on them again in a minute's time.
+-            QTimer.singleShot(CONNECTING_TIMEOUT * 1000, self.check_still_connecting)
+-
+-        self.update_connecting_devices (printer_reasons)
+-        items = self.reasons_seen.keys ()
+-        for tuple in items:
+-            if not tuple in reasons_now:
+-                # Reason no longer present.
+-                iter = self.reasons_seen[tuple]
+-                index = self.mainWindow.treeWidget.indexOfTopLevelItem(iter)
+-                self.mainWindow.treeWidget.takeTopLevelItem(index)
+-                del self.reasons_seen[tuple]
+-        # Update statusbar and icon with most severe printer reason
+-        # across all printers.
+-        self.icon_has_emblem = False
+-        reason = worst_printer_state_reason (connection, printer_reasons)
+-        if reason != None and reason.get_level () >= StateReason.WARNING:
+-            title, text = reason.get_description ()
+-            #if self.statusbar_set:
+-            #    self.statusbar.pop (0)
+-            self.mainWindow.statusBar().showMessage(text)
+-            #self.statusbar.push (0, text)
+-            self.worst_reason_text = text
+-            self.statusbar_set = True
+-
+-            if self.trayicon:
+-                icon = StateReason.LEVEL_ICON[reason.get_level ()]
+-                emblem = QPixmap(KIcon(icon).pixmap(16, 16))
+-                pixbuf = QPixmap(KIcon("printer").pixmap(22, 22))
+-                painter = QPainter(pixbuf)
+-                painter.drawPixmap(pixbuf.width()-emblem.width(),pixbuf.height()-emblem.height(),emblem)
+-                painter.end()
+-                self.sysTray.setIcon(QIcon(pixbuf))
+-                self.icon_has_emblem = True
+-        else:
+-            # No errors
+-            if self.statusbar_set:
+-                #self.statusbar.pop (0)
+-                self.mainWindow.statusBar().clearMessage()
+-                self.statusbar_set = False
+-
+     """not using notifications in qt frontend
+     def on_notification_closed(self, notify):
+     """
+@@ -547,8 +412,7 @@
+                     mins = int(ago / 60)
+                     t = i18np("a minute ago", "%1 minutes ago", mins)
+ 
+-            #self.store.set_value (iter, 4, t)
+-            iter.setText(4, t)
++            iter.setText(5, t)
+ 
+         if need_update and not self.will_update_job_creation_times:
+             self.update_job_creation_times_timer.setInterval(60 * 1000)
+@@ -562,152 +426,121 @@
+         # Return code controls whether the timeout will recur.
+         return self.will_update_job_creation_times
+ 
+-    def refresh(self):
+-        """updates the print dialogue"""
+-        now = time.time ()
+-        if (now - self.last_refreshed) < MIN_REFRESH_INTERVAL:
+-            if self.will_refresh:
+-                return
+-
+-            #gobject.timeout_add (MIN_REFRESH_INTERVAL * 1000,
+-            #                     self.refresh)
+-            QTimer.singleShot(MIN_REFRESH_INTERVAL * 1000, self.update_job_creation_times)
+-            self.will_refresh = True
+-            return
+-
+-        self.will_refresh = False
+-        self.last_refreshed = now
+-
+-        try:
+-            c = cups.Connection ()
+-            jobs = c.getJobs (which_jobs=self.which_jobs, my_jobs=True)
+-        except cups.IPPError, (e, m):
+-            self.show_IPP_Error (e, m)
+-            return
+-        except RuntimeError:
+-            return
++    def print_error_dialog_response(self, response, jobid):
++        self.stopped_job_prompts.remove (jobid)
++        if response == KMessageBox.No:
++            # Diagnose
++            if not self.__dict__.has_key ('troubleshooter'):
++                print "FIXME implement troubleshooter"
++                #import troubleshoot
++                #troubleshooter = troubleshoot.run (self.on_troubleshoot_quit)
++                #self.troubleshooter = troubleshooter
++
++    def add_job (self, job, data):
++        iter = QTreeWidgetItem(self.mainWindow.treeWidget)
++        iter.setText(0, str(job))
++        iter.setText(1, data.get('job-originating-user-name', i18nc("User who printed is not known", 'Unknown')))
++        iter.setText(2, data.get('job-name', i18nc("Print job name is not known", 'Unknown')))
++        self.mainWindow.treeWidget.addTopLevelItem(iter)
++        self.jobiters[job] = iter
++        self.update_job (job, data)
++        self.update_job_creation_times ()
+ 
+-        if self.which_jobs == "not-completed":
+-            num_jobs = len (jobs)
+-        else:
++    def update_job (self, job, data):
++        iter = self.jobiters[job]
++        self.jobs[job] = data
++
++        printer = data['job-printer-name']
++        iter.setText(3, printer)
++
++        size = i18n("Unknown")
++        if data.has_key ('job-k-octets'):
++            size = str (data['job-k-octets']) + 'k'
++        iter.setText(4, size)
++
++        state = None
++        job_requires_auth = False
++        if data.has_key ('job-state'):
+             try:
+-                num_jobs = len (c.getJobs (my_jobs=True))
+-            except cups.IPPError, (e, m):
+-                self.show_IPP_Error (e, m)
+-                return
+-            except RuntimeError:
+-                return
+-
+-        if self.trayicon:
+-            self.num_jobs = num_jobs
+-            if self.hidden and self.num_jobs != self.num_jobs_when_hidden:
+-                self.hidden = False
+-            if num_jobs == 0:
+-                tooltip = i18n("No documents queued")
+-                #FIXMEself.set_statusicon_from_pixbuf (self.icon_no_jobs)
+-            else:
+-                tooltip = i18np("1 document queued", "%1 documents queued", num_jobs)
+-                #self.set_statusicon_from_pixbuf (self.icon_jobs)
+-
+-        my_printers = set()
+-        for job, data in jobs.iteritems ():
+-            state = data.get ('job-state', cups.IPP_JOB_CANCELED)
+-            if state >= cups.IPP_JOB_CANCELED:
+-                continue
+-            uri = data.get ('job-printer-uri', '/')
+-            i = uri.rfind ('/')
+-            my_printers.add (uri[i + 1:])
+-
+-        self.check_state_reasons (c, my_printers)
+-        del c
+-
+-        if self.trayicon:
+-            # If there are no jobs but there is a printer
+-            # warning/error indicated by the icon, set the icon
+-            # tooltip to the reason description.
+-            if self.num_jobs == 0 and self.icon_has_emblem:
+-                tooltip = self.worst_reason_text
+-
+-            self.sysTray.setToolTip (tooltip)
+-            self.set_statusicon_visibility ()
+-
+-        for job in self.jobs:
+-            if not jobs.has_key (job):
+-                #self.store.remove (self.jobiters[job])
+-                index = self.mainWindow.treeWidget.indexOfTopLevelItem(self.jobiters[job])
+-                self.mainWindow.treeWidget.takeTopLevelItem(index)
+-                del self.jobiters[job]
+-
+-        for job, data in jobs.iteritems():
+-            if self.jobs.has_key (job):
+-                iter = self.jobiters[job]
+-            else:
+-                iter = QTreeWidgetItem(self.mainWindow.treeWidget)
+-                iter.setText(0, str(job))
+-                iter.setText(1, data.get('job-name', 'Unknown'))
+-                self.mainWindow.treeWidget.addTopLevelItem(iter)
+-                self.jobiters[job] = iter
+-
+-            uri = data.get('job-printer-uri', '')
+-            i = uri.rfind ('/')
+-            if i != -1:
+-                printer = uri[i + 1:]
+-            iter.setText(2, printer)
+-
+-            if data.has_key ('job-k-octets'):
+-                size = str (data['job-k-octets']) + 'k'
+-            else:
+-                size = 'Unknown'
+-            iter.setText(3, size)
+-            #self.store.set_value (iter, 3, size)
+-
+-            state = None
+-            if data.has_key ('job-state'):
+-                try:
+-                    jstate = data['job-state']
+-                    s = int (jstate)
+-                    state = { cups.IPP_JOB_PENDING:i18nc("Job state", "Pending"),
+-                              cups.IPP_JOB_HELD:i18nc("Job state", "Held"),
++                jstate = data['job-state']
++                s = int (jstate)
++                job_requires_auth = (jstate == cups.IPP_JOB_HELD and
++                                     data.get ('job-hold-until', 'none') ==
++                                     'auth-info-required')
++                if job_requires_auth:
++                    state = i18nc("Job state", "Held for authentication")
++                else:
++                    state = { cups.IPP_JOB_PENDING: i18nc("Job state", "Pending"),
++                              cups.IPP_JOB_HELD: i18nc("Job state", "Held"),
+                               cups.IPP_JOB_PROCESSING: i18nc("Job state", "Processing"),
+                               cups.IPP_JOB_STOPPED: i18nc("Job state", "Stopped"),
+                               cups.IPP_JOB_CANCELED: i18nc("Job state", "Canceled"),
+                               cups.IPP_JOB_ABORTED: i18nc("Job state", "Aborted"),
+                               cups.IPP_JOB_COMPLETED: i18nc("Job state", "Completed") }[s]
+-                except ValueError:
+-                    pass
+-                except IndexError:
+-                    pass    
+-            if state == None:
+-                state = i18nc("Job state", "Unknown")
+-            iter.setText(5, state)
+-            columns = self.mainWindow.treeWidget.columnCount()
+-            for i in range(columns):
+-                self.mainWindow.treeWidget.resizeColumnToContents(i)
++            except ValueError:
++                pass
++            except IndexError:
++                pass
++
++        if state == None:
++            state = i18nc("Job state", "Unknown")
++        iter.setText(6, state)
+ 
+-        self.jobs = jobs
+-        self.update_job_creation_times ()
++        """FIXME TODO
++        # Check whether authentication is required.
++        if self.trayicon:
++            if (job_requires_auth and
++                not self.auth_notifications.has_key (job) and
++                not self.auth_info_dialogs.has_key (job)):
++                try:
++                    cups.require ("1.9.37")
++                except:
++                    debugprint ("Authentication required but "
++                                "authenticateJob() not available")
++                    return
++
++                title = i18n("Authentication Required")
++                text = i18n("Job requires authentication to proceed.")
++                notification = pynotify.Notification (title, text, 'printer')
++                notification.set_data ('job-id', job)
++                notification.set_urgency (pynotify.URGENCY_NORMAL)
++                notification.set_timeout (pynotify.EXPIRES_NEVER)
++                notification.connect ('closed',
++                                      self.on_auth_notification_closed)
++                self.set_statusicon_visibility ()
++                notification.attach_to_status_icon (self.statusicon)
++                notification.add_action ("authenticate", i18n("Authenticate"),
++                                         self.on_auth_notification_authenticate)
++                notification.show ()
++                self.auth_notifications[job] = notification
++            elif (not job_requires_auth and
++                  self.auth_notifications.has_key (job)):
++                self.auth_notifications[job].close ()
++        """
+ 
+     def set_statusicon_visibility (self):
+-        if self.trayicon:
+-            if self.suppress_icon_hide:
+-                # Avoid hiding the icon if we've been woken up to notify
+-                # about a new printer.
+-                self.suppress_icon_hide = False
+-                return
++        if not self.trayicon:
++            return
+ 
+-            if (not self.hidden) and (self.num_jobs > 0 or self.icon_has_emblem) or self.special_status_icon:
+-                self.sysTray.show()
+-            else:
+-                self.sysTray.hide()
++        if self.suppress_icon_hide:
++            # Avoid hiding the icon if we've been woken up to notify
++            # about a new printer.
++            self.suppress_icon_hide = False
++            return
++
++        num_jobs = len (self.jobs.keys ())
++
++        debugprint ("num_jobs: %d" % num_jobs)
++        debugprint ("num_jobs_when_hidden: %d" % self.num_jobs_when_hidden)
+ 
+-    def on_treeview_button_press_event(self, postition):
++        self.sysTray.setVisible(self.special_status_icon or
++                                     num_jobs > self.num_jobs_when_hidden)
++
++    def show_treeview_popup_menu(self, postition):
+         # Right-clicked.
+         items = self.mainWindow.treeWidget.selectedItems ()
+-        print "items" + str(items)
+-        print len(items)
+         if len(items) != 1:
+             return
+-        print "selected: " + str(items)
+         iter = items[0]
+         if iter == None:
+             return
+@@ -720,15 +553,13 @@
+         self.reprint.setEnabled (True)
+         if job.has_key ('job-state'):
+             s = job['job-state']
+-            print s, "jobstate"
+             if s >= cups.IPP_JOB_CANCELED:
+                 self.cancel.setEnabled (False)
+-            if s != cups.IPP_JOB_PENDING and s != cups.IPP_JOB_PROCESSING:
++            if s != cups.IPP_JOB_PENDING:
+                 self.hold.setEnabled (False)
+             if s != cups.IPP_JOB_HELD:
+                 self.release.setEnabled (False)
+-            if (s != cups.IPP_JOB_CANCELED or
+-                not job.get('job-preserved', False)):
++            if (not job.get('job-preserved', False)):
+                 self.reprint.setEnabled (False)
+         self.rightClickMenu.popup(QCursor.pos())
+ 
+@@ -736,8 +567,7 @@
+         self.icon_popupmenu.popup (None, None, None, button, time)
+ 
+     def on_icon_hide_activate(self):
+-        self.num_jobs_when_hidden = self.num_jobs
+-        self.hidden = True
++        self.num_jobs_when_hidden = len (self.jobs.keys ())
+         self.set_statusicon_visibility ()
+ 
+     def on_icon_quit_activate(self):
+@@ -745,83 +575,463 @@
+ 
+     def on_job_cancel_activate(self):
+         try:
+-            c = cups.Connection ()
++            c = authconn.Connection (self.mainWindow)
+             c.cancelJob (self.jobid)
+             del c
+         except cups.IPPError, (e, m):
+-            self.show_IPP_Error (e, m)
+-            self.refresh()
++            if (e != cups.IPP_NOT_POSSIBLE and
++                e != cups.IPP_NOT_FOUND):
++                self.show_IPP_Error (e, m)
++            self.monitor.refresh ()
+             return
+         except RuntimeError:
+             return
+-        self.refresh()
++
++        self.monitor.refresh ()
+ 
+     def on_job_hold_activate(self):
+         try:
+-            c = cups.Connection ()
++            c = authconn.Connection (self.mainWindow)
+             c.setJobHoldUntil (self.jobid, "indefinite")
+             del c
+         except cups.IPPError, (e, m):
+-            self.show_IPP_Error (e, m)
+-            self.refresh()
++            if (e != cups.IPP_NOT_POSSIBLE and
++                e != cups.IPP_NOT_FOUND):
++                self.show_IPP_Error (e, m)
++            self.monitor.refresh ()
+             return
+         except RuntimeError:
+             return
+-        self.refresh()
++
++        self.monitor.refresh ()
+ 
+     def on_job_release_activate(self):
+         try:
+-            c = cups.Connection ()
++            c = authconn.Connection (self.mainWindow)
+             c.setJobHoldUntil (self.jobid, "no-hold")
+             del c
+         except cups.IPPError, (e, m):
+-            self.show_IPP_Error (e, m)
+-            self.refresh()
++            if (e != cups.IPP_NOT_POSSIBLE and
++                e != cups.IPP_NOT_FOUND):
++                self.show_IPP_Error (e, m)
++            self.monitor.refresh ()
+             return
+         except RuntimeError:
+             return
+-        self.refresh()
++
++        self.monitor.refresh ()
+ 
+     def on_job_reprint_activate(self):
+         try:
+-            c = cups.Connection ()
++            c = authconn.Connection (self.mainWindow)
+             c.restartJob (self.jobid)
+             del c
+         except cups.IPPError, (e, m):
+             self.show_IPP_Error (e, m)
+-            self.refresh()
++            self.monitor.refresh ()
+             return
+         except RuntimeError:
+             return
+ 
+-        self.refresh ()
++        self.monitor.refresh ()
+ 
+     def on_refresh_activate(self, menuitem):
+-        self.refresh ()
++        self.monitor.refresh ()
+ 
+-    def handle_dbus_signal(self, *args):
+-        self.refresh ()
++    def job_is_active (self, jobdata):
++        state = jobdata.get ('job-state', cups.IPP_JOB_CANCELED)
++        if state >= cups.IPP_JOB_CANCELED:
++            return False
+ 
+-    ## Printer status window
+-    """FIXME
+-    def set_printer_status_icon (self, column, cell, model, iter, *user_data):
+-        level = model.get_value (iter, 0)
+-        icon = StateReason.LEVEL_ICON[level]
+-        theme = gtk.icon_theme_get_default ()
+-        try:
+-            pixbuf = theme.load_icon (icon, 22, 0)
+-            cell.set_property("pixbuf", pixbuf)
+-        except gobject.GError, exc:
+-            pass # Couldn't load icon
+-    """
+-    """FIXME
+-    def set_printer_status_name (self, column, cell, model, iter, *user_data):
+-        cell.set_property("text", model.get_value (iter, 1))
+-    """
++        return True
++ 
++    def set_statusicon_tooltip (self, tooltip=None):
++        if not self.trayicon:
++            return
++
++        if tooltip == None:
++            num_jobs = len (self.jobs)
++            if num_jobs == 0:
++                tooltip = i18n("No documents queued")
++            else:
++                tooltip = i18np("1 document queued", "%1 documents queued", num_jobs)
++
++        self.sysTray.setToolTip(tooltip)
++
++    def update_status (self, have_jobs=None):
++        # Found out which printer state reasons apply to our active jobs.
++        upset_printers = set()
++        for printer, reasons in self.printer_state_reasons.iteritems ():
++            if len (reasons) > 0:
++                upset_printers.add (printer)
++        debugprint ("Upset printers: %s" % upset_printers)
++
++        my_upset_printers = set()
++        if len (upset_printers):
++            my_upset_printers = set()
++            for jobid in self.active_jobs:
++                # 'job-printer-name' is set by job_added/job_event
++                printer = self.jobs[jobid]['job-printer-name']
++                if printer in upset_printers:
++                    my_upset_printers.add (printer)
++            debugprint ("My upset printers: %s" % my_upset_printers)
++
++        my_reasons = []
++        for printer in my_upset_printers:
++            my_reasons.extend (self.printer_state_reasons[printer])
++
++        # Find out which is the most problematic.
++        self.worst_reason = None
++        if len (my_reasons) > 0:
++            worst_reason = my_reasons[0]
++            for reason in my_reasons:
++                if reason > worst_reason:
++                    worst_reason = reason
++            self.worst_reason = worst_reason
++            debugprint ("Worst reason: %s" % worst_reason)
++
++        if self.worst_reason != None:
++            (title, tooltip) = self.worst_reason.get_description ()
++            self.mainWindow.statusBar().showMessage(tooltip)
++            self.statusbar_set = True
++        else:
++            tooltip = None
++            if self.statusbar_set:
++                self.mainWindow.statusBar().clearMessage()
++                self.statusbar_set = False
++
++        if self.trayicon:
++            self.set_statusicon_visibility ()
++            self.set_statusicon_tooltip (tooltip=tooltip)
++
++    ## Notifications
++    def notify_printer_state_reason_if_important (self, reason):
++        level = reason.get_level ()
++        if level < StateReason.WARNING:
++            # Not important enough to justify a notification.
++            return
++
++        self.notify_printer_state_reason (reason)
++
++    def notify_printer_state_reason (self, reason):        
++        tuple = reason.get_tuple ()
++        if self.state_reason_notifications.has_key (tuple):
++            debugprint ("Already sent notification for %s" % repr (reason))
++            return
++
++        """port?
++        level = reason.get_level ()
++        if (level == StateReason.ERROR or
++            reason.get_reason () == "connecting-to-device"):
++            urgency = pynotify.URGENCY_NORMAL
++        else:
++            urgency = pynotify.URGENCY_LOW
++        """
++
++        (title, text) = reason.get_description ()
++        KNotification.event("Other", text, KIcon("konqueror").pixmap(QSize(22,22)))
++        self.set_statusicon_visibility ()
++
++    ## monitor.Watcher interface
++    def current_printers_and_jobs (self, mon, printers, jobs):
++        self.mainWindow.treeWidget.clear()
++        self.jobs = {}
++        self.jobiters = {}
++        self.printer_uri_index = PrinterURIIndex (names=printers)
++        connection = None
++        for jobid, jobdata in jobs.iteritems ():
++            uri = jobdata.get ('job-printer-uri', '')
++            try:
++                printer = self.printer_uri_index.lookup (uri,
++                                                         connection=connection)
++            except KeyError:
++                printer = uri
++            jobdata['job-printer-name'] = printer
++
++            self.add_job (jobid, jobdata)
++
++            # Fetch complete attributes for these jobs.
++            attrs = None
++            try:
++                if connection == None:
++                    connection = cups.Connection ()
++                attrs = connection.getJobAttributes (jobid)
++            except RuntimeError:
++                pass
++            except AttributeError:
++                pass
++
++            if attrs:
++                jobdata.update (attrs)
++                self.update_job (jobid, jobdata)
++
++        self.jobs = jobs
++        self.active_jobs = set()
++        for jobid, jobdata in jobs.iteritems ():
++            if self.job_is_active (jobdata):
++                self.active_jobs.add (jobid)
++
++        self.update_status ()
++
++    def job_added (self, mon, jobid, eventname, event, jobdata):
++        monitor.Watcher.job_added (self, mon, jobid, eventname, event, jobdata)
++
++        uri = jobdata.get ('job-printer-uri', '')
++        try:
++            printer = self.printer_uri_index.lookup (uri)
++        except KeyError:
++            printer = uri
++        jobdata['job-printer-name'] = printer
++
++        # We may be showing this job already, perhaps because we are showing
++        # completed jobs and one was reprinted.
++        if not self.jobiters.has_key (jobid):
++            self.add_job (jobid, jobdata)
++
++        self.active_jobs.add (jobid)
++        self.update_status (have_jobs=True)
++        if self.trayicon:
++            if not self.job_is_active (jobdata):
++                return
++
++            for reason in self.printer_state_reasons.get (printer, []):
++                if not reason.user_notified:
++                    self.notify_printer_state_reason_if_important (reason)
++
++
++    def job_event (self, mon, jobid, eventname, event, jobdata):
++        monitor.Watcher.job_event (self, mon, jobid, eventname, event, jobdata)
++
++        uri = jobdata.get ('job-printer-uri', '')
++        try:
++            printer = self.printer_uri_index.lookup (uri)
++        except KeyError:
++            printer = uri
++        jobdata['job-printer-name'] = printer
++
++        if self.job_is_active (jobdata):
++            self.active_jobs.add (jobid)
++        elif jobid in self.active_jobs:
++            self.active_jobs.remove (jobid)
++
++        # Look out for stopped jobs.
++        if (self.trayicon and eventname == 'job-stopped' and
++            not jobid in self.stopped_job_prompts):
++            # Why has the job stopped?  It might be due to a job error
++            # of some sort, or it might be that the backend requires
++            # authentication.  If the latter, the job will be held not
++            # stopped, and the job-hold-until attribute will be
++            # 'auth-info-required'.  This will be checked for in
++            # update_job.
++            if jobdata['job-state'] == cups.IPP_JOB_HELD:
++                try:
++                    # Fetch the job-hold-until attribute, as this is
++                    # not provided in the notification attributes.
++                    c = cups.Connection ()
++                    attrs = c.getJobAttributes (jobid)
++                    jobdata.update (attrs)
++                except cups.IPPError:
++                    pass
++                except RuntimeError:
++                    pass
++
++            may_be_problem = True
++            if (jobdata['job-state'] == cups.IPP_JOB_HELD and
++                jobdata['job-hold-until'] == 'auth-info-required'):
++                # Leave this to update_job to deal with.
++                may_be_problem = False
++            else:
++                # Other than that, unfortunately the only
++                # clue we get is the notify-text, which is not
++                # translated into our native language.  We'd better
++                # try parsing it.  In CUPS-1.3.6 the possible strings
++                # are:
++                #
++                # "Job stopped due to filter errors; please consult
++                # the error_log file for details."
++                #
++                # "Job stopped due to backend errors; please consult
++                # the error_log file for details."
++                #
++                # "Job held due to backend errors; please consult the
++                # error_log file for details."
++                #
++                # "Authentication is required for job %d."
++                # [This case is handled in the update_job method.]
++                #
++                # "Job stopped due to printer being paused"
++                # [This should be ignored, as the job was doing just
++                # fine until the printer was stopped for other reasons.]
++                notify_text = event['notify-text']
++                document = jobdata['job-name']
++                if notify_text.find ("backend errors") != -1:
++                    message = i18n("There was a problem sending document `%1' "
++                                "(job %2) to the printer.", document, jobid)
++                elif notify_text.find ("filter errors") != -1:
++                    message = i18n("There was a problem processing document `%1' "
++                                "(job %2).", document, jobid)
++                elif notify_text.find ("being paused") != -1:
++                    may_be_problem = False
++                else:
++                    # Give up and use the provided message untranslated.
++                    message = i18n("There was a problem printing document `%1' "
++                                "(job %2): `%3'.", document, jobid,
++                                                      notify_text)
++
++            if may_be_problem:
++
++                markup = ('<span weight="bold" size="larger">' +
++                          i18n("Print Error") + '</span><br /><br />' +
++                          message)
++                try:
++                    if event['printer-state'] == cups.IPP_PRINTER_STOPPED:
++                        name = event['printer-name']
++                        markup += ' '
++                        markup += i18n("The printer called `%1' has "
++                                       "been disabled.", name)
++                except KeyError:
++                    pass
++
++                self.stopped_job_prompts.add (jobid)
++                result = KMessageBox.warning(self.mainWindow, markup, i18n("Print Error"))
++                #FIXME GTK version asks a question here but we don't have troubleshooter anyway
++                #self.print_error_dialog_response(result, jobid)
++
++        self.update_job (jobid, jobdata)
++
++    def job_removed (self, mon, jobid, eventname, event):
++        monitor.Watcher.job_removed (self, mon, jobid, eventname, event)
++        if self.jobiters.has_key (jobid):
++
++            index = self.mainWindow.treeWidget.indexOfTopLevelItem(self.jobiters[jobid])
++            self.mainWindow.treeWidget.takeTopLevelItem(index)
++            del self.jobiters[jobid]
++            del self.jobs[jobid]
++
++        if jobid in self.active_jobs:
++            self.active_jobs.remove (jobid)
++
++        self.update_status ()
++
++    def state_reason_added (self, mon, reason):
++        monitor.Watcher.state_reason_added (self, mon, reason)
++
++        (title, text) = reason.get_description ()
++        printer = reason.get_printer ()
++        
++        iter = QTreeWidgetItem(self.printersWindow.treeWidget)
++        iter.setText(0, reason.get_printer ())
++        iter.setText(1, printer)
++        iter.setText(1, text)
++        self.printersWindow.treeWidget.addTopLevelItem(iter)
++        self.reasoniters[reason.get_tuple ()] = iter
++
++        try:
++            l = self.printer_state_reasons[printer]
++        except KeyError:
++            l = []
++            self.printer_state_reasons[printer] = l
++
++        reason.user_notified = False
++        l.append (reason)
++        self.update_status ()
++
++        if not self.trayicon:
++            return
++
++        # Find out if the user has jobs queued for that printer.
++        for job, data in self.jobs.iteritems ():
++            if not self.job_is_active (data):
++                continue
++            if data['job-printer-name'] == printer:
++                # Yes!  Notify them of the state reason, if necessary.
++                self.notify_printer_state_reason_if_important (reason)
++                break
++
++    def state_reason_removed (self, mon, reason):
++        monitor.Watcher.state_reason_removed (self, mon, reason)
++
++        try:
++            iter = self.reasoniters[reason.get_tuple ()]
++            index = self.printersWindow.treeWidget.indexOfTopLevelItem(iter)
++            self.printersWindow.treeWidget.takeTopLevelItem(index)
++        except KeyError:
++            debugprint ("Reason iter not found")
++
++        printer = reason.get_printer ()
++        try:
++            reasons = self.printer_state_reasons[printer]
++        except KeyError:
++            debugprint ("Printer not found")
++            return
++
++        try:
++            i = reasons.index (reason)
++        except IndexError:
++            debugprint ("Reason not found")
++            return
++
++        del reasons[i]
++
++        self.update_status ()
++
++        if not self.trayicon:
++            return
++
++    def still_connecting (self, mon, reason):
++        monitor.Watcher.still_connecting (self, mon, reason)
++        if not self.trayicon:
++            return
++
++        self.notify_printer_state_reason (reason)
++
++    def now_connected (self, mon, printer):
++        monitor.Watcher.now_connected (self, mon, printer)
++
++        if not self.trayicon:
++            return
++
++        # Find the connecting-to-device state reason.
++        try:
++            reasons = self.printer_state_reasons[printer]
++            reason = None
++            for r in reasons:
++                if r.get_reason () == "connecting-to-device":
++                    reason = r
++                    break
++        except KeyError:
++            debugprint ("Couldn't find state reason (no reasons)!")
++
++        if reason != None:
++            tuple = reason.get_tuple ()
++        else:
++            debugprint ("Couldn't find state reason in list!")
++            for (level,
++                 p,
++                 r) in self.state_reason_notifications.keys ():
++                if p == printer and r == "connecting-to-device":
++                    debugprint ("Found from notifications list")
++                    tuple = (level, p, r)
++                    break
++
++        try:
++            notification = self.state_reason_notifications[tuple]
++        except KeyError:
++            debugprint ("Unexpected now_connected signal")
++            return
++
++        notification.close ()
++
++    def printer_event (self, mon, printer, eventname, event):
++        monitor.Watcher.printer_event (self, mon, printer, eventname, event)
++        self.printer_uri_index.update_from_attrs (printer, event)
++
++    def printer_removed (self, mon, printer):
++        monitor.Watcher.printer_removed (self, mon, printer)
++        self.printer_uri_index.remove_printer (printer)
+ 
+ ####
+-#### NewPrinterNotification DBus server (the 'new' way).  Note: this interface
+-#### is not final yet.
++#### NewPrinterNotification DBus server (the 'new' way).
+ ####
+ PDS_PATH="/com/redhat/NewPrinterNotification"
+ PDS_IFACE="com.redhat.NewPrinterNotification"
+@@ -856,7 +1066,7 @@
+     @dbus.service.method(PDS_IFACE, in_signature='', out_signature='')
+     def GetReady (self):
+         """hal-cups-utils is settings up a new printer"""
+-        self.jobmanager.notify_new_printer ("", i18n("New Printer"), i18n("Configuring New Printer"))
++        self.jobmanager.notify_new_printer ("", "New Printer", i18n("Configuring New Printer"))
+     """
+         self.wake_up ()
+         if self.getting_ready == 0:
+@@ -901,14 +1111,13 @@
+             return
+         del c
+ 
+-        sys.path.append (SYSTEM_CONFIG_PRINTER_DIR)
+-        from ppds import ppdMakeModelSplit
++        from cupshelpers.ppds import ppdMakeModelSplit
+         (make, model) = ppdMakeModelSplit (printer['printer-make-and-model'])
+         driver = make + " " + model
+         if status < self.STATUS_GENERIC_DRIVER:
+-            title = i18n("Printer added")
++            title = "Printer Added"
+         else:
+-            title = i18n("Missing printer driver")
++            title = "Missing Printer Driver"
+ 
+         if status == self.STATUS_SUCCESS:
+             text = i18n("'%1' is ready for printing.", name)
+@@ -923,7 +1132,7 @@
+     appName     = "printer-applet"
+     catalogue   = "printer-applet"
+     programName = ki18n("Printer Applet")
+-    version     = "1.2"
++    version     = "1.3"
+     description = ki18n("Applet to view current print jobs and configure new printers")
+     license     = KAboutData.License_GPL
+     copyright   = ki18n("2007-2008 Canonical Ltd")
+diff -Naur /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/printer-applet.ui kdeutils-trunk/printer-applet/printer-applet.ui
+--- /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/printer-applet.ui	2008-05-07 12:05:17.000000000 +0300
++++ kdeutils-trunk/printer-applet/printer-applet.ui	2009-01-27 01:22:42.000000000 +0200
+@@ -13,20 +13,12 @@
+    <string>Document Print Status</string>
+   </property>
+   <property name="windowIcon" >
+-   <iconset>printer-128.png</iconset>
++   <iconset>
++    <normaloff>printer-128.png</normaloff>printer-128.png</iconset>
+   </property>
+   <widget class="QWidget" name="centralwidget" >
+    <layout class="QGridLayout" >
+-    <property name="leftMargin" >
+-     <number>0</number>
+-    </property>
+-    <property name="topMargin" >
+-     <number>0</number>
+-    </property>
+-    <property name="rightMargin" >
+-     <number>0</number>
+-    </property>
+-    <property name="bottomMargin" >
++    <property name="margin" >
+      <number>0</number>
+     </property>
+     <item row="0" column="0" >
+@@ -50,6 +42,11 @@
+       </column>
+       <column>
+        <property name="text" >
++        <string>User</string>
++       </property>
++      </column>
++      <column>
++       <property name="text" >
+         <string>Document</string>
+        </property>
+       </column>
+@@ -83,7 +80,7 @@
+      <x>0</x>
+      <y>0</y>
+      <width>894</width>
+-     <height>30</height>
++     <height>27</height>
+     </rect>
+    </property>
+    <widget class="QMenu" name="menuFile" >
+@@ -112,7 +109,8 @@
+   </action>
+   <action name="actionRefresh_2" >
+    <property name="icon" >
+-    <iconset>view-refresh.png</iconset>
++    <iconset>
++     <normaloff>view-refresh.png</normaloff>view-refresh.png</iconset>
+    </property>
+    <property name="text" >
+     <string>Refresh</string>
+@@ -128,7 +126,8 @@
+   </action>
+   <action name="actionClose" >
+    <property name="icon" >
+-    <iconset>window-close.png</iconset>
++    <iconset>
++     <normaloff>window-close.png</normaloff>window-close.png</iconset>
+    </property>
+    <property name="text" >
+     <string>Close</string>
+diff -Naur /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/README kdeutils-trunk/printer-applet/README
+--- /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/README	2008-05-07 12:05:17.000000000 +0300
++++ kdeutils-trunk/printer-applet/README	2009-01-27 01:22:42.000000000 +0200
+@@ -5,7 +5,7 @@
+ 
+ It replaces kjobviewer in KDE 3.
+ 
+-It is a KDE port of system-config-printer by Tim Waugh from Red Hat.
++It is a KDE port of system-config-printer's applet.py by Tim Waugh from Red Hat.
+ 
+ Dependencies are...
+ 
+@@ -15,17 +15,18 @@
+ 
+ python-cups:  http://cyberelk.net/tim/software/pycups/
+ 
+-hal-cups-utils:  svn co http://svn.fedorahosted.org/svn/hal-cups-utils/trunk/
++hal-cups-utils:  https://fedorahosted.org/hal-cups-utils/
+ 
+-hal-cups-utils needs the common parts of system-config-printer (cupshelpers.py, ppds.py, probe_printer.py):
+-svn co http://svn.fedorahosted.org/svn/system-config-printer/trunk
++hal-cups-utils needs the common parts of system-config-printer (cupshelpers/*, ppds.py, probe_printer.py):
++http://cyberelk.net/tim/software/system-config-printer/
+ 
+-hal-cups-utils and system-config-printer like to install to
+-/usr/share/system-config-printer, if you put it elsewhere change the
+-SYSTEM_CONFIG_PRINTER_DIR variable in printer-applet.py
++Note to packagers: system-config-printer is a Gnome app, please split
++out the parts needed by printer-applet (and kdeadmin's
++system-config-printer-kde) into a separate packages to stop KDE
++needing Gnome dependencies.  See for example these Ubuntu packages:
+ 
+-
+-Unfortunately it does not currently use PyKDE4 because KApplication loads QtDbus which freezes when we use python-dbus.
++http://packages.ubuntu.com/intrepid/all/python-cupshelpers/filelist
++http://packages.ubuntu.com/intrepid/all/system-config-printer-common/filelist
+ 
+ 
+ Jonathan Riddell <jriddell@ubuntu.com>, Canonical Ltd, March 2008
+diff -Naur /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/statereason.py kdeutils-trunk/printer-applet/statereason.py
+--- /var/pisi/kdeutils-4.2.4-25/work/kdeutils-4.2.4/printer-applet/statereason.py	1970-01-01 02:00:00.000000000 +0200
++++ kdeutils-trunk/printer-applet/statereason.py	2009-01-27 01:22:42.000000000 +0200
+@@ -0,0 +1,126 @@
++#!/usr/bin/env python
++# -*- coding: utf-8 -*-
++
++#############################################################################
++##
++## Copyright 2007-2009 Canonical Ltd
++## Author: Jonathan Riddell <jriddell@ubuntu.com>
++##
++## Includes code from System Config Printer
++## Copyright 2007, 2008 Tim Waugh <twaugh@redhat.com>
++## Copyright 2007, 2008 Red Hat, Inc.
++##
++## This program is free software; you can redistribute it and/or
++## modify it under the terms of the GNU General Public License as
++## published by the Free Software Foundation; either version 2 of 
++## the License, or (at your option) any later version.
++##
++## This program is distributed in the hope that it will be useful,
++## but WITHOUT ANY WARRANTY; without even the implied warranty of
++## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++## GNU General Public License for more details.
++##
++## You should have received a copy of the GNU General Public License
++## along with this program.  If not, see <http://www.gnu.org/licenses/>.
++##
++#############################################################################
++
++from PyKDE4.kdecore import i18n, ki18n
++
++class StateReason:
++    """Holds problem information for a printer and can be ordered for priority 
++    by comparing with another instance"""
++    REPORT=1
++    WARNING=2
++    ERROR=3
++
++    LEVEL_ICON={
++        REPORT: "dialog-info",
++        WARNING: "dialog-warning",
++        ERROR: "dialog-error"
++        }
++
++    def __init__(self, printer, reason):
++        self.printer = printer
++        self.reason = reason
++        self.level = None
++        self.canonical_reason = None
++
++    def get_printer (self):
++        return self.printer
++
++    def get_level (self):
++        if self.level != None:
++            return self.level
++
++        if (self.reason.endswith ("-report") or
++            self.reason == "connecting-to-device"):
++            self.level = self.REPORT
++        elif self.reason.endswith ("-warning"):
++            self.level = self.WARNING
++        else:
++            self.level = self.ERROR
++        return self.level
++
++    def get_reason (self):
++        if self.canonical_reason:
++            return self.canonical_reason
++
++        level = self.get_level ()
++        reason = self.reason
++        if level == self.WARNING and reason.endswith ("-warning"):
++            reason = reason[:-8]
++        elif level == self.ERROR and reason.endswith ("-error"):
++            reason = reason[:-6]
++        self.canonical_reason = reason
++        return self.canonical_reason
++
++    def get_description (self):
++        messages = {
++            'toner-low': (i18n("Toner low"),
++                          ki18n("Printer '%1' is low on toner.")),
++            'toner-empty': (i18n("Toner empty"),
++                            ki18n("Printer '%1' has no toner left.")),
++            'cover-open': (i18n("Cover open"),
++                           ki18n("The cover is open on printer '%1'.")),
++            'door-open': (i18n("Door open"),
++                          ki18n("The door is open on printer '%1'.")),
++            'media-low': (i18n("Paper low"),
++                          ki18n("Printer '%1' is low on paper.")),
++            'media-empty': (i18n("Out of paper"),
++                            ki18n("Printer '%1' is out of paper.")),
++            'marker-supply-low': (i18n("Ink low"),
++                                  ki18n("Printer '%1' is low on ink.")),
++            'marker-supply-empty': (i18n("Ink empty"),
++                                    ki18n("Printer '%1' has no ink left.")),
++            'offline': (i18n("Printer off-line"),
++                        ki18n("Printer `%1' is currently offline.")),
++            'connecting-to-device': (i18n("Not connected?"),
++                                     ki18n("Printer '%1' may not be connected.")),
++            'other': (i18n("Printer error"),
++                      ki18n("There is a problem on printer `%1'.")),
++            }
++        try:
++            (title, text) = messages[self.get_reason ()]
++            text = text.subs (self.get_printer ()).toString ()
++        except KeyError:
++            if self.get_level () == self.REPORT:
++                title = i18n("Printer report")
++            elif self.get_level () == self.WARNING:
++                title = i18n("Printer warning")
++            elif self.get_level () == self.ERROR:
++                title = i18n("Printer error")
++            text = i18n("Printer '%1': '%2'.", self.get_printer (), self.get_reason ())
++        return (title, text)
++
++    def get_tuple (self):
++        return (self.get_level (), self.get_printer (), self.get_reason ())
++
++    def __cmp__(self, other):
++        if other == None:
++            return 1
++        if other.get_level () != self.get_level ():
++            return cmp (self.get_level (), other.get_level ())
++        if other.get_printer () != self.get_printer ():
++            return cmp (other.get_printer (), self.get_printer ())
++        return cmp (other.get_reason (), self.get_reason ())

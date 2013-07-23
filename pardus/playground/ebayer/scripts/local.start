@@ -1,0 +1,17 @@
+# /etc/conf.d/local.start
+
+# This is a good place to load any misc programs
+# on startup ( use 1>&2 to hide output)
+
+exec >>/var/log/local.start.log 2>&1
+
+/usr/sbin/brctl addbr br0
+/usr/sbin/brctl stp br0 on
+/usr/sbin/brctl addif br0 eth0
+/sbin/ifconfig br0 $IP up
+/sbin/route add default gw $GW dev br0
+/sbin/ifconfig eth0 up
+/sbin/ifconfig br0 up
+
+#/etc/init.d/xend start
+

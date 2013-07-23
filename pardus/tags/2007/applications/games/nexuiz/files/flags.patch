@@ -1,0 +1,45 @@
+diff -Nur nexuiz-2.1-old/darkplaces/makefile.inc nexuiz-2.1/darkplaces/makefile.inc
+--- nexuiz-2.1-old/darkplaces/makefile.inc	2006-10-01 23:05:24.283435256 +0300
++++ nexuiz-2.1/darkplaces/makefile.inc	2006-10-01 23:06:44.493241513 +0300
+@@ -1,5 +1,4 @@
+ # Choose the compiler you want to use
+-CC=gcc
+ 
+ # athlon optimizations
+ #CPUOPTIMIZATIONS=-march=athlon
+@@ -14,7 +13,7 @@
+ # 686 (Pentium Pro/II) optimizations
+ #CPUOPTIMIZATIONS=-march=i686
+ # No specific CPU (386 compatible)
+-CPUOPTIMIZATIONS=
++CPUOPTIMIZATIONS=pardusFLAGS
+ 
+ SDL_CONFIG?=sdl-config
+ 
+@@ -33,7 +32,7 @@
+ 
+ # Advanced Linux Sound Architecture (Linux)
+ OBJ_SND_ALSA=$(OBJ_SND_COMMON) snd_alsa.o
+-LIB_SND_ALSA=-lasound
++LIB_SND_ALSA=`pkg-config --libs alsa`
+ 
+ # Core Audio (Mac OS X)
+ OBJ_SND_COREAUDIO=$(OBJ_SND_COMMON) snd_coreaudio.c
+@@ -148,7 +147,7 @@
+ #OPTIM_RELEASE=-O2 -fno-strict-aliasing -ffast-math -funroll-loops $(CPUOPTIMIZATIONS)
+ #OPTIM_RELEASE=-O2 -fno-strict-aliasing -fno-math-errno -fno-trapping-math -ffinite-math-only -fno-signaling-nans -fcx-limited-range -funroll-loops $(CPUOPTIMIZATIONS)
+ #OPTIM_RELEASE=-O2 -fno-strict-aliasing -funroll-loops $(CPUOPTIMIZATIONS)
+-OPTIM_RELEASE=-O2 -fno-strict-aliasing $(CPUOPTIMIZATIONS)
++OPTIM_RELEASE=-fno-strict-aliasing $(CPUOPTIMIZATIONS)
+ 
+ DO_CC=$(CC) $(CFLAGS) -c $< -o $@
+ 
+@@ -380,7 +379,7 @@
+ 		DP_MAKE_TARGET=$(DP_MAKE_TARGET) DP_SOUND_API=$(DP_SOUND_API) \
+ 		CFLAGS="$(CFLAGS_COMMON) $(CFLAGS_EXTRA) $(CFLAGS_RELEASE) $(OPTIM_RELEASE)"\
+ 		LDFLAGS="$(LDFLAGS_RELEASE) $(LDFLAGS_COMMON)"
+-	strip $(EXE)
++	#strip $(EXE)
+ 
+ vid_glx.o: vid_glx.c
+ 	$(DO_CC) -I/usr/X11R6/include

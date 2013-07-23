@@ -1,0 +1,37 @@
+# Copyright (C) 2007  Miriam Ruiz <little_miry@yahoo.es>
+# Distributed under the same license as the game. See debian/copyright.
+
+Index: digiband-1.0.1/Source/Makefile.linux
+===================================================================
+--- digiband-1.0.1.orig/Source/Makefile.linux	2007-09-14 23:12:24.000000000 +0000
++++ digiband-1.0.1/Source/Makefile.linux	2007-09-14 23:13:46.000000000 +0000
+@@ -3,10 +3,13 @@
+ # Extra optional CXXFLAGS: -DDEBUGSONGLOAD -DDEBUG -DEXCESSIVE -DSHOWWAVES -DDEBUGDRAWTEXT
+ CPP  = g++
+ CC   = gcc
+-LDFLAGS :=  `sdl-config --libs` -lSDL_image -lSDL_ttf -lSDL -lGL -lGLU -lopenal `pkg-config --libs vorbisfile` `pkg-config --libs sndfile` -lmad -L../usr/lib -lavformat -lavutil -lavcodec
+-CXXFLAGS := `sdl-config --cflags` `pkg-config --cflags sndfile` `pkg-config --cflags libavformat` -I../usr/include -DLINUX -Wno-deprecated -O2 -fverbose-asm
++LDFLAGS =
++LIBS =  `sdl-config --libs` -lSDL_image -lSDL_ttf -lSDL -lGL -lGLU -lopenal `pkg-config --libs vorbisfile` `pkg-config --libs sndfile` -lmad -L../usr/lib -lavformat -lavutil -lavcodec
++CFLAGS = -Wno-deprecated -O2
++CXXFLAGS = `sdl-config --cflags` `pkg-config --cflags sndfile` `pkg-config --cflags libavformat` -I../usr/include -DLINUX -fverbose-asm $(CFLAGS)
+ RM = rm -f
+ OBJ = DigiBand.o codec.o madcodec.o sndfilecodec.o stream.o vorbisfilecodec.o alsubsys.o
++DATADIR=.
+ 
+ .PHONY: all all-before all-after clean clean-custom
+ 
+@@ -16,4 +19,12 @@
+ 	${RM} $(OBJ) $(BIN)
+ 
+ DigiBand: $(OBJ)
+-	$(CPP) $(LDFLAGS) $^ -o $@
++	$(CPP) $(LDFLAGS) $(LIBS) $^ -o $@
++
++.SUFFIXES: .C .cpp .o
++
++.cpp.o:
++	$(CPP) $(CXXFLAGS) -DDATADIR=\"$(DATADIR)\" -DHOMEDIR=\"/tmp\" -c -o $@ $<
++
++.C.o:
++	$(CPP) $(CXXFLAGS) -DDATADIR=\"$(DATADIR)\" -DHOMEDIR=\"/tmp\" -c -o $@ $<

@@ -1,0 +1,24 @@
+#!/bin/sh
+# Switch all devices that were in a HID mode to HCI mode
+# after a resume
+
+. "${PM_FUNCTIONS}"
+
+[ -f /etc/conf.d/bluetooth ] || exit $NA
+
+. /etc/conf.d/bluetooth
+
+hid2hci()
+{
+	if [ "$HID2HCI_ENABLE" = "true" ] && [ -x /usr/sbin/hid2hci ]; then
+		/usr/sbin/hid2hci --tohci
+        fi
+}
+
+case "$1" in
+	thaw|resume)
+		hid2hci
+		;;
+	*) exit $NA
+		;;
+esac

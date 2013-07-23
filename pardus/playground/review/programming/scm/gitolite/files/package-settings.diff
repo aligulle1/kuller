@@ -1,0 +1,109 @@
+Index: gitolite-2.0.3/hooks/gitolite-admin/post-update
+===================================================================
+--- gitolite-2.0.3.orig/hooks/gitolite-admin/post-update
++++ gitolite-2.0.3/hooks/gitolite-admin/post-update
+@@ -21,7 +21,7 @@ GIT_WORK_TREE=$GL_ADMINDIR git checkout
+ 
+ od=$PWD
+ cd $GL_ADMINDIR
+-$GL_BINDIR/gl-compile-conf
++gl-compile-conf
+ 
+ cd $od
+ 
+Index: gitolite-2.0.3/src/gitolite.pm
+===================================================================
+--- gitolite-2.0.3.orig/src/gitolite.pm
++++ gitolite-2.0.3/src/gitolite.pm
+@@ -911,7 +911,7 @@ sub setup_authkeys
+     # LOCAL CONSTANTS
+ 
+     # command and options for authorized_keys
+-    my $AUTH_COMMAND="$ENV{GL_BINDIR}/gl-auth-command";
++    my $AUTH_COMMAND="/usr/bin/gl-auth-command";
+     $AUTH_COMMAND="$ENV{GL_BINDIR}/gl-time $ENV{GL_BINDIR}/gl-auth-command" if $GL_PERFLOGT;
+     # set default authentication options
+     $AUTH_OPTIONS ||= "no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty";
+Index: gitolite-2.0.3/src/gl-compile-conf
+===================================================================
+--- gitolite-2.0.3.orig/src/gl-compile-conf
++++ gitolite-2.0.3/src/gl-compile-conf
+@@ -426,7 +426,7 @@ sub do_normal_repos
+         unless ($GL_NO_CREATE_REPOS) {
+             unless (-d "$repo.git") {
+                 print STDERR "creating $repo...\n";
+-                new_repo($repo, "$GL_ADMINDIR/hooks/common");
++                new_repo($repo, "/usr/share/gitolite/hooks/common");
+                 # new_repo would have chdir'd us away; come back
+                 wrap_chdir($REPO_BASE);
+             }
+Index: gitolite-2.0.3/src/gl-install
+===================================================================
+--- gitolite-2.0.3.orig/src/gl-install
++++ gitolite-2.0.3/src/gl-install
+@@ -43,11 +43,7 @@ sub wrap_mkdir
+ unless ($ENV{GL_RC}) {
+     # doesn't exist.  Copy it across, tell user to edit it and come back
+     my $glrc = $ENV{HOME} . "/.gitolite.rc";
+-    if ($GL_PACKAGE_CONF) {
+-        system("cp $GL_PACKAGE_CONF/example.gitolite.rc $glrc");
+-    } else {
+-        system("cp $ENV{GL_BINDIR}/../conf/example.gitolite.rc $glrc");
+-    }
++    system("cp /usr/share/gitolite/conf/example.gitolite.rc $glrc");
+     print "created $glrc\n";
+     print "please edit it, change the paths if you wish to, and RERUN THIS SCRIPT\n";
+     exit;
+@@ -63,18 +59,18 @@ umask($REPO_UMASK);
+ wrap_mkdir($REPO_BASE);
+ wrap_mkdir($GL_ADMINDIR, 0700);
+ # mkdir $GL_ADMINDIR's subdirs
+-for my $dir (qw(conf doc keydir logs src hooks hooks/common hooks/gitolite-admin)) {
++for my $dir qw(conf keydir logs hooks hooks/common hooks/gitolite-admin) {
+     # some of them will stay empty; too lazy to fix right now ;-)
+     wrap_mkdir("$GL_ADMINDIR/$dir", 0700);
+ }
+ 
+ # "src" and "doc" will be overwritten on each install, but not conf
+-if ($GL_PACKAGE_HOOKS) {
+-    system("cp -R -p $GL_PACKAGE_HOOKS $GL_ADMINDIR");
+-} else {
+-    system("cp -R -p $ENV{GL_BINDIR}/../src $ENV{GL_BINDIR}/../doc $ENV{GL_BINDIR}/../hooks $GL_ADMINDIR");
+-    system("cp       $ENV{GL_BINDIR}/../conf/VERSION                        $GL_ADMINDIR/conf");
+-}
++#if ($GL_PACKAGE_HOOKS) {
++#    system("cp -R -p $GL_PACKAGE_HOOKS $GL_ADMINDIR");
++#} else {
++#    system("cp -R -p $ENV{GL_BINDIR}/../src $ENV{GL_BINDIR}/../doc $ENV{GL_BINDIR}/../hooks $GL_ADMINDIR");
++#    system("cp       $ENV{GL_BINDIR}/../conf/VERSION                        $GL_ADMINDIR/conf");
++#}
+ 
+ unless (-f $GL_CONF or $GL_PACKAGE_CONF) {
+     print <<EOF;
+@@ -84,7 +80,7 @@ unless (-f $GL_CONF or $GL_PACKAGE_CONF)
+                 RW+     =   yourname
+     2.  copy "yourname.pub" to $GL_ADMINDIR/keydir
+     3.  run this command
+-            $GL_ADMINDIR/src/gl-compile-conf
++            gl-compile-conf
+ EOF
+ }
+ 
+@@ -93,7 +89,7 @@ chdir($REPO_BASE) or die "chdir $REPO_BA
+ for my $repo (`find . -type d -name "*.git" -prune`) {
+     chomp ($repo);
+     # propagate our own, plus any local admin-defined, hooks
+-    ln_sf("$GL_ADMINDIR/hooks/common", "*", "$repo/hooks");
++    ln_sf("/usr/share/gitolite/hooks/common", "*", "$repo/hooks");
+     # in case of package install, GL_ADMINDIR is no longer the top cop;
+     # override with the package hooks
+     ln_sf("$GL_PACKAGE_HOOKS/common", "*", "$repo/hooks") if $GL_PACKAGE_HOOKS;
+@@ -104,7 +100,7 @@ for my $repo (`find . -type d -name "*.g
+ if ( -d "gitolite-admin.git/hooks" ) {
+     print "copying post-update hook to gitolite-admin repo...\n";
+     unlink "gitolite-admin.git/hooks/post-update";
+-    symlink "$GL_ADMINDIR/hooks/gitolite-admin/post-update", "gitolite-admin.git/hooks/post-update"
++    symlink "/usr/share/gitolite/hooks/gitolite-admin/post-update", "gitolite-admin.git/hooks/post-update"
+         or die "could not symlink post-update hook\n";
+     # ditto... (see previous block)
+     ln_sf("$GL_PACKAGE_HOOKS/gitolite-admin", "post-update", "gitolite-admin.git/hooks") if $GL_PACKAGE_HOOKS;

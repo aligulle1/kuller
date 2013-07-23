@@ -1,0 +1,47 @@
+diff --git a/drivers/acpi/asus_acpi.c b/drivers/acpi/asus_acpi.c
+index fec895a..20e53c4 100644
+--- a/drivers/acpi/asus_acpi.c
++++ b/drivers/acpi/asus_acpi.c
+@@ -490,13 +490,13 @@ proc_read_info(char *page, char **start,
+  */
+ 
+ /* Generic LED functions */
+-static int read_led(const char *ledname, int ledmask)
++static int read_led(const char *ledname, int ledmask, int invert)
+ {
+ 	if (ledname) {
+ 		int led_status;
+ 
+ 		if (read_acpi_int(NULL, ledname, &led_status))
+-			return led_status;
++			return (invert) ? !led_status : led_status;
+ 		else
+ 			printk(KERN_WARNING "Asus ACPI: Error reading LED "
+ 			       "status\n");
+@@ -552,7 +552,7 @@ proc_read_mled(char *page, char **start,
+ 	       void *data)
+ {
+ 	return sprintf(page, "%d\n",
+-		       read_led(hotk->methods->mled_status, MLED_ON));
++		       read_led(hotk->methods->mled_status, MLED_ON, 0));
+ }
+ 
+ static int
+@@ -570,7 +570,7 @@ proc_read_wled(char *page, char **start,
+ 	       void *data)
+ {
+ 	return sprintf(page, "%d\n",
+-		       read_led(hotk->methods->wled_status, WLED_ON));
++		       read_led(hotk->methods->wled_status, WLED_ON, 1));
+ }
+ 
+ static int
+@@ -588,7 +588,7 @@ proc_read_tled(char *page, char **start,
+ 	       void *data)
+ {
+ 	return sprintf(page, "%d\n",
+-		       read_led(hotk->methods->tled_status, TLED_ON));
++		       read_led(hotk->methods->tled_status, TLED_ON, 0));
+ }
+ 
+ static int

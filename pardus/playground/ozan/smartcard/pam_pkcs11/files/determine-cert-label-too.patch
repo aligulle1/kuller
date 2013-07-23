@@ -1,0 +1,103 @@
+Index: pam_pkcs11-0.6.6/src/common/pkcs11_lib.c
+===================================================================
+--- pam_pkcs11-0.6.6.orig/src/common/pkcs11_lib.c
++++ pam_pkcs11-0.6.6/src/common/pkcs11_lib.c
+@@ -931,7 +931,9 @@ struct cert_object_str {
+   CK_KEY_TYPE key_type;
+   CK_CERTIFICATE_TYPE type;
+   CK_BYTE *id;
++  CK_BYTE *label;
+   CK_ULONG id_length;
++  CK_ULONG label_length;
+   CK_OBJECT_HANDLE private_key;
+   X509 *x509;
+ };
+@@ -1468,6 +1470,7 @@ cert_object_t **get_certificate_list(pkc
+ {
+   CK_BYTE *id_value;
+   CK_BYTE *cert_value;
++  CK_BYTE *label_value;
+   CK_OBJECT_HANDLE object;
+   CK_ULONG object_count;
+   X509 *x509;
+@@ -1484,6 +1487,8 @@ cert_object_t **get_certificate_list(pkc
+     {CKA_ID, NULL, 0}
+     ,
+     {CKA_VALUE, NULL, 0}
++    ,
++    {CKA_LABEL, NULL, 0}
+   };
+ 
+   if (h->certs) {
+@@ -1556,39 +1561,67 @@ cert_object_t **get_certificate_list(pkc
+         goto getlist_error;
+       }
+ 
+-    /* Pass 3: store certificate */
++    /* pass 3: get certificate label */
++    cert_template[4].pValue = NULL;
++    cert_template[4].ulValueLen = 0;
++    rv = h->fl->C_GetAttributeValue(h->session, object, cert_template, 5);
++    if (rv != CKR_OK) {
++        set_error("CertID label: C_GetAttributeValue() failed: 0x%08lX", rv);
++        goto getlist_error;
++    }
++    /* allocate enough space */
++    label_value = calloc(cert_template[4].ulValueLen + 1, 1);
++    if (label_value == NULL) {
++        set_error("CertID malloc(%d): not enough free memory available", cert_template[4].ulValueLen);
++        goto getlist_error;
++    }
++    /* read cert label into allocated space */
++    cert_template[4].pValue = label_value;
++    rv = h->fl->C_GetAttributeValue(h->session, object, cert_template, 5);
++    if (rv != CKR_OK) {
++        free(label_value);
++        set_error("CertID label: C_GetAttributeValue() failed: 0x%08lX", rv);
++        goto getlist_error;
++    }
++
++    /* Pass 4: store certificate */
+ 
+     /* convert to X509 data structure */
+       x509 = d2i_X509(NULL, (const unsigned char **)&cert_template[3].pValue, cert_template[3].ulValueLen);
+       if (x509 == NULL) {
+         free(id_value);
+         free(cert_value);
++        free(label_value);
+         set_error("d2i_x509() failed: %s", ERR_error_string(ERR_get_error(), NULL));
+         goto getlist_error;
+       }
++
+     /* finally add certificate to chain */
+     certs= realloc(h->certs,(h->cert_count+1) * sizeof(cert_object_t *));
+     if (!certs) {
+         free(id_value);
+         X509_free(x509);
+-	set_error("realloc() not space to re-size cert table");
++        set_error("realloc() not space to re-size cert table");
+         goto getlist_error;
+     }
+     h->certs=certs;
+     DBG1("Saving Certificate #%d:", h->cert_count + 1);
+     certs[h->cert_count] = NULL;
++    DBG1("- label: %02s", label_value);
+     DBG1("- type: %02x", cert_type);
+     DBG1("- id:   %02x", id_value[0]);
+     h->certs[h->cert_count] = (cert_object_t *)calloc(sizeof(cert_object_t),1);
+     if (h->certs[h->cert_count] == NULL) {
+-	free(id_value);
++        free(id_value);
+         X509_free(x509);
+-	set_error("malloc() not space to allocate cert object");
++        set_error("malloc() not space to allocate cert object");
+         goto getlist_error;
+     }
+     h->certs[h->cert_count]->type = cert_type;
+     h->certs[h->cert_count]->id   = id_value;
++    h->certs[h->cert_count]->label = label_value;
+     h->certs[h->cert_count]->id_length = cert_template[2].ulValueLen;
++    h->certs[h->cert_count]->label_length = cert_template[4].ulValueLen;
+     h->certs[h->cert_count]->x509 = x509;
+     h->certs[h->cert_count]->private_key = CK_INVALID_HANDLE;
+     h->certs[h->cert_count]->key_type = 0;

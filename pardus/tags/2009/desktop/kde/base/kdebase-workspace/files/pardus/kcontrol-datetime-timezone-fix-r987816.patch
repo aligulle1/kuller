@@ -1,0 +1,36 @@
+Index: helper.cpp
+===================================================================
+--- a/kcontrol/dateandtime/helper.cpp	(revision 987815)
++++ b/kcontrol/dateandtime/helper.cpp	(revision 987816)
+@@ -170,15 +170,6 @@
+         }
+         else
+         {
+-            QFile fTimezoneFile("/etc/timezone");
+-
+-            if (fTimezoneFile.open(QIODevice::WriteOnly | QIODevice::Truncate) )
+-            {
+-                QTextStream t(&fTimezoneFile);
+-                t << selectedzone;
+-                fTimezoneFile.close();
+-            }
+-
+             if (!QFile::remove("/etc/localtime"))
+             {
+                 ret |= ERROR_TZONE;
+@@ -188,6 +179,15 @@
+                     ret |= ERROR_TZONE;
+         }
+ 
++        QFile fTimezoneFile("/etc/timezone");
++
++        if (fTimezoneFile.exists() && fTimezoneFile.open(QIODevice::WriteOnly | QIODevice::Truncate) )
++        {
++            QTextStream t(&fTimezoneFile);
++            t << selectedzone;
++            fTimezoneFile.close();
++        }
++
+         QString val = ':' + tz;
+ #endif // !USE_SOLARIS
+ 

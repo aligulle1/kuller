@@ -1,0 +1,74 @@
+Index: kdeutils-4.1.80/printer-applet/cmake-modules/FindSystemConfigPrinter.py
+===================================================================
+--- kdeutils-4.1.80.orig/printer-applet/cmake-modules/FindSystemConfigPrinter.py
++++ kdeutils-4.1.80/printer-applet/cmake-modules/FindSystemConfigPrinter.py
+@@ -2,11 +2,6 @@
+ # Redistribution and use is allowed according to the terms of the BSD license.
+ # For details see the accompanying COPYING-CMAKE-SCRIPTS file.
+ 
+-import sys
+-
+-SYSTEM_CONFIG_PRINTER_DIR = "/usr/share/system-config-printer"
+-sys.path.append (SYSTEM_CONFIG_PRINTER_DIR)
+-
+ try:
+     import cupshelpers.ppds, cupshelpers.cupshelpers
+ except:
+Index: kdeutils-4.1.80/printer-applet/printer-applet-printers.ui
+===================================================================
+--- kdeutils-4.1.80.orig/printer-applet/printer-applet-printers.ui
++++ kdeutils-4.1.80/printer-applet/printer-applet-printers.ui
+@@ -13,7 +13,7 @@
+    <string>Printer Status</string>
+   </property>
+   <property name="windowIcon" >
+-   <iconset>/usr/share/system-config-printer/printer-128.png</iconset>
++   <iconset>printer.png</iconset>
+   </property>
+   <layout class="QGridLayout" >
+    <property name="leftMargin" >
+Index: kdeutils-4.1.80/printer-applet/printer-applet.py
+===================================================================
+--- kdeutils-4.1.80.orig/printer-applet/printer-applet.py
++++ kdeutils-4.1.80/printer-applet/printer-applet.py
+@@ -36,8 +36,6 @@ import os
+ import subprocess
+ import sys
+ 
+-SYSTEM_CONFIG_PRINTER_DIR = "/usr/share/system-config-printer"
+-
+ MIN_REFRESH_INTERVAL = 1 # seconds
+ CONNECTING_TIMEOUT = 60 # seconds
+ 
+@@ -49,11 +47,6 @@ from PyQt4 import uic
+ from PyKDE4.kdecore import i18n, i18nc, i18np, i18ncp, ki18n, KAboutData, KCmdLineArgs, KCmdLineOptions, KStandardDirs, KLocalizedString
+ from PyKDE4.kdeui import KApplication, KXmlGuiWindow, KStandardAction, KIcon, KToggleAction
+ 
+-if QFile.exists(SYSTEM_CONFIG_PRINTER_DIR + "/ppds.py"):
+-    AUTOCONFIGURE = True
+-else:
+-    AUTOCONFIGURE = False
+-
+ def translate(self, prop):
+     """reimplement method from uic to change it to use gettext"""
+     if prop.get("notr", None) == "true":
+@@ -301,8 +294,7 @@ class JobManager(QObject):
+             print >> sys.stderr, "%s: printer-applet failed to connect to system D-Bus"
+             sys.exit (1)
+ 
+-        if AUTOCONFIGURE:
+-            notification = NewPrinterNotification(bus, self)
++        notification = NewPrinterNotification(bus, self)
+ 
+         # D-Bus
+         bus.add_signal_receiver (self.handle_dbus_signal,
+@@ -901,8 +893,7 @@ class NewPrinterNotification(dbus.servic
+             return
+         del c
+ 
+-        sys.path.append (SYSTEM_CONFIG_PRINTER_DIR)
+-        from ppds import ppdMakeModelSplit
++        from cupshelpers.ppds import ppdMakeModelSplit
+         (make, model) = ppdMakeModelSplit (printer['printer-make-and-model'])
+         driver = make + " " + model
+         if status < self.STATUS_GENERIC_DRIVER:

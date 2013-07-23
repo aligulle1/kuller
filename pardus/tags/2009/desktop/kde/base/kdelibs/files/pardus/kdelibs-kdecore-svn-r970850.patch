@@ -1,0 +1,47 @@
+--- kdecore/localization/kcatalog.cpp	2009/05/18 21:48:21	969780
++++ kdecore/localization/kcatalog.cpp	2009/05/21 00:55:42	970850
+@@ -71,11 +71,16 @@
+ class KCatalogPrivate
+ {
+ public:
++    KCatalogPrivate()
++        : bindDone(false)
++    {}
++
+   QByteArray language;
+   QByteArray name;
+   QByteArray localeDir;
+ 
+   QByteArray systemLanguage;
++  bool bindDone;
+ 
+   static QByteArray currentLanguage;
+ 
+@@ -131,13 +136,6 @@
+ {
+   *d = *rhs.d;
+ 
+-  // Update Gettext environment.
+-  // (Sometimes Gettext picks up wrong locale directory if bindings are not
+-  // updated here. No idea why that happens.)
+-  QMutexLocker locker(&catalogStaticData->mutex);
+-  d->setupGettextEnv();
+-  d->resetSystemLanguage();
+-
+   return *this;
+ }
+ 
+@@ -181,10 +179,12 @@
+ 
+   // Rebind text domain if language actually changed from the last time,
+   // as locale directories may differ for different languages of same catalog.
+-  if (language != currentLanguage) {
++  if (language != currentLanguage || !bindDone) {
+ 
+     currentLanguage = language;
++    bindDone = true;
+ 
++    //kDebug() << "bindtextdomain" << name << localeDir;
+     bindtextdomain(name, localeDir);
+ 
+     // // Magic to make sure Gettext doesn't use stale cached translation

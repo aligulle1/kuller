@@ -1,0 +1,37 @@
+From 5ae68fe10e0fe1fcbe61bf128c984c9358baaca3 Mon Sep 17 00:00:00 2001
+From: Mehmet Emre Atasever <memre@pardus.org.tr>
+Date: Tue, 18 Oct 2011 09:37:50 +0300
+Subject: [PATCH 1/2] give parameters one by one
+
+---
+ utils/sb2 |   14 +++++++++++++-
+ 1 files changed, 13 insertions(+), 1 deletions(-)
+
+diff --git a/utils/sb2 b/utils/sb2
+index 17c00d2..725add3 100755
+--- a/utils/sb2
++++ b/utils/sb2
+@@ -1653,7 +1653,19 @@ SBOX_CONFIG_DIR=$HOME/.scratchbox2/$SBOX_TARGET/sb2.config.d
+ if [ $# -gt 0 -o "$STDIN" = true ]; then
+ 	binary="$1"
+ 	shift 1
+-	args="$@"
++	# give parameters one by one. otherwise `sb2 make CFLAGS="-O2 -g"'
++	# command is processed as,
++	#
++	# argv[0] = make
++	# argv[1] = CFLAGS="-O2
++	# argv[2] = -g"
++	#
++	args=""
++	while [ "$1" != "" ]; do
++		args="${args} \"$1\""
++		shift
++	done
++
+ 	exec $SBOX_FAKEROOT_PREFIX sb2-monitor $OPTS_FOR_SB2_MONITOR \
+ 		-L $SBOX_LIBSB2 \
+ 		-x $SBOX_DIR/share/scratchbox2/scripts/sb2-exitreport \
+-- 
+1.7.3.4
+

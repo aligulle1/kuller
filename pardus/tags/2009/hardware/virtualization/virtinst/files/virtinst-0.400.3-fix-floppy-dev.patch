@@ -1,0 +1,38 @@
+# HG changeset patch
+# User Cole Robinson <crobinso@redhat.com>
+# Date 1237498550 14400
+# Node ID fd4baa6410d841f137ea89290c1a8da33c00c3c9
+# Parent  a55347f926f5cfdcfd9b5234b945ec279190c513
+Fix specifying --disk device=floppy
+
+diff -r a55347f926f5 -r fd4baa6410d8 virtinst/FullVirtGuest.py
+--- a/virtinst/FullVirtGuest.py	Thu Mar 19 17:35:27 2009 -0400
++++ b/virtinst/FullVirtGuest.py	Thu Mar 19 17:35:50 2009 -0400
+@@ -113,7 +113,10 @@
+         used_targets = []
+         for disk in self._install_disks:
+             if not disk.bus:
+-                disk.bus = "ide"
++                if disk.device == disk.DEVICE_FLOPPY:
++                    disk.bus = "fdc"
++                else:
++                    disk.bus = "ide"
+             used_targets.append(disk.generate_target(used_targets))
+ 
+         for d in self._install_disks:
+diff -r a55347f926f5 -r fd4baa6410d8 virtinst/VirtualDisk.py
+--- a/virtinst/VirtualDisk.py	Thu Mar 19 17:35:27 2009 -0400
++++ b/virtinst/VirtualDisk.py	Thu Mar 19 17:35:50 2009 -0400
+@@ -813,10 +813,10 @@
+             return ("sd", 16)
+         elif self.bus == "xen":
+             return ("xvd", 16)
++        elif self.bus == "fdc" or self.device == self.DEVICE_FLOPPY:
++            return ("fd", 2)
+         elif self.bus == "ide":
+             return ("hd", 4)
+-        elif self.bus == "floppy" or self.device == self.DEVICE_FLOPPY:
+-            return ("fd", 2)
+         else:
+             return (None, None)
+ 

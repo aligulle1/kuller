@@ -1,0 +1,17 @@
+--- src/io_helpers.cpp.orig	2003-03-02 02:23:00.000000000 +0200
++++ src/io_helpers.cpp	2006-11-19 19:56:37.165771004 +0200
+@@ -363,12 +363,12 @@
+     // Write the BOM: 0xFEFF
+     unicode_t BOM = 0xFEFF;
+     writer.writeChars((const unsigned char*) &BOM, 2);
++    unsigned char *pdata = (unsigned char *) data.c_str();
+     for (size_t i = 0; i < size; i += 2)
+     {
+-      unicode_t ch = (data[i] << 8) | data[i+1];
++      unicode_t ch = (pdata[i] << 8) | pdata[i+1];
+       writer.writeChars((const unsigned char*) &ch, 2);
+     }
+   }
+   return writer.getCur() - beg;
+ }
+-

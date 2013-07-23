@@ -1,0 +1,23 @@
+Index: linux-2.6.18/drivers/ide/ide-io.c
+===================================================================
+--- linux-2.6.18.orig/drivers/ide/ide-io.c
++++ linux-2.6.18/drivers/ide/ide-io.c
+@@ -1594,6 +1594,8 @@ irqreturn_t ide_intr (int irq, void *dev
+ 			 * Whack the status register, just in case
+ 			 * we have a leftover pending IRQ.
+ 			 */
++			/* Ack the interrupt for ich7 - XXX possible race */
++			hwif->OUTB( (hwif->INB(hwif->dma_status) |4) & ~2, hwif->dma_status);
+ 			(void) hwif->INB(hwif->io_ports[IDE_STATUS_OFFSET]);
+ #endif /* CONFIG_BLK_DEV_IDEPCI */
+ 		}
+@@ -1636,6 +1638,9 @@ irqreturn_t ide_intr (int irq, void *dev
+ 	startstop = handler(drive);
+ 	spin_lock_irq(&ide_lock);
+ 
++	/* Ack the interrupt for ich7 - XXX possible race */
++	hwif->OUTB( (hwif->INB(hwif->dma_status) |4) & ~2, hwif->dma_status);
++
+ 	/*
+ 	 * Note that handler() may have set things up for another
+ 	 * interrupt to occur soon, but it cannot happen until

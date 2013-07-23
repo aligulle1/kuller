@@ -1,0 +1,33 @@
+--- m4scripts/VS_WITH_FFMPEG.m4~	2009-03-11 19:04:27.000000000 +0200
++++ m4scripts/VS_WITH_FFMPEG.m4	2009-03-11 19:04:27.000000000 +0200
+@@ -11,7 +11,7 @@
+   AC_MSG_CHECKING([for ffmpeg])
+   AC_MSG_RESULT([no (Disabled)])
+ [else]
+-  AC_CHECK_HEADERS([ffmpeg/avcodec.h ffmpeg/avformat.h ffmpeg/avio.h], no_ffmpeg=0, no_ffmpeg=1)
++  AC_CHECK_HEADERS([libavcodec/avcodec.h libavformat/avformat.h libavformat/avio.h], no_ffmpeg=0, no_ffmpeg=1)
+   if (test x$no_ffmpeg = x0); then
+     AC_MSG_CHECKING([for libavcodec and libavformat])
+     NEW_LIBS="-lavcodec -lavformat"
+@@ -33,7 +33,7 @@
+       AC_MSG_RESULT($haveswscale)
+       
+       if test "x$haveswscale" = "xyes"; then
+-        AC_CHECK_HEADERS([ffmpeg/swscale.h], haveswscale=yes, haveswscale=no)
++        AC_CHECK_HEADERS([libswscale/swscale.h], haveswscale=yes, haveswscale=no)
+       fi
+       if test "x$haveswscale" = "xyes"; then
+         VS_LIBS="${VS_LIBS} ${NEW_LIBS}"
+@@ -42,9 +42,9 @@
+         saved_LIBS="${LIBS}"
+         LIBS="-lavcodec -lavformat"
+         AC_TRY_LINK([extern "C" {
+-		#include <ffmpeg/libavcodec.h>
+-		#include <ffmpeg/libavformat.h>
+-		#include <ffmpeg/libavio.h>
++		#include <libavcodec/avcodec.h>
++		#include <libavformat/avformat.h>
++		#include <libavformat/libavio.h>
+ 		}], [ img_convert(NULL,PIX_FMT_RGB24,NULL,0,0,0);], [ result=yes; no_ffmpeg=0], [result=no; no_ffmpeg=1])
+         AC_MSG_RESULT($result)
+         LIBS="$saved_LIBS"

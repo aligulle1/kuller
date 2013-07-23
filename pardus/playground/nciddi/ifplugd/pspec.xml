@@ -1,0 +1,57 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>ifplugd</Name>
+        <Homepage>http://0pointer.de/lennart/projects/ifplugd/</Homepage>
+        <Packager>
+            <Name>Nihat Ciddi</Name>
+            <Email>nakof@zig.gen.tr</Email>
+        </Packager>
+        <License>GPLv2</License>
+        <IsA>service</IsA>
+        <Summary>Brings up/down ethernet ports automatically with cable detection</Summary>
+        <Archive sha1sum="0f00e6b544c0b7ed6c66fc58cb74f038d3fba77a" type="targz">http://0pointer.de/lennart/projects/ifplugd/ifplugd-0.28.tar.gz</Archive>
+        <BuildDependencies>
+            <Dependency>libdaemon</Dependency>
+            <Dependency>pkgconfig</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <Patch>ifplugd-0.28-nlapi.diff</Patch>
+            <Patch>ifplugd-0.28-interface.patch</Patch>
+            <Patch>ifplugd-0.28-strictalias.patch</Patch>
+            <Patch level="1">ifplugd-0.28-noip.patch</Patch>
+            <Patch>ifplugd-0.28-noinitscript.patch</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>ifplugd</Name>
+        <RuntimeDependencies>
+            <Dependency>libdaemon</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="executable">/usr/sbin</Path>
+            <Path fileType="config">/etc</Path>
+            <Path fileType="doc">/usr/share/doc</Path>
+            <Path fileType="man">/usr/share/man</Path>
+        </Files>
+        <AdditionalFiles>
+            <AdditionalFile owner="root" permission="0644" target="/etc/conf.d/ifplugd">ifplugd.confd</AdditionalFile>
+            <AdditionalFile owner="root" permission="0755" target="/etc/ifplugd/ifplugd.action">ifplugd.action</AdditionalFile>
+        </AdditionalFiles>
+        <Provides>
+            <COMAR script="service.py">System.Service</COMAR>
+        </Provides>
+    </Package>
+
+    <History>
+        <Update release="1">
+            <Date>2008-08-04</Date>
+            <Version>0.28</Version>
+            <Comment>First release</Comment>
+            <Name>Nihat Ciddi</Name>
+            <Email>nakof@zig.gen.tr</Email>
+        </Update>
+    </History>
+</PISI>

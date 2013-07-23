@@ -1,0 +1,85 @@
+diff --git a/programming/scm/git/files/git-svn-gnome-keyring.patch b/programming/scm/git/files/git-svn-gnome-keyring.patch
+new file mode 100644
+index 0000000..9d2d008
+--- /dev/null
++++ b/programming/scm/git/files/git-svn-gnome-keyring.patch
+@@ -0,0 +1,12 @@
++Index: git-1.7.3.4/git-svn.perl
++===================================================================
++--- git-1.7.3.4.orig/git-svn.perl
+++++ git-1.7.3.4/git-svn.perl
++@@ -4886,6 +4886,7 @@ BEGIN {
++ 
++ sub _auth_providers () {
++ 	[
+++	  @{SVN::Core::auth_get_platform_specific_client_providers(undef, undef)},
++ 	  SVN::Client::get_simple_provider(),
++ 	  SVN::Client::get_ssl_server_trust_file_provider(),
++ 	  SVN::Client::get_simple_prompt_provider(
+diff --git a/programming/scm/git/pspec.xml b/programming/scm/git/pspec.xml
+index f2b5744..ff49917 100644
+--- a/programming/scm/git/pspec.xml
++++ b/programming/scm/git/pspec.xml
+@@ -28,6 +28,7 @@
+             <Patch level="1">git-cvsps-ignore.patch</Patch>
+             <!-- Some UI tweaks to gitweb -->
+             <Patch level="1">gitweb-remove-search-box.patch</Patch>
++            <Patch level="1">git-svn-gnome-keyring.patch</Patch>
+         </Patches>
+     </Source>
+ 
+diff --git a/programming/scm/subversion/actions.py b/programming/scm/subversion/actions.py
+index a6dcbb6..f5632ea 100644
+--- a/programming/scm/subversion/actions.py
++++ b/programming/scm/subversion/actions.py
+@@ -26,6 +26,7 @@ def setup():
+                          --with-apxs=/usr/sbin/apxs \
+                          --with-zlib=/usr \
+                          --with-jikes=no \
++                         --with-gnome-keyring \
+                          --disable-mod-activation")
+ 
+ def build():
+@@ -36,7 +37,7 @@ def build():
+     autotools.make("swig-py")
+ 
+     # perl bindings (needed by git-svn*)
+-    autotools.make("swig-pl")
++    autotools.make("swig-pl swig-pl-lib")
+ 
+     # java bindings
+     autotools.make("-j1 javahl")
+diff --git a/programming/scm/subversion/pspec.xml b/programming/scm/subversion/pspec.xml
+index 8b36f38..e2a6f97 100644
+--- a/programming/scm/subversion/pspec.xml
++++ b/programming/scm/subversion/pspec.xml
+@@ -22,6 +22,7 @@
+             <Dependency>sun-jdk</Dependency>
+             <Dependency>apr-util</Dependency>
+             <Dependency>cyrus-sasl</Dependency>
++            <Dependency>libgnome-keyring</Dependency>
+         </BuildDependencies>
+         <Patches>
+             <Patch level="1">subversion.header_wrappers.patch</Patch>
+@@ -36,6 +37,7 @@
+ 
+             <!-- avoid a crash in mod_dav_svn when using locks (CVE-2011-0715) (bzp#17234) -->
+             <Patch level="0">mod-dav-svn-CVE-2011-0715.patch</Patch>
++
+         </Patches>
+     </Source>
+ 
+@@ -78,6 +80,13 @@
+     </Package>
+ 
+     <Package>
++        <Name>subversion-gnome</Name>
++        <Files>
++            <Path fileType="library">/usr/lib/libsvn_auth_gnome_keyring-1.so*</Path>
++        </Files>
++    </Package>
++
++    <Package>
+         <Name>mod_dav_svn</Name>
+         <PartOf>server.web</PartOf>
+         <RuntimeDependencies>

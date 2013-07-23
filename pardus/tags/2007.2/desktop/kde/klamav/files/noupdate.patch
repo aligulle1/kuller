@@ -1,0 +1,262 @@
+--- klamav-0.41-source/klamav-0.41/src/klamav.cpp.org	2007-03-03 01:05:45.000000000 +0200
++++ klamav-0.41-source/klamav-0.41/src/klamav.cpp	    2007-03-03 01:08:47.000000000 +0200
+@@ -150,8 +150,8 @@
+ 		tab->setCurrentPage(2);
+ 		freshklam->slotSearch();
+ 	}
+-        if (downloadClamAVForWizard)
+-            freshklam->checkForNewClamAVNow();
++//        if (downloadClamAVForWizard)
++//            freshklam->checkForNewClamAVNow();
+ 	//klamdb->shouldIShow();
+ 
+ 	CollectionDB::instance()->insertEvent("Launch","KlamAV Launched");
+@@ -291,10 +291,10 @@
+                 kdDebug() << "downloading database" << endl;
+                 downloadDBForWizard = true;
+             }
+-            if (wizard.downloadClamAV()){
+-                kdDebug() << "downloading clamav" << endl;
+-                downloadClamAVForWizard = true;
+-            }
++//            if (wizard.downloadClamAV()){
++//                kdDebug() << "downloading clamav" << endl;
++//                downloadClamAVForWizard = true;
++//            }
+ 
+         }
+ 
+--- klamav-0.41-source/klamav-0.41/src/freshklam.cpp.org	2007-03-03 00:38:55.000000000 +0200
++++ klamav-0.41-source/klamav-0.41/src/freshklam.cpp	    2007-03-03 01:38:30.000000000 +0200
+@@ -112,44 +112,44 @@
+             KDialog::spacingHint(), "vbox");
+ 
+     //Proxy Widget
+-    QGroupBox *software_group = new QGroupBox(i18n("Software Updates"), this);
+-    vbox->addWidget(software_group);
++//    QGroupBox *software_group = new QGroupBox(i18n("Software Updates"), this);
++//    vbox->addWidget(software_group);
+ 
+ 
+-    QGridLayout *software_layout = new QGridLayout( software_group, 5, 2, KDialog::spacingHint(),
+-            KDialog::spacingHint(), "software_layout");
+-    software_layout->addRowSpacing(0, software_group->fontMetrics().height());
+-    software_layout->setColStretch(0, 1);
+-    software_layout->setColStretch(1, 1);
++//    QGridLayout *software_layout = new QGridLayout( software_group, 5, 2, KDialog::spacingHint(),
++//            KDialog::spacingHint(), "software_layout");
++//    software_layout->addRowSpacing(0, software_group->fontMetrics().height());
++//    software_layout->setColStretch(0, 1);
++//    software_layout->setColStretch(1, 1);
+ 
+ 
+     //Dazuko
+-    QWidget *dazuko_hlp = new QWidget( software_group );
+-    software_layout->addMultiCellWidget(dazuko_hlp, 1,2, 0,2);
+-    QGridLayout *dazuko_dir_layout = new QGridLayout(dazuko_hlp,2,2, KDialog::spacingHint() );
++//    QWidget *dazuko_hlp = new QWidget( software_group );
++//    software_layout->addMultiCellWidget(dazuko_hlp, 1,2, 0,2);
++//    QGridLayout *dazuko_dir_layout = new QGridLayout(dazuko_hlp,2,2, KDialog::spacingHint() );
+ 
+ 
+-    clamav_box = new QCheckBox(i18n("Update ClamAV Automatically"), dazuko_hlp);
+-    clamav_box->setMinimumWidth(clamav_box->sizeHint().width());
+-    dazuko_dir_layout->addWidget(clamav_box,0,0);
++//    clamav_box = new QCheckBox(i18n("Update ClamAV Automatically"), dazuko_hlp);
++//    clamav_box->setMinimumWidth(clamav_box->sizeHint().width());
++//    dazuko_dir_layout->addWidget(clamav_box,0,0);
+ 
+-    klamav_box = new QCheckBox(i18n("Update KlamAV Automatically"), dazuko_hlp);
+-    klamav_box->setMinimumWidth(klamav_box->sizeHint().width());
+-    dazuko_dir_layout->addWidget(klamav_box,0,1);
++//    klamav_box = new QCheckBox(i18n("Update KlamAV Automatically"), dazuko_hlp);
++//    klamav_box->setMinimumWidth(klamav_box->sizeHint().width());
++//    dazuko_dir_layout->addWidget(klamav_box,0,1);
+ 
+ 
+ 
+-    clamav_options = new QPushButton (i18n( "Upgrade ClamAV Now" ), dazuko_hlp);
+-    dazuko_dir_layout->addWidget(clamav_options,1,0);
+-    clamav_options->setFixedSize(clamav_options->sizeHint());
+-    connect( clamav_options, SIGNAL( clicked() ), this,
+-		SLOT( checkForNewClamAVNow() ) );
++//    clamav_options = new QPushButton (i18n( "Upgrade ClamAV Now" ), dazuko_hlp);
++//    dazuko_dir_layout->addWidget(clamav_options,1,0);
++//    clamav_options->setFixedSize(clamav_options->sizeHint());
++//    connect( clamav_options, SIGNAL( clicked() ), this,
++//		SLOT( checkForNewClamAVNow() ) );
+ 
+-    klamav_options = new QPushButton (i18n( "Upgrade KlamAV Now" ), dazuko_hlp);
+-    dazuko_dir_layout->addWidget(klamav_options,1,1);
+-    klamav_options->setFixedSize(klamav_options->sizeHint());
+-    connect( klamav_options, SIGNAL( clicked() ), this,
+-		SLOT( checkForNewKlamAVNow() ) );
++//    klamav_options = new QPushButton (i18n( "Upgrade KlamAV Now" ), dazuko_hlp);
++//    dazuko_dir_layout->addWidget(klamav_options,1,1);
++//    klamav_options->setFixedSize(klamav_options->sizeHint());
++//    connect( klamav_options, SIGNAL( clicked() ), this,
++//		SLOT( checkForNewKlamAVNow() ) );
+ 
+ 
+ 
+@@ -354,24 +354,24 @@
+     }
+ 
+ 
+-    if ((pos = item2.find("Recommended version:")) != -1){
++//    if ((pos = item2.find("Recommended version:")) != -1){
+ 
+-        pos2 = item2.find('\n',pos);
+-        QString version = item2.mid((pos+20),pos2 - (pos+20)).stripWhiteSpace();
++//        pos2 = item2.find('\n',pos);
++//        QString version = item2.mid((pos+20),pos2 - (pos+20)).stripWhiteSpace();
+ 
+-        if ((clamav_box->isChecked())){
++//        if ((clamav_box->isChecked())){
+     
+-            int result = KMessageBox::warningContinueCancel(this, i18n( "It looks like your version of the ClamAV engine is out of date! ClamAV-%1 is the most recent version of ClamAV available. Would you like to KlamAV to download and compile it for you?").arg(version),i18n( "Download and Install ClamAV-%1" ).arg(version),i18n( "Download and Install ClamAV-%1" ).arg(version));
++//            int result = KMessageBox::warningContinueCancel(this, i18n( "It looks like your version of the ClamAV engine is out of date! ClamAV-%1 is the most recent version of ClamAV available. Would you like to KlamAV to download and compile it for you?").arg(version),i18n( "Download and Install ClamAV-%1" ).arg(version),i18n( "Download and Install ClamAV-%1" ).arg(version));
+         
+-            switch (result) {
+-                case 2 : 
+-                    break;
+-                case 5 : 
+-                    updater->downloadComponent("clamav",version,"tar.gz");
+-            }
+-        }else if (!(clamav_box->isChecked()))
+-            KNotifyClient::event(kmain->_tray->winId(),"ClamAVOutDated", QString("Your copy of ClamAV is out of date! Please Upgrade to ClamAV %1!").arg(version));
+-    }
++//            switch (result) {
++//                case 2 : 
++//                    break;
++//                case 5 : 
++//                    updater->downloadComponent("clamav",version,"tar.gz");
++//            }
++//        }else if (!(clamav_box->isChecked()))
++//            KNotifyClient::event(kmain->_tray->winId(),"ClamAVOutDated", QString("Your copy of ClamAV is out of date! Please Upgrade to ClamAV %1!").arg(version));
++//    }
+ 
+ 
+ }
+@@ -720,20 +720,20 @@
+         check_combo->setEnabled(false);
+     }
+ 
+-    if ((config->readEntry("AutoUpdateClamAV")) == "Yes"){
+-        clamav_box->setChecked(true);
+-    }else{
+-        clamav_box->setChecked(false);
+-    }
++//    if ((config->readEntry("AutoUpdateClamAV")) == "Yes"){
++//        clamav_box->setChecked(true);
++//    }else{
++//        clamav_box->setChecked(false);
++//    }
++
++//    if ((config->readEntry("AutoUpdateKlamAV")) == "Yes"){
++//        klamav_box->setChecked(true);
++//    }else{
++//        klamav_box->setChecked(false);
++//    }
+ 
+-    if ((config->readEntry("AutoUpdateKlamAV")) == "Yes"){
+-        klamav_box->setChecked(true);
+-    }else{
+-        klamav_box->setChecked(false);
+-    }
+-
+-    connect( clamav_box, SIGNAL(toggled(bool)), SLOT(handleChecks()) );
+-    connect( klamav_box, SIGNAL(toggled(bool)), SLOT(handleChecks()) );
++//    connect( clamav_box, SIGNAL(toggled(bool)), SLOT(handleChecks()) );
++//    connect( klamav_box, SIGNAL(toggled(bool)), SLOT(handleChecks()) );
+     connect( daemon_box, SIGNAL(toggled(bool)), SLOT(handleChecks()) );
+     connect( check_combo, SIGNAL(activated(int)), SLOT(handleChecks()) );
+ 
+@@ -756,17 +756,17 @@
+     }
+     config->writeEntry("NoOfUpdates", check_combo->currentText());
+ 
+-    if (clamav_box->isChecked()){
+-        config->writeEntry("AutoUpdateClamAV","Yes");
+-    }else{
+-        config->writeEntry("AutoUpdateClamAV","No");
+-    }
+-
+-    if (klamav_box->isChecked()){
+-        config->writeEntry("AutoUpdateKlamAV","Yes");
+-    }else{
+-        config->writeEntry("AutoUpdateKlamAV","No");
+-    }
++//    if (clamav_box->isChecked()){
++//        config->writeEntry("AutoUpdateClamAV","Yes");
++//    }else{
++//        config->writeEntry("AutoUpdateClamAV","No");
++//    }
++
++//    if (klamav_box->isChecked()){
++//        config->writeEntry("AutoUpdateKlamAV","Yes");
++//    }else{
++//        config->writeEntry("AutoUpdateKlamAV","No");
++//    }
+  
+     config->sync();
+ }
+@@ -961,11 +961,11 @@
+ Freshklam::resolved( KResolverResults result) // SLOT
+ {
+ 
+-    if ((!( result.error() != KResolver::NoError || result.isEmpty() )) 
+-       && klamav_box->isChecked()){
+-    	updater->checkForNewKlamAV();
+-    }else
+-        kdDebug() << "network error or not set to check for new klamav" << endl;
++//    if ((!( result.error() != KResolver::NoError || result.isEmpty() )) 
++//       && klamav_box->isChecked()){
++//    	updater->checkForNewKlamAV();
++//    }else
++//        kdDebug() << "network error or not set to check for new klamav" << endl;
+ }
+ 
+ 
+@@ -1023,8 +1023,8 @@
+ void Freshklam::toggleUpgradeButtons(bool state)
+ {
+ 
+-    klamav_options->setEnabled(state);
+-    clamav_options->setEnabled(state);
++//    klamav_options->setEnabled(state);
++//    clamav_options->setEnabled(state);
+ 
+ 
+ }
+--- klamav-0.41-source/klamav-0.41/src/update.cpp.org	2007-03-03 01:07:26.000000000 +0200
++++ klamav-0.41-source/klamav-0.41/src/update.cpp	    2007-03-03 01:10:44.000000000 +0200
+@@ -253,7 +253,7 @@
+ 
+     //kdDebug() << "Checking for new KlamAV" << endl;
+ 
+-    checkingDirectly = true;
++    checkingDirectly = false;
+ 
+     highestsofarnumeric = 0;
+     klamav_url = "http://prdownloads.sourceforge.net/klamav/";
+@@ -269,7 +269,7 @@
+ 
+     //kdDebug() << "Checking for new ClamAV" << endl;
+ 
+-    checkingDirectly = true;
++    checkingDirectly = false;
+ 
+     highestsofarnumeric = 0;
+     clamav_url = "http://prdownloads.sourceforge.net/clamav/";
+--- klamav-0.41-source/klamav-0.41/src/sigtool.cpp.org	2007-03-03 02:13:14.000000000 +0200
++++ klamav-0.41-source/klamav-0.41/src/sigtool.cpp	    2007-03-03 03:05:38.000000000 +0200
+@@ -98,7 +98,7 @@
+ 	notes_layout->addMultiCellWidget(notes_hlp, 1,1, 0,1);
+ 	QHBoxLayout *notes_box = new QHBoxLayout(notes_hlp, KDialog::spacingHint() );
+ 	
+-	notes_label = new QLabel(i18n(text), notes_hlp);
++	notes_label = new QLabel(i18n(text.utf8()), notes_hlp);
+ 	notes_label->setAlignment( int( QLabel::WordBreak | QLabel::AlignVCenter ) );
+ 	//notes_label->setFixedSize(notes_label->sizeHint());
+ 	notes_box->addWidget(notes_label);

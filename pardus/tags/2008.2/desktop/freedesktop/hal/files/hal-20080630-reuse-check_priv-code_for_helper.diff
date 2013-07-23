@@ -1,0 +1,648 @@
+From: Danny Kukawka <danny.kukawka@web.de>
+Subject: reuse code in addons to check privileges
+
+Changed code to be able to reuse code of check_priv() in helpers
+like addons. Added new util_helper_priv.{c,h} with a new function
+for checking privileges and changed all affected addons to use
+this code.
+
+Signed-off-by: Danny Kukawka <danny.kukawka@web.de>
+---
+
+ Makefile.am                               |    3 -
+ linux/addons/Makefile.am                  |   10 +--
+ linux/addons/addon-cpufreq.c              |   53 ------------------
+ linux/addons/addon-imac-backlight.c       |   55 -------------------
+ linux/addons/addon-macbook-backlight.c    |   55 -------------------
+ linux/addons/addon-macbookpro-backlight.c |   65 ++--------------------
+ linux/addons/addon-omap-backlight.c       |   55 -------------------
+ util_helper_priv.c                        |   86 ++++++++++++++++++++++++++++++
+ util_helper_priv.h                        |   36 ++++++++++++
+ 9 files changed, 143 insertions(+), 275 deletions(-)
+
+diff --git a/hald/Makefile.am b/hald/Makefile.am
+index 810d4f7..b880685 100644
+--- a/hald/Makefile.am
++++ b/hald/Makefile.am
+@@ -100,7 +100,8 @@ endif
+  ## Red Hat end
+ 
+ EXTRA_DIST = \
+-	hald_marshal.list hald-cache-test.sh \
++	util_helper_priv.h	util_helper_priv.c	\
++	hald_marshal.list 	hald-cache-test.sh 	\
+ 	$(SCRIPT_IN_FILES)
+ 
+ hald_marshal.h: hald_marshal.list
+diff --git a/hald/linux/addons/Makefile.am b/hald/linux/addons/Makefile.am
+index 37beba4..cb67e87 100644
+--- a/hald/linux/addons/Makefile.am
++++ b/hald/linux/addons/Makefile.am
+@@ -31,32 +31,32 @@ endif
+ if BUILD_OMAP
+ libexec_PROGRAMS  +=			\
+ 	hald-addon-omap-backlight
+-hald_addon_omap_backlight_SOURCES = addon-omap-backlight.c ../../logger.c ../../util_helper.c
++hald_addon_omap_backlight_SOURCES = addon-omap-backlight.c ../../logger.c ../../util_helper.c ../../util_helper_priv.c
+ hald_addon_omap_backlight_LDADD = $(top_builddir)/libhal/libhal.la @GLIB_LIBS@
+ endif
+ 
+ if BUILD_IMAC
+ libexec_PROGRAMS += hald-addon-imac-backlight
+-hald_addon_imac_backlight_SOURCES = addon-imac-backlight.c ../../logger.c
++hald_addon_imac_backlight_SOURCES = addon-imac-backlight.c ../../logger.c ../../util_helper_priv.c
+ hald_addon_imac_backlight_LDADD = $(top_builddir)/libhal/libhal.la @GLIB_LIBS@
+ endif
+ 
+ if BUILD_MACBOOKPRO
+ libexec_PROGRAMS += hald-addon-macbookpro-backlight
+-hald_addon_macbookpro_backlight_SOURCES = addon-macbookpro-backlight.c ../../logger.c
++hald_addon_macbookpro_backlight_SOURCES = addon-macbookpro-backlight.c ../../logger.c ../../util_helper_priv.c
+ hald_addon_macbookpro_backlight_LDADD = $(top_builddir)/libhal/libhal.la -lpci -lz @GLIB_LIBS@
+ endif
+ 
+ if BUILD_MACBOOK
+ libexec_PROGRAMS += hald-addon-macbook-backlight
+-hald_addon_macbook_backlight_SOURCES = addon-macbook-backlight.c ../../logger.c ../../util_helper.c
++hald_addon_macbook_backlight_SOURCES = addon-macbook-backlight.c ../../logger.c ../../util_helper.c ../../util_helper_priv.c
+ hald_addon_macbook_backlight_LDADD = $(top_builddir)/libhal/libhal.la -lpci -lz @GLIB_LIBS@
+ endif
+ 
+ if BUILD_CPUFREQ
+ libexec_PROGRAMS += hald-addon-cpufreq
+ hald_addon_cpufreq_SOURCES = addon-cpufreq.c addon-cpufreq.h addon-cpufreq-userspace.h \
+-	                     addon-cpufreq-userspace.c ../../logger.c
++	                     addon-cpufreq-userspace.c ../../logger.c ../../util_helper_priv.c
+ hald_addon_cpufreq_LDADD = $(top_builddir)/libhal/libhal.la @GLIB_LIBS@ @POLKIT_LIBS@
+ endif
+ 
+diff --git a/hald/linux/addons/addon-cpufreq.c b/hald/linux/addons/addon-cpufreq.c
+index 86d8ebc..05a4727 100644
+--- a/hald/linux/addons/addon-cpufreq.c
++++ b/hald/linux/addons/addon-cpufreq.c
+@@ -38,6 +38,7 @@
+ #include "addon-cpufreq-userspace.h"
+ #include "libhal/libhal.h"
+ #include "../../logger.h"
++#include "../../util_helper_priv.h"
+ 
+ #define MAX_LINE_SIZE				255
+ #define CPUFREQ_POLKIT_PRIVILEGE		"org.freedesktop.hal.power-management.cpufreq"
+@@ -908,56 +909,6 @@ static gboolean dbus_raise_error(DBusConnection *connection, DBusMessage *messag
+ 	return TRUE;
+ }
+ 
+-#ifdef HAVE_POLKIT
+-/** 
+- * dbus_is_privileged:
+- * @connection:		connection to D-Bus
+- * @message:		Message
+- * @error:		the error
+- *
+- * Returns: 		TRUE if the caller is privileged
+- *
+- * checks if caller of message possesses the CPUFREQ_POLKIT_PRIVILGE 
+- */
+-static gboolean 
+-dbus_is_privileged (DBusConnection *connection, DBusMessage *message, DBusError *error)
+-{
+-        gboolean ret;
+-        char *polkit_result;
+-        const char *invoked_by_syscon_name;
+-
+-        ret = FALSE;
+-        polkit_result = NULL;
+-
+-        invoked_by_syscon_name = dbus_message_get_sender (message);
+-        
+-        polkit_result = libhal_device_is_caller_privileged (halctx,
+-                                                            udi,
+-                                                            CPUFREQ_POLKIT_PRIVILEGE,
+-                                                            invoked_by_syscon_name,
+-                                                            error);
+-        if (polkit_result == NULL) {
+-		dbus_raise_error (connection, message, CPUFREQ_ERROR_GENERAL,
+-                                  "Cannot determine if caller is privileged");
+-                goto out;
+-        }
+-        if (strcmp (polkit_result, "yes") != 0) {
+-
+-		dbus_raise_error (connection, message, 
+-                                  "org.freedesktop.Hal.Device.PermissionDeniedByPolicy",
+-                                  "%s %s <-- (action, result)",
+-                                  CPUFREQ_POLKIT_PRIVILEGE, polkit_result);
+-                goto out;
+-        }
+-
+-        ret = TRUE;
+-
+-out:
+-        if (polkit_result != NULL)
+-                libhal_free_string (polkit_result);
+-        return ret;
+-}
+-#endif
+ 
+ /** 
+  * dbus_send_reply:
+@@ -1108,7 +1059,7 @@ static DBusHandlerResult dbus_filter_function(DBusConnection *connection,
+ 		return DBUS_HANDLER_RESULT_HANDLED;
+ 
+ #ifdef HAVE_POLKIT
+-	if (!dbus_is_privileged(connection, message, &dbus_error))
++	if (!check_priv (halctx, connection, message, dbus_message_get_path (message), CPUFREQ_POLKIT_PRIVILEGE))
+ 		return DBUS_HANDLER_RESULT_HANDLED;
+ #endif
+ 
+diff --git a/hald/linux/addons/addon-imac-backlight.c b/hald/linux/addons/addon-imac-backlight.c
+index 549e53d..b082f89 100644
+--- a/hald/linux/addons/addon-imac-backlight.c
++++ b/hald/linux/addons/addon-imac-backlight.c
+@@ -35,6 +35,7 @@
+ 
+ #include "libhal/libhal.h"
+ #include "../../logger.h"
++#include "../../util_helper_priv.h"
+ 
+ static LibHalContext *halctx = NULL;
+ 
+@@ -53,58 +54,6 @@ backlight_get(void)
+ 	return inb(0xB3) >> 4;
+ }
+ 
+-static gboolean
+-check_priv (DBusConnection *connection, DBusMessage *message, const char *udi, const char *privilege)
+-#ifdef HAVE_POLKIT
+-{
+-        gboolean ret;
+-        char *polkit_result;
+-        const char *invoked_by_syscon_name;
+-        DBusMessage *reply;
+-        DBusError error;
+-
+-        ret = FALSE;
+-        polkit_result = NULL;
+-
+-        invoked_by_syscon_name = dbus_message_get_sender (message);
+-        
+-        dbus_error_init (&error);
+-        polkit_result = libhal_device_is_caller_privileged (halctx,
+-                                                            udi,
+-                                                            privilege,
+-                                                            invoked_by_syscon_name,
+-                                                            &error);
+-        if (polkit_result == NULL) {
+-                reply = dbus_message_new_error_printf (message,
+-                                                       "org.freedesktop.Hal.Device.Error",
+-                                                       "Cannot determine if caller is privileged",
+-                                                       privilege, polkit_result);
+-                dbus_connection_send (connection, reply, NULL);
+-                goto out;
+-        }
+-        if (strcmp (polkit_result, "yes") != 0) {
+-
+-                reply = dbus_message_new_error_printf (message,
+-                                                       "org.freedesktop.Hal.Device.PermissionDeniedByPolicy",
+-                                                       "%s %s <-- (privilege, result)",
+-                                                       privilege, polkit_result);
+-                dbus_connection_send (connection, reply, NULL);
+-                goto out;
+-        }
+-
+-        ret = TRUE;
+-
+-out:
+-        if (polkit_result != NULL)
+-                libhal_free_string (polkit_result);
+-        return ret;
+-}
+-#else
+-{
+-        return TRUE;
+-}
+-#endif
+-
+ #define BACKLIGHT_OBJECT \
+   "/org/freedesktop/Hal/devices/imac_backlight"
+ #define BACKLIGHT_IFACE \
+@@ -126,7 +75,7 @@ filter_function (DBusConnection * connection, DBusMessage * message, void *userd
+ 	int level;
+ 	int ret;
+ 
+-        if (!check_priv (connection, message, dbus_message_get_path (message), "org.freedesktop.hal.power-management.lcd-panel")) {
++        if (!check_priv (halctx, connection, message, dbus_message_get_path (message), "org.freedesktop.hal.power-management.lcd-panel")) {
+                 return DBUS_HANDLER_RESULT_HANDLED;
+         }
+ 
+diff --git a/hald/linux/addons/addon-macbook-backlight.c b/hald/linux/addons/addon-macbook-backlight.c
+index 47817ab..55d835c 100644
+--- a/hald/linux/addons/addon-macbook-backlight.c
++++ b/hald/linux/addons/addon-macbook-backlight.c
+@@ -69,6 +69,7 @@
+ #include <dbus/dbus-glib-lowlevel.h>
+ #include "libhal/libhal.h"
+ #include "../../util_helper.h"
++#include "../../util_helper_priv.h"
+ 
+ #define REGISTER_OFFSET       0x00061254
+ #define PAGE_SIZE             4096
+@@ -187,58 +188,6 @@ backlight_get (void)
+ 	return (register_get () >> 1) & 0x7fff;
+ }
+ 
+-static gboolean
+-check_priv (DBusConnection *connection, DBusMessage *message, const char *udi, const char *privilege)
+-#ifdef HAVE_POLKIT
+-{
+-        gboolean ret;
+-        char *polkit_result;
+-        const char *invoked_by_syscon_name;
+-        DBusMessage *reply;
+-        DBusError error;
+-
+-        ret = FALSE;
+-        polkit_result = NULL;
+-
+-        invoked_by_syscon_name = dbus_message_get_sender (message);
+-        
+-        dbus_error_init (&error);
+-        polkit_result = libhal_device_is_caller_privileged (halctx,
+-                                                            udi,
+-                                                            privilege,
+-                                                            invoked_by_syscon_name,
+-                                                            &error);
+-        if (polkit_result == NULL) {
+-                reply = dbus_message_new_error_printf (message,
+-                                                       "org.freedesktop.Hal.Device.Error",
+-                                                       "Cannot determine if caller is privileged",
+-                                                       privilege, polkit_result);
+-                dbus_connection_send (connection, reply, NULL);
+-                goto out;
+-        }
+-        if (strcmp (polkit_result, "yes") != 0) {
+-
+-                reply = dbus_message_new_error_printf (message,
+-                                                       "org.freedesktop.Hal.Device.PermissionDeniedByPolicy",
+-                                                       "%s %s <-- (privilege, result)",
+-                                                       privilege, polkit_result);
+-                dbus_connection_send (connection, reply, NULL);
+-                goto out;
+-        }
+-
+-        ret = TRUE;
+-
+-out:
+-        if (polkit_result != NULL)
+-                libhal_free_string (polkit_result);
+-        return ret;
+-}
+-#else
+-{
+-        return TRUE;
+-}
+-#endif
+-
+ 
+ #define BACKLIGHT_OBJECT \
+   "/org/freedesktop/Hal/devices/macbook_backlight"
+@@ -261,7 +210,7 @@ filter_function (DBusConnection * connection, DBusMessage * message, void *userd
+ 	int level;
+ 	int ret;
+ 
+-        if (!check_priv (connection, message, dbus_message_get_path (message), "org.freedesktop.hal.power-management.lcd-panel")) {
++        if (!check_priv (halctx, connection, message, dbus_message_get_path (message), "org.freedesktop.hal.power-management.lcd-panel")) {
+                 return DBUS_HANDLER_RESULT_HANDLED;
+         }
+ 
+diff --git a/hald/linux/addons/addon-macbookpro-backlight.c b/hald/linux/addons/addon-macbookpro-backlight.c
+index ec7ea56..3c1a799 100644
+--- a/hald/linux/addons/addon-macbookpro-backlight.c
++++ b/hald/linux/addons/addon-macbookpro-backlight.c
+@@ -45,6 +45,7 @@
+ 
+ #include "libhal/libhal.h"
+ #include "../../logger.h"
++#include "../../util_helper_priv.h"
+ 
+ static LibHalContext *halctx = NULL;
+ static GMainLoop *main_loop;
+@@ -218,60 +219,6 @@ read_keyboard_backlight (void)
+ }
+ #endif
+ 
+-static gboolean
+-check_priv (DBusConnection *connection, 
+-            DBusMessage *message, 
+-            const char *udi, 
+-            const char *action)
+-#ifdef HAVE_POLKIT
+-{
+-        gboolean ret;
+-        char *polkit_result;
+-        const char *invoked_by_syscon_name;
+-        DBusMessage *reply;
+-        DBusError error;
+-
+-        ret = FALSE;
+-        polkit_result = NULL;
+-
+-        invoked_by_syscon_name = dbus_message_get_sender (message);
+-        
+-        dbus_error_init (&error);
+-        polkit_result = libhal_device_is_caller_privileged (halctx,
+-                                                            udi,
+-                                                            action,
+-                                                            invoked_by_syscon_name,
+-                                                            &error);
+-        if (polkit_result == NULL) {
+-                reply = dbus_message_new_error_printf (message,
+-                                                       "org.freedesktop.Hal.Device.Error",
+-                                                       "Cannot determine if caller is privileged for action '%s'",
+-                                                       action);
+-                dbus_connection_send (connection, reply, NULL);
+-                goto out;
+-        }
+-        if (strcmp (polkit_result, "yes") != 0) {
+-
+-                reply = dbus_message_new_error_printf (message,
+-                                                       "org.freedesktop.Hal.Device.PermissionDeniedByPolicy",
+-                                                       "%s %s <-- (action, result)",
+-                                                       action, polkit_result);
+-                dbus_connection_send (connection, reply, NULL);
+-                goto out;
+-        }
+-
+-        ret = TRUE;
+-
+-out:
+-        if (polkit_result != NULL)
+-                libhal_free_string (polkit_result);
+-        return ret;
+-}
+-#else
+-{
+-        return TRUE;
+-}
+-#endif
+ 
+ static int last_keyboard_brightness = -1;
+ 
+@@ -298,7 +245,7 @@ filter_function (DBusConnection *connection, DBusMessage *message, void *userdat
+ 					 "SetBrightness")) {
+ 		int brightness;
+ 
+-                if (!check_priv (connection, message, udi, "org.freedesktop.hal.power-management.lcd-panel"))
++                if (!check_priv (halctx, connection, message, udi, "org.freedesktop.hal.power-management.lcd-panel"))
+                         goto error;
+ 
+ 		dbus_error_init (&err);
+@@ -335,7 +282,7 @@ filter_function (DBusConnection *connection, DBusMessage *message, void *userdat
+ 						"GetBrightness")) {
+ 		int brightness;
+ 
+-                if (!check_priv (connection, message, udi, "org.freedesktop.hal.power-management.lcd-panel"))
++                if (!check_priv (halctx, connection, message, udi, "org.freedesktop.hal.power-management.lcd-panel"))
+                         goto error;
+ 
+ 		dbus_error_init (&err);
+@@ -366,7 +313,7 @@ filter_function (DBusConnection *connection, DBusMessage *message, void *userdat
+ 						"GetBrightness")) {
+ 		int brightness[2];
+ 
+-                if (!check_priv (connection, message, udi, "org.freedesktop.hal.power-management.light-sensor"))
++                if (!check_priv (halctx, connection, message, udi, "org.freedesktop.hal.power-management.light-sensor"))
+                         goto error;
+ 
+ 		brightness[0] = read_light_sensor (FALSE); /* right */
+@@ -393,7 +340,7 @@ filter_function (DBusConnection *connection, DBusMessage *message, void *userdat
+ 						"org.freedesktop.Hal.Device.KeyboardBacklight", 
+ 						"GetBrightness")) {
+ 
+-                if (!check_priv (connection, message, udi, "org.freedesktop.hal.power-management.keyboard-backlight"))
++                if (!check_priv (halctx, connection, message, udi, "org.freedesktop.hal.power-management.keyboard-backlight"))
+                         goto error;
+ 
+ 		/* I can't get this working so just cache last SetBrightness value :-/ */
+@@ -438,7 +385,7 @@ filter_function (DBusConnection *connection, DBusMessage *message, void *userdat
+ 						"SetBrightness")) {
+ 		int brightness;
+ 
+-                if (!check_priv (connection, message, udi, "org.freedesktop.hal.power-management.keyboard-backlight"))
++                if (!check_priv (halctx, connection, message, udi, "org.freedesktop.hal.power-management.keyboard-backlight"))
+                         goto error;
+ 
+ 		dbus_error_init (&err);
+diff --git a/hald/linux/addons/addon-omap-backlight.c b/hald/linux/addons/addon-omap-backlight.c
+index f9913f5..a0105be 100644
+--- a/hald/linux/addons/addon-omap-backlight.c
++++ b/hald/linux/addons/addon-omap-backlight.c
+@@ -48,7 +48,7 @@
+ #include "libhal/libhal.h"
+ #include "../../logger.h"
+ #include "../../util_helper.h"
+-
++#include "../../util_helper_priv.h"
+ 
+ static GMainLoop *main_loop;
+ static LibHalContext *halctx = NULL;
+@@ -136,57 +136,6 @@ write_backlight (struct backlight * bl, int level)
+ 	close (fd);
+ }
+ 
+-static gboolean
+-check_priv (DBusConnection *connection, DBusMessage *message, const char *udi, const char *privilege)
+-#ifdef HAVE_POLKIT
+-{
+-	gboolean ret;
+-	char *polkit_result;
+-	const char *invoked_by_syscon_name;
+-	DBusMessage *reply;
+-	DBusError error;
+-
+-	ret = FALSE;
+-	polkit_result = NULL;
+-
+-	invoked_by_syscon_name = dbus_message_get_sender (message);
+-
+-	dbus_error_init (&error);
+-	polkit_result = libhal_device_is_caller_privileged (halctx,
+-	                                                    udi,
+-	                                                    privilege,
+-	                                                    invoked_by_syscon_name,
+-	                                                    &error);
+-	if (polkit_result == NULL) {
+-		reply = dbus_message_new_error_printf (message,
+-		                                       "org.freedesktop.Hal.Device.Error",
+-		                                       "Cannot determine if caller is privileged",
+-		                                       privilege, polkit_result);
+-		dbus_connection_send (connection, reply, NULL);
+-		goto out;
+-	}
+-
+-	if (strcmp (polkit_result, "yes") != 0) {
+-		reply = dbus_message_new_error_printf (message,
+-		                                       "org.freedesktop.Hal.Device.PermissionDeniedByPolicy",
+-		                                       "%s %s <-- (privilege, result)",
+-		                                       privilege, polkit_result);
+-		dbus_connection_send (connection, reply, NULL);
+-		goto out;
+-	}
+-
+-	ret = TRUE;
+-
+-out:
+-	if (polkit_result != NULL)
+-		libhal_free_string (polkit_result);
+-	return ret;
+-}
+-#else
+-{
+-	return TRUE;
+-}
+-#endif
+ 
+ /* DBus filter function */
+ static DBusHandlerResult
+@@ -195,7 +144,7 @@ filter_function (DBusConnection *connection, DBusMessage *message, void *userdat
+ 	DBusError err;
+ 	DBusMessage *reply;
+ 
+-	if (!check_priv (connection, message, dbus_message_get_path (message),
++	if (!check_priv (halctx, connection, message, dbus_message_get_path (message),
+ 	                 "org.freedesktop.hal.power-management.lcd-panel")) {
+ 		return DBUS_HANDLER_RESULT_HANDLED;
+ 	}
+diff --git a/hald/util_helper_priv.c b/hald/util_helper_priv.c
+new file mode 100644
+index 0000000..a62735e
+--- /dev/null
++++ b/hald/util_helper_priv.c
+@@ -0,0 +1,86 @@
++/***************************************************************************
++ *
++ * util_helper.c - HAL utilities for helper to check privileges 
++ * (as e.g. prober/addons) et al. 
++ *
++ * Copyright (C) 2008 Danny Kukawka, <danny.kukawka@web,de>
++ *
++ * Licensed under the Academic Free License version 2.1
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
++ *
++ **************************************************************************/
++
++#ifdef HAVE_CONFIG_H
++#  include <config.h>
++#endif
++
++#include <stdlib.h>
++#include <string.h>
++#include <unistd.h>
++
++#include "util_helper_priv.h"
++
++gboolean
++check_priv (LibHalContext *halctx, DBusConnection *connection, DBusMessage *message, const char *udi, const char *action)
++#ifdef HAVE_POLKIT
++{
++        gboolean ret;
++        char *polkit_result;
++        const char *invoked_by_syscon_name;
++        DBusMessage *reply;
++        DBusError error;
++
++        ret = FALSE;
++        polkit_result = NULL;
++
++        invoked_by_syscon_name = dbus_message_get_sender (message);
++        
++        dbus_error_init (&error);
++        polkit_result = libhal_device_is_caller_privileged (halctx,
++                                                            udi,
++                                                            action,
++                                                            invoked_by_syscon_name,
++                                                            &error);
++        if (polkit_result == NULL) {
++                reply = dbus_message_new_error_printf (message,
++                                                       "org.freedesktop.Hal.Device.Error",
++                                                       "Cannot determine if caller is privileged",
++                                                       action, polkit_result);
++                dbus_connection_send (connection, reply, NULL);
++                goto out;
++        }
++        if (strcmp (polkit_result, "yes") != 0) {
++
++                reply = dbus_message_new_error_printf (message,
++                                                       "org.freedesktop.Hal.Device.PermissionDeniedByPolicy",
++                                                       "%s %s <-- (action, result)",
++                                                       action, polkit_result);
++                dbus_connection_send (connection, reply, NULL);
++                goto out;
++        }
++
++        ret = TRUE;
++
++out:
++        if (polkit_result != NULL)
++                libhal_free_string (polkit_result);
++        return ret;
++}
++#else
++{
++        return TRUE;
++}
++#endif
+diff --git a/hald/util_helper_priv.h b/hald/util_helper_priv.h
+new file mode 100644
+index 0000000..e32bb14
+--- /dev/null
++++ b/hald/util_helper_priv.h
+@@ -0,0 +1,36 @@
++/***************************************************************************
++ *
++ * util_helper.h - HAL utilities for helper (as e.g. prober/addons) et al.
++ *
++ * Copyright (C) 2006 David Zeuthen, <david@fubar.dk>
++ *
++ * Licensed under the Academic Free License version 2.1
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
++ *
++ **************************************************************************/
++
++#ifndef UTIL_HELPER_PRIV_H
++#define UTIL_HELPER_PRIV_H
++
++#include <glib.h>
++#include "../libhal/libhal.h"
++
++void drop_privileges (int keep_auxgroups);
++void hal_set_proc_title_init (int argc, char *argv[]);
++void hal_set_proc_title (const char *format, ...);
++gboolean check_priv ( LibHalContext *halctx, DBusConnection *connection, DBusMessage *message, const char *udi, const char *action);
++
++#endif /* UTIL_HELPER_PRIV_H */

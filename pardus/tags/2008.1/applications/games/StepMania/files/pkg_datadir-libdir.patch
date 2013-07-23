@@ -1,0 +1,46 @@
+diff -Naur stepmania-3.9_20070621.orig/configure stepmania-3.9_20070621/configure
+--- stepmania-3.9_20070621.orig/configure	2007-06-22 14:29:48.000000000 +0300
++++ stepmania-3.9_20070621/configure	2007-06-22 21:33:01.000000000 +0300
+@@ -11710,7 +11710,7 @@
+ }'
+ fi
+ 
+-DEFS=-DHAVE_CONFIG_H
++DEFS="-DHAVE_CONFIG_H -DPKG_LIB_DIR=\\\"\$(pkglibdir)\\\" -DPKG_DATA_DIR=\\\"\$(pkgdatadir)\\\""
+ 
+ ac_libobjs=
+ ac_ltlibobjs=
+diff -Naur stepmania-3.9_20070621.orig/src/arch/ArchHooks/ArchHooks_Unix.cpp stepmania-3.9_20070621/src/arch/ArchHooks/ArchHooks_Unix.cpp
+--- stepmania-3.9_20070621.orig/src/arch/ArchHooks/ArchHooks_Unix.cpp	2007-05-03 05:15:38.000000000 +0300
++++ stepmania-3.9_20070621/src/arch/ArchHooks/ArchHooks_Unix.cpp	2007-06-22 22:50:06.000000000 +0300
+@@ -271,6 +271,8 @@
+ 	struct stat st;
+ 	if( !stat(sDirOfExecutable + "/Packages", &st) && st.st_mode&S_IFDIR )
+ 		Root = sDirOfExecutable;
++	else if( !stat( PKG_DATA_DIR "/Songs", &st) && st.st_mode&S_IFDIR )
++		Root = PKG_DATA_DIR;
+ 	else if( !stat(sDirOfExecutable + "/Songs", &st) && st.st_mode&S_IFDIR )
+ 		Root = sDirOfExecutable;
+ 	else if( !stat(RageFileManagerUtil::sInitialWorkingDirectory + "/Songs", &st) && st.st_mode&S_IFDIR )
+diff -Naur stepmania-3.9_20070621.orig/src/arch/LoadingWindow/LoadingWindow_Gtk.cpp stepmania-3.9_20070621/src/arch/LoadingWindow/LoadingWindow_Gtk.cpp
+--- stepmania-3.9_20070621.orig/src/arch/LoadingWindow/LoadingWindow_Gtk.cpp	2006-01-22 03:00:04.000000000 +0200
++++ stepmania-3.9_20070621/src/arch/LoadingWindow/LoadingWindow_Gtk.cpp	2007-06-22 21:33:01.000000000 +0300
+@@ -20,10 +20,17 @@
+ {
+ 	ASSERT( Handle == NULL );
+ 	
++#ifdef PKG_LIB_DIR
++	Handle = dlopen( PKG_LIB_DIR "/" "GtkModule.so", RTLD_NOW );
++	if ( Handle == NULL ) {
++#endif 
+ 	Handle = dlopen( RageFileManagerUtil::sDirOfExecutable + "/" + "GtkModule.so", RTLD_NOW );
+ 	if( Handle == NULL )
+ 		return ssprintf( "dlopen(): %s", dlerror() );
+-
++#ifdef PKG_LIB_DIR
++	}
++#endif	
++	
+ 	Module_Init = (INIT) dlsym(Handle, "Init");
+ 	if( !Module_Init )
+ 		return "Couldn't load symbol Module_Init";

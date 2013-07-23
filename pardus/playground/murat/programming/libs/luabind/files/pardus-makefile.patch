@@ -1,0 +1,45 @@
+--- src/makefile.orig	2005-11-28 22:55:34.000000000 +0200
++++ src/makefile	2007-12-15 15:32:00.000000000 +0200
+@@ -19,13 +19,14 @@
+ 	class_registry.cpp \
+ 	link_compatibility.cpp \
+ 	weak_ref.cpp \
+-	overload_rep.cpp \
+-	link_compatibility.cpp
++	overload_rep.cpp
+ 
+ OBJECTS = $(SOURCES:.cpp=.o)
+ 
+-TARGET = ../lib/libluabind.a
++TARGET = ../lib/libluabind.so.0.0.0
+ 
++LUA_LIBS = -llua -llualib
++LIBS = $(LUA_LIBS)
+ 
+ 
+ 
+@@ -33,11 +34,10 @@
+ all:	$(TARGET)
+ 
+ $(TARGET):	$(OBJECTS)
+-	$(AR) rcu $@ $(OBJECTS)
+-	ranlib $@
++	$(CC) $(CFLAGS) -fPIC -shared -Wl,-soname=libluabind.so.0 -o $(TARGET) $(OBJECTS) $(LIBS)
+ 
+ %.o:%.cpp
+-	$(CXX) -g -ftemplate-depth-100 -Wall -DLUABIND_BUILDING -c $? -o $@ -I$(LUA_PATH)/include -I- -I.. -I$(BOOST_ROOT) $(CONFIG)
++	$(CXX) $(CFLAGS) -g -ftemplate-depth-100 -Wall -DLUABIND_BUILDING -c $? -o $@ -I$(LUA_PATH)/include -I- -I.. -I/usr/include/boost
+ 
+ clean:
+ 	rm -f $(OBJECTS) $(TARGET)
+--- makefile.orig	2004-08-07 16:37:09.000000000 +0300
++++ makefile	2007-12-15 13:56:58.000000000 +0200
+@@ -1,7 +1,7 @@
+ 
+ all clean: lib 
+ 	cd src; $(MAKE) $@
+-	cd test; $(MAKE) $@
++# 	cd test; $(MAKE) $@
+ 
+ lib:
+ 	mkdir -p $@

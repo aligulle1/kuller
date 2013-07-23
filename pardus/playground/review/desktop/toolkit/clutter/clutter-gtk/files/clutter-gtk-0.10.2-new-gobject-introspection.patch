@@ -1,0 +1,34 @@
+diff --git a/clutter-gtk/Makefile.am b/clutter-gtk/Makefile.am
+index aa7d155..af3a950 100644
+--- a/clutter-gtk/Makefile.am
++++ b/clutter-gtk/Makefile.am
+@@ -52,7 +52,7 @@ GtkClutter-@CLUTTER_GTK_API_VERSION@.gir: $(INTROSPECTION_SCANNER) libclutter-gt
+ 		--add-include-path=$(srcdir) --add-include=path=. \
+ 		--include=Clutter-1.0 \
+ 		--include=Gtk-2.0 \
+-		--library=clutter-gtk-@CLUTTER_GTK_API_VERSION@ \
++		--library=libclutter-gtk-@CLUTTER_GTK_API_VERSION@.la \
+ 		--libtool="$(top_builddir)/libtool" \
+ 		--output $@ \
+ 		--pkg gobject-2.0 \
+@@ -72,6 +72,7 @@ typelibsdir = $(libdir)/girepository-1.0/
+ typelibs_DATA = $(BUILT_GIRSOURCES:.gir=.typelib)
+ 
+ %.typelib: %.gir $(INTROSPECTION_COMPILER)
++	LD_LIBRARY_PATH=.libs$${LD_LIBRARY_PATH:+:$$LD_LIBRARY_PATH} \
+ 	$(QUIET_GEN)$(INTROSPECTION_COMPILER) --includedir=$(srcdir) --includedir=. $(INTROSPECTION_COMPILER_OPTS) $< -o $(builddir)/$(@F)
+ 
+ CLEANFILES += $(BUILT_GIRSOURCES) $(typelibs_DATA)
+diff --git a/configure.ac b/configure.ac
+index be52205..258122d 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -156,7 +156,7 @@ AC_SUBST(CLUTTER_PREFIX)
+ 
+ GTK_DOC_CHECK([1.11])
+ 
+-GOBJECT_INTROSPECTION_CHECK([0.6.3])
++GOBJECT_INTROSPECTION_CHECK([0.6.4])
+ 
+ dnl ========================================================================
+ 

@@ -1,0 +1,27 @@
+--- liveMedia/MediaSession.cpp	2007-04-21 22:24:40.000000000 +0300
++++ liveMedia/MediaSession.cpp	2007-04-21 22:25:14.000000000 +0300
+@@ -19,6 +19,7 @@
+ // potentially multiple (audio and/or video) sub-sessions
+ // Implementation
+ 
++#include <locale.h>
+ #include "liveMedia.hh"
+ #ifdef SUPPORT_REAL_RTSP
+ #include "../RealRTSP/include/RealRTSP.hh"
+--- liveMedia/MediaSession.cpp	2007-02-20 13:33:45.000000000 +0200
++++ liveMedia/MediaSession.cpp	2007-04-21 22:22:26.000000000 +0300
+@@ -935,9 +935,14 @@
+       // This "rtpmap" matches our payload format, so set our
+       // codec name and timestamp frequency:
+       // (First, make sure the codec name is upper case)
++      const char* locale = setlocale(LC_ALL,"C");
++
+       for (char* p = codecName; *p != '\0'; ++p) {
+ 	*p = toupper(*p);
+       }
++
++      setlocale(LC_ALL,locale);
++
+       delete[] fCodecName; fCodecName = strDup(codecName);
+       fRTPTimestampFrequency = rtpTimestampFrequency;
+       fNumChannels = numChannels;

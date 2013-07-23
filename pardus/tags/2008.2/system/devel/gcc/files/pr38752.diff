@@ -1,0 +1,62 @@
+2009-01-07  Richard Guenther  <rguenther@suse.de>
+
+	PR tree-optimization/38752
+	* tree-ssa-structalias.c (set_uids_in_ptset): Do not assert we
+	find a subvariable as we might have invalid accesses.
+
+	* gcc.c-torture/compile/pr38752.c: New testcase.
+
+Index: gcc/tree-ssa-structalias.c
+===================================================================
+*** gcc/tree-ssa-structalias.c.orig	2009-01-07 15:28:43.000000000 +0100
+--- gcc/tree-ssa-structalias.c	2009-01-07 15:29:04.000000000 +0100
+*************** set_uids_in_ptset (tree ptr, bitmap into
+*** 4813,4820 ****
+  	      if (tsize
+  		  && host_integerp (tsize, 1))
+  		size = TREE_INT_CST_LOW (tsize);
+! 	      sft = get_first_overlapping_subvar (sv, vi->offset, size, &j);
+! 	      gcc_assert (sft);
+  	      for (; VEC_iterate (tree, sv, j, sft); ++j)
+  		{
+  		  if (SFT_OFFSET (sft) > vi->offset
+--- 4813,4819 ----
+  	      if (tsize
+  		  && host_integerp (tsize, 1))
+  		size = TREE_INT_CST_LOW (tsize);
+! 	      get_first_overlapping_subvar (sv, vi->offset, size, &j);
+  	      for (; VEC_iterate (tree, sv, j, sft); ++j)
+  		{
+  		  if (SFT_OFFSET (sft) > vi->offset
+Index: gcc/testsuite/gcc.c-torture/compile/pr38752.c
+===================================================================
+*** /dev/null	1970-01-01 00:00:00.000000000 +0000
+--- gcc/testsuite/gcc.c-torture/compile/pr38752.c	2009-01-07 15:28:47.000000000 +0100
+***************
+*** 0 ****
+--- 1,25 ----
++ typedef struct
++ {
++   int             baddr;
++ } mstruct_t;
++ 
++ static struct
++ {
++   unsigned int    mapnum;
++   mstruct_t       unused;
++ } mtab;
++ 
++ static mstruct_t *mactab = &mtab.unused;
++ 
++ int
++ main(void)
++ {
++   int i;
++   int addr;
++ 
++   for (i=1; i <= mtab.mapnum; i++)
++     if (addr < mactab[i].baddr)
++       break;
++   return 0;
++ }
++ 

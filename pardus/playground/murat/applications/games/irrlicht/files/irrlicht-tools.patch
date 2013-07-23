@@ -1,0 +1,62 @@
+diff -Naur irrlicht-1.4.orig/tools/GUIEditor/main.cpp irrlicht-1.4/tools/GUIEditor/main.cpp
+--- irrlicht-1.4.orig/tools/GUIEditor/main.cpp	2007-11-17 07:38:40.000000000 +0200
++++ irrlicht-1.4/tools/GUIEditor/main.cpp	2007-12-08 16:16:24.000000000 +0200
+@@ -53,7 +53,7 @@
+ 	IGUISkin *skin = env->createSkin(EGST_WINDOWS_METALLIC);
+ 	env->setSkin(skin);
+ 
+-	IGUIFont *font = env->getFont("../../media/lucida.xml");
++	IGUIFont *font = env->getFont("/usr/share/irrlicht/lucida.xml");
+ 	if (font)
+ 		skin->setFont(font);
+ 	skin->drop();
+diff -Naur irrlicht-1.4.orig/tools/GUIEditor/Makefile irrlicht-1.4/tools/GUIEditor/Makefile
+--- irrlicht-1.4.orig/tools/GUIEditor/Makefile	2007-11-17 07:38:40.000000000 +0200
++++ irrlicht-1.4/tools/GUIEditor/Makefile	2007-12-08 16:40:32.000000000 +0200
+@@ -1,13 +1,13 @@
+-CPPFLAGS =  -I../../include -I/usr/X11R6/include
+-LDFLAGS = -L/usr/X11R6/lib -L../../lib/Linux -lIrrlicht -lGL -lGLU -lXxf86vm -lXext -lX11
++CPPFLAGS =  -I../../include -I/usr/include
++LDFLAGS = -L/usr/X11R6/lib -L../../lib/Linux -lIrrlicht -lGL -lGLU -lXxf86vm -lXext -lX11 -lpng -ljpeg
+ 
+ SRCS = CGUIAttributeEditor.cpp CGUIEditFactory.cpp CGUIEditWindow.cpp CGUIEditWorkspace.cpp CGUIPanel.cpp CGUITextureCacheBrowser.cpp CMemoryReadWriteFile.cpp main.cpp
+ OBJS = $(SRCS:%.cpp=%.o)
+-DEST = GUIEditor
+-
++DEST = irrlicht-GUIEditor
++	
+ all: $(DEST)
+ 
+-GUIEditor: $(OBJS)
++irrlicht-GUIEditor: $(OBJS)
+ 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
+ 
+ clean:
+diff -Naur irrlicht-1.4.orig/tools/IrrFontTool/newFontTool/Makefile irrlicht-1.4/tools/IrrFontTool/newFontTool/Makefile
+--- irrlicht-1.4.orig/tools/IrrFontTool/newFontTool/Makefile	2007-11-17 07:38:40.000000000 +0200
++++ irrlicht-1.4/tools/IrrFontTool/newFontTool/Makefile	2007-12-08 16:17:59.000000000 +0200
+@@ -1,12 +1,12 @@
+ # Makefile for Irrlicht Examples
+ # It's usually sufficient to change just the target name and source file list
+ # and be sure that CXX is set to a valid compiler
+-Target = FontTool
++Target = irrlicht-FontTool
+ Sources = CFontTool.cpp main.cpp
+ 
+ # general compiler settings
+-CPPFLAGS = -I../../../include -I/usr/X11R6/include
+-CXXFLAGS = -O3 -ffast-math
++CPPFLAGS = -I../../../include -I/usr/include
++CXXFLAGS = $(CFLAGS)
+ #CXXFLAGS = -g -Wall
+ 
+ #default target is Linux
+@@ -17,7 +17,7 @@
+ endif
+ 
+ # target specific settings
+-all_linux: LDFLAGS = -L/usr/X11R6/lib$(LIBSELECT) -L../../../lib/Linux -lIrrlicht -lGL -lGLU -lXxf86vm -lXext -lX11
++all_linux: LDFLAGS = -L/usr/X11R6/lib$(LIBSELECT) -L../../../lib/Linux -lIrrlicht -lGL -lGLU -lXxf86vm -lXext -lX11 -lpng -ljpeg
+ all_linux clean_linux: SYSTEM=Linux
+ all_win32: LDFLAGS = -L../../../lib/Win32-gcc -lIrrlicht -lgdi32 -lopengl32 -lglu32 -lm
+ all_win32 clean_win32: SYSTEM=Win32-gcc

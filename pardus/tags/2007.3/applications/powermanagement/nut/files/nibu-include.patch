@@ -1,0 +1,53 @@
+diff -Nur nut-2.2.1-pre1-old/drivers/Makefile.am nut-2.2.1-pre1/drivers/Makefile.am
+--- nut-2.2.1-pre1-old/drivers/Makefile.am	2007-10-19 14:21:48.000000000 +0300
++++ nut-2.2.1-pre1/drivers/Makefile.am	2007-10-19 14:23:59.000000000 +0300
+@@ -171,7 +171,7 @@
+  isbmex.h libhid.h libshut.h libusb.h liebert.h liebert-hid.h main.h	\
+  main-hal.h								\
+  masterguard.h megatec.h metasys.h mge-hid.h mgemib.h mge-shut.h	\
+- mge-utalk.h netvisionmib.h usbhid-ups.h nitram.h nut_usb.h		\
++ mge-utalk.h netvisionmib.h nibumib.h usbhid-ups.h nitram.h nut_usb.h		\
+  oneac.h optiups.h powercom.h pwmib.h safenet.h serial.h		\
+  snmp-ups.h solis.h tripplite.h tripplite-hid.h tripplitesu.h		\
+  upscode2.h victronups.h powerpanel.h upshandler.h
+diff -Nur nut-2.2.1-pre1-old/drivers/Makefile.in nut-2.2.1-pre1/drivers/Makefile.in
+--- nut-2.2.1-pre1-old/drivers/Makefile.in	2007-10-19 14:21:48.000000000 +0300
++++ nut-2.2.1-pre1/drivers/Makefile.in	2007-10-19 14:24:10.000000000 +0300
+@@ -672,7 +672,7 @@
+  isbmex.h libhid.h libshut.h libusb.h liebert.h liebert-hid.h main.h	\
+  main-hal.h								\
+  masterguard.h megatec.h metasys.h mge-hid.h mgemib.h mge-shut.h	\
+- mge-utalk.h netvisionmib.h usbhid-ups.h nitram.h nut_usb.h		\
++ mge-utalk.h netvisionmib.h nibumib.h usbhid-ups.h nitram.h nut_usb.h		\
+  oneac.h optiups.h powercom.h pwmib.h safenet.h serial.h		\
+  snmp-ups.h solis.h tripplite.h tripplite-hid.h tripplitesu.h		\
+  upscode2.h victronups.h powerpanel.h upshandler.h
+diff -Nur nut-2.2.1-pre1-old/drivers/snmp-ups.c nut-2.2.1-pre1/drivers/snmp-ups.c
+--- nut-2.2.1-pre1-old/drivers/snmp-ups.c	2007-10-19 14:21:48.000000000 +0300
++++ nut-2.2.1-pre1/drivers/snmp-ups.c	2007-10-19 14:37:51.000000000 +0300
+@@ -38,6 +38,7 @@
+ #include "mgemib.h"
+ #include "netvisionmib.h"
+ #include "pwmib.h"
++#include "nibumib.h"
+ 
+ mib2nut_info_t mib2nut[] = {
+ 	{ "apcc", APCC_MIB_VERSION, APCC_OID_POWER_STATUS,
+@@ -50,6 +51,8 @@
+ 		PW_OID_MODEL_NAME, pw_mib },
+ 	{ "ietf", IETF_MIB_VERSION, IETF_OID_POWER_STATUS,
+ 		IETF_OID_MFR_NAME, ietf_mib },
++	{ "nibu", NIBU_MIB_VERSION, NIBU_OID_BATT_STATUS,
++		NIBU_OID_MODEL_NAME, nibu_mib },
+ 	{ NULL }
+ };
+ 
+@@ -134,7 +137,7 @@
+ 	upsdebugx(1, "entering upsdrv_makevartable()");
+ 
+ 	addvar(VAR_VALUE, SU_VAR_MIBS,
+-	    "Set MIB compliance (default=ietf, allowed mge,apcc,netvision,pw)");
++	    "Set MIB compliance (default=ietf, allowed mge,apcc,netvision,pw,nibu)");
+ 	addvar(VAR_VALUE | VAR_SENSITIVE, SU_VAR_COMMUNITY,
+ 	    "Set community name (default=public)");
+ 	addvar(VAR_VALUE, SU_VAR_VERSION,

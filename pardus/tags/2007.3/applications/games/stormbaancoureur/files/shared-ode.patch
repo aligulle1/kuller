@@ -1,0 +1,31 @@
+--- Makefile.orig	2007-10-13 21:15:15.000000000 +0300
++++ Makefile	2007-10-14 13:17:59.000000000 +0300
+@@ -38,15 +38,14 @@
+ 
+ 
+ LIBS=\
+-  $(ODEPREFIX)/$(LIBDIRNAME)/libode.a \
+   -lplibssgaux -lplibssg -lplibsg -lplibpu -lplibfnt -lplibul \
+-  -lglut -lGLU -lGL -lasound
++  -lglut -lGLU -lGL -lasound -lode
+ 
+ 
+ all: stormbaancoureur
+ 
+ 
+-stormbaancoureur: $(OBJS) $(ODEPREFIX)/$(LIBDIRNAME)/libode.a
++stormbaancoureur: $(OBJS) -lode
+ 	$(CXX) -o stormbaancoureur $(OBJS) $(LFLAGS) $(LIBS)
+ 
+ staticworldobject.o: ../src-common/staticworldobject.cxx ../src-common/staticworldobject.h ../src-common/worldobject.h
+--- Makefile.orig       2007-10-14 13:25:47.000000000 +0300
++++ Makefile    2007-10-14 13:54:03.000000000 +0300
+@@ -15,7 +15,7 @@
+   -I$(ODEPREFIX)/include \
+   -I$(PLIBPREFIX)/include \
+   -I../src-common \
+-  -O2 -g -Wall
++  $(CFLAGS)
+
+ LFLAGS=\
+   -L$(PLIBPREFIX)/$(LIBDIRNAME) \

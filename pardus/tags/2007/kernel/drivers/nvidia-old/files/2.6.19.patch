@@ -1,0 +1,34 @@
+diff -ur NVIDIA-Linux-x86-1.0-9626-pkg1/usr/src/nv/nv-linux.h NVIDIA-Linux-x86-1.0-9626-pkg1-for-linux-2.6.19-rc2/usr/src/nv/nv-linux.h
+--- usr/src/nv/nv-linux.h	2006-09-21 01:16:26.000000000 +0100
++++ usr/src/nv/nv-linux.h	2006-10-15 09:46:04.000000000 +0100
+@@ -14,7 +14,7 @@
+ 
+ #include "nv.h"
+ 
+-#include <linux/config.h>
++/* #include <linux/config.h> */
+ #include <linux/version.h>
+ #include <linux/utsname.h>
+ 
+diff -ur NVIDIA-Linux-x86-1.0-9626-pkg1/usr/src/nv/nv.c NVIDIA-Linux-x86-1.0-9626-pkg1-for-linux-2.6.19-rc2/usr/src/nv/nv.c
+--- usr/src/nv/nv.c	2006-09-21 01:16:25.000000000 +0100
++++ usr/src/nv/nv.c	2006-10-15 09:46:04.000000000 +0100
+@@ -288,7 +288,7 @@
+ long          nv_kern_unlocked_ioctl(struct file *, unsigned int, unsigned long);
+ long          nv_kern_compat_ioctl(struct file *, unsigned int, unsigned long);
+ void          nv_kern_isr_bh(unsigned long);
+-irqreturn_t   nv_kern_isr(int, void *, struct pt_regs *);
++irqreturn_t   nv_kern_isr(int, void *);
+ void          nv_kern_rc_timer(unsigned long);
+ #if defined(NV_PM_SUPPORT_OLD_STYLE_APM)
+ static int    nv_kern_apm_event(struct pm_dev *, pm_request_t, void *);
+@@ -2595,8 +2595,7 @@
+  */
+ irqreturn_t nv_kern_isr(
+     int   irq,
+-    void *arg,
+-    struct pt_regs *regs
++    void *arg
+ )
+ {
+     nv_linux_state_t *nvl = (void *) arg;

@@ -1,0 +1,468 @@
+Index: Python-2.6.5/configure.in
+===================================================================
+--- Python-2.6.5.orig/configure.in
++++ Python-2.6.5/configure.in
+@@ -2694,50 +2694,6 @@ AC_CHECK_LIB(c, inet_aton, [$ac_cv_prog_
+   AC_CHECK_LIB(resolv, inet_aton)
+ )
+ 
+-# On Tru64, chflags seems to be present, but calling it will
+-# exit Python
+-AC_CACHE_CHECK([for chflags], [ac_cv_have_chflags], [dnl
+-AC_TRY_RUN([[
+-#include <sys/stat.h>
+-#include <unistd.h>
+-int main(int argc, char*argv[])
+-{
+-  if(chflags(argv[0], 0) != 0)
+-    return 1;
+-  return 0;
+-}
+-]], ac_cv_have_chflags=yes,
+-   ac_cv_have_chflags=no,
+-   ac_cv_have_chflags=cross)
+-])
+-if test "$ac_cv_have_chflags" = cross ; then
+-  AC_CHECK_FUNC([chflags], [ac_cv_have_chflags="yes"], [ac_cv_have_chflags="no"])
+-fi
+-if test "$ac_cv_have_chflags" = yes ; then
+-  AC_DEFINE(HAVE_CHFLAGS, 1, Define to 1 if you have the `chflags' function.)
+-fi
+-
+-AC_CACHE_CHECK([for lchflags], [ac_cv_have_lchflags], [dnl
+-AC_TRY_RUN([[
+-#include <sys/stat.h>
+-#include <unistd.h>
+-int main(int argc, char*argv[])
+-{
+-  if(lchflags(argv[0], 0) != 0)
+-    return 1;
+-  return 0;
+-}
+-]], ac_cv_have_lchflags=yes,
+-   ac_cv_have_lchflags=no,
+-   ac_cv_have_lchflags=cross)
+-])
+-if test "$ac_cv_have_lchflags" = cross ; then
+-  AC_CHECK_FUNC([lchflags], [ac_cv_have_lchflags="yes"], [ac_cv_have_lchflags="no"])
+-fi
+-if test "$ac_cv_have_lchflags" = yes ; then
+-  AC_DEFINE(HAVE_LCHFLAGS, 1, Define to 1 if you have the `lchflags' function.)
+-fi
+-
+ dnl Check if system zlib has *Copy() functions
+ dnl
+ dnl On MacOSX the linker will search for dylibs on the entire linker path
+@@ -2985,11 +2941,11 @@ main()
+ AC_MSG_RESULT(good)
+ buggygetaddrinfo=no,
+ AC_MSG_RESULT(buggy)
+-buggygetaddrinfo=yes,
++buggygetaddrinfo=no,
+ AC_MSG_RESULT(buggy)
+-buggygetaddrinfo=yes)], [
++buggygetaddrinfo=no)], [
+ AC_MSG_RESULT(no)
+-buggygetaddrinfo=yes
++buggygetaddrinfo=no
+ ])
+ 
+ if test "$buggygetaddrinfo" = "yes"; then
+@@ -3841,48 +3797,9 @@ else
+   AC_MSG_RESULT(no)
+ fi
+ 
+-AC_MSG_CHECKING(for %zd printf() format support)
+-AC_TRY_RUN([#include <stdio.h>
+-#include <stddef.h>
+-#include <string.h>
+-
+-#ifdef HAVE_SYS_TYPES_H
+-#include <sys/types.h>
+-#endif
+-
+-#ifdef HAVE_SSIZE_T
+-typedef ssize_t Py_ssize_t;
+-#elif SIZEOF_VOID_P == SIZEOF_LONG
+-typedef long Py_ssize_t;
+-#else
+-typedef int Py_ssize_t;
+-#endif
+-
+-int main()
+-{
+-    char buffer[256];
+-
+-    if(sprintf(buffer, "%zd", (size_t)123) < 0)
+-       	return 1;
+-
+-    if (strcmp(buffer, "123"))
+-	return 1;
+-
+-    if (sprintf(buffer, "%zd", (Py_ssize_t)-123) < 0)
+-       	return 1;
+-
+-    if (strcmp(buffer, "-123"))
+-	return 1;
+-
+-    return 0;
+-}],
+-[AC_MSG_RESULT(yes)
+- AC_DEFINE(PY_FORMAT_SIZE_T, "z", [Define to printf format modifier for Py_ssize_t])],
+- AC_MSG_RESULT(no))
+-
+ AC_CHECK_TYPE(socklen_t,,
+   AC_DEFINE(socklen_t,int,
+-            Define to `int' if <sys/socket.h> does not define.),[
++            Define to 'int' if <sys/socket.h> does not define.),[
+ #ifdef HAVE_SYS_TYPES_H
+ #include <sys/types.h>
+ #endif
+Index: Python-2.6.5/Makefile.pre.in
+===================================================================
+--- Python-2.6.5.orig/Makefile.pre.in
++++ Python-2.6.5/Makefile.pre.in
+@@ -175,6 +175,7 @@ UNICODE_OBJS=   @UNICODE_OBJS@
+ 
+ PYTHON=		python$(EXE)
+ BUILDPYTHON=	python$(BUILDEXE)
++HOSTPYTHON=     ./$(BUILDPYTHON)
+ 
+ # The task to run while instrument when building the profile-opt target
+ PROFILE_TASK=	$(srcdir)/Tools/pybench/pybench.py -n 2 --with-gc --with-syscheck
+@@ -206,6 +207,8 @@ GRAMMAR_INPUT=	$(srcdir)/Grammar/Grammar
+ # Parser
+ PGEN=		Parser/pgen$(EXE)
+ 
++HOSTPGEN=   $(PGEN)
++
+ POBJS=		\
+ 		Parser/acceler.o \
+ 		Parser/grammar1.o \
+@@ -394,8 +397,8 @@ platform: $(BUILDPYTHON)
+ # Build the shared modules
+ sharedmods: $(BUILDPYTHON)
+ 	@case $$MAKEFLAGS in \
+-	*s*) $(RUNSHARED) CC='$(CC)' LDSHARED='$(BLDSHARED)' OPT='$(OPT)' ./$(BUILDPYTHON) -E $(srcdir)/setup.py -q build;; \
+-	*) $(RUNSHARED) CC='$(CC)' LDSHARED='$(BLDSHARED)' OPT='$(OPT)' ./$(BUILDPYTHON) -E $(srcdir)/setup.py build;; \
++	*s*) $(RUNSHARED) CC='$(CC)' LDSHARED='$(BLDSHARED)' OPT='$(OPT)' $(HOSTPYTHON) -E $(srcdir)/setup.py -q build;; \
++	*) $(RUNSHARED) CC='$(CC)' LDSHARED='$(BLDSHARED)' OPT='$(OPT)' $(HOSTPYTHON) -E $(srcdir)/setup.py build;; \
+ 	esac
+ 
+ # Build static library
+@@ -517,7 +520,7 @@ Modules/python.o: $(srcdir)/Modules/pyth
+ 
+ $(GRAMMAR_H) $(GRAMMAR_C): $(PGEN) $(GRAMMAR_INPUT)
+ 		-@$(INSTALL) -d Include
+-		-$(PGEN) $(GRAMMAR_INPUT) $(GRAMMAR_H) $(GRAMMAR_C)
++		-$(HOSTPGEN) $(GRAMMAR_INPUT) $(GRAMMAR_H) $(GRAMMAR_C)
+ 
+ $(PGEN):	$(PGENOBJS)
+ 		$(CC) $(OPT) $(LDFLAGS) $(PGENOBJS) $(LIBS) -o $(PGEN)
+@@ -983,7 +986,8 @@ libainstall:	all
+ # Install the dynamically loadable modules
+ # This goes into $(exec_prefix)
+ sharedinstall:
+-	$(RUNSHARED) ./$(BUILDPYTHON) -E $(srcdir)/setup.py install \
++	CC='$(CC)' LDSHARED='$(BLDSHARED)' OPT='$(OPT)' CROSS_COMPILE='$(CROSS_COMPILE)' \
++	$(RUNSHARED) $(HOSTPYTHON) -E $(srcdir)/setup.py install \
+ 	   	--prefix=$(prefix) \
+ 		--install-scripts=$(BINDIR) \
+ 		--install-platlib=$(DESTSHARED) \
+Index: Python-2.6.5/setup.py
+===================================================================
+--- Python-2.6.5.orig/setup.py
++++ Python-2.6.5/setup.py
+@@ -281,6 +281,11 @@ class PyBuildExt(build_ext):
+         ext_filename = os.path.join(
+             self.build_lib,
+             self.get_ext_filename(self.get_ext_fullname(ext.name)))
++
++        if os.environ["BUILD"] != os.environ["TARGET"]:
++            print "Cross compiled module: [%s]" % ext.name
++            return
++
+         try:
+             imp.load_dynamic(ext.name, ext_filename)
+         except ImportError, why:
+@@ -358,11 +363,10 @@ class PyBuildExt(build_ext):
+                     for directory in reversed(options.dirs):
+                         add_dir_to_list(dir_list, directory)
+ 
+-        if os.path.normpath(sys.prefix) != '/usr':
+-            add_dir_to_list(self.compiler.library_dirs,
+-                            sysconfig.get_config_var("LIBDIR"))
+-            add_dir_to_list(self.compiler.include_dirs,
+-                            sysconfig.get_config_var("INCLUDEDIR"))
++        add_dir_to_list(self.compiler.library_dirs,
++                        sysconfig.get_config_var("LIBDIR"))
++        add_dir_to_list(self.compiler.include_dirs,
++                        sysconfig.get_config_var("INCLUDEDIR"))
+ 
+         try:
+             have_unicode = unicode
+@@ -372,11 +376,8 @@ class PyBuildExt(build_ext):
+         # lib_dirs and inc_dirs are used to search for files;
+         # if a file is found in one of those directories, it can
+         # be assumed that no additional -I,-L directives are needed.
+-        lib_dirs = self.compiler.library_dirs + [
+-            '/lib64', '/usr/lib64',
+-            '/lib', '/usr/lib',
+-            ]
+-        inc_dirs = self.compiler.include_dirs + ['/usr/include']
++        lib_dirs = self.compiler.library_dirs
++        inc_dirs = self.compiler.include_dirs
+         exts = []
+         missing = []
+ 
+@@ -598,8 +599,7 @@ class PyBuildExt(build_ext):
+                 readline_libs.append('ncurses')
+             elif self.compiler.find_library_file(lib_dirs, 'curses'):
+                 readline_libs.append('curses')
+-            elif self.compiler.find_library_file(lib_dirs +
+-                                               ['/usr/lib/termcap'],
++            elif self.compiler.find_library_file(lib_dirs,
+                                                'termcap'):
+                 readline_libs.append('termcap')
+             exts.append( Extension('readline', ['readline.c'],
+@@ -627,22 +627,17 @@ class PyBuildExt(build_ext):
+         exts.append( Extension('_socket', ['socketmodule.c'],
+                                depends = ['socketmodule.h']) )
+         # Detect SSL support for the socket module (via _ssl)
+-        search_for_ssl_incs_in = [
+-                              '/usr/local/ssl/include',
+-                              '/usr/contrib/ssl/include/'
+-                             ]
++        search_for_ssl_incs_in = [ '%s/usr/include/openssl' % os.environ["SYSROOT"], ]
++
+         ssl_incs = find_file('openssl/ssl.h', inc_dirs,
+-                             search_for_ssl_incs_in
+-                             )
++                             search_for_ssl_incs_in )
+         if ssl_incs is not None:
+             krb5_h = find_file('krb5.h', inc_dirs,
+-                               ['/usr/kerberos/include'])
++                               ['%s/usr/include/kerberos' % os.environ["SYSROOT"], ] )
+             if krb5_h:
+                 ssl_incs += krb5_h
+         ssl_libs = find_library_file(self.compiler, 'ssl',lib_dirs,
+-                                     ['/usr/local/ssl/lib',
+-                                      '/usr/contrib/ssl/lib/'
+-                                     ] )
++                                     ['%s/usr/lib/' % os.environ["SYSROOT"], ] )
+ 
+         if (ssl_incs is not None and
+             ssl_libs is not None):
+@@ -719,69 +714,18 @@ class PyBuildExt(build_ext):
+         # a release.  Most open source OSes come with one or more
+         # versions of BerkeleyDB already installed.
+ 
+-        max_db_ver = (4, 7)
+-        min_db_ver = (3, 3)
+-        db_setup_debug = False   # verbose debug prints from this script?
+-
+-        def allow_db_ver(db_ver):
+-            """Returns a boolean if the given BerkeleyDB version is acceptable.
+-
+-            Args:
+-              db_ver: A tuple of the version to verify.
+-            """
+-            if not (min_db_ver <= db_ver <= max_db_ver):
+-                return False
+-            # Use this function to filter out known bad configurations.
+-            if (4, 6) == db_ver[:2]:
+-                # BerkeleyDB 4.6.x is not stable on many architectures.
+-                arch = platform_machine()
+-                if arch not in ('i386', 'i486', 'i586', 'i686',
+-                                'x86_64', 'ia64'):
+-                    return False
+-            return True
+-
+-        def gen_db_minor_ver_nums(major):
+-            if major == 4:
+-                for x in range(max_db_ver[1]+1):
+-                    if allow_db_ver((4, x)):
+-                        yield x
+-            elif major == 3:
+-                for x in (3,):
+-                    if allow_db_ver((3, x)):
+-                        yield x
+-            else:
+-                raise ValueError("unknown major BerkeleyDB version", major)
++        max_db_ver = (4, 6, 7)
++        db_setup_debug = True   # verbose debug prints from this script?
+ 
+         # construct a list of paths to look for the header file in on
+         # top of the normal inc_dirs.
+         db_inc_paths = [
+-            '/usr/include/db4',
+-            '/usr/local/include/db4',
+-            '/opt/sfw/include/db4',
+-            '/usr/include/db3',
+-            '/usr/local/include/db3',
+-            '/opt/sfw/include/db3',
+-            # Fink defaults (http://fink.sourceforge.net/)
+-            '/sw/include/db4',
+-            '/sw/include/db3',
++            '%s/usr/include/' % os.environ["SYSROOT"],
+         ]
+         # 4.x minor number specific paths
+-        for x in gen_db_minor_ver_nums(4):
+-            db_inc_paths.append('/usr/include/db4%d' % x)
+-            db_inc_paths.append('/usr/include/db4.%d' % x)
+-            db_inc_paths.append('/usr/local/BerkeleyDB.4.%d/include' % x)
+-            db_inc_paths.append('/usr/local/include/db4%d' % x)
+-            db_inc_paths.append('/pkg/db-4.%d/include' % x)
+-            db_inc_paths.append('/opt/db-4.%d/include' % x)
+-            # MacPorts default (http://www.macports.org/)
+-            db_inc_paths.append('/opt/local/include/db4%d' % x)
+-        # 3.x minor number specific paths
+-        for x in gen_db_minor_ver_nums(3):
+-            db_inc_paths.append('/usr/include/db3%d' % x)
+-            db_inc_paths.append('/usr/local/BerkeleyDB.3.%d/include' % x)
+-            db_inc_paths.append('/usr/local/include/db3%d' % x)
+-            db_inc_paths.append('/pkg/db-3.%d/include' % x)
+-            db_inc_paths.append('/opt/db-3.%d/include' % x)
++        for x in max_db_ver:
++            db_inc_paths.append('%s/usr/include/db4%d' % (os.environ["SYSROOT"], x))
++            db_inc_paths.append('%s/usr/include/db4.%d' % (os.environ["SYSROOT"], x))
+ 
+         # Add some common subdirectories for Sleepycat DB to the list,
+         # based on the standard include directories. This way DB3/4 gets
+@@ -789,14 +733,10 @@ class PyBuildExt(build_ext):
+         # the user has added that prefix into inc_dirs.
+         std_variants = []
+         for dn in inc_dirs:
+-            std_variants.append(os.path.join(dn, 'db3'))
+             std_variants.append(os.path.join(dn, 'db4'))
+-            for x in gen_db_minor_ver_nums(4):
++            for x in max_db_ver:
+                 std_variants.append(os.path.join(dn, "db4%d"%x))
+                 std_variants.append(os.path.join(dn, "db4.%d"%x))
+-            for x in gen_db_minor_ver_nums(3):
+-                std_variants.append(os.path.join(dn, "db3%d"%x))
+-                std_variants.append(os.path.join(dn, "db3.%d"%x))
+ 
+         db_inc_paths = std_variants + db_inc_paths
+         db_inc_paths = [p for p in db_inc_paths if os.path.exists(p)]
+@@ -828,8 +768,7 @@ class PyBuildExt(build_ext):
+                                 print "being ignored (4.6.x must be >= 4.6.21)"
+                                 continue
+ 
+-                        if ( (db_ver not in db_ver_inc_map) and
+-                            allow_db_ver(db_ver) ):
++                        if db_ver not in db_ver_inc_map:
+                             # save the include directory with the db.h version
+                             # (first occurrence only)
+                             db_ver_inc_map[db_ver] = d
+@@ -1608,22 +1547,6 @@ class PyBuildExt(build_ext):
+             if dir not in include_dirs:
+                 include_dirs.append(dir)
+ 
+-        # Check for various platform-specific directories
+-        if platform == 'sunos5':
+-            include_dirs.append('/usr/openwin/include')
+-            added_lib_dirs.append('/usr/openwin/lib')
+-        elif os.path.exists('/usr/X11R6/include'):
+-            include_dirs.append('/usr/X11R6/include')
+-            added_lib_dirs.append('/usr/X11R6/lib64')
+-            added_lib_dirs.append('/usr/X11R6/lib')
+-        elif os.path.exists('/usr/X11R5/include'):
+-            include_dirs.append('/usr/X11R5/include')
+-            added_lib_dirs.append('/usr/X11R5/lib')
+-        else:
+-            # Assume default location for X11
+-            include_dirs.append('/usr/X11/include')
+-            added_lib_dirs.append('/usr/X11/lib')
+-
+         # If Cygwin, then verify that X is installed before proceeding
+         if platform == 'cygwin':
+             x11_inc = find_file('X11/Xlib.h', [], include_dirs)
+@@ -1718,16 +1641,17 @@ class PyBuildExt(build_ext):
+                                          ffi_configfile):
+                 from distutils.dir_util import mkpath
+                 mkpath(ffi_builddir)
+-                config_args = []
++                config_args = [ "--host=%s" % os.environ["BUILD"], 
++                                "--target=%s" % os.environ["TARGET"] ]
+ 
+                 # Pass empty CFLAGS because we'll just append the resulting
+                 # CFLAGS to Python's; -g or -O2 is to be avoided.
+-                cmd = "cd %s && env CFLAGS='' '%s/configure' %s" \
+-                      % (ffi_builddir, ffi_srcdir, " ".join(config_args))
++                cmd = "(cd %s && autoconf -W cross) && (cd %s && env CFLAGS='' '%s/configure' %s)" \
++                      % (ffi_srcdir, ffi_builddir, ffi_srcdir, " ".join(config_args))
+ 
+                 res = os.system(cmd)
+                 if res or not os.path.exists(ffi_configfile):
+-                    print "Failed to configure _ctypes module"
++                    print "Failed to configure _ctypes module (res=%d) or missing conffile=%s" % ( res, ffi_configfile )
+                     return False
+ 
+             fficonfig = {}
+Index: Python-2.6.5/Python/compile.c
+===================================================================
+--- Python-2.6.5.orig/Python/compile.c
++++ Python-2.6.5/Python/compile.c
+@@ -32,7 +32,7 @@
+ #include "symtable.h"
+ #include "opcode.h"
+ 
+-int Py_OptimizeFlag = 0;
++int Py_OptimizeFlag = 1;
+ 
+ #define DEFAULT_BLOCK_SIZE 16
+ #define DEFAULT_BLOCKS 8
+Index: Python-2.6.5/Lib/distutils/command/build_ext.py
+===================================================================
+--- Python-2.6.5.orig/Lib/distutils/command/build_ext.py
++++ Python-2.6.5/Lib/distutils/command/build_ext.py
+@@ -531,7 +531,7 @@ class build_ext (Command):
+             target_lang=language)
+ 
+ 
+-    def swig_sources (self, sources, extension):
++    def swig_sources (self, sources, extension=None):
+ 
+         """Walk the list of source files in 'sources', looking for SWIG
+         interface (.i) files.  Run SWIG on all that are found, and
+Index: Python-2.6.5/Lib/distutils/command/build_scripts.py
+===================================================================
+--- Python-2.6.5.orig/Lib/distutils/command/build_scripts.py
++++ Python-2.6.5/Lib/distutils/command/build_scripts.py
+@@ -87,7 +87,7 @@ class build_scripts (Command):
+                     continue
+ 
+                 match = first_line_re.match(first_line)
+-                if match:
++                if False: #match:
+                     adjust = 1
+                     post_interp = match.group(1) or ''
+ 
+Index: Python-2.6.5/Lib/distutils/unixccompiler.py
+===================================================================
+--- Python-2.6.5.orig/Lib/distutils/unixccompiler.py
++++ Python-2.6.5/Lib/distutils/unixccompiler.py
+@@ -312,6 +312,8 @@ class UnixCCompiler(CCompiler):
+         dylib_f = self.library_filename(lib, lib_type='dylib')
+         static_f = self.library_filename(lib, lib_type='static')
+ 
++        print "Looking in %s for %s" % (lib, dirs)
++
+         for dir in dirs:
+             shared = os.path.join(dir, shared_f)
+             dylib = os.path.join(dir, dylib_f)
+@@ -321,10 +323,13 @@ class UnixCCompiler(CCompiler):
+             # assuming that *all* Unix C compilers do.  And of course I'm
+             # ignoring even GCC's "-static" option.  So sue me.
+             if os.path.exists(dylib):
++                print "Found %s" % (dylib)
+                 return dylib
+             elif os.path.exists(shared):
++                print "Found %s" % (shared)
+                 return shared
+             elif os.path.exists(static):
++                print "Found %s" % (static)
+                 return static
+ 
+         # Oops, didn't find it in *any* of 'dirs'

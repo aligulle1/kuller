@@ -1,0 +1,1062 @@
+diff -r d2eb5fad9242 -r 784805591fa2 docs/src/user.tex
+--- a/docs/src/user.tex	Fri Apr 25 14:03:39 2008 +0100
++++ b/docs/src/user.tex	Tue May 13 15:54:31 2008 +0100
+@@ -2459,9 +2459,7 @@
+ file. Please refer to Section~\ref{subsection:acmlabelmanageddomains}
+ if you are using managed domains.
+ 
+-The following configuration file defines \verb|domain1|
+-(Note: www.jailtime.org or www.xen-get.org might be good
+-places to look for example domU images):
++The following configuration file defines \verb|domain1|:
+ 
+ \begin{scriptsize}
+ \begin{verbatim}
+diff -r d2eb5fad9242 -r 784805591fa2 tools/ioemu/block.c
+--- a/tools/ioemu/block.c	Fri Apr 25 14:03:39 2008 +0100
++++ b/tools/ioemu/block.c	Tue May 13 15:54:31 2008 +0100
+@@ -250,7 +250,7 @@
+ #endif
+     p = strchr(filename, ':');
+     if (!p)
+-        return &bdrv_raw;
++        return NULL; /* do not ever guess raw, it is a security problem! */
+     len = p - filename;
+     if (len > sizeof(protocol) - 1)
+         len = sizeof(protocol) - 1;
+diff -r d2eb5fad9242 -r 784805591fa2 tools/ioemu/hw/xenfb.c
+--- a/tools/ioemu/hw/xenfb.c	Fri Apr 25 14:03:39 2008 +0100
++++ b/tools/ioemu/hw/xenfb.c	Tue May 13 15:54:31 2008 +0100
+@@ -22,8 +22,6 @@
+ #ifndef BTN_LEFT
+ #define BTN_LEFT 0x110 /* from <linux/input.h> */
+ #endif
+-
+-// FIXME defend against malicious frontend?
+ 
+ struct xenfb;
+ 
+@@ -476,6 +474,50 @@
+ 	free(xenfb);
+ }
+ 
++static int xenfb_configure_fb(struct xenfb *xenfb,
++			      int width, int height, int depth,
++			      size_t fb_len, int row_stride)
++{
++	size_t mfn_sz = sizeof(*((struct xenfb_page *)0)->pd);
++	size_t pd_len = sizeof(((struct xenfb_page *)0)->pd) / mfn_sz;
++	size_t fb_pages = pd_len * XC_PAGE_SIZE / mfn_sz;
++	size_t fb_len_max = fb_pages * XC_PAGE_SIZE;
++	int max_width, max_height;
++
++	if (depth != 8 && depth != 16 && depth != 24 && depth != 32) {
++		fprintf(stderr,
++			"FB: can't handle frontend fb depth %d\n",
++			depth);
++		return -1;
++	}
++	if (row_stride < 0 || row_stride > fb_len) {
++		fprintf(stderr,
++			"FB: invalid frontend stride %d\n", row_stride);
++		return -1;
++	}
++	max_width = row_stride / (depth / 8);
++	if (width < 0 || width > max_width) {
++		fprintf(stderr,
++			"FB: invalid frontend width %d limited to %d\n",
++			width, max_width);
++		width = max_width;
++	}
++	max_height = fb_len / row_stride;
++	if (height < 0 || height > max_height) {
++		fprintf(stderr,
++			"FB: invalid frontend height %d limited to %d\n",
++			height, max_height);
++		height = max_height;
++	}
++	xenfb->fb_len = fb_len;
++	xenfb->row_stride = row_stride;
++	xenfb->depth = depth;
++	xenfb->width = width;
++	xenfb->height = height;
++	fprintf(stderr, "Framebuffer %dx%dx%d stride %d\n",
++		width, height, depth, row_stride);
++	return 0;
++}
+ 
+ static void xenfb_on_fb_event(struct xenfb *xenfb)
+ {
+@@ -506,7 +548,6 @@
+ 			    || h != event->update.height) {
+ 				fprintf(stderr, "%s bogus update clipped\n",
+ 					xenfb->fb.nodename);
+-				break;
+ 			}
+ 			xenfb_guest_copy(xenfb, x, y, w, h);
+ 			break;
+@@ -686,14 +727,15 @@
+                 xenfb->protocol[0] = '\0';
+         xenfb_xs_printf(xenfb->xsh, xenfb->fb.nodename, "request-update", "1");
+ 
+-        /* TODO check for permitted ranges */
+-        fb_page = xenfb->fb.page;
+-        xenfb->depth = fb_page->depth;
+-        xenfb->width = fb_page->width;
+-        xenfb->height = fb_page->height;
+-        /* TODO check for consistency with the above */
+-        xenfb->fb_len = fb_page->mem_length;
+-        xenfb->row_stride = fb_page->line_length;
++	fb_page = xenfb->fb.page;
++	if (xenfb_configure_fb(xenfb,
++			       fb_page->width, fb_page->height, fb_page->depth,
++			       fb_page->mem_length, fb_page->line_length)
++	    < 0) {
++		errno = EINVAL;
++		return -1;
++	}
++
+         fprintf(stderr, "Framebuffer depth %d width %d height %d line %d\n",
+                 fb_page->depth, fb_page->width, fb_page->height, fb_page->line_length);
+         if (xenfb_map_fb(xenfb, xenfb->fb.otherend_id) < 0)
+diff -r d2eb5fad9242 -r 784805591fa2 tools/ioemu/xenstore.c
+--- a/tools/ioemu/xenstore.c	Fri Apr 25 14:03:39 2008 +0100
++++ b/tools/ioemu/xenstore.c	Tue May 13 15:54:31 2008 +0100
+@@ -86,6 +86,7 @@
+     int i, is_scsi, is_hdN = 0;
+     unsigned int len, num, hd_index;
+     BlockDriverState *bs;
++    BlockDriver *format;
+ 
+     for(i = 0; i < MAX_DISKS + MAX_SCSI_DISKS; i++)
+         media_filename[i] = NULL;
+@@ -131,6 +132,8 @@
+     }
+         
+     for (i = 0; i < num; i++) {
++	format = NULL; /* don't know what the format is yet */
++
+         /* read the backend path */
+         if (pasprintf(&buf, "%s/device/vbd/%s/backend", path, e[i]) == -1)
+             continue;
+@@ -177,13 +180,20 @@
+         drv = xs_read(xsh, XBT_NULL, buf, &len);
+         if (drv == NULL)
+             continue;
+-        /* Strip off blktap sub-type prefix aio: - QEMU can autodetect this */
++        /* Obtain blktap sub-type prefix */
+         if (!strcmp(drv, "tap") && params[0]) {
+             char *offset = strchr(params, ':'); 
+             if (!offset)
+                 continue ;
++	    free(drv);
++	    drv = malloc(offset - params + 1);
++	    memcpy(drv, params, offset - params);
++	    drv[offset - params] = '\0';
++	    if (!strcmp(drv, "aio"))
++		/* qemu does aio anyway if it can */
++		format = &bdrv_raw;
+             memmove(params, offset+1, strlen(offset+1)+1 );
+-            fprintf(logfile, "Strip off blktap sub-type prefix to %s\n", params); 
++            fprintf(logfile, "Strip off blktap sub-type prefix to %s (drv '%s')\n", params, drv); 
+         }
+         /* Prefix with /dev/ if needed */
+         if (!strcmp(drv, "phy") && params[0] != '/') {
+@@ -191,6 +201,7 @@
+             sprintf(newparams, "/dev/%s", params);
+             free(params);
+             params = newparams;
++	    format = &bdrv_raw;
+         }
+ 
+         /* 
+@@ -227,9 +238,25 @@
+ 
+         /* open device now if media present */
+         if (params[0]) {
+-            if (bdrv_open(bs, params, 0 /* snapshot */) < 0)
+-                fprintf(stderr, "qemu: could not open hard disk image '%s'\n",
+-                        params);
++	    if (!format) {
++		if (!drv) {
++		    fprintf(stderr, "qemu: type (image format) not specified for vbd '%s' or image '%s'\n", buf, params);
++		    continue;
++		}
++		if (!strcmp(drv,"qcow")) {
++		    /* autoguess qcow vs qcow2 */
++		} else if (!strcmp(drv,"file")) {
++		    format = &bdrv_raw;
++		} else {
++		    format = bdrv_find_format(drv);
++		    if (!format) {
++			fprintf(stderr, "qemu: type (image format) '%s' unknown for vbd '%s' or image '%s'\n", drv, buf, params);
++			continue;
++		    }
++		}
++	    }
++            if (bdrv_open2(bs, params, 0 /* snapshot */, format) < 0)
++                fprintf(stderr, "qemu: could not open vbd '%s' or hard disk image '%s' (drv '%s')\n", buf, params, drv ? drv : "?");
+         }
+     }
+ 
+diff -r d2eb5fad9242 -r 784805591fa2 tools/libxc/xc_pagetab.c
+--- a/tools/libxc/xc_pagetab.c	Fri Apr 25 14:03:39 2008 +0100
++++ b/tools/libxc/xc_pagetab.c	Tue May 13 15:54:31 2008 +0100
+@@ -141,7 +141,7 @@
+ 
+     /* Page Table */
+ 
+-    if (pde & 0x00000008) { /* 4M page (or 2M in PAE mode) */
++    if (pde & 0x00000080) { /* 4M page (or 2M in PAE mode) */
+         DPRINTF("Cannot currently cope with 2/4M pages\n");
+         exit(-1);
+     } else { /* 4k page */
+diff -r d2eb5fad9242 -r 784805591fa2 tools/python/xen/xend/XendCheckpoint.py
+--- a/tools/python/xen/xend/XendCheckpoint.py	Fri Apr 25 14:03:39 2008 +0100
++++ b/tools/python/xen/xend/XendCheckpoint.py	Tue May 13 15:54:31 2008 +0100
+@@ -67,8 +67,6 @@
+     # thing is useful for debugging.
+     dominfo.setName('migrating-' + domain_name)
+ 
+-    done_suspend = 0
+-
+     try:
+         dominfo.migrateDevices(network, dst, DEV_MIGRATE_STEP1, domain_name)
+ 
+@@ -96,7 +94,6 @@
+                 log.debug("Suspending %d ...", dominfo.getDomid())
+                 dominfo.shutdown('suspend')
+                 dominfo.waitForShutdown()
+-                done_suspend = 1
+                 dominfo.migrateDevices(network, dst, DEV_MIGRATE_STEP2,
+                                        domain_name)
+                 log.info("Domain %d suspended.", dominfo.getDomid())
+@@ -140,16 +137,9 @@
+             pass
+ 
+     except Exception, exn:
+-        log.exception("Save failed on domain %s (%s).", domain_name,
++        log.exception("Save failed on domain %s (%s) - resuming.", domain_name,
+                       dominfo.getDomid())
+-        
+-        # If we didn't get as far as suspending the domain (for
+-        # example, we couldn't balloon enough memory for the new
+-        # domain), then we don't want to re-plumb the devices, as the
+-        # domU will not be expecting it.
+-        if done_suspend:
+-            log.debug("XendCheckpoint.save: resumeDomain")
+-            dominfo.resumeDomain()
++        dominfo.resumeDomain()
+  
+         try:
+             dominfo.setName(domain_name)
+diff -r d2eb5fad9242 -r 784805591fa2 tools/python/xen/xend/XendDomain.py
+--- a/tools/python/xen/xend/XendDomain.py	Fri Apr 25 14:03:39 2008 +0100
++++ b/tools/python/xen/xend/XendDomain.py	Tue May 13 15:54:31 2008 +0100
+@@ -1296,8 +1296,10 @@
+ 
+         sock.send("receive\n")
+         sock.recv(80)
+-        XendCheckpoint.save(sock.fileno(), dominfo, True, live, dst)
+-        sock.close()
++        try:
++            XendCheckpoint.save(sock.fileno(), dominfo, True, live, dst)
++        finally:
++            sock.close()
+ 
+     def domain_save(self, domid, dst, checkpoint=False):
+         """Start saving a domain to file.
+diff -r d2eb5fad9242 -r 784805591fa2 tools/python/xen/xend/XendDomainInfo.py
+--- a/tools/python/xen/xend/XendDomainInfo.py	Fri Apr 25 14:03:39 2008 +0100
++++ b/tools/python/xen/xend/XendDomainInfo.py	Tue May 13 15:54:31 2008 +0100
+@@ -1935,8 +1935,19 @@
+     def resumeDomain(self):
+         log.debug("XendDomainInfo.resumeDomain(%s)", str(self.domid))
+ 
+-        if self.domid is None:
++        # resume a suspended domain (e.g. after live checkpoint, or after
++        # a later error during save or migate); checks that the domain
++        # is currently suspended first so safe to call from anywhere
++
++        xeninfo = dom_get(self.domid)
++        if xeninfo is None: 
+             return
++        if not xeninfo['shutdown']:
++            return
++        reason = shutdown_reason(xeninfo['shutdown_reason'])
++        if reason != 'suspend':
++            return
++
+         try:
+             # could also fetch a parsed note from xenstore
+             fast = self.info.get_notes().get('SUSPEND_CANCEL') and 1 or 0
+diff -r d2eb5fad9242 -r 784805591fa2 tools/vtpm/Makefile
+--- a/tools/vtpm/Makefile	Fri Apr 25 14:03:39 2008 +0100
++++ b/tools/vtpm/Makefile	Tue May 13 15:54:31 2008 +0100
+@@ -83,7 +83,7 @@
+ 
+ .PHONY: build_sub
+ build_sub:
+-	set -e; @if [ -e $(GMP_HEADER) ]; then \
++	set -e; if [ -e $(GMP_HEADER) ]; then \
+ 		$(MAKE) -C $(VTPM_DIR); \
+ 		if [ "$(BUILD_EMULATOR)" = "y" ]; then \
+ 			$(MAKE) -C $(TPM_EMULATOR_DIR); \
+diff -r d2eb5fad9242 -r 784805591fa2 tools/xenstore/xenstored_core.c
+--- a/tools/xenstore/xenstored_core.c	Fri Apr 25 14:03:39 2008 +0100
++++ b/tools/xenstore/xenstored_core.c	Tue May 13 15:54:31 2008 +0100
+@@ -1915,7 +1915,7 @@
+ 
+ 	/* Main loop. */
+ 	for (;;) {
+-		struct connection *conn, *old_conn;
++		struct connection *conn, *next;
+ 
+ 		if (select(max+1, &inset, &outset, NULL, timeout) < 0) {
+ 			if (errno == EINTR)
+@@ -1939,27 +1939,39 @@
+ 		if (evtchn_fd != -1 && FD_ISSET(evtchn_fd, &inset))
+ 			handle_event();
+ 
+-		conn = list_entry(connections.next, typeof(*conn), list);
+-		while (&conn->list != &connections) {
+-			talloc_increase_ref_count(conn);
++		next = list_entry(connections.next, typeof(*conn), list);
++		while (&next->list != &connections) {
++			conn = next;
++
++			next = list_entry(conn->list.next,
++					  typeof(*conn), list);
+ 
+ 			if (conn->domain) {
++				talloc_increase_ref_count(conn);
+ 				if (domain_can_read(conn))
+ 					handle_input(conn);
++				if (talloc_free(conn) == 0)
++					continue;
++
++				talloc_increase_ref_count(conn);
+ 				if (domain_can_write(conn) &&
+ 				    !list_empty(&conn->out_list))
+ 					handle_output(conn);
++				if (talloc_free(conn) == 0)
++					continue;
+ 			} else {
++				talloc_increase_ref_count(conn);
+ 				if (FD_ISSET(conn->fd, &inset))
+ 					handle_input(conn);
++				if (talloc_free(conn) == 0)
++					continue;
++
++				talloc_increase_ref_count(conn);
+ 				if (FD_ISSET(conn->fd, &outset))
+ 					handle_output(conn);
++				if (talloc_free(conn) == 0)
++					continue;
+ 			}
+-
+-			old_conn = conn;
+-			conn = list_entry(old_conn->list.next,
+-					  typeof(*conn), list);
+-			talloc_free(old_conn);
+ 		}
+ 
+ 		max = initialize_set(&inset, &outset, *sock, *ro_sock,
+diff -r d2eb5fad9242 -r 784805591fa2 xen/arch/x86/domain.c
+--- a/xen/arch/x86/domain.c	Fri Apr 25 14:03:39 2008 +0100
++++ b/xen/arch/x86/domain.c	Tue May 13 15:54:31 2008 +0100
+@@ -135,16 +135,16 @@
+     {
+         list_for_each_entry ( page, &d->page_list, list )
+         {
+-            printk("    DomPage %p: mfn=%p, caf=%08x, taf=%" PRtype_info "\n",
+-                   _p(page_to_maddr(page)), _p(page_to_mfn(page)),
++            printk("    DomPage %p: caf=%08x, taf=%" PRtype_info "\n",
++                   _p(page_to_mfn(page)),
+                    page->count_info, page->u.inuse.type_info);
+         }
+     }
+ 
+     list_for_each_entry ( page, &d->xenpage_list, list )
+     {
+-        printk("    XenPage %p: mfn=%p, caf=%08x, taf=%" PRtype_info "\n",
+-               _p(page_to_maddr(page)), _p(page_to_mfn(page)),
++        printk("    XenPage %p: caf=%08x, taf=%" PRtype_info "\n",
++               _p(page_to_mfn(page)),
+                page->count_info, page->u.inuse.type_info);
+     }
+ }
+diff -r d2eb5fad9242 -r 784805591fa2 xen/arch/x86/hvm/hvm.c
+--- a/xen/arch/x86/hvm/hvm.c	Fri Apr 25 14:03:39 2008 +0100
++++ b/xen/arch/x86/hvm/hvm.c	Tue May 13 15:54:31 2008 +0100
+@@ -371,14 +371,14 @@
+          ((ctxt.cr0 & (X86_CR0_PE|X86_CR0_PG)) == X86_CR0_PG) )
+     {
+         gdprintk(XENLOG_ERR, "HVM restore: bad CR0 0x%"PRIx64"\n",
+-                 ctxt.msr_efer);
++                 ctxt.cr0);
+         return -EINVAL;
+     }
+ 
+     if ( ctxt.cr4 & HVM_CR4_GUEST_RESERVED_BITS )
+     {
+         gdprintk(XENLOG_ERR, "HVM restore: bad CR4 0x%"PRIx64"\n",
+-                 ctxt.msr_efer);
++                 ctxt.cr4);
+         return -EINVAL;
+     }
+ 
+diff -r d2eb5fad9242 -r 784805591fa2 xen/arch/x86/hvm/i8254.c
+--- a/xen/arch/x86/hvm/i8254.c	Fri Apr 25 14:03:39 2008 +0100
++++ b/xen/arch/x86/hvm/i8254.c	Tue May 13 15:54:31 2008 +0100
+@@ -206,19 +206,21 @@
+ 
+     switch ( s->mode )
+     {
+-        case 2:
+-            /* Periodic timer. */
+-            create_periodic_time(v, &pit->pt0, period, 0, 0, pit_time_fired, 
+-                                 &pit->count_load_time[channel]);
+-            break;
+-        case 1:
+-            /* One-shot timer. */
+-            create_periodic_time(v, &pit->pt0, period, 0, 1, pit_time_fired,
+-                                 &pit->count_load_time[channel]);
+-            break;
+-        default:
+-            destroy_periodic_time(&pit->pt0);
+-            break;
++    case 2:
++    case 3:
++        /* Periodic timer. */
++        create_periodic_time(v, &pit->pt0, period, 0, 0, pit_time_fired, 
++                             &pit->count_load_time[channel]);
++        break;
++    case 1:
++    case 4:
++        /* One-shot timer. */
++        create_periodic_time(v, &pit->pt0, period, 0, 1, pit_time_fired,
++                             &pit->count_load_time[channel]);
++        break;
++    default:
++        destroy_periodic_time(&pit->pt0);
++        break;
+     }
+ }
+ 
+diff -r d2eb5fad9242 -r 784805591fa2 xen/arch/x86/hvm/stdvga.c
+--- a/xen/arch/x86/hvm/stdvga.c	Fri Apr 25 14:03:39 2008 +0100
++++ b/xen/arch/x86/hvm/stdvga.c	Tue May 13 15:54:31 2008 +0100
+@@ -130,14 +130,15 @@
+ 
+     /* When in standard vga mode, emulate here all writes to the vram buffer
+      * so we can immediately satisfy reads without waiting for qemu. */
+-    s->stdvga =
+-        (s->sr[7] == 0x00) &&  /* standard vga mode */
+-        (s->gr[6] == 0x05);    /* misc graphics register w/ MemoryMapSelect=1
+-                                * 0xa0000-0xaffff (64k region), AlphaDis=1 */
++    s->stdvga = (s->sr[7] == 0x00);
+ 
+     if ( !prev_stdvga && s->stdvga )
+     {
+-        s->cache = 1;       /* (re)start caching video buffer */
++        /*
++         * (Re)start caching of video buffer.
++         * XXX TODO: In case of a restart the cache could be unsynced.
++         */
++        s->cache = 1;
+         gdprintk(XENLOG_INFO, "entering stdvga and caching modes\n");
+     }
+     else if ( prev_stdvga && !s->stdvga )
+@@ -181,6 +182,40 @@
+     return 0; /* propagate to external ioemu */
+ }
+ 
++static unsigned int stdvga_mem_offset(
++    struct hvm_hw_stdvga *s, unsigned int mmio_addr)
++{
++    unsigned int memory_map_mode = (s->gr[6] >> 2) & 3;
++    unsigned int offset = mmio_addr & 0x1ffff;
++
++    switch ( memory_map_mode )
++    {
++    case 0:
++        break;
++    case 1:
++        if ( offset >= 0x10000 )
++            goto fail;
++        offset += 0; /* assume bank_offset == 0; */
++        break;
++    case 2:
++        offset -= 0x10000;
++        if ( offset >= 0x8000 )
++            goto fail;
++        break;
++    default:
++    case 3:
++        offset -= 0x18000;
++        if ( offset >= 0x8000 )
++            goto fail;
++        break;
++    }
++
++    return offset;
++
++ fail:
++    return ~0u;
++}
++
+ #define GET_PLANE(data, p) (((data) >> ((p) * 8)) & 0xff)
+ 
+ static uint8_t stdvga_mem_readb(uint64_t addr)
+@@ -190,8 +225,8 @@
+     uint32_t ret, *vram_l;
+     uint8_t *vram_b;
+ 
+-    addr &= 0x1ffff;
+-    if ( addr >= 0x10000 )
++    addr = stdvga_mem_offset(s, addr);
++    if ( addr == ~0u )
+         return 0xff;
+ 
+     if ( s->sr[4] & 0x08 )
+@@ -272,8 +307,8 @@
+     uint32_t write_mask, bit_mask, set_mask, *vram_l;
+     uint8_t *vram_b;
+ 
+-    addr &= 0x1ffff;
+-    if ( addr >= 0x10000 )
++    addr = stdvga_mem_offset(s, addr);
++    if ( addr == ~0u )
+         return;
+ 
+     if ( s->sr[4] & 0x08 )
+@@ -563,7 +598,7 @@
+         register_portio_handler(d, 0x3ce, 2, stdvga_intercept_pio);
+         /* MMIO. */
+         register_buffered_io_handler(
+-            d, 0xa0000, 0x10000, stdvga_intercept_mmio);
++            d, 0xa0000, 0x20000, stdvga_intercept_mmio);
+     }
+ }
+ 
+diff -r d2eb5fad9242 -r 784805591fa2 xen/arch/x86/hvm/svm/emulate.c
+--- a/xen/arch/x86/hvm/svm/emulate.c	Fri Apr 25 14:03:39 2008 +0100
++++ b/xen/arch/x86/hvm/svm/emulate.c	Tue May 13 15:54:31 2008 +0100
+@@ -28,9 +28,6 @@
+ #include <asm/hvm/svm/vmcb.h>
+ #include <asm/hvm/svm/emulate.h>
+ 
+-
+-extern int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip,
+-        int inst_len);
+ 
+ #define REX_PREFIX_BASE 0x40
+ #define REX_X           0x02
+@@ -412,8 +409,8 @@
+  * Intel has a vmcs entry to give the instruction length. AMD doesn't.  So we
+  * have to do a little bit of work to find out... 
+  *
+- * The caller can either pass a NULL pointer to the guest_eip_buf, or a pointer
+- * to enough bytes to satisfy the instruction including prefix bytes.
++ * The caller may supply a buffer of at least MAX_INST_LEN bytes, which
++ * the instruction will be read into.
+  */
+ int __get_instruction_length_from_list(struct vcpu *v,
+         enum instruction_index *list, unsigned int list_count, 
+@@ -425,21 +422,40 @@
+     unsigned int j;
+     int found = 0;
+     enum instruction_index instr = 0;
+-    u8 buffer[MAX_INST_LEN];
++    unsigned long fetch_addr;
++    int fetch_len;
+     u8 *buf;
+     const u8 *opcode = NULL;
++    u8 temp_buffer[MAX_INST_LEN];
+ 
+-    if (guest_eip_buf)
+-    {
+-        buf = guest_eip_buf;
+-    }
+-    else
+-    {
+-        if ( inst_copy_from_guest(buffer, svm_rip2pointer(v), MAX_INST_LEN)
+-             != MAX_INST_LEN )
+-            return 0;
+-        buf = buffer;
+-    }
++    /* Use the stack if the caller didn't give us a buffer */
++    buf = ( guest_eip_buf ) ? guest_eip_buf : temp_buffer;
++
++#define FETCH(_buf, _addr, _len) do                                           \
++    {                                                                         \
++        switch ( hvm_fetch_from_guest_virt((_buf), (_addr), (_len)) )         \
++        {                                                                     \
++        case HVMCOPY_okay:                                                    \
++            break;                                                            \
++        case HVMCOPY_bad_gva_to_gfn:                                          \
++            /* OK just to give up; we'll have injected #PF already */         \
++            return 0;                                                         \
++        case HVMCOPY_bad_gfn_to_mfn:                                          \
++            /* Not OK: fetches from non-RAM pages are not supportable. */     \
++            gdprintk(XENLOG_ERR, "Bad instruction fetch at %#lx (%#lx)\n",    \
++                     (unsigned long) guest_cpu_user_regs()->eip, fetch_addr); \
++            hvm_inject_exception(TRAP_gp_fault, 0, 0);                        \
++            return 0;                                                         \
++        }                                                                     \
++    } while (0)
++
++    /* Fetch up to the next page break; we'll fetch from the next page
++     * later if we have to. */
++    fetch_addr = svm_rip2pointer(v);
++    fetch_len = PAGE_SIZE - (fetch_addr & ~PAGE_MASK) ;
++    if ( fetch_len > MAX_INST_LEN ) 
++        fetch_len = MAX_INST_LEN;
++    FETCH(buf, fetch_addr, fetch_len);
+ 
+     for (j = 0; j < list_count; j++)
+     {
+@@ -450,7 +466,16 @@
+         while (inst_len < MAX_INST_LEN && 
+                 is_prefix(buf[inst_len]) && 
+                 !is_prefix(opcode[1]))
++        {
+             inst_len++;
++            if ( inst_len >= fetch_len ) 
++            { 
++                FETCH(buf + fetch_len, 
++                      fetch_addr + fetch_len, 
++                      MAX_INST_LEN - fetch_len);
++                fetch_len = MAX_INST_LEN;
++            }
++        }
+ 
+         ASSERT(opcode[0] <= 15);    /* Make sure the table is correct. */
+         found = 1;
+@@ -460,6 +485,14 @@
+             /* If the last byte is zero, we just accept it without checking */
+             if (i == opcode[0]-1 && opcode[i+1] == 0)
+                 break;
++
++            if ( inst_len + i >= fetch_len ) 
++            { 
++                FETCH(buf + fetch_len, 
++                      fetch_addr + fetch_len, 
++                      MAX_INST_LEN - fetch_len);
++                fetch_len = MAX_INST_LEN;
++            }
+ 
+             if (buf[inst_len+i] != opcode[i+1])
+             {
+@@ -487,7 +520,11 @@
+ 
+     printk("%s: Mismatch between expected and actual instruction bytes: "
+             "eip = %lx\n",  __func__, (unsigned long)vmcb->rip);
++    hvm_inject_exception(TRAP_gp_fault, 0, 0);
+     return 0;
++
++#undef FETCH
++
+ }
+ 
+ /*
+diff -r d2eb5fad9242 -r 784805591fa2 xen/arch/x86/hvm/svm/svm.c
+--- a/xen/arch/x86/hvm/svm/svm.c	Fri Apr 25 14:03:39 2008 +0100
++++ b/xen/arch/x86/hvm/svm/svm.c	Tue May 13 15:54:31 2008 +0100
+@@ -78,7 +78,10 @@
+ {
+     struct vcpu *curr = current;
+ 
+-    if ( unlikely((inst_len == 0) || (inst_len > 15)) )
++    if ( unlikely(inst_len == 0) )
++        return;
++
++    if ( unlikely(inst_len > 15) )
+     {
+         gdprintk(XENLOG_ERR, "Bad instruction length %u\n", inst_len);
+         domain_crash(curr->domain);
+@@ -1131,18 +1134,28 @@
+ 
+ static int svm_get_prefix_info(struct vcpu *v, unsigned int dir, 
+                                 svm_segment_register_t **seg, 
+-                                unsigned int *asize)
++                                unsigned int *asize,
++                                unsigned int isize)
+ {
+     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+     unsigned char inst[MAX_INST_LEN];
+     int i;
+ 
+     memset(inst, 0, MAX_INST_LEN);
+-    if (inst_copy_from_guest(inst, svm_rip2pointer(v), sizeof(inst)) 
+-        != MAX_INST_LEN) 
++    
++    switch ( hvm_fetch_from_guest_virt(inst, svm_rip2pointer(v), isize) )
+     {
+-        gdprintk(XENLOG_ERR, "get guest instruction failed\n");
+-        return 0;
++        case HVMCOPY_okay:
++            break;
++        case HVMCOPY_bad_gva_to_gfn:
++            /* OK just to give up; we'll have injected #PF already */
++            return 0;
++        case HVMCOPY_bad_gfn_to_mfn:
++            gdprintk(XENLOG_ERR, "Bad prefix fetch at %#lx (%#lx)\n",
++                     (unsigned long) guest_cpu_user_regs()->eip,
++                     svm_rip2pointer(v));
++            domain_crash(v->domain);
++            return 0;
+     }
+ 
+     for (i = 0; i < MAX_INST_LEN; i++)
+@@ -1232,12 +1245,8 @@
+      * to figure out what it is...
+      */
+     isize = vmcb->exitinfo2 - regs->eip;
+-
+-    if (info.fields.rep)
+-        isize --;
+-
+-    if (isize > 1) 
+-        if ( !svm_get_prefix_info(v, info.fields.type, &seg, &asize) )
++    if ( isize > ((info.fields.rep) ? 2 : 1) ) 
++        if ( !svm_get_prefix_info(v, info.fields.type, &seg, &asize, isize) )
+             return 0;
+ 
+     if (info.fields.type == IOREQ_WRITE)
+@@ -1593,30 +1602,24 @@
+     enum instruction_index list_b[] = {INSTR_MOVCR2, INSTR_SMSW};
+     enum instruction_index match;
+ 
+-    if ( inst_copy_from_guest(buffer, svm_rip2pointer(v), sizeof(buffer))
+-         != sizeof buffer )
+-        /* #PF will have been delivered if appropriate. */
++
++    if ( type == TYPE_MOV_TO_CR )
++    {
++        inst_len = __get_instruction_length_from_list(
++            v, list_a, ARRAY_SIZE(list_a), buffer, &match);
++    }
++    else /* type == TYPE_MOV_FROM_CR */
++    {
++        inst_len = __get_instruction_length_from_list(
++            v, list_b, ARRAY_SIZE(list_b), buffer, &match);
++    }
++
++    if ( inst_len == 0 )
+         return;
+ 
+     /* get index to first actual instruction byte - as we will need to know 
+        where the prefix lives later on */
+     index = skip_prefix_bytes(buffer, sizeof(buffer));
+-    
+-    if ( type == TYPE_MOV_TO_CR )
+-    {
+-        inst_len = __get_instruction_length_from_list(
+-            v, list_a, ARRAY_SIZE(list_a), &buffer[index], &match);
+-    }
+-    else /* type == TYPE_MOV_FROM_CR */
+-    {
+-        inst_len = __get_instruction_length_from_list(
+-            v, list_b, ARRAY_SIZE(list_b), &buffer[index], &match);
+-    }
+-
+-    if ( inst_len == 0 )
+-        return;
+-
+-    inst_len += index;
+ 
+     /* Check for REX prefix - it's ALWAYS the last byte of any prefix bytes */
+     if (index > 0 && (buffer[index-1] & 0xF0) == 0x40)
+@@ -1941,16 +1944,6 @@
+     unsigned long g_vaddr;
+     int inst_len;
+ 
+-    /* 
+-     * Unknown how many bytes the invlpg instruction will take.  Use the
+-     * maximum instruction length here
+-     */
+-    if ( inst_copy_from_guest(opcode, svm_rip2pointer(v), length) < length )
+-    {
+-        gdprintk(XENLOG_ERR, "Error reading memory %d bytes\n", length);
+-        return;
+-    }
+-
+     if ( invlpga )
+     {
+         inst_len = __get_instruction_length(v, INSTR_INVLPGA, opcode);
+@@ -1965,8 +1958,8 @@
+     else
+     {
+         /* What about multiple prefix codes? */
++        inst_len = __get_instruction_length(v, INSTR_INVLPG, opcode);
+         prefix = (is_prefix(opcode[0]) ? opcode[0] : 0);
+-        inst_len = __get_instruction_length(v, INSTR_INVLPG, opcode);
+         if ( inst_len <= 0 )
+         {
+             gdprintk(XENLOG_ERR, "Error getting invlpg instr len\n");
+diff -r d2eb5fad9242 -r 784805591fa2 xen/arch/x86/hvm/vmx/vmx.c
+--- a/xen/arch/x86/hvm/vmx/vmx.c	Fri Apr 25 14:03:39 2008 +0100
++++ b/xen/arch/x86/hvm/vmx/vmx.c	Tue May 13 15:54:31 2008 +0100
+@@ -1390,7 +1390,6 @@
+     unsigned char inst[MAX_INST_LEN];
+     enum x86_segment seg = x86_seg_ds;
+     int i;
+-    extern int inst_copy_from_guest(unsigned char *, unsigned long, int);
+ 
+     if ( likely(cpu_has_vmx_ins_outs_instr_info) )
+     {
+@@ -1415,7 +1414,7 @@
+         eip += __vmread(GUEST_CS_BASE);
+ 
+     memset(inst, 0, MAX_INST_LEN);
+-    if ( inst_copy_from_guest(inst, eip, inst_len) != inst_len )
++    if ( hvm_fetch_from_guest_virt(inst, eip, inst_len) != HVMCOPY_okay )
+     {
+         gdprintk(XENLOG_ERR, "Get guest instruction failed\n");
+         domain_crash(current->domain);
+diff -r d2eb5fad9242 -r 784805591fa2 xen/arch/x86/hvm/vpt.c
+--- a/xen/arch/x86/hvm/vpt.c	Fri Apr 25 14:03:39 2008 +0100
++++ b/xen/arch/x86/hvm/vpt.c	Tue May 13 15:54:31 2008 +0100
+@@ -338,9 +338,9 @@
+     /* Periodic timer must be at least 0.9ms. */
+     if ( (period < 900000) && !one_shot )
+     {
+-        gdprintk(XENLOG_WARNING,
+-                 "HVM_PlatformTime: program too small period %"PRIu64"\n",
+-                 period);
++        if ( !test_and_set_bool(pt->warned_timeout_too_short) )
++            gdprintk(XENLOG_WARNING, "HVM_PlatformTime: program too "
++                     "small period %"PRIu64"\n", period);
+         period = 900000;
+     }
+ 
+diff -r d2eb5fad9242 -r 784805591fa2 xen/arch/x86/mm/shadow/multi.c
+--- a/xen/arch/x86/mm/shadow/multi.c	Fri Apr 25 14:03:39 2008 +0100
++++ b/xen/arch/x86/mm/shadow/multi.c	Tue May 13 15:54:31 2008 +0100
+@@ -2006,7 +2006,7 @@
+         else 
+         {
+             /* Shadowing an actual guest l1 table */
+-            if ( !mfn_valid(gw->l2mfn) ) return NULL; /* No guest page. */
++            if ( !mfn_valid(gw->l1mfn) ) return NULL; /* No guest page. */
+             *sl1mfn = get_shadow_status(v, gw->l1mfn, SH_type_l1_shadow);
+             if ( !mfn_valid(*sl1mfn) ) 
+             {
+diff -r d2eb5fad9242 -r 784805591fa2 xen/arch/x86/time.c
+--- a/xen/arch/x86/time.c	Fri Apr 25 14:03:39 2008 +0100
++++ b/xen/arch/x86/time.c	Tue May 13 15:54:31 2008 +0100
+@@ -738,12 +738,13 @@
+     }
+ 
+     local_irq_disable();
+-    rdtscll(curr_tsc);
+-    t->local_tsc_stamp = curr_tsc;
++    /* Platform time /first/, as we may be delayed by platform_timer_lock. */
+     t->stime_master_stamp = read_platform_stime();
+     /* TSC-extrapolated time may be bogus after frequency change. */
+     /*t->stime_local_stamp = get_s_time();*/
+     t->stime_local_stamp = t->stime_master_stamp;
++    rdtscll(curr_tsc);
++    t->local_tsc_stamp = curr_tsc;
+     set_time_scale(&t->tsc_scale, freq);
+     local_irq_enable();
+ 
+@@ -813,11 +814,14 @@
+     prev_local_stime  = t->stime_local_stamp;
+     prev_master_stime = t->stime_master_stamp;
+ 
+-    /* Disable IRQs to get 'instantaneous' current timestamps. */
++    /*
++     * Disable IRQs to get 'instantaneous' current timestamps. We read platform
++     * time first, as we may be delayed when acquiring platform_timer_lock.
++     */
+     local_irq_disable();
++    curr_master_stime = read_platform_stime();
++    curr_local_stime  = get_s_time();
+     rdtscll(curr_tsc);
+-    curr_local_stime  = get_s_time();
+-    curr_master_stime = read_platform_stime();
+     local_irq_enable();
+ 
+ #if 0
+diff -r d2eb5fad9242 -r 784805591fa2 xen/arch/x86/x86_64/domain.c
+--- a/xen/arch/x86/x86_64/domain.c	Fri Apr 25 14:03:39 2008 +0100
++++ b/xen/arch/x86/x86_64/domain.c	Tue May 13 15:54:31 2008 +0100
+@@ -9,11 +9,23 @@
+ #include <asm/hypercall.h>
+ #include <compat/vcpu.h>
+ 
++#define xen_vcpu_info vcpu_info
++CHECK_SIZE_(struct, vcpu_info);
++#undef xen_vcpu_info
++
++#define xen_vcpu_register_vcpu_info vcpu_register_vcpu_info
++CHECK_vcpu_register_vcpu_info;
++#undef xen_vcpu_register_vcpu_info
++
++#define xen_vcpu_get_physid vcpu_get_physid
++CHECK_vcpu_get_physid;
++#undef xen_vcpu_get_physid
++
+ int
+ arch_compat_vcpu_op(
+     int cmd, struct vcpu *v, XEN_GUEST_HANDLE(void) arg)
+ {
+-    long rc = 0;
++    int rc = -ENOSYS;
+ 
+     switch ( cmd )
+     {
+@@ -51,8 +63,9 @@
+         break;
+     }
+ 
+-    default:
+-        rc = -ENOSYS;
++    case VCPUOP_register_vcpu_info:
++    case VCPUOP_get_physid:
++        rc = arch_do_vcpu_op(cmd, v, arg);
+         break;
+     }
+ 
+diff -r d2eb5fad9242 -r 784805591fa2 xen/common/compat/domain.c
+--- a/xen/common/compat/domain.c	Fri Apr 25 14:03:39 2008 +0100
++++ b/xen/common/compat/domain.c	Tue May 13 15:54:31 2008 +0100
+@@ -11,11 +11,15 @@
+ #include <xen/hypercall.h>
+ #include <compat/vcpu.h>
+ 
++#define xen_vcpu_set_periodic_timer vcpu_set_periodic_timer
++CHECK_vcpu_set_periodic_timer;
++#undef xen_vcpu_set_periodic_timer
++
+ int compat_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
+ {
+     struct domain *d = current->domain;
+     struct vcpu *v;
+-    long rc = 0;
++    int rc = 0;
+ 
+     if ( (vcpuid < 0) || (vcpuid >= MAX_VIRT_CPUS) )
+         return -EINVAL;
+@@ -57,7 +61,6 @@
+     case VCPUOP_is_up:
+     case VCPUOP_set_periodic_timer:
+     case VCPUOP_stop_periodic_timer:
+-    case VCPUOP_set_singleshot_timer:
+     case VCPUOP_stop_singleshot_timer:
+     case VCPUOP_send_nmi:
+         rc = do_vcpu_op(cmd, vcpuid, arg);
+@@ -74,6 +77,19 @@
+         xlat_vcpu_runstate_info(&runstate.nat);
+         if ( copy_to_guest(arg, &runstate.cmp, 1) )
+             rc = -EFAULT;
++        break;
++    }
++
++    case VCPUOP_set_singleshot_timer:
++    {
++        struct compat_vcpu_set_singleshot_timer cmp;
++        struct vcpu_set_singleshot_timer *nat;
++
++        if ( copy_from_guest(&cmp, arg, 1) )
++            return -EFAULT;
++        nat = (void *)COMPAT_ARG_XLAT_VIRT_START(current->vcpu_id);
++        XLAT_vcpu_set_singleshot_timer(nat, &cmp);
++        rc = do_vcpu_op(cmd, vcpuid, guest_handle_from_ptr(nat, void));
+         break;
+     }
+ 
+diff -r d2eb5fad9242 -r 784805591fa2 xen/include/asm-x86/hvm/vpt.h
+--- a/xen/include/asm-x86/hvm/vpt.h	Fri Apr 25 14:03:39 2008 +0100
++++ b/xen/include/asm-x86/hvm/vpt.h	Tue May 13 15:54:31 2008 +0100
+@@ -78,6 +78,7 @@
+     bool_t one_shot;
+     bool_t do_not_freeze;
+     bool_t irq_issued;
++    bool_t warned_timeout_too_short;
+ #define PTSRC_isa    1 /* ISA time source */
+ #define PTSRC_lapic  2 /* LAPIC time source */
+     u8 source;                  /* PTSRC_ */
+diff -r d2eb5fad9242 -r 784805591fa2 xen/include/public/physdev.h
+--- a/xen/include/public/physdev.h	Fri Apr 25 14:03:39 2008 +0100
++++ b/xen/include/public/physdev.h	Tue May 13 15:54:31 2008 +0100
+@@ -81,7 +81,11 @@
+ #define PHYSDEVOP_set_iobitmap           7
+ struct physdev_set_iobitmap {
+     /* IN */
+-    XEN_GUEST_HANDLE_00030205(uint8) bitmap;
++#if __XEN_INTERFACE_VERSION__ >= 0x00030205
++    XEN_GUEST_HANDLE(uint8) bitmap;
++#else
++    uint8_t *bitmap;
++#endif
+     uint32_t nr_ports;
+ };
+ typedef struct physdev_set_iobitmap physdev_set_iobitmap_t;
+diff -r d2eb5fad9242 -r 784805591fa2 xen/include/public/xen-compat.h
+--- a/xen/include/public/xen-compat.h	Fri Apr 25 14:03:39 2008 +0100
++++ b/xen/include/public/xen-compat.h	Tue May 13 15:54:31 2008 +0100
+@@ -41,11 +41,4 @@
+ #error "These header files do not support the requested interface version."
+ #endif
+ 
+-/* Fields defined as a Xen guest handle since 0x00030205. */
+-#if __XEN_INTERFACE_VERSION__ >= 0x00030205
+-#define XEN_GUEST_HANDLE_00030205(type) XEN_GUEST_HANDLE(type)
+-#else
+-#define XEN_GUEST_HANDLE_00030205(type) type *
+-#endif
+-
+ #endif /* __XEN_PUBLIC_XEN_COMPAT_H__ */
+diff -r d2eb5fad9242 -r 784805591fa2 xen/include/public/xen.h
+--- a/xen/include/public/xen.h	Fri Apr 25 14:03:39 2008 +0100
++++ b/xen/include/public/xen.h	Tue May 13 15:54:31 2008 +0100
+@@ -245,7 +245,11 @@
+         /* SET_LDT */
+         unsigned int nr_ents;
+         /* TLB_FLUSH_MULTI, INVLPG_MULTI */
+-        XEN_GUEST_HANDLE_00030205(void) vcpumask;
++#if __XEN_INTERFACE_VERSION__ >= 0x00030205
++        XEN_GUEST_HANDLE(void) vcpumask;
++#else
++        void *vcpumask;
++#endif
+     } arg2;
+ };
+ typedef struct mmuext_op mmuext_op_t;
+diff -r d2eb5fad9242 -r 784805591fa2 xen/include/xlat.lst
+--- a/xen/include/xlat.lst	Fri Apr 25 14:03:39 2008 +0100
++++ b/xen/include/xlat.lst	Tue May 13 15:54:31 2008 +0100
+@@ -5,6 +5,7 @@
+ ?	mmu_update			xen.h
+ !	mmuext_op			xen.h
+ !	start_info			xen.h
++?	vcpu_info			xen.h
+ ?	vcpu_time_info			xen.h
+ !	cpu_user_regs			arch-x86/xen-@arch@.h
+ !	trap_info			arch-x86/xen.h
+@@ -40,6 +41,10 @@
+ ?	sched_remote_shutdown		sched.h
+ ?	sched_shutdown			sched.h
+ ?	t_buf				trace.h
++?	vcpu_get_physid			vcpu.h
++?	vcpu_register_vcpu_info		vcpu.h
+ !	vcpu_runstate_info		vcpu.h
++?	vcpu_set_periodic_timer		vcpu.h
++!	vcpu_set_singleshot_timer	vcpu.h
+ ?	xenoprof_init			xenoprof.h
+ ?	xenoprof_passive		xenoprof.h
+diff -r d2eb5fad9242 -r 784805591fa2 xen/tools/get-fields.sh
+--- a/xen/tools/get-fields.sh	Fri Apr 25 14:03:39 2008 +0100
++++ b/xen/tools/get-fields.sh	Tue May 13 15:54:31 2008 +0100
+@@ -310,7 +310,6 @@
+ 	done
+ 	echo " \\"
+ 	echo "} while (0)"
+-	echo ""
+ }
+ 
+ check_field ()

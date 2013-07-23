@@ -1,0 +1,36 @@
+commit 7f10cc4e838c2b2d7272031954c56c407569d497
+Author: Maik Broemme <mbroemme@plusserver.de>
+Date:   Fri Sep 14 22:12:34 2007 +0200
+
+    ACPI: video: remove dmesg spam
+    
+    i am actually heavily using the ACPI video extension for my Thinkpad X61
+    Tablet. I have bound the input events triggered by the brightness
+    up/down keys to a simple
+    
+    echo <value> > /sys/class/backlight/acpi_video1/brightness
+    
+    but everytime the event is triggered and acpi_video_device_lcd_set_level()
+    is called i got a notificication in my kernel log like:
+    
+    set_level status: 0
+    set_level status: 0
+    set_level status: 0
+    set_level status: 0
+    ...
+    
+    Signed-off-by: Maik Broemme <mbroemme@plusserver.de>
+    Signed-off-by: Len Brown <len.brown@intel.com>
+
+Index: pardus-2.6/drivers/acpi/video.c
+===================================================================
+--- pardus-2.6.orig/drivers/acpi/video.c
++++ pardus-2.6/drivers/acpi/video.c
+@@ -345,7 +345,6 @@ acpi_video_device_lcd_set_level(struct a
+ 	arg0.integer.value = level;
+ 	status = acpi_evaluate_object(device->dev->handle, "_BCM", &args, NULL);
+ 
+-	printk(KERN_DEBUG "set_level status: %x\n", status);
+ 	return status;
+ }
+ 

@@ -1,0 +1,37 @@
+From: Colin Ian King <colin.king@canonical.com>
+Date: Tue, 3 Jun 2008 12:02:25 +0000 (+0100)
+Subject: UBUNTU: drm_sysfs_suspend uses KERN_ERR in printk
+X-Git-Tag: Ubuntu-2.6.24-19.33~12
+X-Git-Url: http://kernel.ubuntu.com/git?p=ubuntu%2Fubuntu-hardy.git;a=commitdiff_plain;h=4ab25b793cdb7ae59f8fd37c323b3fe084b68efc
+
+UBUNTU: drm_sysfs_suspend uses KERN_ERR in printk
+OriginalAuthor: Jesse Barnes <jbarnes@virtuousgeek.org>
+Bug: #234239
+
+A two line backport of commit 57f7bd5b455298dbe94227aa1fedbbfe63bbf252
+to remove KERN_ERR printk in DRM suspend. Original posting:
+
+remove debug printk from DRM suspend path
+
+Not sure how this snuck upstream, but it really doesn't belong there. We
+don't need a KERN_ERR printk in the suspend path to know what's going on (at
+least not anymore).
+
+Signed-off-by: Jesse Barnes <jbarnes@virtuousgeek.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
+---
+
+Index: 2008-devel/drivers/char/drm/drm_sysfs.c
+===================================================================
+--- 2008-devel.orig/drivers/char/drm/drm_sysfs.c
++++ 2008-devel/drivers/char/drm/drm_sysfs.c
+@@ -34,8 +34,6 @@ static int drm_sysfs_suspend(struct devi
+ 	struct drm_minor *drm_minor = to_drm_minor(dev);
+ 	struct drm_device *drm_dev = drm_minor->dev;
+ 
+-	printk(KERN_ERR "%s\n", __FUNCTION__);
+-
+ 	if (drm_minor->type == DRM_MINOR_CONTROL)
+ 		if (drm_dev->driver->suspend)
+ 			return drm_dev->driver->suspend(drm_dev, state);

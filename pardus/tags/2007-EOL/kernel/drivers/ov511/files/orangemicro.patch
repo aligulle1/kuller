@@ -1,0 +1,167 @@
+diff -Nur ov511-2.32-old/ovfx2.c ov511-2.32/ovfx2.c
+--- ov511-2.32-old/ovfx2.c	2007-01-19 18:17:42.626939641 +0200
++++ ov511-2.32/ovfx2.c	2007-01-19 18:17:53.903225385 +0200
+@@ -1324,22 +1324,47 @@
+ 	if (FATAL_ERROR(rc))
+ 		return rc;
+ 
+-	/********* The following settings are specific to this camera ********/
+-	i2c_w(ov, 0x03, 0x80);		  /* Hardcoded saturation value */
+-	i2c_w_mask(ov, 0x12, 0x48, 0x48); /* Enable h-mirror and raw output */
+-	i2c_w_mask(ov, 0x27, 0x10, 0x10); /* Bypass RGB matrix */
+-	i2c_w_mask(ov, 0x28, 0x04, 0x04); /* G/BR (YG) mode */
+-	i2c_w_mask(ov, 0x2a, 0x00, 0x10); /* No UV 2-pixel delay */
+-	i2c_w_mask(ov, 0x2d, 0x40, 0x40); /* QVGA 60 FPS (redundant?) */
+-	i2c_w(ov, 0x67, 0x00); 		  /* Disable YUV postprocess */
+-	i2c_w_mask(ov, 0x2d, 0x00, 0x0f); /* Disable anti-alias */
+-	i2c_w(ov, 0x24, 0x20); 		  /* Use QVGA white pixel ratio */
+-	i2c_w(ov, 0x25, 0x30); 		  /* Use QVGA black pixel ratio */
+-	i2c_w(ov, 0x60, 0x26);		  /* Unknown */
+-	i2c_w(ov, 0x74, 0x20);		  /* AGC max gain = 4x */
+-	i2c_w(ov, 0x06, 0x68);		  /* Hardcoded brightness value */
+-	i2c_w(ov, 0x14, 0x04);		  /*  */
+ 
++
++	if(ov->dev->descriptor.idVendor==VEND_ORANGE_MICRO && 
++	   ov->dev->descriptor.idProduct==PROD_IBOT2){
++	  /********* The following settings are specific to this camera ********/
++	  PDEBUG(2, "Setting up IBOT2 camera");
++
++	  i2c_w(ov, 0x03, 0x80);		  /* Hardcoded saturation value */
++	  i2c_w_mask(ov, 0x12, 0x48, 0x48); /* Enable h-mirror and raw output */
++	  i2c_w_mask(ov, 0x27, 0x10, 0x10); /* Bypass RGB matrix */
++	  i2c_w_mask(ov, 0x28, 0x04, 0x04); /* G/BR (YG) mode */
++	  i2c_w_mask(ov, 0x2a, 0x00, 0x10); /* No UV 2-pixel delay */
++	  i2c_w_mask(ov, 0x2d, 0x40, 0x40); /* QVGA 60 FPS (redundant?) */
++	  i2c_w(ov, 0x67, 0x00); 		  /* Disable YUV postprocess */
++	  i2c_w_mask(ov, 0x2d, 0x00, 0x0f); /* Disable anti-alias */
++	  i2c_w(ov, 0x24, 0x20); 		  /* Use QVGA white pixel ratio */
++	  i2c_w(ov, 0x25, 0x30); 		  /* Use QVGA black pixel ratio */
++	  i2c_w(ov, 0x60, 0x26);		  /* Unknown */
++	  i2c_w(ov, 0x74, 0x20);		  /* AGC max gain = 4x */
++	  i2c_w(ov, 0x06, 0x68);		  /* Hardcoded brightness value */
++	  i2c_w(ov, 0x14, 0x04);		  /*  */
++	} else if(ov->dev->descriptor.idVendor==VEND_APLUX && 
++		  ov->dev->descriptor.idProduct==PROD_MU2CAM){
++
++	  PDEBUG(2, "Setting up APLUX camera");
++	  /********* The following settings are specific to this camera ********/
++	  i2c_w(ov, 0x03, 0x80);	    /* Hardcoded saturation value */
++	  i2c_w(ov, 0x06, 0x68);	    /* Hardcoded brightness value */
++	  i2c_w_mask(ov, 0x12, 0x48, 0x48); /* Enable h-mirror and raw output */
++	  i2c_w(ov, 0x14, 0x04);	    /*  */
++	  i2c_w(ov, 0x24, 0x20); 	    /* Use QVGA white pixel ratio */
++	  i2c_w(ov, 0x25, 0x30); 	    /* Use QVGA black pixel ratio */
++	  i2c_w_mask(ov, 0x27, 0x10, 0x10); /* Bypass RGB matrix */
++	  i2c_w_mask(ov, 0x28, 0x04, 0x04); /* G/BR (YG) mode */
++	  i2c_w_mask(ov, 0x2a, 0x00, 0x10); /* No UV 2-pixel delay */
++	  i2c_w_mask(ov, 0x2d, 0x40, 0x40); /* QVGA 60 FPS (redundant?) */
++	  i2c_w_mask(ov, 0x2d, 0x04, 0x04); /* Turn on anti banding filter */
++	  i2c_w(ov, 0x60, 0x26);	    /* Unknown */
++	  i2c_w(ov, 0x67, 0x00); 	    /* Disable YUV postprocess */
++	  i2c_w(ov, 0x74, 0x20);	    /* AGC max gain = 4x */
++	}
+ 	return 0;
+ }
+ 
+@@ -1450,20 +1475,46 @@
+ 	      unsigned char *pIn,
+ 	      unsigned char *pOut)
+ {
+-	const unsigned int a = frame->rawwidth * frame->rawheight / 2;
+-	int i;
++  //  const unsigned int a = frame->rawwidth * frame->rawheight / 2;
++  int i,j;
+ 
+-	for (i = 0; i < a; i++) {
+-		pOut[0] = pIn[1];
+-		pOut[1] = pIn[0];
+-		pOut[2] = pIn[3];
+-		pOut[3] = pIn[1];
+-		pOut[4] = pIn[2];
+-		pOut[5] = pIn[3];
++  for(i = 0; i< frame->rawheight; i++){
++    
++    for (j = 0; j < (frame->rawwidth/2)-2; j++) {
++      
++	pOut[0] = pIn[1];
++	pOut[1] = (pIn[4]+pIn[6])>>1;
++	pOut[2] = pIn[3];
++	pOut[3] = pIn[5];
++	pOut[4] = (pIn[6]+pIn[8])>>1;
++	pOut[5] = pIn[3];
++	pIn += 4;
++	pOut += 6;
++    }
++    
++    pOut[0] = pIn[1];
++    pOut[1] = (pIn[4]+pIn[6])>>1;
++    pOut[2] = pIn[3];
++    pOut[3] = pIn[1];
++    pOut[4] = (pIn[4]+pIn[6])>>1;
++    pOut[5] = pIn[3];
++    
++    pIn += 4;
++    pOut += 6;
++    
++    
++    pOut[0] = pIn[1];
++    pOut[1] = (pIn[0]+pIn[2])>>1;
++    pOut[2] = pIn[3];
++    pOut[3] = pIn[1];
++    pOut[4] = (pIn[0]+pIn[2])>>1;
++    pOut[5] = pIn[3];
++    if(i !=frame->rawheight-1){
++      pIn += 4;
++      pOut += 6;
++    }
++  }
+ 
+-		pIn += 4;
+-		pOut += 6;
+-	}
+ }
+ 
+ /* Flip image vertically */
+@@ -1501,8 +1552,6 @@
+ 		PDEBUG(4, "Dumping %d bytes", frame->bytes_recvd);
+ 		gbgr_to_bgr24(frame, frame->rawdata, frame->data);
+ 	} else if (dumppix == 2) {	/* Dump raw data */
+-		memset(frame->data, 0,
+-			MAX_DATA_SIZE(ov->maxwidth, ov->maxheight));
+ 		PDEBUG(4, "Dumping %d bytes", frame->bytes_recvd);
+ 		memcpy(frame->data, frame->rawdata, frame->bytes_recvd);
+ 	} else {
+@@ -1568,7 +1617,7 @@
+ 			PDEBUG(3, "Frame was short; discarding");
+ 			frame->bytes_recvd = 0;
+ 			frame->grabstate = FRAME_ERROR;
+-			wake_up_interruptible(&frame->wq);
++			frame->bytes_recvd=0;
+ 			return;
+ 		}
+ #endif
+@@ -2314,6 +2363,8 @@
+ 			ov->frame[f].depth = depth;
+ 		}
+ 
++		ov->frame[f].bytes_recvd = 0;
++
+ 		/* Mark it as ready */
+ 		ov->frame[f].grabstate = FRAME_READY;
+ 
+diff -Nur ov511-2.32-old/ovfx2.h ov511-2.32/ovfx2.h
+--- ov511-2.32-old/ovfx2.h	2007-01-19 18:17:42.626939641 +0200
++++ ov511-2.32/ovfx2.h	2007-01-19 18:17:53.903225385 +0200
+@@ -84,9 +84,9 @@
+ #define OVFX2_BULK_ENDPOINT_ADDR	2
+ 
+ /* # of BULK scratch buffers */
+-#define OVFX2_NUMSBUF		8
++#define OVFX2_NUMSBUF		4
+ 
+-#define OVFX2_BULK_SIZE		32768
++#define OVFX2_BULK_SIZE		65536
+ 
+ #define OVFX2_NUMFRAMES		2
+ #if OVFX2_NUMFRAMES > VIDEO_MAX_FRAME

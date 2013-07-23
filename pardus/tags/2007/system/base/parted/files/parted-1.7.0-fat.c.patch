@@ -1,0 +1,17 @@
+--- parted-1.7.0/libparted/fs/fat/fat.c.P0	2006-05-15 05:19:48.000000000 -0400
++++ parted-1.7.0/libparted/fs/fat/fat.c	2006-05-19 10:18:19.000000000 -0400
+@@ -123,12 +123,8 @@
+ 
+ 	if (!fat_boot_sector_read (&fs_info->boot_sector, geom))
+ 		goto error_free_fs;
+-	if (!fat_boot_sector_analyse (&fs_info->boot_sector, fs)) {
+-		*fat_type = fat_boot_sector_probe_type (&fs_info->boot_sector,
+-							geom);
+-		fat_free (fs);
+-		return ped_geometry_duplicate (geom);
+-	}
++	if (!fat_boot_sector_analyse (&fs_info->boot_sector, fs))
++		goto error_free_fs;
+ 
+ 	*fat_type = fs_info->fat_type;
+ 	result = ped_geometry_new (geom->dev, geom->start,

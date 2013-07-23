@@ -1,0 +1,348 @@
+From: Stefan Bader <stefan.bader@canonical.com>
+Date: Mon, 9 Jun 2008 13:47:41 +0000 (-0400)
+Subject: UBUNTU: ACPICA: Fix for resource descriptor optimization issues for _CRS/_SRC
+X-Git-Url: http://kernel.ubuntu.com/git?p=ubuntu%2Fubuntu-hardy.git;a=commitdiff_plain;h=70cb93e6771963cca14ad9a3d87687484ee02428
+
+UBUNTU: ACPICA: Fix for resource descriptor optimization issues for _CRS/_SRC
+
+Bug: #152187
+BumpABI: yes
+
+ACPICA: Fix for resource descriptor optimization issues for _CRS/_SRC
+
+Fixed a problem where resource descriptor size optimization
+could cause a problem when a _CRS resource template is passed
+to a _SRS method. The _SRS resource template must use the same
+descriptors (with the same size) as returned from _CRS. This
+change affects the following resource descriptors: IRQ/IRQNoFlags
+and StartDependendentFn/StartDependentFnNoPri.
+
+http://bugzilla.kernel.org/show_bug.cgi?id=9487
+
+Signed-off-by: Bob Moore <robert.moore@intel.com>
+Signed-off-by: Alexey Starikovskiy <astarikovskiy@suse.de>
+Signed-off-by: Len Brown <len.brown@intel.com>
+
+-------------------------------------------------------------------------------
+
+From: Bjorn Helgaas <bjorn.helgaas@hp.com>
+
+When configuring the resources of an ACPI device, we first evaluate _CRS
+to get a template of resource descriptors, then fill in the specific
+resource values we want, and finally evaluate _SRS to actually configure
+the device.
+
+Some resources have optional fields, so the size of encoded descriptors
+varies depending on the specific values.  For example, IRQ descriptors can
+be either two or three bytes long.  The third byte contains triggering
+information and can be omitted if the IRQ is edge-triggered and active
+high.
+
+The BIOS often assumes that IRQ descriptors in the _SRS buffer use the
+same format as those in the _CRS buffer, so this patch enforces that
+constraint.
+
+The "Start Dependent Function" descriptor also has an optional byte, but
+we don't currently encode those descriptors, so I didn't do anything for
+those.
+
+I have tested this patch on a Toshiba Portege 4000.  Without the patch,
+parport_pc claims the parallel port only if I use "pnpacpi=off".  This
+patch makes it work with PNPACPI.
+
+This is an extension of a patch by Tom Jaeger:
+    http://bugzilla.kernel.org/show_bug.cgi?id=9487#c42
+
+References:
+    http://bugzilla.kernel.org/show_bug.cgi?id=5832
+	Enabling ACPI Plug and Play in kernels >2.6.9 kills Parallel support
+    http://bugzilla.kernel.org/show_bug.cgi?id=9487
+	buggy firmware expects four-byte IRQ resource descriptor (was: Serial
+	port disappears after Suspend on Toshiba R25)
+    http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commitdiff;h=1d5b285da1893b90507b081664ac27f1a8a3dc5b related ACPICA fix
+
+Signed-off-by: Bjorn Helgaas <bjorn.helgaas@hp.com>
+
+-------------------------------------------------------------------------------
+
+Signed-off-by: Stefan Bader <stefan.bader@canonical.com>
+---
+
+Index: 2008-devel/drivers/acpi/resources/rscalc.c
+===================================================================
+--- 2008-devel.orig/drivers/acpi/resources/rscalc.c
++++ 2008-devel/drivers/acpi/resources/rscalc.c
+@@ -211,6 +211,13 @@ acpi_rs_get_aml_length(struct acpi_resou
+ 		 * variable-length fields
+ 		 */
+ 		switch (resource->type) {
++		case ACPI_RESOURCE_TYPE_IRQ:
++
++			if (resource->data.irq.descriptor_length == 2) {
++				total_size--;
++			}
++			break;
++
+ 		case ACPI_RESOURCE_TYPE_VENDOR:
+ 			/*
+ 			 * Vendor Defined Resource:
+Index: 2008-devel/drivers/acpi/resources/rsdump.c
+===================================================================
+--- 2008-devel.orig/drivers/acpi/resources/rsdump.c
++++ 2008-devel/drivers/acpi/resources/rsdump.c
+@@ -87,8 +87,10 @@ acpi_rs_dump_descriptor(void *resource, 
+  *
+  ******************************************************************************/
+ 
+-struct acpi_rsdump_info acpi_rs_dump_irq[6] = {
++struct acpi_rsdump_info acpi_rs_dump_irq[7] = {
+ 	{ACPI_RSD_TITLE, ACPI_RSD_TABLE_SIZE(acpi_rs_dump_irq), "IRQ", NULL},
++	{ACPI_RSD_UINT8, ACPI_RSD_OFFSET(irq.descriptor_length),
++	 "Descriptor Length", NULL},
+ 	{ACPI_RSD_1BITFLAG, ACPI_RSD_OFFSET(irq.triggering), "Triggering",
+ 	 acpi_gbl_he_decode},
+ 	{ACPI_RSD_1BITFLAG, ACPI_RSD_OFFSET(irq.polarity), "Polarity",
+@@ -115,9 +117,11 @@ struct acpi_rsdump_info acpi_rs_dump_dma
+ 	 NULL}
+ };
+ 
+-struct acpi_rsdump_info acpi_rs_dump_start_dpf[3] = {
++struct acpi_rsdump_info acpi_rs_dump_start_dpf[4] = {
+ 	{ACPI_RSD_TITLE, ACPI_RSD_TABLE_SIZE(acpi_rs_dump_start_dpf),
+ 	 "Start-Dependent-Functions", NULL},
++	{ACPI_RSD_UINT8, ACPI_RSD_OFFSET(start_dpf.descriptor_length),
++	 "Descriptor Length", NULL},
+ 	{ACPI_RSD_2BITFLAG, ACPI_RSD_OFFSET(start_dpf.compatibility_priority),
+ 	 "Compatibility Priority", acpi_gbl_config_decode},
+ 	{ACPI_RSD_2BITFLAG, ACPI_RSD_OFFSET(start_dpf.performance_robustness),
+Index: 2008-devel/drivers/acpi/resources/rsio.c
+===================================================================
+--- 2008-devel.orig/drivers/acpi/resources/rsio.c
++++ 2008-devel/drivers/acpi/resources/rsio.c
+@@ -185,7 +185,7 @@ struct acpi_rsconvert_info acpi_rs_conve
+  *
+  ******************************************************************************/
+ 
+-struct acpi_rsconvert_info acpi_rs_get_start_dpf[5] = {
++struct acpi_rsconvert_info acpi_rs_get_start_dpf[6] = {
+ 	{ACPI_RSC_INITGET, ACPI_RESOURCE_TYPE_START_DEPENDENT,
+ 	 ACPI_RS_SIZE(struct acpi_resource_start_dependent),
+ 	 ACPI_RSC_TABLE_SIZE(acpi_rs_get_start_dpf)},
+@@ -196,6 +196,12 @@ struct acpi_rsconvert_info acpi_rs_get_s
+ 	 ACPI_ACCEPTABLE_CONFIGURATION,
+ 	 2},
+ 
++	/* Get the descriptor length (0 or 1 for Start Dpf descriptor) */
++
++	{ACPI_RSC_1BITFLAG, ACPI_RS_OFFSET(data.start_dpf.descriptor_length),
++	 AML_OFFSET(start_dpf.descriptor_type),
++	 0},
++
+ 	/* All done if there is no flag byte present in the descriptor */
+ 
+ 	{ACPI_RSC_EXIT_NE, ACPI_RSC_COMPARE_AML_LENGTH, 0, 1},
+@@ -219,7 +225,9 @@ struct acpi_rsconvert_info acpi_rs_get_s
+  *
+  ******************************************************************************/
+ 
+-struct acpi_rsconvert_info acpi_rs_set_start_dpf[6] = {
++struct acpi_rsconvert_info acpi_rs_set_start_dpf[10] = {
++	/* Start with a default descriptor of length 1 */
++
+ 	{ACPI_RSC_INITSET, ACPI_RESOURCE_NAME_START_DEPENDENT,
+ 	 sizeof(struct aml_resource_start_dependent),
+ 	 ACPI_RSC_TABLE_SIZE(acpi_rs_set_start_dpf)},
+@@ -236,6 +244,33 @@ struct acpi_rsconvert_info acpi_rs_set_s
+ 	 AML_OFFSET(start_dpf.flags),
+ 	 2},
+ 	/*
++	 * All done if the output descriptor length is required to be 1
++	 * (i.e., optimization to 0 bytes cannot be attempted)
++	 */
++	{ACPI_RSC_EXIT_EQ, ACPI_RSC_COMPARE_VALUE,
++	 ACPI_RS_OFFSET(data.start_dpf.descriptor_length),
++	 1},
++
++	/* Set length to 0 bytes (no flags byte) */
++
++	{ACPI_RSC_LENGTH, 0, 0,
++	 sizeof(struct aml_resource_start_dependent_noprio)},
++
++	/*
++	 * All done if the output descriptor length is required to be 0.
++	 *
++	 * TBD: Perhaps we should check for error if input flags are not
++	 * compatible with a 0-byte descriptor.
++	 */
++	{ACPI_RSC_EXIT_EQ, ACPI_RSC_COMPARE_VALUE,
++	 ACPI_RS_OFFSET(data.start_dpf.descriptor_length),
++	 0},
++
++	/* Reset length to 1 byte (descriptor with flags byte) */
++
++	{ACPI_RSC_LENGTH, 0, 0, sizeof(struct aml_resource_irq)},
++
++	/*
+ 	 * All done if flags byte is necessary -- if either priority value
+ 	 * is not ACPI_ACCEPTABLE_CONFIGURATION
+ 	 */
+Index: 2008-devel/drivers/acpi/resources/rsirq.c
+===================================================================
+--- 2008-devel.orig/drivers/acpi/resources/rsirq.c
++++ 2008-devel/drivers/acpi/resources/rsirq.c
+@@ -52,7 +52,7 @@ ACPI_MODULE_NAME("rsirq")
+  * acpi_rs_get_irq
+  *
+  ******************************************************************************/
+-struct acpi_rsconvert_info acpi_rs_get_irq[7] = {
++struct acpi_rsconvert_info acpi_rs_get_irq[8] = {
+ 	{ACPI_RSC_INITGET, ACPI_RESOURCE_TYPE_IRQ,
+ 	 ACPI_RS_SIZE(struct acpi_resource_irq),
+ 	 ACPI_RSC_TABLE_SIZE(acpi_rs_get_irq)},
+@@ -69,6 +69,12 @@ struct acpi_rsconvert_info acpi_rs_get_i
+ 	 ACPI_EDGE_SENSITIVE,
+ 	 1},
+ 
++	/* Get the descriptor length (2 or 3 for IRQ descriptor) */
++
++	{ACPI_RSC_2BITFLAG, ACPI_RS_OFFSET(data.irq.descriptor_length),
++	 AML_OFFSET(irq.descriptor_type),
++	 0},
++
+ 	/* All done if no flag byte present in descriptor */
+ 
+ 	{ACPI_RSC_EXIT_NE, ACPI_RSC_COMPARE_AML_LENGTH, 0, 3},
+@@ -94,7 +100,9 @@ struct acpi_rsconvert_info acpi_rs_get_i
+  *
+  ******************************************************************************/
+ 
+-struct acpi_rsconvert_info acpi_rs_set_irq[9] = {
++struct acpi_rsconvert_info acpi_rs_set_irq[13] = {
++	/* Start with a default descriptor of length 3 */
++
+ 	{ACPI_RSC_INITSET, ACPI_RESOURCE_NAME_IRQ,
+ 	 sizeof(struct aml_resource_irq),
+ 	 ACPI_RSC_TABLE_SIZE(acpi_rs_set_irq)},
+@@ -105,7 +113,7 @@ struct acpi_rsconvert_info acpi_rs_set_i
+ 	 AML_OFFSET(irq.irq_mask),
+ 	 ACPI_RS_OFFSET(data.irq.interrupt_count)},
+ 
+-	/* Set the flags byte by default */
++	/* Set the flags byte */
+ 
+ 	{ACPI_RSC_1BITFLAG, ACPI_RS_OFFSET(data.irq.triggering),
+ 	 AML_OFFSET(irq.flags),
+@@ -118,6 +126,33 @@ struct acpi_rsconvert_info acpi_rs_set_i
+ 	{ACPI_RSC_1BITFLAG, ACPI_RS_OFFSET(data.irq.sharable),
+ 	 AML_OFFSET(irq.flags),
+ 	 4},
++
++	/*
++	 * All done if the output descriptor length is required to be 3
++	 * (i.e., optimization to 2 bytes cannot be attempted)
++	 */
++	{ACPI_RSC_EXIT_EQ, ACPI_RSC_COMPARE_VALUE,
++	 ACPI_RS_OFFSET(data.irq.descriptor_length),
++	 3},
++
++	/* Set length to 2 bytes (no flags byte) */
++
++	{ACPI_RSC_LENGTH, 0, 0, sizeof(struct aml_resource_irq_noflags)},
++
++	/*
++	 * All done if the output descriptor length is required to be 2.
++	 *
++	 * TBD: Perhaps we should check for error if input flags are not
++	 * compatible with a 2-byte descriptor.
++	 */
++	{ACPI_RSC_EXIT_EQ, ACPI_RSC_COMPARE_VALUE,
++	 ACPI_RS_OFFSET(data.irq.descriptor_length),
++	 2},
++
++	/* Reset length to 3 bytes (descriptor with flags byte) */
++
++	{ACPI_RSC_LENGTH, 0, 0, sizeof(struct aml_resource_irq)},
++
+ 	/*
+ 	 * Check if the flags byte is necessary. Not needed if the flags are:
+ 	 * ACPI_EDGE_SENSITIVE, ACPI_ACTIVE_HIGH, ACPI_EXCLUSIVE
+@@ -134,7 +169,7 @@ struct acpi_rsconvert_info acpi_rs_set_i
+ 	 ACPI_RS_OFFSET(data.irq.sharable),
+ 	 ACPI_EXCLUSIVE},
+ 
+-	/* irq_no_flags() descriptor can be used */
++	/* We can optimize to a 2-byte irq_no_flags() descriptor */
+ 
+ 	{ACPI_RSC_LENGTH, 0, 0, sizeof(struct aml_resource_irq_noflags)}
+ };
+Index: 2008-devel/drivers/acpi/resources/rsmisc.c
+===================================================================
+--- 2008-devel.orig/drivers/acpi/resources/rsmisc.c
++++ 2008-devel/drivers/acpi/resources/rsmisc.c
+@@ -497,6 +497,17 @@ acpi_rs_convert_resource_to_aml(struct a
+ 			}
+ 			break;
+ 
++		case ACPI_RSC_EXIT_EQ:
++			/*
++			 * Control - Exit conversion if equal
++			 */
++			if (*ACPI_ADD_PTR(u8, resource,
++					  COMPARE_TARGET(info)) ==
++			    COMPARE_VALUE(info)) {
++				goto exit;
++			}
++			break;
++
+ 		default:
+ 
+ 			ACPI_ERROR((AE_INFO, "Invalid conversion opcode"));
+Index: 2008-devel/drivers/pnp/pnpacpi/rsparser.c
+===================================================================
+--- 2008-devel.orig/drivers/pnp/pnpacpi/rsparser.c
++++ 2008-devel/drivers/pnp/pnpacpi/rsparser.c
+@@ -752,6 +752,12 @@ static acpi_status pnpacpi_type_resource
+ 	if (pnpacpi_supported_resource(res)) {
+ 		(*resource)->type = res->type;
+ 		(*resource)->length = sizeof(struct acpi_resource);
++		if (res->type == ACPI_RESOURCE_TYPE_IRQ)
++			(*resource)->data.irq.descriptor_length =
++				res->data.irq.descriptor_length;
++		if (res->type == ACPI_RESOURCE_TYPE_START_DEPENDENT)
++			(*resource)->data.start_dpf.descriptor_length =
++				res->data.start_dpf.descriptor_length;
+ 		(*resource)++;
+ 	}
+ 
+Index: 2008-devel/include/acpi/acresrc.h
+===================================================================
+--- 2008-devel.orig/include/acpi/acresrc.h
++++ 2008-devel/include/acpi/acresrc.h
+@@ -94,6 +94,7 @@ typedef const struct acpi_rsconvert_info
+ #define ACPI_RSC_BITMASK16              18
+ #define ACPI_RSC_EXIT_NE                19
+ #define ACPI_RSC_EXIT_LE                20
++#define ACPI_RSC_EXIT_EQ                21
+ 
+ /* Resource Conversion sub-opcodes */
+ 
+Index: 2008-devel/include/acpi/actypes.h
+===================================================================
+--- 2008-devel.orig/include/acpi/actypes.h
++++ 2008-devel/include/acpi/actypes.h
+@@ -990,6 +990,7 @@ struct acpi_vendor_uuid {
+  *  Structures used to describe device resources
+  */
+ struct acpi_resource_irq {
++	u8 descriptor_length;
+ 	u8 triggering;
+ 	u8 polarity;
+ 	u8 sharable;
+@@ -1006,6 +1007,7 @@ struct acpi_resource_dma {
+ };
+ 
+ struct acpi_resource_start_dependent {
++	u8 descriptor_length;
+ 	u8 compatibility_priority;
+ 	u8 performance_robustness;
+ };

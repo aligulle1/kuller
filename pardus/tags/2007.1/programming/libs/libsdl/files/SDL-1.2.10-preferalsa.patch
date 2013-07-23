@@ -1,0 +1,41 @@
+--- SDL-1.2.10/src/audio/SDL_audio.c.preferalsa	2006-05-09 10:47:05.000000000 +0200
++++ SDL-1.2.10/src/audio/SDL_audio.c	2006-05-19 11:14:32.000000000 +0200
+@@ -36,6 +36,15 @@
+ 
+ /* Available audio drivers */
+ static AudioBootStrap *bootstrap[] = {
++#if SDL_AUDIO_DRIVER_ALSA
++	&ALSA_bootstrap,
++#endif
++#if SDL_AUDIO_DRIVER_ARTS
++	&ARTS_bootstrap,
++#endif
++#if SDL_AUDIO_DRIVER_ESD
++	&ESD_bootstrap,
++#endif
+ #if SDL_AUDIO_DRIVER_BSD
+ 	&BSD_AUDIO_bootstrap,
+ #endif
+@@ -43,9 +52,6 @@
+ 	&DSP_bootstrap,
+ 	&DMA_bootstrap,
+ #endif
+-#if SDL_AUDIO_DRIVER_ALSA
+-	&ALSA_bootstrap,
+-#endif
+ #if SDL_AUDIO_DRIVER_QNXNTO
+ 	&QNXNTOAUDIO_bootstrap,
+ #endif
+@@ -55,12 +61,6 @@
+ #if SDL_AUDIO_DRIVER_DMEDIA
+ 	&DMEDIA_bootstrap,
+ #endif
+-#if SDL_AUDIO_DRIVER_ARTS
+-	&ARTS_bootstrap,
+-#endif
+-#if SDL_AUDIO_DRIVER_ESD
+-	&ESD_bootstrap,
+-#endif
+ #if SDL_AUDIO_DRIVER_NAS
+ 	&NAS_bootstrap,
+ #endif

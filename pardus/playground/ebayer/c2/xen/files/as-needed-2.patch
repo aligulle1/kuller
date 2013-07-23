@@ -1,0 +1,33 @@
+# http://sources.gentoo.org/cgi-bin/viewvc.cgi/gentoo-x86/app-emulation/xen-tools/files/xen-tools-4.0.0-asneeded.patch?view=log
+--- tools/xenpaging/Makefile
++++ tools/xenpaging/Makefile
+@@ -4,6 +4,6 @@
+ CFLAGS   += -I $(XEN_XC)
+ CFLAGS   += -I ./
+ CFLAGS   += $(CFLAGS_libxenctrl) $(CFLAGS_libxenstore)
+-LDFLAGS  += $(LDFLAGS_libxenctrl) $(LDFLAGS_libxenstore)
++xenpaging_LIBS = $(LDFLAGS_libxenctrl) $(LDFLAGS_libxenstore)
+ 
+ POLICY    = default
+
+@@ -27,7 +27,7 @@
+ all: $(IBINS)
+ 
+ xenpaging: $(OBJS)
+-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
++	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(xenpaging_LIBS)
+ 
+ install: all
+ 	$(INSTALL_DIR) $(DESTDIR)$(SBINDIR)
+--- tools/libxc/Makefile
++++ tools/libxc/Makefile
+@@ -172,7 +172,6 @@
+ xc_dom_bzimageloader.o: CFLAGS += $(call zlib-options,D)
+ xc_dom_bzimageloader.opic: CFLAGS += $(call zlib-options,D)
+ 
+-libxenguest.so.$(MAJOR).$(MINOR): LDFLAGS += $(call zlib-options,l)
+ libxenguest.so.$(MAJOR).$(MINOR): $(GUEST_PIC_OBJS) libxenctrl.so
+-	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenguest.so.$(MAJOR) $(SHLIB_CFLAGS) -o $@ $(GUEST_PIC_OBJS) -lz -lxenctrl $(PTHREAD_LIBS)
++	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenguest.so.$(MAJOR) $(SHLIB_CFLAGS) -o $@ $(GUEST_PIC_OBJS) -lz -lxenctrl $(PTHREAD_LIBS) $(call zlib-options,l)
+ 
+ -include $(DEPS)

@@ -1,0 +1,419 @@
+diff -ur xmame-0.103.orig/Makefile xmame-0.103/Makefile
+--- xmame-0.103.orig/Makefile	2006-01-02 04:13:36.000000000 +0200
++++ xmame-0.103/Makefile	2006-02-07 06:52:03.000000000 +0200
+@@ -52,7 +52,7 @@
+ 
+ # Uncomment to use DRC MIPS3 engine (faster emulation, but only works on x86-
+ # compatible CPUs).
+-# X86_MIPS3_DRC = 1
++X86_MIPS3_DRC = 1
+ 
+ # Uncomment to use DRC PowerPC engine (faster emulation, but only works on x86-
+ # compatible CPUs).
+@@ -73,7 +73,7 @@
+ # On Linux-i386 you can enable this without causing problems on non
+ # MMX capable processors: the Linux code will autodetect if an MMX
+ # capable processor is present and use the right code.
+-# EFFECT_MMX_ASM = 1
++EFFECT_MMX_ASM = 1
+ 
+ 
+ ###########################################################################
+@@ -118,7 +118,6 @@
+ 
+ # If you want to use whatever CFLAGS are currently set in your 
+ # environment, then comment this out.
+-CFLAGS =
+ 
+ 
+ ###########################################################################
+@@ -127,7 +126,6 @@
+ ###########################################################################
+ 
+ # GCC on x86
+-CFLAGS = -O2
+ 
+ # GCC on x86 with some optimizations
+ # CFLAGS = -O2 -mtune=i686 -fomit-frame-pointer -fstrength-reduce -ffast-math
+@@ -171,11 +169,9 @@
+   #########################################################################
+ 
+   # Uncomment for a Linux/PowerPC system.
+-  # CFLAGS += -fsigned-char -mlongcall
+ 
+   # Uncomment for OpenStep.  This might also apply to some versions of 
+   # Mac OS X, but it definitely breaks things in OS X 10.3 with GCC 3.3.
+-  # CFLAGS += -traditional-cpp
+ 
+ 
+   #########################################################################
+@@ -183,19 +179,14 @@
+   #########################################################################
+   
+   # Check for C89 + GNU extensions compliance.
+-  CFLAGS += -std=gnu89
+ 
+   # Show all warnings.
+-  CFLAGS += -Wall
+ 
+   # Don't warn about unused variables.
+-  CFLAGS += -Wno-unused
+ 
+   # Warn about declarations after statements.
+-  CFLAGS += -Wdeclaration-after-statement
+ 
+   # Don't warn about code that might break strict aliasing rules. 
+-  # CFLAGS += -Wno-strict-aliasing
+ 
+ 
+   #########################################################################
+@@ -203,17 +194,13 @@
+   #########################################################################
+ 
+   # Detect non-ANSI C code.
+-  # CFLAGS += -pedantic -ansi -D_XOPEN_SOURCE -D_BSD_SOURCE \
+   # -Wno-long-long -Wno-trigraphs -Dasm=__asm__
+  
+   # Check for C89 compliance.
+-  # CFLAGS += -std=c89
+ 
+   # Enable debugging (e.g., using gdb).
+-  # CFLAGS += -ggdb
+  
+   # Enable gprof profiling.
+-  # CFLAGS += -pg
+ 
+ 
+   #########################################################################
+@@ -223,46 +210,33 @@
+   # Optimization level -- choose one of these.
+   # Use -O1 if you suspect that -O2 is producing bad code; use -O3 for a 
+   # possible speedup; use -Os for a smaller executable.
+-  # CFLAGS += -O2
+-  # CFLAGS += -O1
+-  # CFLAGS += -O3
+-  # CFLAGS += -Os
+ 
+   # This option should reduce compilation time and disk activity, but at 
+   # the expense of using a LOT more memory.  If you have less than 
+   # 256Mb of RAM, you may not want to use this.
+-  # CFLAGS += -pipe
+   
+   # If you use GCC 3.x and find that it's taking many minutes to link, 
+   # enable this to speed up the link stage considerably.
+-  # CFLAGS += -fno-merge-constants
+   
+   # Free up the frame pointer register for other uses.  This can make 
+   # debugging impossible on some platforms, notably x86.  Also, GCC 3.0.2 
+   # can produce invalid code for x86 with this enabled.
+-  # CFLAGS += -fomit-frame-pointer
+ 
+   # Use with GCC 2.95.1 and above for a nice speedup.  For GCC 3.0 and
+   # up, this is automatically turned on by -O2 and higher.
+-  # CFLAGS += -fstrict-aliasing
+ 
+   # Use with EGCS 1.1.x and GCC 2.95; otherwise, xmame compilation will 
+   # break.
+-  # CFLAGS += -fno-strict-aliasing
+  
+   # Unroll loops for a possible speedup.  Beware that combining this with 
+   # -O2 in GCC 3.0.x on x86 platforms miscompiles src/sndhrdw/williams.c, 
+   # causing narc (and possibly other games) to segfault.
+-  # CFLAGS += -funroll-loops
+ 
+   # Produce faster floating point code that isn't IEEE/ISO-compliant.
+-  # CFLAGS += -ffast-math
+ 
+   # Strength reduction and elimination of iteration variables.
+-  # CFLAGS += -fstrength-reduce
+ 
+   # Enable minor optimizations that are relatively expensive.
+-  # CFLAGS += -fexpensive-optimizations
+ 
+ 
+   #########################################################################
+@@ -278,51 +252,13 @@
+   # -mtune.
+ 
+   # x86 options that work with any version of GCC:
+-  # CFLAGS += -march=i386
+-  # CFLAGS += -march=i486
+-  # CFLAGS += -march=i586
+-  # CFLAGS += -march=i686
+-  # CFLAGS += -march=pentium
+-  # CFLAGS += -march=pentiumpro
+ 
+   # x86 options that work only with newer versions of GCC:
+-  # CFLAGS += -march=pentium-mmx
+-  # CFLAGS += -march=pentium2
+-  # CFLAGS += -march=pentium3
+-  # CFLAGS += -march=pentium3m
+-  # CFLAGS += -march=pentium-m
+-  # CFLAGS += -march=pentium4
+-  # CFLAGS += -march=pentium4m
+-  # CFLAGS += -march=prescott
+-  # CFLAGS += -march=nocona
+-  # CFLAGS += -march=k6
+-  # CFLAGS += -march=k6-2
+-  # CFLAGS += -march=k6-3
+-  # CFLAGS += -march=athlon
+-  # CFLAGS += -march=athlon-tbird
+-  # CFLAGS += -march=athlon-4
+-  # CFLAGS += -march=athlon-xp
+-  # CFLAGS += -march=athlon-mp
+-  # CFLAGS += -march=k8
+-  # CFLAGS += -march=opteron
+-  # CFLAGS += -march=athlon64
+-  # CFLAGS += -march=athlon-fx
+-  # CFLAGS += -march=winchip-c6
+-  # CFLAGS += -march=winchip-2
+-  # CFLAGS += -march=c3
+-  # CFLAGS += -march=c3-2
+ 
+   # x86 SIMD options that work only with newer versions of GCC:
+-  # CFLAGS += -mfpmath=sse
+-  # CFLAGS += -mfpmath=sse,387
+   #
+-  # CFLAGS += -mmmx
+-  # CFLAGS += -msse
+-  # CFLAGS += -msse2
+-  # CFLAGS += -m3dnow
+   #
+   # A good value for PIII/Athlon XP(MP) and above:
+-  # CFLAGS += -mfpmath=sse -msse 
+ 
+ else
+ ifeq ($(CC),icc)
+@@ -388,10 +324,8 @@
+   LDFLAGS=$(XOPT) $(XTARGET) $(XPARALLEL) $(EXTRA_OPTS)
+ 
+   # uncomment for silence...
+-  CFLAGS += -erroff
+   # Tell xmame that we really are in fact elf.  If not supplied, SHARED_PREFIX 
+   # is set causing dlopen()'s to fail.
+-  CFLAGS += -D__ELF__ 
+ endif
+ endif
+ endif
+@@ -502,7 +436,7 @@
+ ###########################################################################
+ 
+ # Uncomment next line to build expat as part of the build.
+-# BUILD_EXPAT = 1
++BUILD_EXPAT = 1
+ 
+ # Uncomment next line to build zlib as part of the build.
+ # BUILD_ZLIB = 1
+@@ -535,10 +469,10 @@
+ # Select destination directory for your compiled program, manual page,
+ # and binary distribution.
+ ifndef PREFIX
+-PREFIX = /usr/local
++PREFIX = /usr
+ endif
+ BINDIR = $(PREFIX)/bin
+-MANDIR = $(PREFIX)/man/man6
++MANDIR = $(PREFIX)/share/man/man6
+ 
+ # This is the default path for ROMs and other data files.
+ XMAMEROOT = $(PREFIX)/share/x$(TARGET)
+@@ -604,7 +538,6 @@
+ # ARCH  = solaris
+ # For Solaris, you MIGHT need to add paths where other stuff is; libjpeg and 
+ # so on...  If so, uncomment the next two lines.
+-# CFLAGS += -I/usr/local/include -I/usr/sfw/include 
+ # LDFLAGS += -L/usr/local/lib -L/usr/sfw/lib
+ 
+ # QNX Neutrino (QNX4/QNX6)
+@@ -645,7 +578,7 @@
+ 
+ # Enable the standard joystick driver, which should work in Linux, OpenBSD, 
+ # NetBSD, and FreeBSD.
+-# JOY_STANDARD = 1
++JOY_STANDARD = 1
+ 
+ # Linux FM-TOWNS game pad joystick emulation support.  Thanks to Osamu 
+ # Kurati.
+@@ -686,9 +619,9 @@
+ # Choose any additonal sound drivers you want to include, besides the 
+ # native sound driver for your system.
+ # SOUND_ESOUND = 1
+-# SOUND_ALSA = 1
+-# SOUND_ARTS_TEIRA = 1
+-# SOUND_ARTS_SMOTEK = 1
++SOUND_ALSA = 1
++SOUND_ARTS_TEIRA = 1
++SOUND_ARTS_SMOTEK = 1
+ # SOUND_SDL = 1
+ # SOUND_WAVEOUT = 1
+ 
+@@ -736,10 +669,10 @@
+ 
+ # Enable XFree86 DGA.  This also causes "make install" to set the suid bit 
+ # on the executable.
+-# X11_DGA = 1
++X11_DGA = 1
+ 
+ # Build support for OpenGL rendering into the X-Window version
+-# X11_OPENGL = 1
++X11_OPENGL = 1
+ 
+ # Build support for rendering through Glide into the X-Window version
+ # X11_GLIDE = 1
+@@ -747,7 +680,6 @@
+ # The XIL library (Solaris 2.5.1 and higher)
+ # X11_XIL = 1
+ # Turn off the annoying obsolesence message if XIL is enabled
+-# CFLAGS += -DSUNXIL_WARNING_DISABLE
+ 
+ # Choose the location of your X headers and libraries.
+ 
+@@ -776,7 +708,7 @@
+ # XINPUT_DEVICES = 1
+ 
+ # Enable Xinerama support
+-# X11_XINERAMA = 1
++X11_XINERAMA = 1
+ 
+ 
+ ##############################################################################
+diff -ur xmame-0.103.orig/makefile.unix xmame-0.103/makefile.unix
+--- xmame-0.103.orig/makefile.unix	2006-01-02 04:13:36.000000000 +0200
++++ xmame-0.103/makefile.unix	2006-02-07 06:50:12.000000000 +0200
+@@ -73,7 +73,7 @@
+ # On Linux-i386 you can enable this without causing problems on non
+ # MMX capable processors: the Linux code will autodetect if an MMX
+ # capable processor is present and use the right code.
+-# EFFECT_MMX_ASM = 1
++EFFECT_MMX_ASM = 1
+ 
+ 
+ ###########################################################################
+@@ -502,7 +502,7 @@
+ ###########################################################################
+ 
+ # Uncomment next line to build expat as part of the build.
+-# BUILD_EXPAT = 1
++BUILD_EXPAT = 1
+ 
+ # Uncomment next line to build zlib as part of the build.
+ # BUILD_ZLIB = 1
+@@ -535,10 +535,10 @@
+ # Select destination directory for your compiled program, manual page,
+ # and binary distribution.
+ ifndef PREFIX
+-PREFIX = /usr/local
++PREFIX = /usr
+ endif
+ BINDIR = $(PREFIX)/bin
+-MANDIR = $(PREFIX)/man/man6
++MANDIR = $(PREFIX)/share/man/man6
+ 
+ # This is the default path for ROMs and other data files.
+ XMAMEROOT = $(PREFIX)/share/x$(TARGET)
+@@ -645,7 +645,7 @@
+ 
+ # Enable the standard joystick driver, which should work in Linux, OpenBSD, 
+ # NetBSD, and FreeBSD.
+-# JOY_STANDARD = 1
++JOY_STANDARD = 1
+ 
+ # Linux FM-TOWNS game pad joystick emulation support.  Thanks to Osamu 
+ # Kurati.
+@@ -686,9 +686,9 @@
+ # Choose any additonal sound drivers you want to include, besides the 
+ # native sound driver for your system.
+ # SOUND_ESOUND = 1
+-# SOUND_ALSA = 1
+-# SOUND_ARTS_TEIRA = 1
+-# SOUND_ARTS_SMOTEK = 1
++SOUND_ALSA = 1
++SOUND_ARTS_TEIRA = 1
++SOUND_ARTS_SMOTEK = 1
+ # SOUND_SDL = 1
+ # SOUND_WAVEOUT = 1
+ 
+@@ -736,10 +736,10 @@
+ 
+ # Enable XFree86 DGA.  This also causes "make install" to set the suid bit 
+ # on the executable.
+-# X11_DGA = 1
++X11_DGA = 1
+ 
+ # Build support for OpenGL rendering into the X-Window version
+-# X11_OPENGL = 1
++X11_OPENGL = 1
+ 
+ # Build support for rendering through Glide into the X-Window version
+ # X11_GLIDE = 1
+@@ -776,7 +776,7 @@
+ # XINPUT_DEVICES = 1
+ 
+ # Enable Xinerama support
+-# X11_XINERAMA = 1
++X11_XINERAMA = 1
+ 
+ 
+ ##############################################################################
+diff -ur xmame-0.103.orig/src/unix/effect_asm.asm xmame-0.103/src/unix/effect_asm.asm
+--- xmame-0.103.orig/src/unix/effect_asm.asm	2006-01-02 04:13:34.000000000 +0200
++++ xmame-0.103/src/unix/effect_asm.asm	2006-02-07 06:46:27.000000000 +0200
+@@ -1614,3 +1614,8 @@
+ PixLine		resd    4096
+ 
+ end
++
++%ifidn __OUTPUT_FORMAT__,elf
++section .note.GNU-stack noalloc noexec nowrite progbits
++%endif
++                        
+diff -ur xmame-0.103.orig/src/unix/unix.mak xmame-0.103/src/unix/unix.mak
+--- xmame-0.103.orig/src/unix/unix.mak	2006-01-03 03:57:17.000000000 +0200
++++ xmame-0.103/src/unix/unix.mak	2006-02-07 06:49:50.000000000 +0200
+@@ -4,7 +4,7 @@
+ 
+ # *** Comment out this line to get verbose make output, for debugging build
+ # problems
+-QUIET = 1
++#QUIET = 1
+ 
+ 
+ ##############################################################################
+@@ -74,8 +74,8 @@
+ 
+ INST.x11	= doinstall
+ INST.ggi        = doinstall
+-INST.svgalib    = doinstallsuid
+-INST.svgafx     = doinstallsuid
++INST.svgalib    = doinstall
++INST.svgafx     = doinstall
+ INST.SDL	= doinstall
+ INST.photon2	= doinstall
+ 
+@@ -95,7 +95,7 @@
+ CFLAGS.x11 += -DUSE_GLIDE -I/usr/include/glide3
+ LIBS.x11   += -lglide3
+ endif
+-INST.x11    = doinstallsuid
++INST.x11    = doinstall
+ endif
+ ifdef X11_XIL
+ CFLAGS.x11 += -DUSE_XIL
+@@ -104,7 +104,7 @@
+ ifdef X11_DGA
+ CFLAGS.x11 += -DUSE_DGA
+ LIBS.x11   += -lXxf86dga -lXxf86vm
+-INST.x11    = doinstallsuid
++INST.x11    = doinstall
+ endif
+ # must be last since it does a += on INST.x11
+ ifdef X11_OPENGL
+@@ -744,7 +744,7 @@
+ 	-$(INSTALL_PROGRAM_DIR) $(BINDIR)
+ 	$(INSTALL_PROGRAM) $(NAME).$(DISPLAY_METHOD) $(BINDIR)
+ 
+-doinstallsuid:
++notforus:
+ 	@echo installing binaries under $(BINDIR)...
+ 	-$(INSTALL_PROGRAM_DIR) $(BINDIR)
+ 	$(INSTALL_PROGRAM_SUID) $(NAME).$(DISPLAY_METHOD) $(BINDIR)

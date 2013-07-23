@@ -1,0 +1,37 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+#
+# Copyright 2008 TUBITAK/UEKAE
+# Licensed under the GNU General Public License, version 2.
+# See the file http://www.gnu.org/licenses/old-licenses/gpl-2.0.txt
+
+from pisi.actionsapi import autotools
+from pisi.actionsapi import pisitools
+from pisi.actionsapi import pythonmodules
+from pisi.actionsapi import get
+
+def setup():
+    for makefile in ("mk/beforeauto.mk.in", "mk/platforms/i586_linux_2.0_*.mk"):
+        pisitools.dosed(makefile, "^CXXDEBUGFLAGS.*", "CXXDEBUGFLAGS = %s" % get.CXXFLAGS())
+        pisitools.dosed(makefile, "^CDEBUGFLAGS.*", "CDEBUGFLAGS = %s" % get.CFLAGS())
+        pisitools.dosed(makefile, "^SharedLibraryPlatformLinkFlagsTemplate = (.*)",
+                                  r"SharedLibraryPlatformLinkFlagsTemplate = %s \1" % get.LDFLAGS())
+
+    autotools.configure("--disable-static \
+                         --with-openssl=/usr \
+                         --with-omniNames-logdir=/var/log/omniNames")
+
+def build():
+    autotools.make()
+
+def install():
+    autotools.rawInstall("DESTDIR=%s" % get.installDIR())
+
+    pisitools.insinto("/etc", "sample.cfg", "omniORB.cfg")
+    pisitools.dodir("/var/log/omniNames")
+    pisitools.dodir("/var/lib/omniMapper")
+
+    pythonmodules.fixCompiledPy()
+
+    pisitools.dodoc("CREDITS", "COPYING*", "README*")
+    pisitools.doman("man/*/*")

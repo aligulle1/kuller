@@ -1,0 +1,20 @@
+diff -Nuar kredentials-0.9.5.orig/src/Makefile.in kredentials-0.9.5/src/Makefile.in
+--- kredentials-0.9.5.orig/src/Makefile.in	2011-10-26 12:13:11.601000117 +0300
++++ kredentials-0.9.5/src/Makefile.in	2011-10-26 13:32:17.558000115 +0300
+@@ -377,6 +377,7 @@
+ # the application source, library search path, and link libraries
+ kredentials_SOURCES = main.cpp kredentials.cpp krb5_wrap.cpp
+ kredentials_LDFLAGS = $(KDE_RPATH) $(all_libraries)
++kredentials_XLDFLAGS = $(subst -Wl, -Xlinker -Wl, $(kredentials_LDFLAGS))
+ kredentials_LDADD = $(LIB_KDEUI)
+ krbcheck_SOURCES = krbcheck.cpp krb5_wrap.cpp
+ krbcheck_LDFLAGS = $(all_libraries)
+@@ -477,7 +478,7 @@
+ 	$(CXXLINK) $(krbcheck_LDFLAGS) $(krbcheck_OBJECTS) $(krbcheck_LDADD) $(LIBS)
+ kredentials$(EXEEXT): $(kredentials_OBJECTS) $(kredentials_DEPENDENCIES) 
+ 	@rm -f kredentials$(EXEEXT)
+-	$(CXXLINK) $(kredentials_LDFLAGS) $(kredentials_OBJECTS) $(kredentials_LDADD) $(LIBS)
++	$(CXXLINK) $(kredentials_XLDFLAGS) $(kredentials_OBJECTS) $(kredentials_LDADD) $(LIBS)
+ 
+ mostlyclean-compile:
+ 	-rm -f *.$(OBJEXT)

@@ -1,0 +1,251 @@
+Index: notification-daemon-0.4.0/configure.ac
+===================================================================
+--- notification-daemon-0.4.0.orig/configure.ac
++++ notification-daemon-0.4.0/configure.ac
+@@ -83,7 +83,6 @@ pkg_modules="
+ 	dbus-1 >= $REQ_DBUS_VERSION, \
+ 	dbus-glib-1 >= $REQ_DBUS_VERSION, \
+ 	libsexy >= $REQ_SEXY_VERSION, \
+-	gconf-2.0, \
+ 	libwnck-1.0 \
+ "
+ PKG_CHECK_MODULES(NOTIFICATION_DAEMON, $pkg_modules)
+@@ -109,13 +108,6 @@ AM_CONDITIONAL(HAVE_GDK, test "x$have_gd
+ AC_SUBST(GDK_CFLAGS)
+ AC_SUBST(GDK_LIBS)
+ 
+-AM_GCONF_SOURCE_2
+-AC_PATH_PROG(GCONFTOOL, gconftool-2, no)
+-
+-if test "x$GCONFTOOL" = "xno"; then
+-	AC_MSG_ERROR([gconftool-2 executable not found in your path - should be installed with Gconf])
+-fi
+-
+ dnl
+ dnl Check the D-BUS version.
+ dnl
+Index: notification-daemon-0.4.0/data/Makefile.am
+===================================================================
+--- notification-daemon-0.4.0.orig/data/Makefile.am
++++ notification-daemon-0.4.0/data/Makefile.am
+@@ -16,21 +16,11 @@ iconscalable_DATA = icons/scalable/notif
+ servicedir   = $(DBUS_SERVICES_DIR)
+ service_DATA = org.freedesktop.Notifications.service
+ 
+-schemasdir       = $(GCONF_SCHEMA_FILE_DIR)
+-schemas_in_files = notification-daemon.schemas.in
+-schemas_DATA     = $(schemas_in_files:.schemas.in=.schemas)
+-
+ @INTLTOOL_SCHEMAS_RULE@
+ 
+-if GCONF_SCHEMAS_INSTALL
+-install-data-local:
+-	GCONF_CONFIG_SOURCE=$(GCONF_SCHEMA_CONFIG_SOURCE) $(GCONFTOOL) --makefile-install-rule $(schemas_DATA)
+-else
+ install-data-local:
+-endif
+ 
+ EXTRA_DIST = \
+-	$(schemas_in_files) \
+ 	$(service_DATA) \
+ 	$(icon16_DATA) \
+ 	$(icon22_DATA) \
+@@ -39,9 +29,6 @@ EXTRA_DIST = \
+ 	$(icon48_DATA) \
+ 	$(iconscalable_DATA)
+ 
+-CLEANFILES = $(schemas_DATA)
+-
+-
+ gtk_update_icon_cache = gtk-update-icon-cache -f -t $(datadir)/icons/hicolor
+ 
+ install-data-hook: update-icon-cache
+Index: notification-daemon-0.4.0/src/daemon/daemon.c
+===================================================================
+--- notification-daemon-0.4.0.orig/src/daemon/daemon.c
++++ notification-daemon-0.4.0/src/daemon/daemon.c
+@@ -98,7 +98,6 @@ struct _NotifyDaemonPrivate
+ 	gint stacks_size;
+ };
+ 
+-static GConfClient *gconf_client = NULL;
+ static DBusConnection *dbus_conn = NULL;
+ 
+ #define CHECK_DBUS_VERSION(major, minor) \
+@@ -155,7 +154,6 @@ static void
+ notify_daemon_init(NotifyDaemon *daemon)
+ {
+ 	NotifyStackLocation location;
+-	GConfClient *client = get_gconf_client();
+ 	GdkDisplay *display;
+ 	GdkScreen *screen;
+ 	gchar *slocation;
+@@ -167,8 +165,7 @@ notify_daemon_init(NotifyDaemon *daemon)
+ 	daemon->priv->next_id = 1;
+ 	daemon->priv->timeout_source = 0;
+ 
+-	slocation = gconf_client_get_string(client, GCONF_KEY_POPUP_LOCATION,
+-										NULL);
++	slocation = NULL;
+ 	location = get_stack_location_from_string(slocation);
+ 	g_free(slocation);
+ 
+@@ -789,40 +786,6 @@ window_clicked_cb(GtkWindow *nw, GdkEven
+ }
+ 
+ static void
+-popup_location_changed_cb(GConfClient *client, guint cnxn_id,
+-						  GConfEntry *entry, gpointer user_data)
+-{
+-	NotifyDaemon *daemon = (NotifyDaemon*)user_data;
+-	NotifyStackLocation stack_location;
+-	const char *slocation;
+-	GConfValue *value;
+-	gint i;
+-
+-	if (daemon == NULL)
+-		return;
+-
+-	value = gconf_entry_get_value(entry);
+-	slocation = (value != NULL ? gconf_value_get_string(value) : NULL);
+-
+-	if (slocation != NULL && *slocation != '\0')
+-	{
+-		stack_location = get_stack_location_from_string(slocation);
+-	}
+-	else
+-	{
+-		gconf_client_set_string(get_gconf_client(),
+-			"/apps/notification-daemon/popup_location",
+-			popup_stack_locations[POPUP_STACK_DEFAULT_INDEX].identifier,
+-			NULL);
+-
+-		stack_location = NOTIFY_STACK_LOCATION_DEFAULT;
+-	}
+-
+-	for (i = 0; i < daemon->priv->stacks_size; i++)
+-		notify_stack_set_location(daemon->priv->stacks[i], stack_location);
+-}
+-
+-static void
+ url_clicked_cb(GtkWindow *nw, const char *url)
+ {
+ 	NotifyDaemon *daemon = NW_GET_DAEMON(nw);
+@@ -1397,12 +1360,6 @@ notify_daemon_get_server_information(Not
+ 	return TRUE;
+ }
+ 
+-GConfClient *
+-get_gconf_client(void)
+-{
+-	return gconf_client;
+-}
+-
+ int
+ main(int argc, char **argv)
+ {
+@@ -1417,11 +1374,6 @@ main(int argc, char **argv)
+ 	sound_init();
+ 
+ 	gtk_init(&argc, &argv);
+-	gconf_init(argc, argv, NULL);
+-
+-	gconf_client = gconf_client_get_default();
+-	gconf_client_add_dir(gconf_client, GCONF_KEY_DAEMON,
+-						 GCONF_CLIENT_PRELOAD_NONE, NULL);
+ 
+ 	error = NULL;
+ 
+@@ -1457,20 +1409,11 @@ main(int argc, char **argv)
+ 
+ 	daemon = g_object_new(NOTIFY_TYPE_DAEMON, NULL);
+ 
+-	gconf_client_notify_add(gconf_client, GCONF_KEY_POPUP_LOCATION,
+-							popup_location_changed_cb, daemon,
+-							NULL, NULL);
+-
+-	/* Emit signal to verify/set current key */
+-	gconf_client_notify(gconf_client, GCONF_KEY_POPUP_LOCATION);
+-
+ 	dbus_g_connection_register_g_object(connection,
+ 										"/org/freedesktop/Notifications",
+ 										G_OBJECT(daemon));
+ 
+ 	gtk_main();
+ 
+-	g_object_unref(G_OBJECT(gconf_client));
+-
+ 	return 0;
+ }
+Index: notification-daemon-0.4.0/src/daemon/daemon.h
+===================================================================
+--- notification-daemon-0.4.0.orig/src/daemon/daemon.h
++++ notification-daemon-0.4.0/src/daemon/daemon.h
+@@ -22,19 +22,12 @@
+ #ifndef NOTIFY_DAEMON_H
+ #define NOTIFY_DAEMON_H
+ 
+-#include <gconf/gconf-client.h>
+ #include <glib.h>
+ #include <glib-object.h>
+ 
+ #include <dbus/dbus-glib.h>
+ #include <dbus/dbus-glib-lowlevel.h>
+ 
+-#define GCONF_KEY_DAEMON         "/apps/notification-daemon"
+-#define GCONF_KEY_THEME          GCONF_KEY_DAEMON "/theme"
+-#define GCONF_KEY_POPUP_LOCATION GCONF_KEY_DAEMON "/popup_location"
+-#define GCONF_KEY_SOUND_ENABLED  GCONF_KEY_DAEMON "/sound_enabled"
+-#define GCONF_KEY_DEFAULT_SOUND  GCONF_KEY_DAEMON "/default_sound"
+-
+ #define NOTIFY_TYPE_DAEMON (notify_daemon_get_type())
+ #define NOTIFY_DAEMON(obj) \
+ 	(G_TYPE_CHECK_INSTANCE_CAST ((obj), NOTIFY_TYPE_DAEMON, NotifyDaemon))
+@@ -111,8 +104,6 @@ gboolean notify_daemon_get_server_inform
+ 											  char **out_version,
+ 											  char **out_spec_ver);
+ 
+-GConfClient *get_gconf_client(void);
+-
+ G_END_DECLS
+ 
+ #endif /* NOTIFY_DAEMON_H */
+Index: notification-daemon-0.4.0/src/daemon/engines.c
+===================================================================
+--- notification-daemon-0.4.0.orig/src/daemon/engines.c
++++ notification-daemon-0.4.0/src/daemon/engines.c
+@@ -1,6 +1,5 @@
+ #include "config.h"
+ 
+-#include <gconf/gconf-client.h>
+ #include "daemon.h"
+ #include "engines.h"
+ 
+@@ -124,8 +123,7 @@ theme_engine_unref(ThemeEngine *engine)
+ }
+ 
+ static void
+-theme_changed_cb(GConfClient *client, guint cnxn_id, GConfEntry *entry,
+-				 gpointer user_data)
++theme_changed_cb(guint cnxn_id, gpointer user_data)
+ {
+ 	if (active_engine == NULL)
+ 		return;
+@@ -141,16 +139,7 @@ get_theme_engine(void)
+ {
+ 	if (active_engine == NULL)
+ 	{
+-		GConfClient *client = get_gconf_client();
+-		char *enginename = gconf_client_get_string(client, GCONF_KEY_THEME,
+-												   NULL);
+-
+-		if (theme_prop_notify_id == 0)
+-		{
+-			theme_prop_notify_id = gconf_client_notify_add(client,
+-				"/apps/notification-daemon/theme", theme_changed_cb, NULL,
+-				NULL, NULL);
+-		}
++		char *enginename = NULL;
+ 
+ 		if (enginename == NULL)
+ 		{

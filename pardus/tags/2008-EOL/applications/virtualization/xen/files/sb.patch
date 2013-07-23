@@ -1,0 +1,56 @@
+diff -r ef03fdafc731 tools/ioemu/hw/dma.c
+--- a/tools/ioemu/hw/dma.c	Mon Jan 28 10:42:14 2008 +0000
++++ b/tools/ioemu/hw/dma.c	Tue Jan 29 23:09:20 2008 +0200
+@@ -440,6 +440,13 @@ static void dma_reset(void *opaque)
+     write_cont (d, (0x0d << d->dshift), 0);
+ }
+ 
++static int dma_phony_handler (void *opaque, int nchan, int dma_pos, int dma_len)
++{
++    dolog ("unregistered DMA channel used nchan=%d dma_pos=%d dma_len=%d\n",
++           nchan, dma_pos, dma_len);
++    return dma_pos;
++}
++
+ /* dshift = 0: 8 bit DMA, 1 = 16 bit DMA */
+ static void dma_init2(struct dma_cont *d, int base, int dshift,
+                       int page_base, int pageh_base)
+@@ -472,6 +479,9 @@ static void dma_init2(struct dma_cont *d
+     }
+     qemu_register_reset(dma_reset, d);
+     dma_reset(d);
++    for (i = 0; i < LENOFA (d->regs); ++i) {
++        d->regs[i].transfer_handler = dma_phony_handler;
++    }
+ }
+ 
+ static void dma_save (QEMUFile *f, void *opaque)
+diff -r ef03fdafc731 tools/ioemu/hw/sb16.c
+--- a/tools/ioemu/hw/sb16.c	Mon Jan 28 10:42:14 2008 +0000
++++ b/tools/ioemu/hw/sb16.c	Tue Jan 29 23:09:20 2008 +0200
+@@ -1188,6 +1188,12 @@ static int SB_read_DMA (void *opaque, in
+     SB16State *s = opaque;
+     int till, copy, written, free;
+ 
++    if (s->block_size <= 0) {
++        dolog ("invalid block size=%d nchan=%d dma_pos=%d dma_len=%d\n",
++               s->block_size, nchan, dma_pos, dma_len);
++        return dma_pos;
++    }
++
+     if (s->left_till_irq < 0) {
+         s->left_till_irq = s->block_size;
+     }
+@@ -1235,10 +1241,8 @@ static int SB_read_DMA (void *opaque, in
+             s->block_size);
+ #endif
+ 
+-    if (s->block_size) {
+-        while (s->left_till_irq <= 0) {
+-            s->left_till_irq = s->block_size + s->left_till_irq;
+-        }
++    while (s->left_till_irq <= 0) {
++        s->left_till_irq = s->block_size + s->left_till_irq;
+     }
+ 
+     return dma_pos;

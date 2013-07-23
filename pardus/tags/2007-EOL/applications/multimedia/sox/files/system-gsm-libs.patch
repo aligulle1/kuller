@@ -1,0 +1,177 @@
+diff -Naur sox-13.0.0.orig/configure.ac sox-13.0.0/configure.ac
+--- sox-13.0.0.orig/configure.ac	2007-02-11 21:48:22.000000000 +0200
++++ sox-13.0.0/configure.ac	2007-08-21 11:10:35.000000000 +0300
+@@ -96,16 +96,11 @@
+ fi
+ 
+ dnl Check for libgsm
+-AC_CHECK_HEADERS(gsm/gsm.h, found_libgsm=yes)
++AC_CHECK_HEADERS(gsm.h, found_libgsm=yes)
+ if test "$found_libgsm" = yes; then
+     AC_CHECK_LIB(gsm, gsm_create, LIBS="$LIBS -lgsm")
+     AC_DEFINE(EXTERNAL_GSM, 1, [Define if you are using an external GSM library])
+-else
+-    LIBGSM_SUBDIR=src/libgsm
+-    LIBGSM_LIBADD=libgsm/libgsm.la
+ fi
+-AC_SUBST(LIBGSM_SUBDIR)
+-AC_SUBST(LIBGSM_LIBADD)
+      
+ dnl Check for libsndfile
+ AC_ARG_WITH(sndfile, AC_HELP_STRING([--with-sndfile],
+@@ -179,13 +174,11 @@
+ 
+ dnl Generate output files.
+ AX_CREATE_STDINT_H(src/ststdint.h)
+-AC_CONFIG_FILES(Makefile src/Makefile src/libgsm/Makefile src/libst-config)
++AC_CONFIG_FILES(Makefile src/Makefile src/libst-config)
+ AC_OUTPUT
+ 
+ if test "$found_libgsm" = "yes"; then
+    gsm_option="external"
+-else
+-   gsm_option="in-tree"
+ fi
+ 
+ dnl Report configuration.
+diff -Naur sox-13.0.0.orig/Makefile.am sox-13.0.0/Makefile.am
+--- sox-13.0.0.orig/Makefile.am	2007-01-27 04:59:50.000000000 +0200
++++ sox-13.0.0/Makefile.am	2007-08-21 11:11:22.000000000 +0300
+@@ -2,8 +2,8 @@
+ 
+ ACLOCAL_AMFLAGS = -I m4
+ 
+-SUBDIRS = @LIBGSM_SUBDIR@ src
+-DIST_SUBDIRS = src/libgsm src
++SUBDIRS = src
++DIST_SUBDIRS = src
+ 
+ # man pages are not considered to be sources, so need to add "dist_"
+ # prefix to ensure they are added to the distribution.
+diff -Naur sox-13.0.0.orig/Makefile.in sox-13.0.0/Makefile.in
+--- sox-13.0.0.orig/Makefile.in	2007-02-11 21:48:39.000000000 +0200
++++ sox-13.0.0/Makefile.in	2007-08-21 11:12:14.000000000 +0300
+@@ -116,10 +116,8 @@
+ INSTALL_SCRIPT = @INSTALL_SCRIPT@
+ INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
+ LDFLAGS = @LDFLAGS@
+-LIBGSM_LIBADD = @LIBGSM_LIBADD@
+-LIBGSM_SUBDIR = @LIBGSM_SUBDIR@
+ LIBOBJS = @LIBOBJS@
+-LIBS = @LIBS@
++LIBS = -lgsm @LIBS@
+ LIBTOOL = @LIBTOOL@
+ LIBTOOLFLAGS = @LIBTOOLFLAGS@
+ LIBTOOL_DEPS = @LIBTOOL_DEPS@
+@@ -190,8 +188,8 @@
+ sysconfdir = @sysconfdir@
+ target_alias = @target_alias@
+ ACLOCAL_AMFLAGS = -I m4
+-SUBDIRS = @LIBGSM_SUBDIR@ src
+-DIST_SUBDIRS = src/libgsm src
++SUBDIRS = src
++DIST_SUBDIRS = src
+ 
+ # man pages are not considered to be sources, so need to add "dist_"
+ # prefix to ensure they are added to the distribution.
+diff -Naur sox-13.0.0.orig/src/gsm.c sox-13.0.0/src/gsm.c
+--- sox-13.0.0.orig/src/gsm.c	2007-01-25 03:02:01.000000000 +0200
++++ sox-13.0.0/src/gsm.c	2007-08-21 11:13:16.000000000 +0300
+@@ -29,9 +29,7 @@
+ #include "st_i.h"
+ 
+ #ifdef EXTERNAL_GSM
+-#include <gsm/gsm.h>
+-#else
+-#include "libgsm/gsm.h"
++#include <gsm.h>
+ #endif
+ 
+ #include <errno.h>
+diff -Naur sox-13.0.0.orig/src/Makefile.am sox-13.0.0/src/Makefile.am
+--- sox-13.0.0.orig/src/Makefile.am	2007-02-11 21:49:10.000000000 +0200
++++ sox-13.0.0/src/Makefile.am	2007-08-21 11:13:46.000000000 +0300
+@@ -29,7 +29,7 @@
+ libst_la_SOURCES = $(formats) $(effects) alsa.c oss.c sunaudio.c handlers.c \
+ 		   misc.c st_i.h stio.c util.c xmalloc.c xmalloc.h \
+ 		   getopt.c getopt1.c getopt.h stconfig.h
+-libst_la_LIBADD = @LIBGSM_LIBADD@
++libst_la_LIBADD = -lgsm
+ 
+ sox_SOURCES = sox.c
+ sox_LDADD = libst.la
+diff -Naur sox-13.0.0.orig/src/Makefile.in sox-13.0.0/src/Makefile.in
+--- sox-13.0.0.orig/src/Makefile.in	2007-02-11 21:49:58.000000000 +0200
++++ sox-13.0.0/src/Makefile.in	2007-08-21 11:20:37.000000000 +0300
+@@ -66,7 +66,7 @@
+ libst_la_DEPENDENCIES =
+ am__objects_1 = 8svx.lo adpcm.lo adpcms.lo aiff.lo au.lo auto.lo \
+ 	avr.lo cdr.lo cvsd.lo dat.lo flac.lo g711.lo g721.lo \
+-	g723_24.lo g723_40.lo g72x.lo gsm.lo hcom.lo ima_rw.lo maud.lo \
++	g723_24.lo g723_40.lo g72x.lo hcom.lo ima_rw.lo maud.lo \
+ 	mp3.lo nulfile.lo prc.lo raw.lo sf.lo skelform.lo smp.lo \
+ 	sndfile.lo sndrtool.lo sphere.lo tx16w.lo voc.lo vorbis.lo \
+ 	vox.lo wav.lo wve.lo xa.lo
+@@ -142,8 +142,6 @@
+ INSTALL_SCRIPT = @INSTALL_SCRIPT@
+ INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
+ LDFLAGS = @LDFLAGS@
+-LIBGSM_LIBADD = @LIBGSM_LIBADD@
+-LIBGSM_SUBDIR = @LIBGSM_SUBDIR@
+ LIBOBJS = @LIBOBJS@
+ LIBS = @LIBS@
+ 
+@@ -224,7 +222,7 @@
+ include_HEADERS = st.h ststdint.h
+ formats = 8svx.c adpcm.c adpcm.h adpcms.c adpcms.h aiff.c au.c auto.c avr.c \
+ 	  cdr.c cvsd.c cvsdfilt.h dat.c flac.c g711.c g711.h g721.c g723_24.c \
+-	  g723_40.c g72x.c g72x.h gsm.c hcom.c ima_rw.c ima_rw.h \
++	  g723_40.c g72x.c g72x.h hcom.c ima_rw.c ima_rw.h \
+ 	  maud.c mp3.c nulfile.c prc.c raw.c sf.c sfircam.h skelform.c smp.c \
+ 	  sndfile.c sndrtool.c sphere.c tx16w.c voc.c vorbis.c vox.c wav.c \
+ 	  wav.h wve.c xa.c
+@@ -241,7 +239,7 @@
+ 		   misc.c st_i.h stio.c util.c xmalloc.c xmalloc.h \
+ 		   getopt.c getopt1.c getopt.h stconfig.h
+ 
+-libst_la_LIBADD = @LIBGSM_LIBADD@
++libst_la_LIBADD = -lgsm
+ sox_SOURCES = sox.c
+ sox_LDADD = libst.la
+ EXTRA_DIST = tests.sh testall.sh tests.bat testall.bat monkey.au monkey.wav
+@@ -704,9 +702,6 @@
+ 
+ all: sox$(EXEEXT) play rec
+ 
+-libgsm/libgsm.la:
+-	$(MAKE) -C libgsm
+-
+ play rec: sox$(EXEEXT)
+ 	./sox --help > /dev/null
+ 	test -f .libs/lt-sox && ( $(RM) $@ && $(LN_S) .libs/lt-sox $@ ) || $(LN_S) sox$(EXEEXT) $@
+diff -Naur sox-13.0.0.orig/src/stconfig.h.in sox-13.0.0/src/stconfig.h.in
+--- sox-13.0.0.orig/src/stconfig.h.in	2007-02-11 21:49:59.000000000 +0200
++++ sox-13.0.0/src/stconfig.h.in	2007-08-21 11:21:28.000000000 +0300
+@@ -24,7 +24,7 @@
+ /* Define to 1 if you have the `getopt_long' function. */
+ #undef HAVE_GETOPT_LONG
+ 
+-/* Define to 1 if you have the <gsm/gsm.h> header file. */
++/* Define to 1 if you have the <gsm.h> header file. */
+ #undef HAVE_GSM_GSM_H
+ 
+ /* Define to 1 if you have the <inttypes.h> header file. */
+diff -Naur sox-13.0.0.orig/src/wav.c sox-13.0.0/src/wav.c
+--- sox-13.0.0.orig/src/wav.c	2007-02-06 15:45:37.000000000 +0200
++++ sox-13.0.0/src/wav.c	2007-08-21 11:21:59.000000000 +0300
+@@ -24,9 +24,7 @@
+ #include "ima_rw.h"
+ #include "adpcm.h"
+ #ifdef EXTERNAL_GSM
+-#include <gsm/gsm.h>
+-#else
+-#include "libgsm/gsm.h"
++#include <gsm.h>
+ #endif
+ 
+ /* To allow padding to samplesPerBlock. Works, but currently never true. */

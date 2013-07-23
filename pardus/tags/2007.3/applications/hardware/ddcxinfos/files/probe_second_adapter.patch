@@ -1,0 +1,41 @@
+diff -Nur ddcxinfos-0.1.orig/ddcxinfos.c ddcxinfos-0.1/ddcxinfos.c
+--- ddcxinfos-0.1.orig/ddcxinfos.c	2005-10-06 04:53:47.000000000 +0300
++++ ddcxinfos-0.1/ddcxinfos.c	2007-03-10 23:47:30.000000000 +0200
+@@ -33,10 +33,12 @@
+ 			 );
+ 	printf("\n");
+ 	
+-//	for (adapter = 0; adapter < 8; adapter++) {
+-//	by zaburt
+-    adapter = 0;
+-	//	printf("Video Controller: %d\n\n", adapter);
++	for (adapter = 0; adapter < 2; adapter++) {
++		//printf("Video Controller: %d\n\n", adapter);
++		if (vbe_get_edid_supported(adapter)) break;
++	}
++	
++	if (adapter < 2) {
+ 		if ((edid = vbe_get_edid_info(adapter)) == NULL) return 0;
+ 		if (edid->version == 255 && edid->revision == 255) return 0;
+ 	
+@@ -73,6 +75,6 @@
+ 			   modelines[j].modeline);
+ 		  } else printf("\n");
+ 		}
+-//	}
++	}
+ 	return 0;
+ }
+diff -Nur ddcxinfos-0.1.orig/vbe.c ddcxinfos-0.1/vbe.c
+--- ddcxinfos-0.1.orig/vbe.c	2005-10-06 04:36:09.000000000 +0300
++++ ddcxinfos-0.1/vbe.c	2007-03-10 23:36:50.000000000 +0200
+@@ -202,7 +202,8 @@
+ 	/* Check for successful return. */
+ 	if((regs.eax & 0xff) == 0x4f) {
+ 		/* Supported. */
+-		ret = 1;
++		//ret = 1;
++		ret = regs.ebx & 0x03;
+ 	} else {
+ 		/* Not supported. */
+ 		ret = 0;

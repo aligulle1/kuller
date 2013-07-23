@@ -1,0 +1,22 @@
+--- gtk-vnc-0.3.8/src/Makefile.am.orig	2009-06-07 18:16:12.000000000 +0200
++++ gtk-vnc-0.3.8/src/Makefile.am	2009-06-07 18:14:12.000000000 +0200
+@@ -4,7 +4,7 @@
+ lib_LTLIBRARIES = libgtk-vnc-1.0.la
+ 
+ libgtk_vnc_1_0_la_LIBADD = @GTK_LIBS@ @GNUTLS_LIBS@ \
+-			   @GTHREAD_LIBS@ \
++			   @GTHREAD_LIBS@   -lX11 \
+                            ../gnulib/lib/libgnu.la
+ libgtk_vnc_1_0_la_CFLAGS = @GTK_CFLAGS@ @GNUTLS_CFLAGS@ \
+ 			   @GTHREAD_CFLAGS@ @WARNING_CFLAGS@ \
+@@ -51,8 +51,8 @@
+ # Auto-generated C code for Python binding is full of compiler warnings :-(
+ #gtkvnc_la_CFLAGS = @GTK_CFLAGS@ @WARNING_CFLAGS@ @PYTHON_INCLUDES@ @PYGTK_CFLAGS@
+ gtkvnc_la_CFLAGS = @GTK_CFLAGS@ @PYTHON_INCLUDES@ \
+-		   @PYGTK_CFLAGS@
+-gtkvnc_la_LDFLAGS = -module -avoid-version -fPIC
++		   @PYGTK_CFLAGS@ `python-config --libs`
++gtkvnc_la_LDFLAGS = -module -avoid-version -fPIC `pkg-config --libs gtk+-2.0`
+ gtkvnc_la_SOURCES = vncmodule.c vncmodule.defs.c
+ 
+ CODEGENDIR = $(shell pkg-config --variable=codegendir pygtk-2.0)

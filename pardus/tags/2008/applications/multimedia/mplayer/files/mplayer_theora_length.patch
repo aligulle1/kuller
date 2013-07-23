@@ -1,0 +1,57 @@
+Index: libmpdemux/demux_ogg.c
+===================================================================
+--- libmpdemux/demux_ogg.c	(Revision 26751)
++++ libmpdemux/demux_ogg.c	(Arbeitskopie)
+@@ -113,6 +113,8 @@
+   vorbis_info      vi;
+   int vi_initialized;
+ 
++  int gshift;
++
+   void *ogg_d;
+ } ogg_stream_t;
+ 
+@@ -881,6 +883,7 @@
+ 				      sh_v->bih->biWidth*sh_v->bih->biHeight);
+ 	    ogg_d->subs[ogg_d->num_sub].samplerate = sh_v->fps;
+ 	    ogg_d->subs[ogg_d->num_sub].theora = 1;
++	    ogg_d->subs[ogg_d->num_sub].gshift = theora_granule_shift (&inf);
+ 	    ogg_d->subs[ogg_d->num_sub].id = n_video;
+ 	    n_video++;
+ 	    mp_msg(MSGT_DEMUX,MSGL_INFO,
+@@ -1548,12 +1551,32 @@
+     switch(cmd) {
+ 	case DEMUXER_CTRL_GET_TIME_LENGTH:
+ 	    if (ogg_d->final_granulepos<=0) return DEMUXER_CTRL_DONTKNOW;
+-	    *(double *)arg=(double)ogg_d->final_granulepos / rate;
++	    if (os->theora)
++            {
++                int64_t pos = ogg_d->final_granulepos >> os->gshift;
++                int64_t iframemask = (1 << os->gshift) - 1;
++                pos += ogg_d->final_granulepos & iframemask;
++                *(double *)arg=(double)pos / rate;
++            }
++            else
++            {
++                *(double *)arg=(double)ogg_d->final_granulepos / rate;
++            }
+ 	    return DEMUXER_CTRL_GUESS;
+ 
+ 	case DEMUXER_CTRL_GET_PERCENT_POS:
+ 	    if (ogg_d->final_granulepos<=0) return DEMUXER_CTRL_DONTKNOW;
+-	    *(int *)arg=(os->lastpos*100) / ogg_d->final_granulepos;
++	    if (os->theora)
++            {
++                int64_t pos = ogg_d->final_granulepos >> os->gshift;
++                int64_t iframemask = (1 << os->gshift) - 1;
++                pos += ogg_d->final_granulepos & iframemask;
++	        *(int *)arg=(os->lastpos*100) / pos;
++            }
++	    else
++	    {
++	        *(int *)arg=(os->lastpos*100) / ogg_d->final_granulepos;
++	    }
+ 	    return DEMUXER_CTRL_OK;
+ 
+ 	default:
+

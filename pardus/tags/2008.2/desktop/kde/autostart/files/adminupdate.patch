@@ -1,0 +1,42 @@
+diff -ur konversation-1.0.1.orig/admin/acinclude.m4.in konversation-1.0.1/admin/acinclude.m4.in
+--- konversation-1.0.1.orig/admin/acinclude.m4.in	2006-10-06 19:43:29.000000000 +0300
++++ konversation-1.0.1/admin/acinclude.m4.in	2008-05-21 01:00:19.000000000 +0300
+@@ -983,7 +983,7 @@
+   X_INCLUDES="-I$x_includes"
+ fi
+ 
+-if test -z "$kde_x_libraries" || test "x$kde_x_libraries" = xNONE; then
++if test -z "$kde_x_libraries" || test "x$kde_x_libraries" = xNONE || test "x$kde_x_libraries" = "/usr/lib"; then
+   X_LDFLAGS=""
+   x_libraries="/usr/lib"; dnl better than nothing :-
+  else
+@@ -3198,7 +3198,7 @@
+         case $host in
+           *-*-linux-gnu)	
+             CFLAGS="-std=iso9899:1990 -W -Wall -Wchar-subscripts -Wshadow -Wpointer-arith -Wmissing-prototypes -Wwrite-strings -D_XOPEN_SOURCE=500 -D_BSD_SOURCE $CFLAGS"
+-            CXXFLAGS="-ansi -D_XOPEN_SOURCE=500 -D_BSD_SOURCE -Wcast-align -Wconversion -Wchar-subscripts $CXXFLAGS"
++            CXXFLAGS="-ansi -D_XOPEN_SOURCE=500 -D_BSD_SOURCE -Wcast-align -Wchar-subscripts $CXXFLAGS"
+             KDE_CHECK_COMPILER_FLAG(Wmissing-format-attribute, [CXXFLAGS="$CXXFLAGS -Wformat-security -Wmissing-format-attribute"])
+             KDE_CHECK_C_COMPILER_FLAG(Wmissing-format-attribute, [CFLAGS="$CFLAGS -Wformat-security -Wmissing-format-attribute"])
+           ;;
+diff -ur konversation-1.0.1.orig/admin/cvs.sh konversation-1.0.1/admin/cvs.sh
+--- konversation-1.0.1.orig/admin/cvs.sh	2006-10-06 19:43:29.000000000 +0300
++++ konversation-1.0.1/admin/cvs.sh	2008-05-21 01:00:24.000000000 +0300
+@@ -68,7 +68,7 @@
+     echo "*** KDE requires automake $required_automake_version"
+     exit 1
+     ;;
+-  automake*1.6.* | automake*1.7* | automake*1.8* | automake*1.9*)
++  automake*1.6.* | automake*1.7* | automake*1.8* | automake*1.9* | automake*1.10*)
+     echo "*** $AUTOMAKE_STRING found."
+     UNSERMAKE=no
+     ;;
+@@ -316,7 +316,7 @@
+    fi
+ fi
+ if test -z "$VERSION" || test "$VERSION" = "@VERSION@"; then
+-     VERSION="\"3.5.5\""
++     VERSION="\"3.5.6\""
+ fi
+ if test -z "$modulename" || test "$modulename" = "@MODULENAME@"; then
+    modulename=`pwd`; 

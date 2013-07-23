@@ -1,0 +1,76 @@
+Introduction
+------------
+
+Bugzilla is a powerful bug tracking system used by a large number of open
+source projects.
+
+In order to use Bugzilla, you will first need to configure it for your
+environment.  The first step to doing this is to run the checksetup.pl
+script, which will perform module version checks and create an initial
+config file in /etc/bugzilla called localconfig.  You then need to ensure
+the values in this file are accurate for your environment.
+
+Once this is done, you may need to modify default settings for your database
+to ensure it accepts Bugzilla data properly.  Please see
+http://www.bugzilla.org/docs/4.0/en/html/configuration.html for specifics of
+database setting modifications.
+
+Lastly, simply re-run checksetup.pl to populate the database tables, set up
+the templates, and add the administrator ID.  You should be done at this point.
+
+There are two useful cron jobs which are included with Bugzilla which should be
+put in place after configuration is done.  The first is a daily cron job for
+statistics collection.  This is in the file "cron.daily" and can be enabled by
+simply copying this file to /etc/cron.daily/bugzilla (or any other file name in
+the /etc/cron.daily/ directory).  The second is the "whine" cron job, designed
+to run every 15 minutes.  To enable this job, simply coopy the cron.whine file
+to /etc/cron.d/bugzilla (or any other filename within the /etc/cron.d/
+directory).
+
+
+MySQL configuration
+-------------------
+
+* If you're doing an installation from scratch, use the mysql_secure_installation
+script for a secure mySQL setup.
+
+* By default, MySQL will only allow you to insert things into the database that are smaller than 1MB.
+Attachments may be larger than this. Also, Bugzilla combines all comments on a single bug into one
+field for full-text searching, and the combination of all comments on a single bug could in
+some cases be larger than 1MB. Add max_allowed_packet=4M to mysqld section in my.cnf:
+
+[mysqld]
+# Allow packets up to 4MB
+max_allowed_packet=4M
+
+*   By default, words must be at least four characters in length in order to be indexed by
+MySQL's full-text indexes. This causes a lot of Bugzilla specific words to be
+missed, including "cc", "ftp" and "uri".
+
+Add ft_min_word_len=N
+
+to mysqld section in my.cnf to lower the limit to N character.
+
+[mysqld]
+# Allow small words in full-text indexes
+ft_min_word_len=2
+
+
+HTTPD configuration
+-------------------
+
+You should also ensure that you have disabled KeepAlive support in your Apache
+install when utilizing Bugzilla under mod_perl.
+
+Migration
+---------
+
+1. * If it is a completely new installation, create an SQL dump of your bugzilla database
+with the bugzilla-backup script.
+
+2. Apply the dump onto your new installation with the bugzilla-restore script.
+
+3. Run bugzilla-init to complete the migration.
+
+4. For 3.x to 4, you may also want to run the contrib/convert_workflow.pl to migrate to the
+new bug workflow.

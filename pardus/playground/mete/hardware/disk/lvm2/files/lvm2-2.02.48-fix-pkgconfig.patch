@@ -1,0 +1,49 @@
+libdevmapper.so doesn't link to SELinux libraries unless SELinux is enabled.
+Adding those libraries to Libs.private unconditionally is wrong.
+
+See bug 270350
+---
+Index: LVM2.2.02.53/configure.in
+===================================================================
+--- LVM2.2.02.53.orig/configure.in
++++ LVM2.2.02.53/configure.in
+@@ -829,18 +829,19 @@ if test x$SELINUX = xyes; then
+ 	if test x$HAVE_SEPOL = xyes; then
+ 		AC_DEFINE([HAVE_SEPOL], 1,
+ 		  [Define to 1 if sepol_check_context is available.])
+-		LIBS="-lsepol $LIBS"
++		SELINUX_LIBS="-lsepol $SELINUX_LIBS"
+ 	fi
+ 
+ 	AC_CHECK_LIB(selinux, is_selinux_enabled, HAVE_SELINUX=yes, HAVE_SELINUX=no)
+ 
+ 	if test x$HAVE_SELINUX = xyes; then
+ 		AC_DEFINE([HAVE_SELINUX], 1, [Define to 1 to include support for selinux.])
+-		LIBS="-lselinux $LIBS"
++		SELINUX_LIBS="-lselinux $SELINUX_LIBS"
+ 	else
+ 		AC_MSG_WARN(Disabling selinux)
+ 	fi
+ 
++	LIBS="$SELINUX_LIBS $LIBS"
+ 	# With --enable-static_link and selinux enabled, linking
+ 	# fails on at least Debian unstable due to unsatisfied references
+ 	# to pthread_mutex_lock and _unlock.  See if we need -lpthread.
+@@ -1110,6 +1111,7 @@ AC_SUBST(PKGCONFIG)
+ AC_SUBST(POOL)
+ AC_SUBST(QUORUM_CFLAGS)
+ AC_SUBST(QUORUM_LIBS)
++AC_SUBST(SELINUX_LIBS)
+ AC_SUBST(SACKPT_CFLAGS)
+ AC_SUBST(SACKPT_LIBS)
+ AC_SUBST(SALCK_CFLAGS)
+Index: LVM2.2.02.53/libdm/libdevmapper.pc.in
+===================================================================
+--- LVM2.2.02.53.orig/libdm/libdevmapper.pc.in
++++ LVM2.2.02.53/libdm/libdevmapper.pc.in
+@@ -8,4 +8,4 @@ Description: device-mapper library
+ Version: @DM_LIB_PATCHLEVEL@
+ Cflags: -I${includedir} 
+ Libs: -L${libdir} -ldevmapper
+-Libs.private: -lselinux -lsepol
++Libs.private: @SELINUX_LIBS@

@@ -1,0 +1,52 @@
+diff -ur libsndfile-1.0.17-orig/src/aiff.c libsndfile-1.0.17/src/aiff.c
+--- libsndfile-1.0.17-orig/src/aiff.c	2006-08-31 19:22:07.000000000 +1000
++++ libsndfile-1.0.17/src/aiff.c	2009-04-27 19:24:01.000000000 +1000
+@@ -714,13 +714,25 @@
+ 						psf_log_printf (psf, "  Count : %d\n", mark_count) ;
+ 
+ 						for (n = 0 ; n < mark_count && bytesread < dword ; n++)
+-						{	bytesread += psf_binheader_readf (psf, "E241", &mark_id, &position, &pstr_len) ;
+-							psf_log_printf (psf, "   Mark ID  : %u\n   Position : %u\n", mark_id, position) ;
++						{	unsigned int pstr_len ;
++							unsigned char ch ;
+ 
+-							pstr_len += (pstr_len & 1) + 1 ; /* fudgy, fudgy, hack, hack */
+-
+-							bytesread += psf_binheader_readf (psf, "b", psf->u.scbuf, pstr_len) ;
+-							psf_log_printf (psf, "   Name     : %s\n", psf->u.scbuf) ;
++							bytesread += psf_binheader_readf (psf, "E241", &mark_id, &position, &ch) ;
++  							psf_log_printf (psf, "   Mark ID  : %u\n   Position : %u\n", mark_id, position) ;
++  
++							pstr_len = (ch & 1) ? ch : ch + 1 ;
++
++							if (pstr_len < sizeof (psf->u.scbuf) - 1)
++							{	bytesread += psf_binheader_readf (psf, "b", psf->u.scbuf, pstr_len) ;
++								psf->u.scbuf [pstr_len] = 0 ;
++								}
++							else
++							{	unsigned int read_len = pstr_len - (sizeof (psf->u.scbuf) - 1) ;
++								bytesread += psf_binheader_readf (psf, "bj", psf->u.scbuf, read_len, pstr_len - read_len) ;
++								psf->u.scbuf [sizeof (psf->u.scbuf) - 1] = 0 ;
++								}
++  
++  							psf_log_printf (psf, "   Name     : %s\n", psf->u.scbuf) ;
+ 
+ 							markstr [n].markerID = mark_id ;
+ 							markstr [n].position = position ;
+diff -ur libsndfile-1.0.17-orig/src/voc.c libsndfile-1.0.17/src/voc.c
+--- libsndfile-1.0.17-orig/src/voc.c	2006-08-31 19:22:07.000000000 +1000
++++ libsndfile-1.0.17/src/voc.c	2009-04-27 19:21:18.000000000 +1000
+@@ -209,6 +209,13 @@
+ 
+ 						psf_log_printf (psf, " ASCII : %d\n", size) ;
+ 
++						if (size < sizeof (psf->header) - 1)
++						{	offset += psf_binheader_readf (psf, "b", psf->header, size) ;
++							psf->header [size] = 0 ;
++							psf_log_printf (psf, "  text : %s\n", psf->header) ;
++							continue ;
++							}
++
+ 						offset += psf_binheader_readf (psf, "b", psf->header, size) ;
+ 						psf->header [size] = 0 ;
+ 						psf_log_printf (psf, "  text : %s\n", psf->header) ;

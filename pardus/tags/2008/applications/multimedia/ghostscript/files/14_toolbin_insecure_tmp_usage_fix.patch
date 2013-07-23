@@ -1,0 +1,142 @@
+diff -urN gs-gpl-8.56.dfsg.1.orig/toolbin/gsindent gs-gpl-8.56.dfsg.1/toolbin/gsindent
+--- gs-gpl-8.56.dfsg.1.orig/toolbin/gsindent	2007-05-05 01:18:57.000000000 +0900
++++ gs-gpl-8.56.dfsg.1/toolbin/gsindent	2007-05-05 01:22:08.000000000 +0900
+@@ -21,12 +21,13 @@
+ # The perl invocations work around a bug in GNU indent.
+ 
+ if [ $# -ne 0 ]; then
++    tempfile=`mktemp -t || tempfile` || { echo "$0: Cannot create temporary file" >&2; exit 1; }
+     for f in $*
+     do
+-	$0 < $f > /tmp/$$
++	$0 < $f > $tempfile
+ 	cp -p $f $f.bak
+ 	if ( test ! -e $f~ ) then cp -p $f $f~; fi
+-	mv /tmp/$$ $f
++	mv $tempfile $f
+     done
+     exit
+ fi
+diff -urN gs-gpl-8.56.dfsg.1.orig/toolbin/gssubst gs-gpl-8.56.dfsg.1/toolbin/gssubst
+--- gs-gpl-8.56.dfsg.1.orig/toolbin/gssubst	2007-05-05 01:18:57.000000000 +0900
++++ gs-gpl-8.56.dfsg.1/toolbin/gssubst	2007-05-05 01:23:06.000000000 +0900
+@@ -35,7 +35,27 @@
+ }
+ puts "$from => $to"
+ flush stdout
+-set tmp /tmp/[pid]
++switch $tcl_platform(platform) {
++	unix {
++		set tmpdir /tmp   # or even $::env(TMPDIR), at times.
++	} macintosh {
++		set tmpdir $::env(TRASH_FOLDER)  ;# a better place?
++	} default {
++		set tmpdir [pwd]
++			catch {set tmpdir $::env(TMP)}
++		catch {set tmpdir $::env(TEMP)}
++	}
++}
++set tmp [file join $tmpdir [pid]]
++set access [list RDWR CREAT EXCL TRUNC]
++set perm 0600
++if {[catch {open $tmp $access $perm} fid ]} {
++# something went wrong
++	error "Could not open tempfile."
++}
++if {[catch {close $tmp} err]} {
++	error "Failed closing temporary file: $err"
++}
+ foreach f [lreplace $argv 0 1] {
+     if {![file exists $f~]} {exec cp -p $f $f~}
+     exec perl -pe "s\{\\b${from}\\b\}\{${to}\}g" < $f > $tmp
+diff -urN gs-gpl-8.56.dfsg.1.orig/toolbin/many2pdf.tcl gs-gpl-8.56.dfsg.1/toolbin/many2pdf.tcl
+--- gs-gpl-8.56.dfsg.1.orig/toolbin/many2pdf.tcl	2007-05-05 01:18:57.000000000 +0900
++++ gs-gpl-8.56.dfsg.1/toolbin/many2pdf.tcl	2007-05-05 01:26:02.000000000 +0900
+@@ -24,7 +24,24 @@
+ # Define the file containing the list of input file names.
+ set LIST_FILE_NAME /gs/show.lst
+ # Define the directory where the output will be stored.
+-set PDF_DIR /gs/tmp-pdf
++switch $tcl_platform(platform) {
++   unix {
++	   set tmpdir /tmp   # or even $::env(TMPDIR), at times.
++   } macintosh {
++	   set tmpdir $::env(TRASH_FOLDER)  ;# a better place?
++   } default {
++	   set tmpdir [pwd]
++	   catch {set tmpdir $::env(TMP)}
++	   catch {set tmpdir $::env(TEMP)}
++   }
++}
++set PDF_DIR [file join $tmpdir [pid]]
++set perm 0600
++exec umask 077
++if {[catch {exec mkdir $PDF_DIR} ]} {
++    # something went wrong
++    error "Could not create temporary directory."
++}
+ 
+ proc maxwaitfor {filesize} {
+     return [expr $filesize / 5000 + 30]
+@@ -50,8 +67,22 @@
+ 	    puts "****** $ps FAILED, DOES NOT EXIST ******"
+ 	    continue
+ 	}
+-	set script /tmp/${pid}.tcl
+-	set status /tmp/${pid}.out
++	set script [file join $tmpdir [pid] .tcl ]
++	set status [file join $tmpdir [pid] .out ]
++	set access [list RDWR CREAT EXCL TRUNC]
++	set perm 0600
++	if {[catch {open $script $access $perm} fid ]} {
++		error "Could not open tempfile."
++	}
++	if {[catch {close $script} err]} {
++		error "Failed closing temporary file: $err"
++	}
++	if {[catch {open $status $access $perm} fid ]} {
++		error "Could not open tempfile."
++	}
++	if {[catch {close $status} err]} {
++		error "Failed closing temporary file: $err"
++	}
+ 	set tmp [open $script w]
+ 	puts $tmp "\
+ 	set tmp \[open $status w\]
+diff -urN gs-gpl-8.56.dfsg.1.orig/toolbin/pre.tcl gs-gpl-8.56.dfsg.1/toolbin/pre.tcl
+--- gs-gpl-8.56.dfsg.1.orig/toolbin/pre.tcl	2007-05-05 01:18:57.000000000 +0900
++++ gs-gpl-8.56.dfsg.1/toolbin/pre.tcl	2007-05-05 01:26:50.000000000 +0900
+@@ -183,12 +183,31 @@
+ 	lappend doclist $d
+     }
+ }
++switch $tcl_platform(platform) {
++     unix {
++         set tmpdir /tmp   # or even $::env(TMPDIR), at times.
++     } macintosh {
++         set tmpdir $::env(TRASH_FOLDER)  ;# a better place?
++     } default {
++         set tmpdir [pwd]
++         catch {set tmpdir $::env(TMP)}
++         catch {set tmpdir $::env(TEMP)}
++     }
++}
+ 
+ if {$argv == {update}} {
+ 	# Update dates in .htm and .1 files.
+     proc updoc {doc before after} {
+-	set tmpfile /tmp/[pid]
+-	catch {file delete $tmpfile}
++        set tmpfile [file join $tmpdir [pid]]
++        set access [list RDWR CREAT EXCL TRUNC]
++        set perm 0600
++        if {[catch {open $tempfile $access $perm} fid ]} {
++             # something went wrong
++             error "Could not open tempfile."
++        }
++        if {[catch {close $t} err]} {
++             error "Failed closing temporary file: $err"
++        }
+ 	exec perl -pwe "s{$before}{$after}" < $doc > $tmpfile
+ 	file rename -force $tmpfile $doc
+     }

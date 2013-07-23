@@ -1,0 +1,76 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>vmd</Name>
+        <Homepage>http://www.ks.uiuc.edu/Research/vmd</Homepage>
+        <Packager>
+            <Name>Gökcen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Packager>
+        <License>vmd</License>
+        <Icon>vmd</Icon>
+        <IsA>app:gui</IsA>
+        <Summary>Visual Molecular Dynamics</Summary>
+        <Description>vmd is a molecular visualization program for displaying, animating, and analyzing large biomolecular systems using 3-D graphics and built-in scripting.</Description>
+        <!-- Agree the license and download 1.8.7 tarball from http://www.ks.uiuc.edu/Development/Download/download.cgi?PackageName=VMD -->
+        <Archive sha1sum="409b6f8959d551f581991073f98885b47c21c25c" type="targz">http://www.ks.uiuc.edu/Research/vmd/vmd-1.8.7.src.tar.gz</Archive>
+        <BuildDependencies>
+            <Dependency>python-numpy</Dependency>
+            <Dependency>netcdf-devel</Dependency>
+            <Dependency>fltk-devel</Dependency>
+            <Dependency>tcl-devel</Dependency>
+            <Dependency>tcltk-devel</Dependency>
+            <Dependency>libXft-devel</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <!-- slightly modified gentoo patch, -ltcl and -ltk parts are removed, that's all -->
+            <Patch level="1">vmd-1.8.7-gentoo.patch</Patch>
+            <Patch level="1">use-xdg-open-as-browser.patch</Patch>
+            <Patch level="1">use-gtk-like-fltk-scheme.patch</Patch>
+            <Patch level="1">use-xdg-open-as-ps-renderer.patch</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>vmd</Name>
+        <RuntimeDependencies>
+            <Dependency>python-numpy</Dependency>
+            <Dependency>netcdf</Dependency>
+            <Dependency>fltk</Dependency>
+            <Dependency>tcl</Dependency>
+            <Dependency>tcltk</Dependency>
+            <Dependency>stride</Dependency>
+            <Dependency>tachyon</Dependency>
+            <Dependency>mesa</Dependency>
+            <Dependency>xdg-utils</Dependency>
+            <Dependency>libXft</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="data">/etc</Path>
+            <Path fileType="executable">/usr/bin</Path>
+            <Path fileType="data">/usr/lib</Path>
+            <Path fileType="library">/usr/lib/vmd/*.so</Path>
+            <Path fileType="header">/usr/lib/vmd/*.h</Path>
+            <Path fileType="library">/usr/lib/vmd/*.a</Path>
+            <Path fileType="doc">/usr/share/doc</Path>
+            <Path fileType="data">/usr/share/applications</Path>
+            <Path fileType="data">/usr/share/pixmaps</Path>
+        </Files>
+        <AdditionalFiles>
+            <AdditionalFile owner="root" permission="0644" target="/usr/share/pixmaps/vmd.png">vmd.png</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/usr/share/applications/vmd.desktop">vmd.desktop</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/etc/env.d/99vmd">99vmd</AdditionalFile>
+        </AdditionalFiles>
+    </Package>
+
+    <History>
+        <Update release="1">
+            <Date>2011-11-25</Date>
+            <Version>1.8.7</Version>
+            <Comment>First release.</Comment>
+            <Name>Gökcen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+    </History>
+</PISI>

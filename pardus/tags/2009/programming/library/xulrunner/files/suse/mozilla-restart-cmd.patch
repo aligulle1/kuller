@@ -1,0 +1,50 @@
+From: Wolfgang Rosenauer
+Subject: Set the correct restart command for session managers
+References:
+https://bugzilla.novell.com/show_bug.cgi?id=396552
+
+
+Index: toolkit/xre/nsNativeAppSupportUnix.cpp
+===================================================================
+RCS file: /cvsroot/mozilla/toolkit/xre/nsNativeAppSupportUnix.cpp,v
+retrieving revision 1.5
+diff -u -p -6 -r1.5 nsNativeAppSupportUnix.cpp
+--- toolkit/xre/nsNativeAppSupportUnix.cpp	21 Feb 2008 10:55:06 -0000	1.5
++++ toolkit/xre/nsNativeAppSupportUnix.cpp	4 Jun 2008 16:04:51 -0000
+@@ -156,18 +156,32 @@ gboolean save_yourself_cb(GnomeClient *c
+   rv = gDirServiceProvider->GetFile(XRE_EXECUTABLE_FILE, &dummy, getter_AddRefs(executablePath));
+ 
+   if (NS_SUCCEEDED(rv)) {
+     nsCAutoString path;
+     char* argv[1];
+ 
+-    // Strip off the -bin suffix to get the shell script we should run; this is what Breakpad does
+     nsCAutoString leafName;
+     rv = executablePath->GetNativeLeafName(leafName);
+-    if (NS_SUCCEEDED(rv) && StringEndsWith(leafName, NS_LITERAL_CSTRING("-bin"))) {
+-      leafName.SetLength(leafName.Length() - strlen("-bin"));
+-      executablePath->SetNativeLeafName(leafName);
++    if (NS_SUCCEEDED(rv)) {
++      if (StringEndsWith(leafName, NS_LITERAL_CSTRING("-bin"))) {
++        // Strip off the -bin suffix to get the shell script we should run; this is what Breakpad does
++        leafName.SetLength(leafName.Length() - strlen("-bin"));
++        executablePath->SetNativeLeafName(leafName);
++      } else {
++        // It's most likely a xulapp so check if leafName.sh is executable
++        // and use that instead of plain xulrunner stub
++        PRBool exec;
++        nsCOMPtr<nsIFile> tempPath;
++        executablePath->Clone(getter_AddRefs(tempPath));
++        leafName.Append(NS_LITERAL_CSTRING(".sh"));
++        tempPath->SetNativeLeafName(leafName);
++        tempPath->IsExecutable(&exec);
++        if (exec) {
++          executablePath->SetNativeLeafName(leafName);
++        }
++      }
+     }
+ 
+     executablePath->GetNativePath(path);
+     argv[0] = (char*)(path.get());
+ 
+     gnome_client_set_restart_command(client, 1, argv);

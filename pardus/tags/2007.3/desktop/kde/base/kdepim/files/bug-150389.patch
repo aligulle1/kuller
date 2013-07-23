@@ -1,0 +1,338 @@
+Index: akregator/src/mk4storage/storagemk4impl.cpp
+===================================================================
+--- akregator/src/mk4storage/storagemk4impl.cpp	(revision 721754)
++++ akregator/src/mk4storage/storagemk4impl.cpp	(revision 721755)
+@@ -57,7 +57,6 @@
+         QStringList feedURLs;
+         c4_StringProp purl, pFeedList, pTagSet;
+         c4_IntProp punread, ptotalCount, plastFetch;
+-        QTimer* commitTimer;
+         QString archivePath;
+         
+         bool taggingEnabled;
+@@ -87,10 +86,6 @@
+ StorageMK4Impl::StorageMK4Impl() : d(new StorageMK4ImplPrivate)
+ {
+     setArchivePath(QString::null); // set path to default
+-    // commit changes every 3 seconds
+-    d->commitTimer = new QTimer(this);
+-    connect(d->commitTimer, SIGNAL(timeout()), this, SLOT(slotCommit()));
+-    d->commitTimer->start(3000);
+ }
+ 
+ QString StorageMK4Impl::defaultArchivePath()
+@@ -145,8 +140,6 @@
+ 
+ bool StorageMK4Impl::close()
+ {
+-    d->commitTimer->stop();
+-
+     QMap<QString, FeedStorage*>::Iterator it;
+     QMap<QString, FeedStorage*>::Iterator end(d->feeds.end() ) ;
+     for (it = d->feeds.begin(); it != end; ++it)
+@@ -217,7 +210,7 @@
+     findrow = d->archiveView.GetAt(findidx);
+     d->punread(findrow) = unread;
+     d->archiveView.SetAt(findidx, findrow);
+-    d->modified = true;
++    markDirty();
+ }
+ 
+ int StorageMK4Impl::totalCountFor(const QString &url)
+@@ -239,7 +232,7 @@
+     findrow = d->archiveView.GetAt(findidx);
+     d->ptotalCount(findrow) = total;
+     d->archiveView.SetAt(findidx, findrow);
+-    d->modified = true;
++    markDirty();
+ }
+ 
+ int StorageMK4Impl::lastFetchFor(const QString& url)
+@@ -261,13 +254,23 @@
+     findrow = d->archiveView.GetAt(findidx);
+     d->plastFetch(findrow) = lastFetch;
+     d->archiveView.SetAt(findidx, findrow);
+-    d->modified = true;
++    markDirty();
+ }
+ 
++void StorageMK4Impl::markDirty()
++{
++    if (!d->modified)
++    {
++        d->modified = true;
++        // commit changes after 3 seconds
++        QTimer::singleShot(3000, this, SLOT(slotCommit()));
++    }
++}
++
+ void StorageMK4Impl::slotCommit()
+ {
+     if (d->modified)
+-    	commit();
++        commit();
+     d->modified = false;
+ }
+ 
+@@ -286,7 +289,7 @@
+ 	    d->ptotalCount(findrow) = 0;
+ 	    d->plastFetch(findrow) = 0;
+             d->archiveView.Add(findrow);
+-            d->modified = true;
++            markDirty();
+         }
+         fs->convertOldArchive();
+     }
+@@ -353,7 +356,7 @@
+         d->pFeedList(row) = !opmlStr.isEmpty() ? opmlStr.utf8().data() : "";
+         d->feedListView.SetAt(0, row);
+     }
+-    d->modified = true;
++    markDirty();
+ }
+ 
+ QString StorageMK4Impl::restoreFeedList() const
+@@ -381,7 +384,7 @@
+         d->pTagSet(row) = !xmlStr.isEmpty() ? xmlStr.utf8().data() : "";
+         d->feedListView.SetAt(0, row);
+     }
+-    d->modified = true;
++    markDirty();
+ }
+ 
+ QString StorageMK4Impl::restoreTagSet() const
+Index: akregator/src/mk4storage/storagemk4impl.h
+===================================================================
+--- akregator/src/mk4storage/storagemk4impl.h	(revision 721754)
++++ akregator/src/mk4storage/storagemk4impl.h	(revision 721755)
+@@ -114,6 +114,8 @@
+         
+         virtual bool taggingEnabled() const;
+         
++        void markDirty();
++
+     protected slots:
+         virtual void slotCommit();
+         
+Index: akregator/src/mk4storage/feedstoragemk4impl.cpp
+===================================================================
+--- akregator/src/mk4storage/feedstoragemk4impl.cpp	(revision 721754)
++++ akregator/src/mk4storage/feedstoragemk4impl.cpp	(revision 721755)
+@@ -125,7 +125,7 @@
+     }
+     
+     setUnread(unr);
+-    d->modified = true;
++    markDirty();
+     commit();
+ }
+ 
+@@ -181,6 +181,16 @@
+     delete d; d = 0;
+ }
+ 
++void FeedStorageMK4Impl::markDirty()
++{
++    if (!d->modified)
++    {
++        d->modified = true;
++        // Tell this to mainStorage
++        d->mainStorage->markDirty();
++    }
++}
++
+ void FeedStorageMK4Impl::commit()
+ {
+     if (d->modified)
+@@ -290,7 +300,7 @@
+     if (!contains(guid))
+     {
+         d->archiveView.Add(row);
+-	d->modified = true;
++        markDirty();
+         setTotalCount(totalCount()+1);
+     }
+ }
+@@ -318,7 +328,7 @@
+             removeTag(guid, *it);
+         setTotalCount(totalCount()-1);
+         d->archiveView.RemoveAt(findidx);
+-        d->modified = true;
++        markDirty();
+     }   
+ }
+ 
+@@ -370,7 +380,7 @@
+     d->pauthor(row) = "";
+     d->pcommentsLink(row) = "";
+     d->archiveView.SetAt(findidx, row);
+-    d->modified = true;
++    markDirty();
+ }
+ 
+ QString FeedStorageMK4Impl::link(const QString& guid)
+@@ -400,7 +410,7 @@
+     row = d->archiveView.GetAt(findidx);
+     d->pstatus(row) = status;
+     d->archiveView.SetAt(findidx, row);
+-    d->modified = true;
++    markDirty();
+ }
+ 
+ QString FeedStorageMK4Impl::title(const QString& guid)
+@@ -425,7 +435,7 @@
+     row = d->archiveView.GetAt(findidx);
+     d->ppubDate(row) = pubdate;
+     d->archiveView.SetAt(findidx, row);
+-    d->modified = true;
++    markDirty();
+ }
+ 
+ void FeedStorageMK4Impl::setGuidIsHash(const QString& guid, bool isHash)
+@@ -437,7 +447,7 @@
+     row = d->archiveView.GetAt(findidx);
+     d->pguidIsHash(row) = isHash;
+     d->archiveView.SetAt(findidx, row);
+-    d->modified = true;
++    markDirty();
+ }
+ 
+ void FeedStorageMK4Impl::setLink(const QString& guid, const QString& link)
+@@ -449,7 +459,7 @@
+     row = d->archiveView.GetAt(findidx);
+     d->plink(row) = !link.isEmpty() ? link.ascii() : "";
+     d->archiveView.SetAt(findidx, row);
+-    d->modified = true;
++    markDirty();
+ }
+ 
+ void FeedStorageMK4Impl::setHash(const QString& guid, uint hash)
+@@ -461,7 +471,7 @@
+     row = d->archiveView.GetAt(findidx);
+     d->phash(row) = hash;
+     d->archiveView.SetAt(findidx, row);
+-    d->modified = true;
++    markDirty();
+ }
+ 
+ void FeedStorageMK4Impl::setTitle(const QString& guid, const QString& title)
+@@ -473,7 +483,7 @@
+     row = d->archiveView.GetAt(findidx);
+     d->ptitle(row) = !title.isEmpty() ? title.utf8().data() : "";
+     d->archiveView.SetAt(findidx, row);
+-    d->modified = true;
++    markDirty();
+ }
+ 
+ void FeedStorageMK4Impl::setDescription(const QString& guid, const QString& description)
+@@ -485,7 +495,7 @@
+     row = d->archiveView.GetAt(findidx);
+     d->pdescription(row) = !description.isEmpty() ? description.utf8().data() : "";
+     d->archiveView.SetAt(findidx, row);
+-    d->modified = true;
++    markDirty();
+ }
+ 
+ void FeedStorageMK4Impl::setAuthor(const QString& guid, const QString& author)
+@@ -497,7 +507,7 @@
+     row = d->archiveView.GetAt(findidx);
+     d->pauthor(row) = !author.isEmpty() ? author.utf8().data() : "";
+     d->archiveView.SetAt(findidx, row);
+-    d->modified = true;
++    markDirty();
+ }
+ 
+ QString FeedStorageMK4Impl::author(const QString& guid)
+@@ -516,7 +526,7 @@
+     row = d->archiveView.GetAt(findidx);
+     d->pcommentsLink(row) = !commentsLink.isEmpty() ? commentsLink.utf8().data() : "";
+     d->archiveView.SetAt(findidx, row);
+-    d->modified = true;
++    markDirty();
+ }
+ 
+ void FeedStorageMK4Impl::setComments(const QString& guid, int comments)
+@@ -528,7 +538,7 @@
+     row = d->archiveView.GetAt(findidx);
+     d->pcomments(row) = comments;
+     d->archiveView.SetAt(findidx, row);
+-    d->modified = true;
++    markDirty();
+ }
+ 
+ 
+@@ -541,7 +551,7 @@
+     row = d->archiveView.GetAt(findidx);
+     d->pguidIsPermaLink(row) = isPermaLink;
+     d->archiveView.SetAt(findidx, row);
+-    d->modified = true;
++    markDirty();
+ }
+ 
+ void FeedStorageMK4Impl::addCategory(const QString& /*guid*/, const Category& /*cat*/)
+@@ -595,7 +605,7 @@
+             d->catView.SetAt(catidx2, catrow2);
+         }
+ 
+-        d->modified = true;
++        markDirty();
+     } 
+     */
+ }
+@@ -687,7 +697,7 @@
+             d->ptaggedArticles(tagrow) = tagView2;
+             d->tagView.SetAt(tagidx2, tagrow);
+         }
+-        d->modified = true;
++        markDirty();
+     } 
+ }
+ 
+@@ -732,7 +742,7 @@
+             }
+         }
+         
+-        d->modified = true;
++        markDirty();
+     }
+ }
+ 
+@@ -811,7 +821,7 @@
+     d->pEnclosureLength(row) = length;
+ 
+     d->archiveView.SetAt(findidx, row);
+-    d->modified = true;
++    markDirty();
+ }
+ 
+ void FeedStorageMK4Impl::removeEnclosure(const QString& guid)
+@@ -827,7 +837,7 @@
+     d->pEnclosureLength(row) = -1;
+ 
+     d->archiveView.SetAt(findidx, row);
+-    d->modified = true;
++    markDirty();
+ }
+ 
+ void FeedStorageMK4Impl::enclosure(const QString& guid, bool& hasEnclosure, QString& url, QString& type, int& length)
+@@ -854,7 +864,7 @@
+     if (d->taggingEnabled)
+         d->tagStorage->RemoveAll();
+     setUnread(0);
+-    d->modified = true;
++    markDirty();
+ }
+ 
+ } // namespace Backend
+Index: akregator/src/mk4storage/feedstoragemk4impl.h
+===================================================================
+--- akregator/src/mk4storage/feedstoragemk4impl.h	(revision 721754)
++++ akregator/src/mk4storage/feedstoragemk4impl.h	(revision 721755)
+@@ -94,6 +94,7 @@
+         
+         virtual void convertOldArchive();
+    private:
++        void markDirty();
+         /** finds article by guid, returns -1 if not in archive **/
+         int findArticle(const QString& guid);
+         void setTotalCount(int total);

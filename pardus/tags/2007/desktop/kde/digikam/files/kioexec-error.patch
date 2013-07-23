@@ -1,0 +1,40 @@
+--- digikam/utilities/hotplug/digikam-gphoto2-camera.desktop.in	2006-12-05 21:52:32.000000000 +0200
++++ digikam/utilities/hotplug/digikam-gphoto2-camera.desktop.in	2006-12-12 09:47:28.188001536 +0200
+@@ -1,5 +1,5 @@
+ [Desktop Action digiKam Detect and Download]
+-Exec=@digikamhelper_dir@/digikam-camera detect
++Exec=@digikamhelper_dir@/digikam-camera detect %u
+ Icon=digikam
+ Name=digiKam Detect and Download
+ 
+--- digikam/utilities/hotplug/digikam-camera	2006-12-05 21:52:32.000000000 +0200
++++ digikam/utilities/hotplug/digikam-camera	2006-12-12 10:15:30.845198760 +0200
+@@ -10,6 +10,7 @@
+ storage)
+ 	cmdoption=--download-from
+ 	dcopcall=downloadFrom
++    args="$@"
+ 	;;
+ *)
+ 	echo "${0##*/}: wrong action.  Usage"
+@@ -23,9 +24,17 @@
+ 	case "$app" in
+ 	    digikam-*)
+ 		echo "recycling running $app: $dcopcall $@"
+-		exec dcop "$app" camera  "$dcopcall" "$@"
++        if test -z "$args"; then
++		    exec dcop "$app" camera  "$dcopcall"
++        else
++            exec dcop "$app" camera  "$dcopcall" "$args"
++        fi
+ 	    ;;
+ 	esac
+ done;
+-echo "starting digikam with $cmdoption $@"
+-exec digikam  "$cmdoption" "$@"
++echo "starting digikam with $cmdoption $args"
++if test -z "$args"; then
++    exec digikam  "$cmdoption"
++else
++    exec digikam  "$cmdoption" "$args"
++fi

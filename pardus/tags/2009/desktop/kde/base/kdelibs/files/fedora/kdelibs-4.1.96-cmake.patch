@@ -1,0 +1,38 @@
+diff -up kdelibs-4.1.96/cmake/modules/FindKdepimLibs.cmake.orig kdelibs-4.1.96/cmake/modules/FindKdepimLibs.cmake
+--- kdelibs-4.1.96/cmake/modules/FindKdepimLibs.cmake.orig	2009-01-08 22:14:13.000000000 +0100
++++ kdelibs-4.1.96/cmake/modules/FindKdepimLibs.cmake	2009-01-08 22:14:59.000000000 +0100
+@@ -64,9 +64,13 @@
+ # See kdepimlibs/CMakeLists.txt and kdepimlibs/KdepimLibsConfig.cmake.in 
+ # for details. Alex
+ 
+-
++set(KDEPIMLIBS_VERSION 4.2.0)
++set(_KdepimLibsConfig_INSTALL_DIR ${LIB_INSTALL_DIR}/KdepimLibs-${KDEPIMLIBS_VERSION}/cmake)
++if(KDE4_USE_COMMON_CMAKE_PACKAGE_CONFIG_DIR)
++   set(_KdepimLibsConfig_INSTALL_DIR ${LIB_INSTALL_DIR}/cmake/KdepimLibs-${KDEPIMLIBS_VERSION} )
++endif(KDE4_USE_COMMON_CMAKE_PACKAGE_CONFIG_DIR)
+ set(_KdepimLibs_FIND_QUIETLY  ${KdepimLibs_FIND_QUIETLY})
+-find_package(KdepimLibs ${KdepimLibs_FIND_VERSION} QUIET NO_MODULE PATHS ${KDE4_LIB_DIR}/KdepimLibs/cmake )
++find_package(KdepimLibs ${KdepimLibs_FIND_VERSION} QUIET NO_MODULE PATHS ${_KdepimLibsConfig_INSTALL_DIR} )
+ set(KdepimLibs_FIND_QUIETLY ${_KdepimLibs_FIND_QUIETLY})
+ 
+ include(FindPackageHandleStandardArgs)
+diff -up kdelibs-4.1.96/cmake/modules/FindKDE4Workspace.cmake.orig kdelibs-4.1.96/cmake/modules/FindKDE4Workspace.cmake
+--- kdelibs-4.1.96/cmake/modules/FindKDE4Workspace.cmake.orig	2009-01-10 21:53:41.000000000 +0100
++++ kdelibs-4.1.96/cmake/modules/FindKDE4Workspace.cmake	2009-01-10 21:54:03.000000000 +0100
+@@ -62,8 +62,14 @@
+ # for details. Alex
+ 
+ 
++set(KDE4WORKSPACE_VERSION 4.2.0)
++set(_KdeWorkspaceConfig_INSTALL_DIR ${LIB_INSTALL_DIR}/KDE4Workspace-${KDE4WORKSPACE_VERSION}/cmake)
++if(KDE4_USE_COMMON_CMAKE_PACKAGE_CONFIG_DIR)
++   set(_KdeWorkspaceConfig_INSTALL_DIR ${LIB_INSTALL_DIR}/cmake/KDE4Workspace-${KDE4WORKSPACE_VERSION} )
++endif(KDE4_USE_COMMON_CMAKE_PACKAGE_CONFIG_DIR)
++
+ set(_KDE4Workspace_FIND_QUIETLY  ${KDE4Workspace_FIND_QUIETLY})
+-find_package(KDE4Workspace QUIET NO_MODULE PATHS ${KDE4_LIB_DIR}/KDE4Workspace/cmake )
++find_package(KDE4Workspace QUIET NO_MODULE PATHS ${_KdeWorkspaceConfig_INSTALL_DIR} )
+ set(KDE4Workspace_FIND_QUIETLY ${_KDE4Workspace_FIND_QUIETLY})
+ 
+ include(FindPackageHandleStandardArgs)

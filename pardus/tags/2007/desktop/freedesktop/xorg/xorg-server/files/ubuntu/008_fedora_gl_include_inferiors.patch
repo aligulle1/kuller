@@ -1,0 +1,67 @@
+--- xorg-server-7.1.orig/xorg-server-1.1.99.903/hw/xfree86/dri/dri.c-gl-include-inferiors	2006-04-02 21:34:54.000000000 -0400
++++ xorg-server-7.1.orig/xorg-server-1.1.99.903/hw/xfree86/dri/dri.c	2006-06-12 20:58:00.000000000 -0400
+@@ -69,6 +69,8 @@
+ #include "mi.h"
+ #include "mipointer.h"
+ 
++#include "selection.h"
++
+ #if !defined(PANORAMIX)
+ extern Bool noPanoramiXExtension;
+ #endif
+@@ -1116,6 +1118,31 @@
+     return TRUE;
+ }
+ 
++extern Selection *CurrentSelections;
++extern int NumCurrentSelections;
++
++static Bool
++DRIIncludeInferiors(void)
++{
++
++  static Atom atom = BAD_RESOURCE;
++  static char atom_name[] = "_COMPIZ_GL_INCLUDE_INFERIORS";
++  int i;
++
++  if (atom == BAD_RESOURCE) {
++    atom = MakeAtom(atom_name, strlen(atom_name), True);
++    if (atom == BAD_RESOURCE)
++      return False;
++  }
++
++  for (i = 0; i < NumCurrentSelections; i++)
++    if (CurrentSelections[i].selection == atom &&
++	CurrentSelections[i].window != None)
++      return True;
++
++  return False;
++}
++
+ Bool
+ DRIGetDrawableInfo(ScreenPtr pScreen,
+                    DrawablePtr pDrawable,
+@@ -1134,6 +1161,7 @@
+ {
+     DRIScreenPrivPtr    pDRIPriv = DRI_SCREEN_PRIV(pScreen);
+     DRIDrawablePrivPtr	pDRIDrawablePriv, pOldDrawPriv;
++    RegionPtr		pClipList;
+     WindowPtr		pWin, pOldWin;
+     int			i;
+ 
+@@ -1227,8 +1255,13 @@
+ #endif
+ 	    *W = (int)(pWin->drawable.width);
+ 	    *H = (int)(pWin->drawable.height);
+-	    *numClipRects = REGION_NUM_RECTS(&pWin->clipList);
+-	    *pClipRects = (drm_clip_rect_t *)REGION_RECTS(&pWin->clipList);
++	    if (DRIIncludeInferiors())
++	      pClipList = &pWin->borderClip;
++	    else
++	      pClipList = &pWin->clipList;
++	      
++	    *numClipRects = REGION_NUM_RECTS(pClipList);
++	    *pClipRects = (drm_clip_rect_t *)REGION_RECTS(pClipList);
+ 
+ 	    if (!*numClipRects && pDRIPriv->fullscreen) {
+ 				/* use fake full-screen clip rect */

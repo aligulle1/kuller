@@ -1,0 +1,347 @@
+diff --git a/docs/news.html b/docs/news.html
+index b6fa0b9..8c80b41 100644
+--- a/docs/news.html
++++ b/docs/news.html
+@@ -11,7 +11,7 @@
+ <H1>News</H1>
+ 
+ 
+-<h2>March 26, 2010</h2>
++<h2>March 28, 2010</h2>
+ <p>
+ <a href="relnotes-7.7.1.html">Mesa 7.7.1</a> is released.  This is a bug-fix
+ release fixing issues found in the 7.7 release.
+diff --git a/src/glx/x11/glxext.c b/src/glx/x11/glxext.c
+index 5633a3e..387c081 100644
+--- a/src/glx/x11/glxext.c
++++ b/src/glx/x11/glxext.c
+@@ -438,10 +438,16 @@ __glXInitializeVisualConfigFromTags(__GLcontextModes * config, int count,
+       case GLX_Y_INVERTED_EXT:
+          config->yInverted = *bp++;
+          break;
++      case GLX_USE_GL:
++         if (fbconfig_style_tags)
++            bp++;
++         break;
+       case None:
+          i = count;
+          break;
+       default:
++         /* Ignore the unrecognized tag's value */
++         bp++;
+          break;
+       }
+    }
+diff --git a/src/mesa/drivers/dri/r300/r300_ioctl.c b/src/mesa/drivers/dri/r300/r300_ioctl.c
+index bb34efe..369a6e1 100644
+--- a/src/mesa/drivers/dri/r300/r300_ioctl.c
++++ b/src/mesa/drivers/dri/r300/r300_ioctl.c
+@@ -532,20 +532,21 @@ static void r300EmitClearState(GLcontext * ctx)
+ 			(5 << R300_VF_MAX_VTX_NUM_SHIFT));
+ 	}
+ 
+-	if (r300->radeon.radeonScreen->chip_family == CHIP_FAMILY_RV515)
+-		vap_cntl |= (2 << R300_PVS_NUM_FPUS_SHIFT);
+-	else if ((r300->radeon.radeonScreen->chip_family == CHIP_FAMILY_RV530) ||
+-		 (r300->radeon.radeonScreen->chip_family == CHIP_FAMILY_RV560) ||
+-		 (r300->radeon.radeonScreen->chip_family == CHIP_FAMILY_RV570))
++	if ((r300->radeon.radeonScreen->chip_family == CHIP_FAMILY_R300) ||
++	    (r300->radeon.radeonScreen->chip_family == CHIP_FAMILY_R350))
++		vap_cntl |= (4 << R300_PVS_NUM_FPUS_SHIFT);
++	else if (r300->radeon.radeonScreen->chip_family == CHIP_FAMILY_RV530)
+ 		vap_cntl |= (5 << R300_PVS_NUM_FPUS_SHIFT);
+ 	else if ((r300->radeon.radeonScreen->chip_family == CHIP_FAMILY_RV410) ||
+ 		 (r300->radeon.radeonScreen->chip_family == CHIP_FAMILY_R420))
+ 		vap_cntl |= (6 << R300_PVS_NUM_FPUS_SHIFT);
+ 	else if ((r300->radeon.radeonScreen->chip_family == CHIP_FAMILY_R520) ||
+-		 (r300->radeon.radeonScreen->chip_family == CHIP_FAMILY_R580))
++		 (r300->radeon.radeonScreen->chip_family == CHIP_FAMILY_R580) ||
++		 (r300->radeon.radeonScreen->chip_family == CHIP_FAMILY_RV560) ||
++		 (r300->radeon.radeonScreen->chip_family == CHIP_FAMILY_RV570))
+ 		vap_cntl |= (8 << R300_PVS_NUM_FPUS_SHIFT);
+ 	else
+-		vap_cntl |= (4 << R300_PVS_NUM_FPUS_SHIFT);
++		vap_cntl |= (2 << R300_PVS_NUM_FPUS_SHIFT);
+ 
+ 	R300_STATECHANGE(r300, vap_cntl);
+ 
+diff --git a/src/mesa/drivers/dri/r300/r300_render.c b/src/mesa/drivers/dri/r300/r300_render.c
+index e3e6285..9f3256c 100644
+--- a/src/mesa/drivers/dri/r300/r300_render.c
++++ b/src/mesa/drivers/dri/r300/r300_render.c
+@@ -386,6 +386,14 @@ void r300RunRenderPrimitive(GLcontext * ctx, int start, int end, int prim)
+ 			WARN_ONCE("Fixme: can't handle spliting prim %d\n", prim);
+ 			return;
+ 		}
++
++		if (rmesa->radeon.radeonScreen->kernel_mm) {
++			BEGIN_BATCH_NO_AUTOSTATE(2);
++			OUT_BATCH_REGSEQ(R300_VAP_VF_MAX_VTX_INDX, 1);
++			OUT_BATCH(rmesa->radeon.tcl.aos[0].count);
++			END_BATCH();
++		}
++
+ 		r300_emit_scissor(rmesa->radeon.glCtx);
+ 		while (num_verts > 0) {
+ 			int nr;
+diff --git a/src/mesa/drivers/dri/r300/r300_state.c b/src/mesa/drivers/dri/r300/r300_state.c
+index a1f2590..4387756 100644
+--- a/src/mesa/drivers/dri/r300/r300_state.c
++++ b/src/mesa/drivers/dri/r300/r300_state.c
+@@ -1659,20 +1659,21 @@ void r300VapCntl(r300ContextPtr rmesa, GLuint input_count,
+ 				    (5 << R300_PVS_NUM_CNTLRS_SHIFT) |
+ 				    (5 << R300_VF_MAX_VTX_NUM_SHIFT));
+ 
+-    if (rmesa->radeon.radeonScreen->chip_family == CHIP_FAMILY_RV515)
+-	rmesa->hw.vap_cntl.cmd[R300_VAP_CNTL_INSTR] |= (2 << R300_PVS_NUM_FPUS_SHIFT);
+-    else if ((rmesa->radeon.radeonScreen->chip_family == CHIP_FAMILY_RV530) ||
+-	     (rmesa->radeon.radeonScreen->chip_family == CHIP_FAMILY_RV560) ||
+-	     (rmesa->radeon.radeonScreen->chip_family == CHIP_FAMILY_RV570))
++    if ((rmesa->radeon.radeonScreen->chip_family == CHIP_FAMILY_R300) ||
++	(rmesa->radeon.radeonScreen->chip_family == CHIP_FAMILY_R350))
++	rmesa->hw.vap_cntl.cmd[R300_VAP_CNTL_INSTR] |= (4 << R300_PVS_NUM_FPUS_SHIFT);
++    else if (rmesa->radeon.radeonScreen->chip_family == CHIP_FAMILY_RV530)
+ 	rmesa->hw.vap_cntl.cmd[R300_VAP_CNTL_INSTR] |= (5 << R300_PVS_NUM_FPUS_SHIFT);
+     else if ((rmesa->radeon.radeonScreen->chip_family == CHIP_FAMILY_RV410) ||
+ 	     (rmesa->radeon.radeonScreen->chip_family == CHIP_FAMILY_R420))
+ 	rmesa->hw.vap_cntl.cmd[R300_VAP_CNTL_INSTR] |= (6 << R300_PVS_NUM_FPUS_SHIFT);
+     else if ((rmesa->radeon.radeonScreen->chip_family == CHIP_FAMILY_R520) ||
+-	     (rmesa->radeon.radeonScreen->chip_family == CHIP_FAMILY_R580))
++	     (rmesa->radeon.radeonScreen->chip_family == CHIP_FAMILY_R580) ||
++	     (rmesa->radeon.radeonScreen->chip_family == CHIP_FAMILY_RV560) ||
++	     (rmesa->radeon.radeonScreen->chip_family == CHIP_FAMILY_RV570))
+ 	rmesa->hw.vap_cntl.cmd[R300_VAP_CNTL_INSTR] |= (8 << R300_PVS_NUM_FPUS_SHIFT);
+     else
+-	rmesa->hw.vap_cntl.cmd[R300_VAP_CNTL_INSTR] |= (4 << R300_PVS_NUM_FPUS_SHIFT);
++	rmesa->hw.vap_cntl.cmd[R300_VAP_CNTL_INSTR] |= (2 << R300_PVS_NUM_FPUS_SHIFT);
+ 
+ }
+ 
+diff --git a/src/mesa/drivers/dri/radeon/radeon_chipset.h b/src/mesa/drivers/dri/radeon/radeon_chipset.h
+index f17a305..98732c8 100644
+--- a/src/mesa/drivers/dri/radeon/radeon_chipset.h
++++ b/src/mesa/drivers/dri/radeon/radeon_chipset.h
+@@ -357,6 +357,7 @@
+ #define PCI_CHIP_RV770_9456             0x9456
+ #define PCI_CHIP_RV770_945A             0x945A
+ #define PCI_CHIP_RV770_945B             0x945B
++#define PCI_CHIP_RV770_945E             0x945E
+ #define PCI_CHIP_RV790_9460             0x9460
+ #define PCI_CHIP_RV790_9462             0x9462
+ #define PCI_CHIP_RV770_946A             0x946A
+@@ -368,6 +369,7 @@
+ #define PCI_CHIP_RV730_9487             0x9487
+ #define PCI_CHIP_RV730_9488             0x9488
+ #define PCI_CHIP_RV730_9489             0x9489
++#define PCI_CHIP_RV730_948A             0x948A
+ #define PCI_CHIP_RV730_948F             0x948F
+ #define PCI_CHIP_RV730_9490             0x9490
+ #define PCI_CHIP_RV730_9491             0x9491
+@@ -386,6 +388,7 @@
+ #define PCI_CHIP_RV710_9553             0x9553
+ #define PCI_CHIP_RV710_9555             0x9555
+ #define PCI_CHIP_RV710_9557             0x9557
++#define PCI_CHIP_RV710_955F             0x955F
+ 
+ #define PCI_CHIP_RV740_94A0             0x94A0
+ #define PCI_CHIP_RV740_94A1             0x94A1
+diff --git a/src/mesa/drivers/dri/radeon/radeon_screen.c b/src/mesa/drivers/dri/radeon/radeon_screen.c
+index 9eb19b2..0d29547 100644
+--- a/src/mesa/drivers/dri/radeon/radeon_screen.c
++++ b/src/mesa/drivers/dri/radeon/radeon_screen.c
+@@ -848,6 +848,7 @@ static int radeon_set_screen_flags(radeonScreenPtr screen, int device_id)
+    case PCI_CHIP_RV770_9456:
+    case PCI_CHIP_RV770_945A:
+    case PCI_CHIP_RV770_945B:
++   case PCI_CHIP_RV770_945E:
+    case PCI_CHIP_RV790_9460:
+    case PCI_CHIP_RV790_9462:
+    case PCI_CHIP_RV770_946A:
+@@ -862,6 +863,7 @@ static int radeon_set_screen_flags(radeonScreenPtr screen, int device_id)
+    case PCI_CHIP_RV730_9487:
+    case PCI_CHIP_RV730_9488:
+    case PCI_CHIP_RV730_9489:
++   case PCI_CHIP_RV730_948A:
+    case PCI_CHIP_RV730_948F:
+    case PCI_CHIP_RV730_9490:
+    case PCI_CHIP_RV730_9491:
+@@ -883,6 +885,7 @@ static int radeon_set_screen_flags(radeonScreenPtr screen, int device_id)
+    case PCI_CHIP_RV710_9553:
+    case PCI_CHIP_RV710_9555:
+    case PCI_CHIP_RV710_9557:
++   case PCI_CHIP_RV710_955F:
+       screen->chip_family = CHIP_FAMILY_RV710;
+       screen->chip_flags = RADEON_CHIPSET_TCL;
+       break;
+@@ -1135,6 +1138,7 @@ radeonCreateScreen( __DRIscreenPrivate *sPriv )
+        /* pipe overrides */
+        switch (dri_priv->deviceID) {
+        case PCI_CHIP_R300_AD: /* 9500 with 1 quadpipe verified by: Reid Linnemann <lreid@cs.okstate.edu> */
++       case PCI_CHIP_R350_AH: /* 9800 SE only have 1 quadpipe */
+        case PCI_CHIP_RV410_5E4C: /* RV410 SE only have 1 quadpipe */
+        case PCI_CHIP_RV410_5E4F: /* RV410 SE only have 1 quadpipe */
+ 	   screen->num_gb_pipes = 1;
+@@ -1342,6 +1346,7 @@ radeonCreateScreen2(__DRIscreenPrivate *sPriv)
+        /* pipe overrides */
+        switch (device_id) {
+        case PCI_CHIP_R300_AD: /* 9500 with 1 quadpipe verified by: Reid Linnemann <lreid@cs.okstate.edu> */
++       case PCI_CHIP_R350_AH: /* 9800 SE only have 1 quadpipe */
+        case PCI_CHIP_RV410_5E4C: /* RV410 SE only have 1 quadpipe */
+        case PCI_CHIP_RV410_5E4F: /* RV410 SE only have 1 quadpipe */
+ 	   screen->num_gb_pipes = 1;
+diff --git a/src/mesa/shader/program.c b/src/mesa/shader/program.c
+index ef0c276..89cb441 100644
+--- a/src/mesa/shader/program.c
++++ b/src/mesa/shader/program.c
+@@ -623,7 +623,7 @@ replace_registers(struct prog_instruction *inst, GLuint numInst,
+    GLuint i, j;
+    for (i = 0; i < numInst; i++) {
+       /* src regs */
+-      for (j = 0; j < _mesa_num_inst_src_regs(inst->Opcode); j++) {
++      for (j = 0; j < _mesa_num_inst_src_regs(inst[i].Opcode); j++) {
+          if (inst[i].SrcReg[j].File == oldFile &&
+              inst[i].SrcReg[j].Index == oldIndex) {
+             inst[i].SrcReg[j].File = newFile;
+@@ -650,7 +650,7 @@ adjust_param_indexes(struct prog_instruction *inst, GLuint numInst,
+ {
+    GLuint i, j;
+    for (i = 0; i < numInst; i++) {
+-      for (j = 0; j < _mesa_num_inst_src_regs(inst->Opcode); j++) {
++      for (j = 0; j < _mesa_num_inst_src_regs(inst[i].Opcode); j++) {
+          GLuint f = inst[i].SrcReg[j].File;
+          if (f == PROGRAM_CONSTANT ||
+              f == PROGRAM_UNIFORM ||
+diff --git a/src/mesa/state_tracker/st_atom_scissor.c b/src/mesa/state_tracker/st_atom_scissor.c
+index 5e0c51c..56b1383 100644
+--- a/src/mesa/state_tracker/st_atom_scissor.c
++++ b/src/mesa/state_tracker/st_atom_scissor.c
+@@ -72,12 +72,15 @@ update_scissor( struct st_context *st )
+          scissor.minx = scissor.miny = scissor.maxx = scissor.maxy = 0;
+    }
+ 
+-   /* Now invert Y.  Pipe drivers use the convention Y=0=top for surfaces
++   /* Now invert Y if needed.
++    * Gallium drivers use the convention Y=0=top for surfaces.
+     */
+-   miny = fb->Height - scissor.maxy;
+-   maxy = fb->Height - scissor.miny;
+-   scissor.miny = miny;
+-   scissor.maxy = maxy;
++   if (st_fb_orientation(fb) == Y_0_TOP) {
++      miny = fb->Height - scissor.maxy;
++      maxy = fb->Height - scissor.miny;
++      scissor.miny = miny;
++      scissor.maxy = maxy;
++   }
+ 
+    if (memcmp(&scissor, &st->state.scissor, sizeof(scissor)) != 0) {
+       /* state has changed */
+diff --git a/src/mesa/state_tracker/st_extensions.c b/src/mesa/state_tracker/st_extensions.c
+index 54d7c61..5c827a2 100644
+--- a/src/mesa/state_tracker/st_extensions.c
++++ b/src/mesa/state_tracker/st_extensions.c
+@@ -67,6 +67,7 @@ void st_init_limits(struct st_context *st)
+ {
+    struct pipe_screen *screen = st->pipe->screen;
+    struct gl_constants *c = &st->ctx->Const;
++   struct gl_program_constants *pc;
+ 
+    c->MaxTextureLevels
+       = _min(screen->get_param(screen, PIPE_CAP_MAX_TEXTURE_2D_LEVELS),
+@@ -124,6 +125,96 @@ void st_init_limits(struct st_context *st)
+    /* XXX separate query for early function return? */
+    st->ctx->Shader.EmitContReturn =
+       screen->get_param(screen, PIPE_CAP_TGSI_CONT_SUPPORTED);
++
++   if (screen->get_param(screen, PIPE_CAP_GLSL)) {
++      /*
++       * In the lack of more fine grained capabilities, if the pipe driver supports
++       * GLSL then assume native limits match Mesa software limits.
++       */
++
++      pc = &c->FragmentProgram;
++      pc->MaxNativeInstructions      = pc->MaxInstructions;
++      pc->MaxNativeAluInstructions   = pc->MaxAluInstructions;
++      pc->MaxNativeTexInstructions   = pc->MaxTexInstructions;
++      pc->MaxNativeTexIndirections   = pc->MaxTexIndirections;
++      pc->MaxNativeAttribs           = pc->MaxAttribs;
++      pc->MaxNativeTemps             = pc->MaxTemps;
++      pc->MaxNativeAddressRegs       = pc->MaxAddressRegs;
++      pc->MaxNativeParameters        = pc->MaxParameters;
++
++      pc = &c->VertexProgram;
++      pc->MaxNativeInstructions      = pc->MaxInstructions;
++      pc->MaxNativeAluInstructions   = pc->MaxAluInstructions;
++      pc->MaxNativeTexInstructions   = pc->MaxTexInstructions;
++      pc->MaxNativeTexIndirections   = pc->MaxTexIndirections;
++      pc->MaxNativeAttribs           = pc->MaxAttribs;
++      pc->MaxNativeTemps             = pc->MaxTemps;
++      pc->MaxNativeAddressRegs       = pc->MaxAddressRegs;
++      pc->MaxNativeParameters        = pc->MaxParameters;
++   } else if (screen->get_param(screen, PIPE_CAP_SM3)) {
++      /*
++       * Assume the hardware meets the minimum requirements
++       * for Shader Model 3.
++       *
++       * See also:
++       * - http://msdn.microsoft.com/en-us/library/bb172920(VS.85).aspx
++       * - http://msdn.microsoft.com/en-us/library/bb172963(VS.85).aspx
++       */
++
++      pc = &c->FragmentProgram;
++      pc->MaxNativeInstructions      = 512; /* D3DMIN30SHADERINSTRUCTIONS */
++      pc->MaxNativeAluInstructions   = pc->MaxNativeInstructions;
++      pc->MaxNativeTexInstructions   = pc->MaxNativeInstructions;
++      pc->MaxNativeTexIndirections   = pc->MaxNativeTexInstructions;
++      pc->MaxNativeAttribs           = 10;
++      pc->MaxNativeTemps             = 32;
++      pc->MaxNativeAddressRegs       = 1; /* aL */
++      pc->MaxNativeParameters        = 224;
++
++      pc = &c->VertexProgram;
++      pc->MaxNativeInstructions      = 512; /* D3DMIN30SHADERINSTRUCTIONS */
++      pc->MaxNativeAluInstructions   = pc->MaxNativeInstructions;
++      pc->MaxNativeTexInstructions   = pc->MaxNativeInstructions;
++      pc->MaxNativeTexIndirections   = pc->MaxNativeTexInstructions;
++      pc->MaxNativeAttribs           = 16;
++      pc->MaxNativeTemps             = 32;
++      pc->MaxNativeAddressRegs       = 2; /* a0 and aL */
++      pc->MaxNativeParameters        = 256;
++   } else {
++      /*
++       * Assume the hardware meets the minimum requirements
++       * for Shader Model 2.
++       *
++       * See also:
++       * - http://msdn.microsoft.com/en-us/library/bb172918(VS.85).aspx
++       * - http://msdn.microsoft.com/en-us/library/bb172961(VS.85).aspx
++       */
++
++      pc = &c->FragmentProgram;
++      pc->MaxNativeInstructions      = 96; /* D3DPS20_MIN_NUMINSTRUCTIONSLOTS */
++      pc->MaxNativeAluInstructions   = 64;
++      pc->MaxNativeTexInstructions   = 32;
++      pc->MaxNativeTexIndirections   = pc->MaxNativeTexInstructions;
++      pc->MaxNativeAttribs           = 10; /* 2 color + 8 texture coord */
++      pc->MaxNativeTemps             = 12; /* D3DPS20_MIN_NUMTEMPS */
++      pc->MaxNativeAddressRegs       = 0;
++      pc->MaxNativeParameters        = 16;
++
++      pc = &c->VertexProgram;
++      pc->MaxNativeInstructions      = 256;
++      pc->MaxNativeAluInstructions   = 256;
++      pc->MaxNativeTexInstructions   = 0;
++      pc->MaxNativeTexIndirections   = 0;
++      pc->MaxNativeAttribs           = 16;
++      pc->MaxNativeTemps             = 12; /* D3DVS20_MIN_NUMTEMPS */
++      pc->MaxNativeAddressRegs       = 2; /* a0 and aL */
++      pc->MaxNativeParameters        = 256;
++   }
++
++   if (!screen->get_param(screen, PIPE_CAP_MAX_VERTEX_TEXTURE_UNITS)) {
++      c->VertexProgram.MaxNativeTexInstructions = 0;
++      c->VertexProgram.MaxNativeTexIndirections = 0;
++   }
+ }
+ 
+ 

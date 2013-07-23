@@ -1,0 +1,4843 @@
+diff --git a/Documentation/DocBook/device-drivers.tmpl b/Documentation/DocBook/device-drivers.tmpl
+index 1b2dd4f..dd17408 100644
+--- a/Documentation/DocBook/device-drivers.tmpl
++++ b/Documentation/DocBook/device-drivers.tmpl
+@@ -299,6 +299,10 @@ X!Idrivers/video/console/fonts.c
+ !Edrivers/input/ff-core.c
+ !Edrivers/input/ff-memless.c
+      </sect1>
++     <sect1><title>Multitouch Library</title>
++!Iinclude/linux/input/mt.h
++!Edrivers/input/input-mt.c
++     </sect1>
+      <sect1><title>Polled input devices</title>
+ !Iinclude/linux/input-polldev.h
+ !Edrivers/input/input-polldev.c
+diff --git a/Documentation/input/multi-touch-protocol.txt b/Documentation/input/multi-touch-protocol.txt
+index c0fc1c7..07215fa 100644
+--- a/Documentation/input/multi-touch-protocol.txt
++++ b/Documentation/input/multi-touch-protocol.txt
+@@ -6,31 +6,149 @@ Multi-touch (MT) Protocol
+ Introduction
+ ------------
+ 
+-In order to utilize the full power of the new multi-touch devices, a way to
+-report detailed finger data to user space is needed. This document
+-describes the multi-touch (MT) protocol which allows kernel drivers to
+-report details for an arbitrary number of fingers.
++In order to utilize the full power of the new multi-touch and multi-user
++devices, a way to report detailed data from multiple contacts, i.e.,
++objects in direct contact with the device surface, is needed.  This
++document describes the multi-touch (MT) protocol which allows kernel
++drivers to report details for an arbitrary number of contacts.
++
++The protocol is divided into two types, depending on the capabilities of the
++hardware. For devices handling anonymous contacts (type A), the protocol
++describes how to send the raw data for all contacts to the receiver. For
++devices capable of tracking identifiable contacts (type B), the protocol
++describes how to send updates for individual contacts via event slots.
++
++
++Protocol Usage
++--------------
++
++Contact details are sent sequentially as separate packets of ABS_MT
++events. Only the ABS_MT events are recognized as part of a contact
++packet. Since these events are ignored by current single-touch (ST)
++applications, the MT protocol can be implemented on top of the ST protocol
++in an existing driver.
++
++Drivers for type A devices separate contact packets by calling
++input_mt_sync() at the end of each packet. This generates a SYN_MT_REPORT
++event, which instructs the receiver to accept the data for the current
++contact and prepare to receive another.
++
++Drivers for type B devices separate contact packets by calling
++input_mt_slot(), with a slot as argument, at the beginning of each packet.
++This generates an ABS_MT_SLOT event, which instructs the receiver to
++prepare for updates of the given slot.
++
++All drivers mark the end of a multi-touch transfer by calling the usual
++input_sync() function. This instructs the receiver to act upon events
++accumulated since last EV_SYN/SYN_REPORT and prepare to receive a new set
++of events/packets.
++
++The main difference between the stateless type A protocol and the stateful
++type B slot protocol lies in the usage of identifiable contacts to reduce
++the amount of data sent to userspace. The slot protocol requires the use of
++the ABS_MT_TRACKING_ID, either provided by the hardware or computed from
++the raw data [5].
++
++For type A devices, the kernel driver should generate an arbitrary
++enumeration of the full set of anonymous contacts currently on the
++surface. The order in which the packets appear in the event stream is not
++important.  Event filtering and finger tracking is left to user space [3].
++
++For type B devices, the kernel driver should associate a slot with each
++identified contact, and use that slot to propagate changes for the contact.
++Creation, replacement and destruction of contacts is achieved by modifying
++the ABS_MT_TRACKING_ID of the associated slot.  A non-negative tracking id
++is interpreted as a contact, and the value -1 denotes an unused slot.  A
++tracking id not previously present is considered new, and a tracking id no
++longer present is considered removed.  Since only changes are propagated,
++the full state of each initiated contact has to reside in the receiving
++end.  Upon receiving an MT event, one simply updates the appropriate
++attribute of the current slot.
++
++
++Protocol Example A
++------------------
++
++Here is what a minimal event sequence for a two-contact touch would look
++like for a type A device:
++
++   ABS_MT_POSITION_X x[0]
++   ABS_MT_POSITION_Y y[0]
++   SYN_MT_REPORT
++   ABS_MT_POSITION_X x[1]
++   ABS_MT_POSITION_Y y[1]
++   SYN_MT_REPORT
++   SYN_REPORT
+ 
++The sequence after moving one of the contacts looks exactly the same; the
++raw data for all present contacts are sent between every synchronization
++with SYN_REPORT.
+ 
+-Usage
+------
++Here is the sequence after lifting the first contact:
+ 
+-Anonymous finger details are sent sequentially as separate packets of ABS
+-events. Only the ABS_MT events are recognized as part of a finger
+-packet. The end of a packet is marked by calling the input_mt_sync()
+-function, which generates a SYN_MT_REPORT event. This instructs the
+-receiver to accept the data for the current finger and prepare to receive
+-another. The end of a multi-touch transfer is marked by calling the usual
+-input_sync() function. This instructs the receiver to act upon events
+-accumulated since last EV_SYN/SYN_REPORT and prepare to receive a new
+-set of events/packets.
++   ABS_MT_POSITION_X x[1]
++   ABS_MT_POSITION_Y y[1]
++   SYN_MT_REPORT
++   SYN_REPORT
++
++And here is the sequence after lifting the second contact:
++
++   SYN_MT_REPORT
++   SYN_REPORT
++
++If the driver reports one of BTN_TOUCH or ABS_PRESSURE in addition to the
++ABS_MT events, the last SYN_MT_REPORT event may be omitted. Otherwise, the
++last SYN_REPORT will be dropped by the input core, resulting in no
++zero-contact event reaching userland.
++
++
++Protocol Example B
++------------------
++
++Here is what a minimal event sequence for a two-contact touch would look
++like for a type B device:
++
++   ABS_MT_SLOT 0
++   ABS_MT_TRACKING_ID 45
++   ABS_MT_POSITION_X x[0]
++   ABS_MT_POSITION_Y y[0]
++   ABS_MT_SLOT 1
++   ABS_MT_TRACKING_ID 46
++   ABS_MT_POSITION_X x[1]
++   ABS_MT_POSITION_Y y[1]
++   SYN_REPORT
++
++Here is the sequence after moving contact 45 in the x direction:
++
++   ABS_MT_SLOT 0
++   ABS_MT_POSITION_X x[0]
++   SYN_REPORT
++
++Here is the sequence after lifting the contact in slot 0:
++
++   ABS_MT_TRACKING_ID -1
++   SYN_REPORT
++
++The slot being modified is already 0, so the ABS_MT_SLOT is omitted.  The
++message removes the association of slot 0 with contact 45, thereby
++destroying contact 45 and freeing slot 0 to be reused for another contact.
++
++Finally, here is the sequence after lifting the second contact:
++
++   ABS_MT_SLOT 1
++   ABS_MT_TRACKING_ID -1
++   SYN_REPORT
++
++
++Event Usage
++-----------
+ 
+ A set of ABS_MT events with the desired properties is defined. The events
+ are divided into categories, to allow for partial implementation.  The
+ minimum set consists of ABS_MT_POSITION_X and ABS_MT_POSITION_Y, which
+-allows for multiple fingers to be tracked.  If the device supports it, the
++allows for multiple contacts to be tracked.  If the device supports it, the
+ ABS_MT_TOUCH_MAJOR and ABS_MT_WIDTH_MAJOR may be used to provide the size
+-of the contact area and approaching finger, respectively.
++of the contact area and approaching contact, respectively.
+ 
+ The TOUCH and WIDTH parameters have a geometrical interpretation; imagine
+ looking through a window at someone gently holding a finger against the
+@@ -41,56 +159,27 @@ ABS_MT_TOUCH_MAJOR, the diameter of the outer region is
+ ABS_MT_WIDTH_MAJOR. Now imagine the person pressing the finger harder
+ against the glass. The inner region will increase, and in general, the
+ ratio ABS_MT_TOUCH_MAJOR / ABS_MT_WIDTH_MAJOR, which is always smaller than
+-unity, is related to the finger pressure. For pressure-based devices,
++unity, is related to the contact pressure. For pressure-based devices,
+ ABS_MT_PRESSURE may be used to provide the pressure on the contact area
+-instead.
++instead. Devices capable of contact hovering can use ABS_MT_DISTANCE to
++indicate the distance between the contact and the surface.
+ 
+-In addition to the MAJOR parameters, the oval shape of the finger can be
++In addition to the MAJOR parameters, the oval shape of the contact can be
+ described by adding the MINOR parameters, such that MAJOR and MINOR are the
+ major and minor axis of an ellipse. Finally, the orientation of the oval
+ shape can be describe with the ORIENTATION parameter.
+ 
+ The ABS_MT_TOOL_TYPE may be used to specify whether the touching tool is a
+-finger or a pen or something else.  Devices with more granular information
++contact or a pen or something else.  Devices with more granular information
+ may specify general shapes as blobs, i.e., as a sequence of rectangular
+ shapes grouped together by an ABS_MT_BLOB_ID. Finally, for the few devices
+ that currently support it, the ABS_MT_TRACKING_ID event may be used to
+-report finger tracking from hardware [5].
+-
+-Here is what a minimal event sequence for a two-finger touch would look
+-like:
+-
+-   ABS_MT_POSITION_X
+-   ABS_MT_POSITION_Y
+-   SYN_MT_REPORT
+-   ABS_MT_POSITION_X
+-   ABS_MT_POSITION_Y
+-   SYN_MT_REPORT
+-   SYN_REPORT
+-
+-Here is the sequence after lifting one of the fingers:
+-
+-   ABS_MT_POSITION_X
+-   ABS_MT_POSITION_Y
+-   SYN_MT_REPORT
+-   SYN_REPORT
++report contact tracking from hardware [5].
+ 
+-And here is the sequence after lifting the remaining finger:
+-
+-   SYN_MT_REPORT
+-   SYN_REPORT
+-
+-If the driver reports one of BTN_TOUCH or ABS_PRESSURE in addition to the
+-ABS_MT events, the last SYN_MT_REPORT event may be omitted. Otherwise, the
+-last SYN_REPORT will be dropped by the input core, resulting in no
+-zero-finger event reaching userland.
+ 
+ Event Semantics
+ ---------------
+ 
+-The word "contact" is used to describe a tool which is in direct contact
+-with the surface. A finger, a pen or a rubber all classify as contacts.
+-
+ ABS_MT_TOUCH_MAJOR
+ 
+ The length of the major axis of the contact. The length should be given in
+@@ -125,6 +214,12 @@ The pressure, in arbitrary units, on the contact area. May be used instead
+ of TOUCH and WIDTH for pressure-based devices or any device with a spatial
+ signal intensity distribution.
+ 
++ABS_MT_DISTANCE
++
++The distance, in surface units, between the contact and the surface. Zero
++distance means the contact is touching the surface. A positive number means
++the contact is hovering above the surface.
++
+ ABS_MT_ORIENTATION
+ 
+ The orientation of the ellipse. The value should describe a signed quarter
+@@ -157,15 +252,16 @@ MT_TOOL_PEN [2].
+ ABS_MT_BLOB_ID
+ 
+ The BLOB_ID groups several packets together into one arbitrarily shaped
+-contact. This is a low-level anonymous grouping, and should not be confused
+-with the high-level trackingID [5]. Most kernel drivers will not have blob
+-capability, and can safely omit the event.
++contact. This is a low-level anonymous grouping for type A devices, and
++should not be confused with the high-level trackingID [5]. Most type A
++devices do not have blob capability, so drivers can safely omit this event.
+ 
+ ABS_MT_TRACKING_ID
+ 
+ The TRACKING_ID identifies an initiated contact throughout its life cycle
+-[5]. There are currently only a few devices that support it, so this event
+-should normally be omitted.
++[5]. This event is mandatory for type B devices. The value range of the
++TRACKING_ID should be large enough to ensure unique identification of a
++contact maintained over an extended period of time.
+ 
+ 
+ Event Computation
+@@ -192,20 +288,11 @@ finger along the X axis (1).
+ Finger Tracking
+ ---------------
+ 
+-The kernel driver should generate an arbitrary enumeration of the set of
+-anonymous contacts currently on the surface. The order in which the packets
+-appear in the event stream is not important.
+-
+ The process of finger tracking, i.e., to assign a unique trackingID to each
+-initiated contact on the surface, is left to user space; preferably the
+-multi-touch X driver [3]. In that driver, the trackingID stays the same and
+-unique until the contact vanishes (when the finger leaves the surface). The
+-problem of assigning a set of anonymous fingers to a set of identified
+-fingers is a euclidian bipartite matching problem at each event update, and
+-relies on a sufficiently rapid update rate.
+-
+-There are a few devices that support trackingID in hardware. User space can
+-make use of these native identifiers to reduce bandwidth and cpu usage.
++initiated contact on the surface, is a Euclidian Bipartite Matching
++problem.  At each event synchronization, the set of actual contacts is
++matched to the set of contacts from the previous synchronization. A full
++implementation can be found in [3].
+ 
+ 
+ Gestures
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 02f75fc..486e48b 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -2901,8 +2901,10 @@ F:	drivers/input/
+ INPUT MULTITOUCH (MT) PROTOCOL
+ M:	Henrik Rydberg <rydberg@euromail.se>
+ L:	linux-input@vger.kernel.org
++T:	git git://git.kernel.org/pub/scm/linux/kernel/git/rydberg/input-mt.git
+ S:	Maintained
+ F:	Documentation/input/multi-touch-protocol.txt
++F:	drivers/input/input-mt.c
+ K:	\b(ABS|SYN)_MT_
+ 
+ INTEL IDLE DRIVER
+diff --git a/drivers/hid/Kconfig b/drivers/hid/Kconfig
+index 4340993..822dafe 100644
+--- a/drivers/hid/Kconfig
++++ b/drivers/hid/Kconfig
+@@ -55,12 +55,6 @@ source "drivers/hid/usbhid/Kconfig"
+ menu "Special HID drivers"
+ 	depends on HID
+ 
+-config HID_3M_PCT
+-	tristate "3M PCT"
+-	depends on USB_HID
+-	---help---
+-	Support for 3M PCT touch screens.
+-
+ config HID_A4TECH
+ 	tristate "A4 tech" if EMBEDDED
+ 	depends on USB_HID
+@@ -86,12 +80,6 @@ config HID_BELKIN
+ 	---help---
+ 	Support for Belkin Flip KVM and Wireless keyboard.
+ 
+-config HID_CANDO
+-	tristate "Cando dual touch panel"
+-	depends on USB_HID
+-	---help---
+-	Support for Cando dual touch panel.
+-
+ config HID_CHERRY
+ 	tristate "Cherry" if EMBEDDED
+ 	depends on USB_HID
+@@ -142,11 +130,6 @@ config DRAGONRISE_FF
+ 	Say Y here if you want to enable force feedback support for DragonRise Inc.
+ 	game controllers.
+ 
+-config HID_EGALAX
+-	tristate "eGalax multi-touch panel"
+-	depends on USB_HID
+-	---help---
+-	Support for the eGalax dual-touch panel.
+ 
+ config HID_EZKEY
+ 	tristate "Ezkey" if EMBEDDED
+@@ -237,12 +220,6 @@ config HID_MICROSOFT
+ 	---help---
+ 	Support for Microsoft devices that are not fully compliant with HID standard.
+ 
+-config HID_MOSART
+-	tristate "MosArt"
+-	depends on USB_HID
+-	---help---
+-	Support for MosArt dual-touch panels.
+-
+ config HID_MONTEREY
+ 	tristate "Monterey" if EMBEDDED
+ 	depends on USB_HID
+@@ -250,6 +227,39 @@ config HID_MONTEREY
+ 	---help---
+ 	Support for Monterey Genius KB29E.
+ 
++config HID_MULTITOUCH
++	tristate "HID Multitouch panels"
++	depends on USB_HID
++	---help---
++	  Generic support for HID multitouch panels.
++
++	  Say Y here if you have one of the following devices:
++	  - 3M PCT touch screens
++	  - ActionStar dual touch panels
++	  - Cando dual touch panels
++	  - Chunghwa panels
++	  - CVTouch panels
++	  - Cypress TrueTouch panels
++	  - Elo TouchSystems IntelliTouch Plus panels
++	  - GeneralTouch 'Sensing Win7-TwoFinger' panels
++	  - GoodTouch panels
++	  - Hanvon dual touch panels
++	  - Ilitek dual touch panels
++	  - IrTouch Infrared USB panels
++	  - Lumio CrystalTouch panels
++	  - MosArt dual-touch panels
++	  - PenMount dual touch panels
++	  - Pixcir dual touch panels
++	  - eGalax dual-touch panels, including the Joojoo and Wetab tablets
++	  - Stantum multitouch panels
++	  - Touch International Panels
++	  - Unitec Panels
++
++	  If unsure, say N.
++
++	  To compile this driver as a module, choose M here: the
++	  module will be called hid-multitouch.
++
+ config HID_NTRIG
+ 	tristate "NTrig"
+ 	depends on USB_HID
+@@ -374,12 +384,6 @@ config HID_SONY
+ 	---help---
+ 	Support for Sony PS3 controller.
+ 
+-config HID_STANTUM
+-	tristate "Stantum"
+-	depends on USB_HID
+-	---help---
+-	Support for Stantum multitouch panel.
+-
+ config HID_SUNPLUS
+ 	tristate "Sunplus"
+ 	depends on USB_HID
+diff --git a/drivers/hid/Makefile b/drivers/hid/Makefile
+index 987fa06..cecedea 100644
+--- a/drivers/hid/Makefile
++++ b/drivers/hid/Makefile
+@@ -3,6 +3,10 @@
+ #
+ hid-objs			:= hid-core.o hid-input.o
+ 
++LINUXINCLUDE := -I$(KBUILD_EXTMOD)/../../include $(LINUXINCLUDE)
++
++EXTRA_CFLAGS := -DMT_DBG
++
+ ifdef CONFIG_DEBUG_FS
+ 	hid-objs		+= hid-debug.o
+ endif
+@@ -22,16 +26,13 @@ ifdef CONFIG_LOGIG940_FF
+ 	hid-logitech-objs	+= hid-lg3ff.o
+ endif
+ 
+-obj-$(CONFIG_HID_3M_PCT)	+= hid-3m-pct.o
+ obj-$(CONFIG_HID_A4TECH)	+= hid-a4tech.o
+ obj-$(CONFIG_HID_APPLE)		+= hid-apple.o
+ obj-$(CONFIG_HID_BELKIN)	+= hid-belkin.o
+-obj-$(CONFIG_HID_CANDO)		+= hid-cando.o
+ obj-$(CONFIG_HID_CHERRY)	+= hid-cherry.o
+ obj-$(CONFIG_HID_CHICONY)	+= hid-chicony.o
+ obj-$(CONFIG_HID_CYPRESS)	+= hid-cypress.o
+ obj-$(CONFIG_HID_DRAGONRISE)	+= hid-drff.o
+-obj-$(CONFIG_HID_EGALAX)	+= hid-egalax.o
+ obj-$(CONFIG_HID_EZKEY)		+= hid-ezkey.o
+ obj-$(CONFIG_HID_GYRATION)	+= hid-gyration.o
+ obj-$(CONFIG_HID_KENSINGTON)	+= hid-kensington.o
+@@ -40,7 +41,7 @@ obj-$(CONFIG_HID_LOGITECH)	+= hid-logitech.o
+ obj-$(CONFIG_HID_MAGICMOUSE)    += hid-magicmouse.o
+ obj-$(CONFIG_HID_MICROSOFT)	+= hid-microsoft.o
+ obj-$(CONFIG_HID_MONTEREY)	+= hid-monterey.o
+-obj-$(CONFIG_HID_MOSART)	+= hid-mosart.o
++obj-$(CONFIG_HID_MULTITOUCH)	+= hid-multitouch.o
+ obj-$(CONFIG_HID_NTRIG)		+= hid-ntrig.o
+ obj-$(CONFIG_HID_ORTEK)		+= hid-ortek.o
+ obj-$(CONFIG_HID_PRODIKEYS)	+= hid-prodikeys.o
+@@ -53,7 +54,6 @@ obj-$(CONFIG_HID_ROCCAT_KONE)	+= hid-roccat-kone.o
+ obj-$(CONFIG_HID_SAMSUNG)	+= hid-samsung.o
+ obj-$(CONFIG_HID_SMARTJOYPLUS)	+= hid-sjoy.o
+ obj-$(CONFIG_HID_SONY)		+= hid-sony.o
+-obj-$(CONFIG_HID_STANTUM)	+= hid-stantum.o
+ obj-$(CONFIG_HID_SUNPLUS)	+= hid-sunplus.o
+ obj-$(CONFIG_HID_GREENASIA)	+= hid-gaff.o
+ obj-$(CONFIG_HID_THRUSTMASTER)	+= hid-tmff.o
+diff --git a/drivers/hid/hid-3m-pct.c b/drivers/hid/hid-3m-pct.c
+deleted file mode 100644
+index 2a0d56b..0000000
+--- a/drivers/hid/hid-3m-pct.c
++++ /dev/null
+@@ -1,316 +0,0 @@
+-/*
+- *  HID driver for 3M PCT multitouch panels
+- *
+- *  Copyright (c) 2009-2010 Stephane Chatty <chatty@enac.fr>
+- *
+- */
+-
+-/*
+- * This program is free software; you can redistribute it and/or modify it
+- * under the terms of the GNU General Public License as published by the Free
+- * Software Foundation; either version 2 of the License, or (at your option)
+- * any later version.
+- */
+-
+-#include <linux/device.h>
+-#include <linux/hid.h>
+-#include <linux/module.h>
+-#include <linux/slab.h>
+-#include <linux/usb.h>
+-
+-MODULE_AUTHOR("Stephane Chatty <chatty@enac.fr>");
+-MODULE_DESCRIPTION("3M PCT multitouch panels");
+-MODULE_LICENSE("GPL");
+-
+-#include "hid-ids.h"
+-
+-struct mmm_finger {
+-	__s32 x, y, w, h;
+-	__u8 rank;
+-	bool touch, valid;
+-};
+-
+-struct mmm_data {
+-	struct mmm_finger f[10];
+-	__u8 curid, num;
+-	bool touch, valid;
+-};
+-
+-static int mmm_input_mapping(struct hid_device *hdev, struct hid_input *hi,
+-		struct hid_field *field, struct hid_usage *usage,
+-		unsigned long **bit, int *max)
+-{
+-	switch (usage->hid & HID_USAGE_PAGE) {
+-
+-	case HID_UP_BUTTON:
+-		return -1;
+-
+-	case HID_UP_GENDESK:
+-		switch (usage->hid) {
+-		case HID_GD_X:
+-			hid_map_usage(hi, usage, bit, max,
+-					EV_ABS, ABS_MT_POSITION_X);
+-			/* touchscreen emulation */
+-			input_set_abs_params(hi->input, ABS_X,
+-						field->logical_minimum,
+-						field->logical_maximum, 0, 0);
+-			return 1;
+-		case HID_GD_Y:
+-			hid_map_usage(hi, usage, bit, max,
+-					EV_ABS, ABS_MT_POSITION_Y);
+-			/* touchscreen emulation */
+-			input_set_abs_params(hi->input, ABS_Y,
+-						field->logical_minimum,
+-						field->logical_maximum, 0, 0);
+-			return 1;
+-		}
+-		return 0;
+-
+-	case HID_UP_DIGITIZER:
+-		switch (usage->hid) {
+-		/* we do not want to map these: no input-oriented meaning */
+-		case 0x14:
+-		case 0x23:
+-		case HID_DG_INPUTMODE:
+-		case HID_DG_DEVICEINDEX:
+-		case HID_DG_CONTACTCOUNT:
+-		case HID_DG_CONTACTMAX:
+-		case HID_DG_INRANGE:
+-		case HID_DG_CONFIDENCE:
+-			return -1;
+-		case HID_DG_TIPSWITCH:
+-			/* touchscreen emulation */
+-			hid_map_usage(hi, usage, bit, max, EV_KEY, BTN_TOUCH);
+-			return 1;
+-		case HID_DG_WIDTH:
+-			hid_map_usage(hi, usage, bit, max,
+-					EV_ABS, ABS_MT_TOUCH_MAJOR);
+-			return 1;
+-		case HID_DG_HEIGHT:
+-			hid_map_usage(hi, usage, bit, max,
+-					EV_ABS, ABS_MT_TOUCH_MINOR);
+-			input_set_abs_params(hi->input, ABS_MT_ORIENTATION,
+-					1, 1, 0, 0);
+-			return 1;
+-		case HID_DG_CONTACTID:
+-			field->logical_maximum = 59;
+-			hid_map_usage(hi, usage, bit, max,
+-					EV_ABS, ABS_MT_TRACKING_ID);
+-			return 1;
+-		}
+-		/* let hid-input decide for the others */
+-		return 0;
+-
+-	case 0xff000000:
+-		/* we do not want to map these: no input-oriented meaning */
+-		return -1;
+-	}
+-
+-	return 0;
+-}
+-
+-static int mmm_input_mapped(struct hid_device *hdev, struct hid_input *hi,
+-		struct hid_field *field, struct hid_usage *usage,
+-		unsigned long **bit, int *max)
+-{
+-	if (usage->type == EV_KEY || usage->type == EV_ABS)
+-		clear_bit(usage->code, *bit);
+-
+-	return 0;
+-}
+-
+-/*
+- * this function is called when a whole packet has been received and processed,
+- * so that it can decide what to send to the input layer.
+- */
+-static void mmm_filter_event(struct mmm_data *md, struct input_dev *input)
+-{
+-	struct mmm_finger *oldest = 0;
+-	bool pressed = false, released = false;
+-	int i;
+-
+-	/*
+-	 * we need to iterate on all fingers to decide if we have a press
+-	 * or a release event in our touchscreen emulation.
+-	 */
+-	for (i = 0; i < 10; ++i) {
+-		struct mmm_finger *f = &md->f[i];
+-		if (!f->valid) {
+-			/* this finger is just placeholder data, ignore */
+-		} else if (f->touch) {
+-			/* this finger is on the screen */
+-			int wide = (f->w > f->h);
+-			input_event(input, EV_ABS, ABS_MT_TRACKING_ID, i);
+-			input_event(input, EV_ABS, ABS_MT_POSITION_X, f->x);
+-			input_event(input, EV_ABS, ABS_MT_POSITION_Y, f->y);
+-			input_event(input, EV_ABS, ABS_MT_ORIENTATION, wide);
+-			input_event(input, EV_ABS, ABS_MT_TOUCH_MAJOR,
+-						wide ? f->w : f->h);
+-			input_event(input, EV_ABS, ABS_MT_TOUCH_MINOR,
+-						wide ? f->h : f->w);
+-			input_mt_sync(input);
+-			/*
+-			 * touchscreen emulation: maintain the age rank
+-			 * of this finger, decide if we have a press
+-			 */
+-			if (f->rank == 0) {
+-				f->rank = ++(md->num);
+-				if (f->rank == 1)
+-					pressed = true;
+-			}
+-			if (f->rank == 1)
+-				oldest = f;
+-		} else {
+-			/* this finger took off the screen */
+-			/* touchscreen emulation: maintain age rank of others */
+-			int j;
+-
+-			for (j = 0; j < 10; ++j) {
+-				struct mmm_finger *g = &md->f[j];
+-				if (g->rank > f->rank) {
+-					g->rank--;
+-					if (g->rank == 1)
+-						oldest = g;
+-				}
+-			}
+-			f->rank = 0;
+-			--(md->num);
+-			if (md->num == 0)
+-				released = true;
+-		}
+-		f->valid = 0;
+-	}
+-
+-	/* touchscreen emulation */
+-	if (oldest) {
+-		if (pressed)
+-			input_event(input, EV_KEY, BTN_TOUCH, 1);
+-		input_event(input, EV_ABS, ABS_X, oldest->x);
+-		input_event(input, EV_ABS, ABS_Y, oldest->y);
+-	} else if (released) {
+-		input_event(input, EV_KEY, BTN_TOUCH, 0);
+-	}
+-}
+-
+-/*
+- * this function is called upon all reports
+- * so that we can accumulate contact point information,
+- * and call input_mt_sync after each point.
+- */
+-static int mmm_event(struct hid_device *hid, struct hid_field *field,
+-				struct hid_usage *usage, __s32 value)
+-{
+-	struct mmm_data *md = hid_get_drvdata(hid);
+-	/*
+-	 * strangely, this function can be called before
+-	 * field->hidinput is initialized!
+-	 */
+-	if (hid->claimed & HID_CLAIMED_INPUT) {
+-		struct input_dev *input = field->hidinput->input;
+-		switch (usage->hid) {
+-		case HID_DG_TIPSWITCH:
+-			md->touch = value;
+-			break;
+-		case HID_DG_CONFIDENCE:
+-			md->valid = value;
+-			break;
+-		case HID_DG_WIDTH:
+-			if (md->valid)
+-				md->f[md->curid].w = value;
+-			break;
+-		case HID_DG_HEIGHT:
+-			if (md->valid)
+-				md->f[md->curid].h = value;
+-			break;
+-		case HID_DG_CONTACTID:
+-			if (md->valid) {
+-				md->curid = value;
+-				md->f[value].touch = md->touch;
+-				md->f[value].valid = 1;
+-			}
+-			break;
+-		case HID_GD_X:
+-			if (md->valid)
+-				md->f[md->curid].x = value;
+-			break;
+-		case HID_GD_Y:
+-			if (md->valid)
+-				md->f[md->curid].y = value;
+-			break;
+-		case HID_DG_CONTACTCOUNT:
+-			mmm_filter_event(md, input);
+-			break;
+-		}
+-	}
+-
+-	/* we have handled the hidinput part, now remains hiddev */
+-	if (hid->claimed & HID_CLAIMED_HIDDEV && hid->hiddev_hid_event)
+-		hid->hiddev_hid_event(hid, field, usage, value);
+-
+-	return 1;
+-}
+-
+-static int mmm_probe(struct hid_device *hdev, const struct hid_device_id *id)
+-{
+-	int ret;
+-	struct mmm_data *md;
+-
+-	md = kzalloc(sizeof(struct mmm_data), GFP_KERNEL);
+-	if (!md) {
+-		dev_err(&hdev->dev, "cannot allocate 3M data\n");
+-		return -ENOMEM;
+-	}
+-	hid_set_drvdata(hdev, md);
+-
+-	ret = hid_parse(hdev);
+-	if (!ret)
+-		ret = hid_hw_start(hdev, HID_CONNECT_DEFAULT);
+-
+-	if (ret)
+-		kfree(md);
+-	return ret;
+-}
+-
+-static void mmm_remove(struct hid_device *hdev)
+-{
+-	hid_hw_stop(hdev);
+-	kfree(hid_get_drvdata(hdev));
+-	hid_set_drvdata(hdev, NULL);
+-}
+-
+-static const struct hid_device_id mmm_devices[] = {
+-	{ HID_USB_DEVICE(USB_VENDOR_ID_3M, USB_DEVICE_ID_3M1968) },
+-	{ HID_USB_DEVICE(USB_VENDOR_ID_3M, USB_DEVICE_ID_3M2256) },
+-	{ }
+-};
+-MODULE_DEVICE_TABLE(hid, mmm_devices);
+-
+-static const struct hid_usage_id mmm_grabbed_usages[] = {
+-	{ HID_ANY_ID, HID_ANY_ID, HID_ANY_ID },
+-	{ HID_ANY_ID - 1, HID_ANY_ID - 1, HID_ANY_ID - 1}
+-};
+-
+-static struct hid_driver mmm_driver = {
+-	.name = "3m-pct",
+-	.id_table = mmm_devices,
+-	.probe = mmm_probe,
+-	.remove = mmm_remove,
+-	.input_mapping = mmm_input_mapping,
+-	.input_mapped = mmm_input_mapped,
+-	.usage_table = mmm_grabbed_usages,
+-	.event = mmm_event,
+-};
+-
+-static int __init mmm_init(void)
+-{
+-	return hid_register_driver(&mmm_driver);
+-}
+-
+-static void __exit mmm_exit(void)
+-{
+-	hid_unregister_driver(&mmm_driver);
+-}
+-
+-module_init(mmm_init);
+-module_exit(mmm_exit);
+-
+diff --git a/drivers/hid/hid-cando.c b/drivers/hid/hid-cando.c
+deleted file mode 100644
+index 4267a6f..0000000
+--- a/drivers/hid/hid-cando.c
++++ /dev/null
+@@ -1,272 +0,0 @@
+-/*
+- *  HID driver for Cando dual-touch panels
+- *
+- *  Copyright (c) 2010 Stephane Chatty <chatty@enac.fr>
+- *
+- */
+-
+-/*
+- * This program is free software; you can redistribute it and/or modify it
+- * under the terms of the GNU General Public License as published by the Free
+- * Software Foundation; either version 2 of the License, or (at your option)
+- * any later version.
+- */
+-
+-#include <linux/device.h>
+-#include <linux/hid.h>
+-#include <linux/module.h>
+-#include <linux/slab.h>
+-
+-MODULE_AUTHOR("Stephane Chatty <chatty@enac.fr>");
+-MODULE_DESCRIPTION("Cando dual-touch panel");
+-MODULE_LICENSE("GPL");
+-
+-#include "hid-ids.h"
+-
+-struct cando_data {
+-	__u16 x, y;
+-	__u8 id;
+-	__s8 oldest;		/* id of the oldest finger in previous frame */
+-	bool valid;		/* valid finger data, or just placeholder? */
+-	bool first;		/* is this the first finger in this frame? */
+-	__s8 firstid;		/* id of the first finger in the frame */
+-	__u16 firstx, firsty;	/* (x, y) of the first finger in the frame */
+-};
+-
+-static int cando_input_mapping(struct hid_device *hdev, struct hid_input *hi,
+-		struct hid_field *field, struct hid_usage *usage,
+-		unsigned long **bit, int *max)
+-{
+-	switch (usage->hid & HID_USAGE_PAGE) {
+-
+-	case HID_UP_GENDESK:
+-		switch (usage->hid) {
+-		case HID_GD_X:
+-			hid_map_usage(hi, usage, bit, max,
+-					EV_ABS, ABS_MT_POSITION_X);
+-			/* touchscreen emulation */
+-			input_set_abs_params(hi->input, ABS_X,
+-						field->logical_minimum,
+-						field->logical_maximum, 0, 0);
+-			return 1;
+-		case HID_GD_Y:
+-			hid_map_usage(hi, usage, bit, max,
+-					EV_ABS, ABS_MT_POSITION_Y);
+-			/* touchscreen emulation */
+-			input_set_abs_params(hi->input, ABS_Y,
+-						field->logical_minimum,
+-						field->logical_maximum, 0, 0);
+-			return 1;
+-		}
+-		return 0;
+-
+-	case HID_UP_DIGITIZER:
+-		switch (usage->hid) {
+-		case HID_DG_TIPSWITCH:
+-		case HID_DG_CONTACTMAX:
+-			return -1;
+-		case HID_DG_INRANGE:
+-			/* touchscreen emulation */
+-			hid_map_usage(hi, usage, bit, max, EV_KEY, BTN_TOUCH);
+-			return 1;
+-		case HID_DG_CONTACTID:
+-			hid_map_usage(hi, usage, bit, max,
+-					EV_ABS, ABS_MT_TRACKING_ID);
+-			return 1;
+-		}
+-		return 0;
+-	}
+-
+-	return 0;
+-}
+-
+-static int cando_input_mapped(struct hid_device *hdev, struct hid_input *hi,
+-		struct hid_field *field, struct hid_usage *usage,
+-		unsigned long **bit, int *max)
+-{
+-	if (usage->type == EV_KEY || usage->type == EV_ABS)
+-		clear_bit(usage->code, *bit);
+-
+-	return 0;
+-}
+-
+-/*
+- * this function is called when a whole finger has been parsed,
+- * so that it can decide what to send to the input layer.
+- */
+-static void cando_filter_event(struct cando_data *td, struct input_dev *input)
+-{
+-	td->first = !td->first; /* touchscreen emulation */
+-
+-	if (!td->valid) {
+-		/*
+-		 * touchscreen emulation: if this is the second finger and
+-		 * the first was valid, the first was the oldest; if the
+-		 * first was not valid and there was a valid finger in the
+-		 * previous frame, this is a release.
+-		 */
+-		if (td->first) {
+-			td->firstid = -1;
+-		} else if (td->firstid >= 0) {
+-			input_event(input, EV_ABS, ABS_X, td->firstx);
+-			input_event(input, EV_ABS, ABS_Y, td->firsty);
+-			td->oldest = td->firstid;
+-		} else if (td->oldest >= 0) {
+-			input_event(input, EV_KEY, BTN_TOUCH, 0);
+-			td->oldest = -1;
+-		}
+-
+-		return;
+-	}
+-	
+-	input_event(input, EV_ABS, ABS_MT_TRACKING_ID, td->id);
+-	input_event(input, EV_ABS, ABS_MT_POSITION_X, td->x);
+-	input_event(input, EV_ABS, ABS_MT_POSITION_Y, td->y);
+-
+-	input_mt_sync(input);
+-
+-	/*
+-	 * touchscreen emulation: if there was no touching finger previously,
+-	 * emit touch event
+-	 */
+-	if (td->oldest < 0) {
+-		input_event(input, EV_KEY, BTN_TOUCH, 1);
+-		td->oldest = td->id;
+-	}
+-
+-	/*
+-	 * touchscreen emulation: if this is the first finger, wait for the
+-	 * second; the oldest is then the second if it was the oldest already
+-	 * or if there was no first, the first otherwise.
+-	 */
+-	if (td->first) {
+-		td->firstx = td->x;
+-		td->firsty = td->y;
+-		td->firstid = td->id;
+-	} else {
+-		int x, y, oldest;
+-		if (td->id == td->oldest || td->firstid < 0) {
+-			x = td->x;
+-			y = td->y;
+-			oldest = td->id;
+-		} else {
+-			x = td->firstx;
+-			y = td->firsty;
+-			oldest = td->firstid;
+-		}
+-		input_event(input, EV_ABS, ABS_X, x);
+-		input_event(input, EV_ABS, ABS_Y, y);
+-		td->oldest = oldest;
+-	}
+-}
+-
+-
+-static int cando_event(struct hid_device *hid, struct hid_field *field,
+-				struct hid_usage *usage, __s32 value)
+-{
+-	struct cando_data *td = hid_get_drvdata(hid);
+-
+-	if (hid->claimed & HID_CLAIMED_INPUT) {
+-		struct input_dev *input = field->hidinput->input;
+-
+-		switch (usage->hid) {
+-		case HID_DG_INRANGE:
+-			td->valid = value;
+-			break;
+-		case HID_DG_CONTACTID:
+-			td->id = value;
+-			break;
+-		case HID_GD_X:
+-			td->x = value;
+-			break;
+-		case HID_GD_Y:
+-			td->y = value;
+-			cando_filter_event(td, input);
+-			break;
+-		case HID_DG_TIPSWITCH:
+-			/* avoid interference from generic hidinput handling */
+-			break;
+-
+-		default:
+-			/* fallback to the generic hidinput handling */
+-			return 0;
+-		}
+-	}
+-
+-	/* we have handled the hidinput part, now remains hiddev */
+-	if (hid->claimed & HID_CLAIMED_HIDDEV && hid->hiddev_hid_event)
+-		hid->hiddev_hid_event(hid, field, usage, value);
+-
+-	return 1;
+-}
+-
+-static int cando_probe(struct hid_device *hdev, const struct hid_device_id *id)
+-{
+-	int ret;
+-	struct cando_data *td;
+-
+-	td = kmalloc(sizeof(struct cando_data), GFP_KERNEL);
+-	if (!td) {
+-		dev_err(&hdev->dev, "cannot allocate Cando Touch data\n");
+-		return -ENOMEM;
+-	}
+-	hid_set_drvdata(hdev, td);
+-	td->first = false;
+-	td->oldest = -1;
+-	td->valid = false;
+-
+-	ret = hid_parse(hdev);
+-	if (!ret)
+-		ret = hid_hw_start(hdev, HID_CONNECT_DEFAULT);
+-
+-	if (ret)
+-		kfree(td);
+-
+-	return ret;
+-}
+-
+-static void cando_remove(struct hid_device *hdev)
+-{
+-	hid_hw_stop(hdev);
+-	kfree(hid_get_drvdata(hdev));
+-	hid_set_drvdata(hdev, NULL);
+-}
+-
+-static const struct hid_device_id cando_devices[] = {
+-	{ HID_USB_DEVICE(USB_VENDOR_ID_CANDO,
+-			USB_DEVICE_ID_CANDO_MULTI_TOUCH) },
+-	{ HID_USB_DEVICE(USB_VENDOR_ID_CANDO,
+-			USB_DEVICE_ID_CANDO_MULTI_TOUCH_11_6) },
+-	{ }
+-};
+-MODULE_DEVICE_TABLE(hid, cando_devices);
+-
+-static const struct hid_usage_id cando_grabbed_usages[] = {
+-	{ HID_ANY_ID, HID_ANY_ID, HID_ANY_ID },
+-	{ HID_ANY_ID - 1, HID_ANY_ID - 1, HID_ANY_ID - 1}
+-};
+-
+-static struct hid_driver cando_driver = {
+-	.name = "cando-touch",
+-	.id_table = cando_devices,
+-	.probe = cando_probe,
+-	.remove = cando_remove,
+-	.input_mapping = cando_input_mapping,
+-	.input_mapped = cando_input_mapped,
+-	.usage_table = cando_grabbed_usages,
+-	.event = cando_event,
+-};
+-
+-static int __init cando_init(void)
+-{
+-	return hid_register_driver(&cando_driver);
+-}
+-
+-static void __exit cando_exit(void)
+-{
+-	hid_unregister_driver(&cando_driver);
+-}
+-
+-module_init(cando_init);
+-module_exit(cando_exit);
+-
+diff --git a/drivers/hid/hid-core.c b/drivers/hid/hid-core.c
+index 866e54e..f39563e 100644
+--- a/drivers/hid/hid-core.c
++++ b/drivers/hid/hid-core.c
+@@ -1165,6 +1165,10 @@ int hid_connect(struct hid_device *hdev, unsigned int connect_mask)
+ 	if ((connect_mask & HID_CONNECT_HIDINPUT) && !hidinput_connect(hdev,
+ 				connect_mask & HID_CONNECT_HIDINPUT_FORCE))
+ 		hdev->claimed |= HID_CLAIMED_INPUT;
++	if (hdev->quirks & HID_QUIRK_MULTITOUCH)
++		/* this device should be handled by hid-multitouch, skip it */
++		return -ENODEV;
++
+ 	if ((connect_mask & HID_CONNECT_HIDDEV) && hdev->hiddev_connect &&
+ 			!hdev->hiddev_connect(hdev,
+ 				connect_mask & HID_CONNECT_HIDDEV_FORCE))
+@@ -1239,6 +1243,7 @@ static const struct hid_device_id hid_blacklist[] = {
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_3M, USB_DEVICE_ID_3M2256) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_A4TECH, USB_DEVICE_ID_A4TECH_WCP32PU) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_A4TECH, USB_DEVICE_ID_A4TECH_X5_005D) },
++	{ HID_USB_DEVICE(USB_VENDOR_ID_ACTIONSTAR, USB_DEVICE_ID_ACTIONSTAR_1011) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_APPLE, USB_DEVICE_ID_APPLE_ATV_IRCONTROL) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_APPLE, USB_DEVICE_ID_APPLE_IRCONTROL4) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_APPLE, USB_DEVICE_ID_APPLE_MIGHTYMOUSE) },
+@@ -1280,28 +1285,47 @@ static const struct hid_device_id hid_blacklist[] = {
+ 	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_APPLE, USB_DEVICE_ID_APPLE_ALU_WIRELESS_2009_JIS) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_APPLE, USB_DEVICE_ID_APPLE_FOUNTAIN_TP_ONLY) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_APPLE, USB_DEVICE_ID_APPLE_GEYSER1_TP_ONLY) },
++	{ HID_USB_DEVICE(USB_VENDOR_ID_ASUS, USB_DEVICE_ID_ASUS_T91MT) },
++	{ HID_USB_DEVICE(USB_VENDOR_ID_ASUS, USB_DEVICE_ID_ASUSTEK_MULTITOUCH_YFO) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_BELKIN, USB_DEVICE_ID_FLIP_KVM) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_BTC, USB_DEVICE_ID_BTC_EMPREX_REMOTE) },
++	{ HID_USB_DEVICE(USB_VENDOR_ID_CANDO, USB_DEVICE_ID_CANDO_PIXCIR_MULTI_TOUCH) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_CANDO, USB_DEVICE_ID_CANDO_MULTI_TOUCH) },
++	{ HID_USB_DEVICE(USB_VENDOR_ID_CANDO, USB_DEVICE_ID_CANDO_MULTI_TOUCH_10_1) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_CANDO, USB_DEVICE_ID_CANDO_MULTI_TOUCH_11_6) },
++	{ HID_USB_DEVICE(USB_VENDOR_ID_CANDO, USB_DEVICE_ID_CANDO_MULTI_TOUCH_15_6) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_CHERRY, USB_DEVICE_ID_CHERRY_CYMOTION) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_CHERRY, USB_DEVICE_ID_CHERRY_CYMOTION_SOLAR) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_CHICONY, USB_DEVICE_ID_CHICONY_TACTICAL_PAD) },
++	{ HID_USB_DEVICE(USB_VENDOR_ID_CHUNGHWAT, USB_DEVICE_ID_CHUNGHWAT_MULTITOUCH) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_CREATIVELABS, USB_DEVICE_ID_PRODIKEYS_PCMIDI) },
++	{ HID_USB_DEVICE(USB_VENDOR_ID_CVTOUCH, USB_DEVICE_ID_CVTOUCH_SCREEN) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_CYPRESS, USB_DEVICE_ID_CYPRESS_BARCODE_1) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_CYPRESS, USB_DEVICE_ID_CYPRESS_BARCODE_2) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_CYPRESS, USB_DEVICE_ID_CYPRESS_BARCODE_3) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_CYPRESS, USB_DEVICE_ID_CYPRESS_MOUSE) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_DRAGONRISE, 0x0006) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_DWAV, USB_DEVICE_ID_DWAV_EGALAX_MULTITOUCH) },
++	{ HID_USB_DEVICE(USB_VENDOR_ID_DWAV, USB_DEVICE_ID_DWAV_EGALAX_MULTITOUCH1) },
++	{ HID_USB_DEVICE(USB_VENDOR_ID_DWAV, USB_DEVICE_ID_DWAV_EGALAX_MULTITOUCH2) },
++	{ HID_USB_DEVICE(USB_VENDOR_ID_DWAV, USB_DEVICE_ID_DWAV_EGALAX_MULTITOUCH3) },
++	{ HID_USB_DEVICE(USB_VENDOR_ID_DWAV, USB_DEVICE_ID_DWAV_EGALAX_MULTITOUCH4) },
++	{ HID_USB_DEVICE(USB_VENDOR_ID_DWAV, USB_DEVICE_ID_DWAV_EGALAX_MULTITOUCH5) },
++	{ HID_USB_DEVICE(USB_VENDOR_ID_ELO, USB_DEVICE_ID_ELO_TS2515) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_EZKEY, USB_DEVICE_ID_BTC_8193) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_GAMERON, USB_DEVICE_ID_GAMERON_DUAL_PSX_ADAPTOR) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_GAMERON, USB_DEVICE_ID_GAMERON_DUAL_PCS_ADAPTOR) },
++	{ HID_USB_DEVICE(USB_VENDOR_ID_GENERAL_TOUCH, USB_DEVICE_ID_GENERAL_TOUCH_WIN7_TWOFINGERS) },
++	{ HID_USB_DEVICE(USB_VENDOR_ID_GOODTOUCH, USB_DEVICE_ID_GOODTOUCH_000f) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_GREENASIA, 0x0003) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_GREENASIA, 0x0012) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_GYRATION, USB_DEVICE_ID_GYRATION_REMOTE) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_GYRATION, USB_DEVICE_ID_GYRATION_REMOTE_2) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_GYRATION, USB_DEVICE_ID_GYRATION_REMOTE_3) },
++	{ HID_USB_DEVICE(USB_VENDOR_ID_HANVON, USB_DEVICE_ID_HANVON_MULTITOUCH) },
++	{ HID_USB_DEVICE(USB_VENDOR_ID_HANVON_ALT, USB_DEVICE_ID_HANVON_ALT_MULTITOUCH) },
++	{ HID_USB_DEVICE(USB_VENDOR_ID_ILITEK, USB_DEVICE_ID_ILITEK_MULTITOUCH) },
++	{ HID_USB_DEVICE(USB_VENDOR_ID_IRTOUCHSYSTEMS, USB_DEVICE_ID_IRTOUCH_INFRARED_USB) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_KENSINGTON, USB_DEVICE_ID_KS_SLIMBLADE) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_KYE, USB_DEVICE_ID_KYE_ERGO_525V) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_LABTEC, USB_DEVICE_ID_LABTEC_WIRELESS_KEYBOARD) },
+@@ -1328,6 +1352,8 @@ static const struct hid_device_id hid_blacklist[] = {
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_LOGITECH, USB_DEVICE_ID_LOGITECH_RUMBLEPAD2) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_LOGITECH, USB_DEVICE_ID_SPACETRAVELLER) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_LOGITECH, USB_DEVICE_ID_SPACENAVIGATOR) },
++	{ HID_USB_DEVICE(USB_VENDOR_ID_LUMIO, USB_DEVICE_ID_CRYSTALTOUCH) },
++	{ HID_USB_DEVICE(USB_VENDOR_ID_LUMIO, USB_DEVICE_ID_CRYSTALTOUCH_DUAL) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_MICROCHIP, USB_DEVICE_ID_PICOLCD) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_MICROCHIP, USB_DEVICE_ID_PICOLCD_BOOTLOADER) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_MICROSOFT, USB_DEVICE_ID_SIDEWINDER_GV) },
+@@ -1356,6 +1382,7 @@ static const struct hid_device_id hid_blacklist[] = {
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_NTRIG, USB_DEVICE_ID_NTRIG_TOUCH_SCREEN_17) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_NTRIG, USB_DEVICE_ID_NTRIG_TOUCH_SCREEN_18) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_ORTEK, USB_DEVICE_ID_ORTEK_WKB2000) },
++	{ HID_USB_DEVICE(USB_VENDOR_ID_PENMOUNT, USB_DEVICE_ID_PENMOUNT_PCI) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_PETALYNX, USB_DEVICE_ID_PETALYNX_MAXTER_REMOTE) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_QUANTA, USB_DEVICE_ID_QUANTA_OPTICAL_TOUCH) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_QUANTA, USB_DEVICE_ID_PIXART_IMAGING_INC_OPTICAL_TOUCH_SCREEN) },
+@@ -1366,6 +1393,8 @@ static const struct hid_device_id hid_blacklist[] = {
+ 	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_SONY, USB_DEVICE_ID_SONY_PS3_CONTROLLER) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_SONY, USB_DEVICE_ID_SONY_VAIO_VGX_MOUSE) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_STANTUM, USB_DEVICE_ID_MTP) },
++	{ HID_USB_DEVICE(USB_VENDOR_ID_STANTUM_STM, USB_DEVICE_ID_MTP_STM) },
++	{ HID_USB_DEVICE(USB_VENDOR_ID_STANTUM_SITRONIX, USB_DEVICE_ID_MTP_SITRONIX) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_SUNPLUS, USB_DEVICE_ID_SUNPLUS_WDESKTOP) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_THRUSTMASTER, 0xb300) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_THRUSTMASTER, 0xb304) },
+@@ -1375,7 +1404,11 @@ static const struct hid_device_id hid_blacklist[] = {
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_THRUSTMASTER, 0xb653) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_THRUSTMASTER, 0xb654) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_TOPSEED, USB_DEVICE_ID_TOPSEED_CYBERLINK) },
++	{ HID_USB_DEVICE(USB_VENDOR_ID_TOUCH_INTL, USB_DEVICE_ID_TOUCH_INTL_MULTI_TOUCH) },
++	{ HID_USB_DEVICE(USB_VENDOR_ID_TURBOX, USB_DEVICE_ID_TURBOX_TOUCHSCREEN_MOSART) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_TWINHAN, USB_DEVICE_ID_TWINHAN_IR_REMOTE) },
++	{ HID_USB_DEVICE(USB_VENDOR_ID_UNITEC, USB_DEVICE_ID_UNITEC_USB_TOUCH_0709) },
++	{ HID_USB_DEVICE(USB_VENDOR_ID_UNITEC, USB_DEVICE_ID_UNITEC_USB_TOUCH_0A19) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_WISEGROUP, USB_DEVICE_ID_SMARTJOY_PLUS) },
+ 	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_WACOM, USB_DEVICE_ID_WACOM_GRAPHIRE_BLUETOOTH) },
+ 	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_WACOM, USB_DEVICE_ID_WACOM_INTUOS4_BLUETOOTH) },
+@@ -1571,7 +1604,6 @@ static const struct hid_device_id hid_ignore_list[] = {
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_AIPTEK, USB_DEVICE_ID_AIPTEK_24) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_AIRCABLE, USB_DEVICE_ID_AIRCABLE1) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_ALCOR, USB_DEVICE_ID_ALCOR_USBRS232) },
+-	{ HID_USB_DEVICE(USB_VENDOR_ID_ASUS, USB_DEVICE_ID_ASUS_T91MT)},
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_ASUSTEK, USB_DEVICE_ID_ASUSTEK_LCM)},
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_ASUSTEK, USB_DEVICE_ID_ASUSTEK_LCM2)},
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_AVERMEDIA, USB_DEVICE_ID_AVER_FM_MR800) },
+@@ -1586,7 +1618,6 @@ static const struct hid_device_id hid_ignore_list[] = {
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_DELORME, USB_DEVICE_ID_DELORME_EM_LT20) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_ESSENTIAL_REALITY, USB_DEVICE_ID_ESSENTIAL_REALITY_P5) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_ETT, USB_DEVICE_ID_TC5UH) },
+-	{ HID_USB_DEVICE(USB_VENDOR_ID_GENERAL_TOUCH, 0x0001) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_GENERAL_TOUCH, 0x0002) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_GENERAL_TOUCH, 0x0003) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_GENERAL_TOUCH, 0x0004) },
+diff --git a/drivers/hid/hid-egalax.c b/drivers/hid/hid-egalax.c
+deleted file mode 100644
+index 5cd004e..0000000
+--- a/drivers/hid/hid-egalax.c
++++ /dev/null
+@@ -1,287 +0,0 @@
+-/*
+- *  HID driver for eGalax dual-touch panels
+- *
+- *  Copyright (c) 2010 Stephane Chatty <chatty@enac.fr>
+- *
+- */
+-
+-/*
+- * This program is free software; you can redistribute it and/or modify it
+- * under the terms of the GNU General Public License as published by the Free
+- * Software Foundation; either version 2 of the License, or (at your option)
+- * any later version.
+- */
+-
+-#include <linux/device.h>
+-#include <linux/hid.h>
+-#include <linux/module.h>
+-#include <linux/usb.h>
+-#include <linux/slab.h>
+-#include "usbhid/usbhid.h"
+-
+-MODULE_AUTHOR("Stephane Chatty <chatty@enac.fr>");
+-MODULE_DESCRIPTION("eGalax dual-touch panel");
+-MODULE_LICENSE("GPL");
+-
+-#include "hid-ids.h"
+-
+-struct egalax_data {
+-	__u16 x, y, z;
+-	__u8 id;
+-	bool first;		/* is this the first finger in the frame? */
+-	bool valid;		/* valid finger data, or just placeholder? */
+-	bool activity;		/* at least one active finger previously? */
+-	__u16 lastx, lasty, lastz;	/* latest valid (x, y, z) in the frame */
+-};
+-
+-static int egalax_input_mapping(struct hid_device *hdev, struct hid_input *hi,
+-		struct hid_field *field, struct hid_usage *usage,
+-		unsigned long **bit, int *max)
+-{
+-	switch (usage->hid & HID_USAGE_PAGE) {
+-
+-	case HID_UP_GENDESK:
+-		switch (usage->hid) {
+-		case HID_GD_X:
+-			hid_map_usage(hi, usage, bit, max,
+-					EV_ABS, ABS_MT_POSITION_X);
+-			/* touchscreen emulation */
+-			input_set_abs_params(hi->input, ABS_X,
+-						field->logical_minimum,
+-						field->logical_maximum, 0, 0);
+-			return 1;
+-		case HID_GD_Y:
+-			hid_map_usage(hi, usage, bit, max,
+-					EV_ABS, ABS_MT_POSITION_Y);
+-			/* touchscreen emulation */
+-			input_set_abs_params(hi->input, ABS_Y,
+-						field->logical_minimum,
+-						field->logical_maximum, 0, 0);
+-			return 1;
+-		}
+-		return 0;
+-
+-	case HID_UP_DIGITIZER:
+-		switch (usage->hid) {
+-		case HID_DG_TIPSWITCH:
+-			/* touchscreen emulation */
+-			hid_map_usage(hi, usage, bit, max, EV_KEY, BTN_TOUCH);
+-			return 1;
+-		case HID_DG_INRANGE:
+-		case HID_DG_CONFIDENCE:
+-		case HID_DG_CONTACTCOUNT:
+-		case HID_DG_CONTACTMAX:
+-			return -1;
+-		case HID_DG_CONTACTID:
+-			hid_map_usage(hi, usage, bit, max,
+-					EV_ABS, ABS_MT_TRACKING_ID);
+-			return 1;
+-		case HID_DG_TIPPRESSURE:
+-			hid_map_usage(hi, usage, bit, max,
+-					EV_ABS, ABS_MT_PRESSURE);
+-			/* touchscreen emulation */
+-			input_set_abs_params(hi->input, ABS_PRESSURE,
+-						field->logical_minimum,
+-						field->logical_maximum, 0, 0);
+-			return 1;
+-		}
+-		return 0;
+-	}
+-
+-	/* ignore others (from other reports we won't get anyway) */
+-	return -1;
+-}
+-
+-static int egalax_input_mapped(struct hid_device *hdev, struct hid_input *hi,
+-		struct hid_field *field, struct hid_usage *usage,
+-		unsigned long **bit, int *max)
+-{
+-	if (usage->type == EV_KEY || usage->type == EV_ABS)
+-		clear_bit(usage->code, *bit);
+-
+-	return 0;
+-}
+-
+-/*
+- * this function is called when a whole finger has been parsed,
+- * so that it can decide what to send to the input layer.
+- */
+-static void egalax_filter_event(struct egalax_data *td, struct input_dev *input)
+-{
+-	td->first = !td->first; /* touchscreen emulation */
+-
+-	if (td->valid) {
+-		/* emit multitouch events */
+-		input_event(input, EV_ABS, ABS_MT_TRACKING_ID, td->id);
+-		input_event(input, EV_ABS, ABS_MT_POSITION_X, td->x >> 3);
+-		input_event(input, EV_ABS, ABS_MT_POSITION_Y, td->y >> 3);
+-		input_event(input, EV_ABS, ABS_MT_PRESSURE, td->z);
+-
+-		input_mt_sync(input);
+-
+-		/*
+-		 * touchscreen emulation: store (x, y) as
+-		 * the last valid values in this frame
+-		 */
+-		td->lastx = td->x;
+-		td->lasty = td->y;
+-		td->lastz = td->z;
+-	}
+-
+-	/*
+-	 * touchscreen emulation: if this is the second finger and at least
+-	 * one in this frame is valid, the latest valid in the frame is
+-	 * the oldest on the panel, the one we want for single touch
+-	 */
+-	if (!td->first && td->activity) {
+-		input_event(input, EV_ABS, ABS_X, td->lastx >> 3);
+-		input_event(input, EV_ABS, ABS_Y, td->lasty >> 3);
+- 		input_event(input, EV_ABS, ABS_PRESSURE, td->lastz);
+-	}
+-
+-	if (!td->valid) {
+-		/*
+-		 * touchscreen emulation: if the first finger is invalid
+-		 * and there previously was finger activity, this is a release
+-		 */ 
+-		if (td->first && td->activity) {
+-			input_event(input, EV_KEY, BTN_TOUCH, 0);
+-			td->activity = false;
+-		}
+-		return;
+-	}
+-
+-
+-	/* touchscreen emulation: if no previous activity, emit touch event */
+-	if (!td->activity) {
+-		input_event(input, EV_KEY, BTN_TOUCH, 1);
+-		td->activity = true;
+-	}
+-}
+-
+-
+-static int egalax_event(struct hid_device *hid, struct hid_field *field,
+-				struct hid_usage *usage, __s32 value)
+-{
+-	struct egalax_data *td = hid_get_drvdata(hid);
+-
+-	if (hid->claimed & HID_CLAIMED_INPUT) {
+-		struct input_dev *input = field->hidinput->input;
+-
+-		switch (usage->hid) {
+-		case HID_DG_INRANGE:
+-		case HID_DG_CONFIDENCE:
+-			/* avoid interference from generic hidinput handling */
+-			break;
+-		case HID_DG_TIPSWITCH:
+-			td->valid = value;
+-			break;
+-		case HID_DG_TIPPRESSURE:
+-			td->z = value;
+-			break;
+-		case HID_DG_CONTACTID:
+-			td->id = value;
+-			break;
+-		case HID_GD_X:
+-			td->x = value;
+-			break;
+-		case HID_GD_Y:
+-			td->y = value;
+-			/* this is the last field in a finger */
+-			egalax_filter_event(td, input);
+-			break;
+-		case HID_DG_CONTACTCOUNT:
+-			/* touch emulation: this is the last field in a frame */
+-			td->first = false;
+-			break;
+-
+-		default:
+-			/* fallback to the generic hidinput handling */
+-			return 0;
+-		}
+-	}
+-
+-	/* we have handled the hidinput part, now remains hiddev */
+-	if (hid->claimed & HID_CLAIMED_HIDDEV && hid->hiddev_hid_event)
+-		hid->hiddev_hid_event(hid, field, usage, value);
+-
+-	return 1;
+-}
+-
+-static int egalax_probe(struct hid_device *hdev, const struct hid_device_id *id)
+-{
+-	int ret;
+-	struct egalax_data *td;
+-	struct hid_report *report;
+-
+-	td = kmalloc(sizeof(struct egalax_data), GFP_KERNEL);
+-	if (!td) {
+-		dev_err(&hdev->dev, "cannot allocate eGalax data\n");
+-		return -ENOMEM;
+-	}
+-	hid_set_drvdata(hdev, td);
+-
+-	ret = hid_parse(hdev);
+-	if (ret)
+-		goto end;
+-
+-	ret = hid_hw_start(hdev, HID_CONNECT_DEFAULT);
+-	if (ret)
+-		goto end;
+-
+-	report = hdev->report_enum[HID_FEATURE_REPORT].report_id_hash[5]; 
+-	if (report) {
+-		report->field[0]->value[0] = 2;
+-		usbhid_submit_report(hdev, report, USB_DIR_OUT);
+-	}
+-
+-end:
+-	if (ret)
+-		kfree(td);
+-
+-	return ret;
+-}
+-
+-static void egalax_remove(struct hid_device *hdev)
+-{
+-	hid_hw_stop(hdev);
+-	kfree(hid_get_drvdata(hdev));
+-	hid_set_drvdata(hdev, NULL);
+-}
+-
+-static const struct hid_device_id egalax_devices[] = {
+-	{ HID_USB_DEVICE(USB_VENDOR_ID_DWAV,
+-			USB_DEVICE_ID_DWAV_EGALAX_MULTITOUCH) },
+-	{ }
+-};
+-MODULE_DEVICE_TABLE(hid, egalax_devices);
+-
+-static const struct hid_usage_id egalax_grabbed_usages[] = {
+-	{ HID_ANY_ID, HID_ANY_ID, HID_ANY_ID },
+-	{ HID_ANY_ID - 1, HID_ANY_ID - 1, HID_ANY_ID - 1}
+-};
+-
+-static struct hid_driver egalax_driver = {
+-	.name = "egalax-touch",
+-	.id_table = egalax_devices,
+-	.probe = egalax_probe,
+-	.remove = egalax_remove,
+-	.input_mapping = egalax_input_mapping,
+-	.input_mapped = egalax_input_mapped,
+-	.usage_table = egalax_grabbed_usages,
+-	.event = egalax_event,
+-};
+-
+-static int __init egalax_init(void)
+-{
+-	return hid_register_driver(&egalax_driver);
+-}
+-
+-static void __exit egalax_exit(void)
+-{
+-	hid_unregister_driver(&egalax_driver);
+-}
+-
+-module_init(egalax_init);
+-module_exit(egalax_exit);
+-
+diff --git a/drivers/hid/hid-ids.h b/drivers/hid/hid-ids.h
+index 31601ee..fcddd63 100644
+--- a/drivers/hid/hid-ids.h
++++ b/drivers/hid/hid-ids.h
+@@ -34,6 +34,9 @@
+ #define USB_DEVICE_ID_ACECAD_FLAIR	0x0004
+ #define USB_DEVICE_ID_ACECAD_302	0x0008
+ 
++#define USB_VENDOR_ID_ACTIONSTAR	0x2101
++#define USB_DEVICE_ID_ACTIONSTAR_1011	0x1011
++
+ #define USB_VENDOR_ID_ADS_TECH 		0x06e1
+ #define USB_DEVICE_ID_ADS_TECH_RADIO_SI470X	0xa155
+ 
+@@ -103,6 +106,7 @@
+ 
+ #define USB_VENDOR_ID_ASUS		0x0486
+ #define USB_DEVICE_ID_ASUS_T91MT	0x0185
++#define USB_DEVICE_ID_ASUSTEK_MULTITOUCH_YFO	0x0186
+ 
+ #define USB_VENDOR_ID_ASUSTEK		0x0b05
+ #define USB_DEVICE_ID_ASUSTEK_LCM	0x1726
+@@ -128,8 +132,11 @@
+ #define USB_DEVICE_ID_BTC_EMPREX_REMOTE	0x5578
+ 
+ #define USB_VENDOR_ID_CANDO		0x2087
+-#define USB_DEVICE_ID_CANDO_MULTI_TOUCH 0x0a01
++#define USB_DEVICE_ID_CANDO_PIXCIR_MULTI_TOUCH 0x0703
++#define USB_DEVICE_ID_CANDO_MULTI_TOUCH	0x0a01
++#define USB_DEVICE_ID_CANDO_MULTI_TOUCH_10_1 0x0a02
+ #define USB_DEVICE_ID_CANDO_MULTI_TOUCH_11_6 0x0b03
++#define USB_DEVICE_ID_CANDO_MULTI_TOUCH_15_6 0x0f01
+ 
+ #define USB_VENDOR_ID_CH		0x068e
+ #define USB_DEVICE_ID_CH_PRO_PEDALS	0x00f2
+@@ -148,6 +155,9 @@
+ #define USB_VENDOR_ID_CHICONY		0x04f2
+ #define USB_DEVICE_ID_CHICONY_TACTICAL_PAD	0x0418
+ 
++#define USB_VENDOR_ID_CHUNGHWAT		0x2247
++#define USB_DEVICE_ID_CHUNGHWAT_MULTITOUCH	0x0001
++
+ #define USB_VENDOR_ID_CIDC		0x1677
+ 
+ #define USB_VENDOR_ID_CMEDIA		0x0d8c
+@@ -160,6 +170,9 @@
+ #define USB_VENDOR_ID_CREATIVELABS	0x041e
+ #define USB_DEVICE_ID_PRODIKEYS_PCMIDI	0x2801
+ 
++#define USB_VENDOR_ID_CVTOUCH		0x1ff7
++#define USB_DEVICE_ID_CVTOUCH_SCREEN	0x0013
++
+ #define USB_VENDOR_ID_CYGNAL		0x10c4
+ #define USB_DEVICE_ID_CYGNAL_RADIO_SI470X	0x818a
+ 
+@@ -170,6 +183,7 @@
+ #define USB_DEVICE_ID_CYPRESS_BARCODE_1	0xde61
+ #define USB_DEVICE_ID_CYPRESS_BARCODE_2	0xde64
+ #define USB_DEVICE_ID_CYPRESS_BARCODE_3	0xbca1
++#define USB_DEVICE_ID_CYPRESS_TRUETOUCH	0xc001
+ 
+ #define USB_VENDOR_ID_DEALEXTREAME	0x10c5
+ #define USB_DEVICE_ID_DEALEXTREAME_RADIO_SI4701	0x819a
+@@ -186,8 +200,14 @@
+ #define USB_VENDOR_ID_DWAV		0x0eef
+ #define USB_DEVICE_ID_EGALAX_TOUCHCONTROLLER	0x0001
+ #define USB_DEVICE_ID_DWAV_EGALAX_MULTITOUCH	0x480d
++#define USB_DEVICE_ID_DWAV_EGALAX_MULTITOUCH1	0x720c
++#define USB_DEVICE_ID_DWAV_EGALAX_MULTITOUCH2	0x72a1
++#define USB_DEVICE_ID_DWAV_EGALAX_MULTITOUCH3	0x480e
++#define USB_DEVICE_ID_DWAV_EGALAX_MULTITOUCH4	0x726b
++#define USB_DEVICE_ID_DWAV_EGALAX_MULTITOUCH5	0x725e
+ 
+ #define USB_VENDOR_ID_ELO		0x04E7
++#define USB_DEVICE_ID_ELO_TS2515	0x0022
+ #define USB_DEVICE_ID_ELO_TS2700	0x0020
+ 
+ #define USB_VENDOR_ID_ESSENTIAL_REALITY	0x0d7f
+@@ -207,6 +227,7 @@
+ #define USB_DEVICE_ID_GAMERON_DUAL_PCS_ADAPTOR	0x0002
+ 
+ #define USB_VENDOR_ID_GENERAL_TOUCH	0x0dfc
++#define USB_DEVICE_ID_GENERAL_TOUCH_WIN7_TWOFINGERS 0x0001
+ 
+ #define USB_VENDOR_ID_GLAB		0x06c2
+ #define USB_DEVICE_ID_4_PHIDGETSERVO_30	0x0038
+@@ -218,6 +239,9 @@
+ #define USB_DEVICE_ID_0_8_8_IF_KIT	0x0053
+ #define USB_DEVICE_ID_PHIDGET_MOTORCONTROL	0x0058
+ 
++#define USB_VENDOR_ID_GOODTOUCH		0x1aad
++#define USB_DEVICE_ID_GOODTOUCH_000f	0x000f
++
+ #define USB_VENDOR_ID_GOTOP		0x08f2
+ #define USB_DEVICE_ID_SUPER_Q2		0x007f
+ #define USB_DEVICE_ID_GOGOPEN		0x00ce
+@@ -285,14 +309,26 @@
+ #define USB_DEVICE_ID_GYRATION_REMOTE_2 0x0003
+ #define USB_DEVICE_ID_GYRATION_REMOTE_3 0x0008
+ 
++#define USB_VENDOR_ID_HANVON		0x20b3
++#define USB_DEVICE_ID_HANVON_MULTITOUCH	0x0a18
++
++#define USB_VENDOR_ID_HANVON_ALT	0x22ed
++#define USB_DEVICE_ID_HANVON_ALT_MULTITOUCH	0x1010
++
+ #define USB_VENDOR_ID_HAPP		0x078b
+ #define USB_DEVICE_ID_UGCI_DRIVING	0x0010
+ #define USB_DEVICE_ID_UGCI_FLYING	0x0020
+ #define USB_DEVICE_ID_UGCI_FIGHTING	0x0030
+ 
++#define USB_VENDOR_ID_ILITEK		0x222a
++#define USB_DEVICE_ID_ILITEK_MULTITOUCH	0x0001
++
+ #define USB_VENDOR_ID_IMATION		0x0718
+ #define USB_DEVICE_ID_DISC_STAKKA	0xd000
+ 
++#define USB_VENDOR_ID_IRTOUCHSYSTEMS	0x6615
++#define USB_DEVICE_ID_IRTOUCH_INFRARED_USB	0x0070
++
+ #define USB_VENDOR_ID_KBGEAR		0x084e
+ #define USB_DEVICE_ID_KBGEAR_JAMSTUDIO	0x1001
+ 
+@@ -348,6 +384,10 @@
+ #define USB_DEVICE_ID_DINOVO_MINI	0xc71f
+ #define USB_DEVICE_ID_LOGITECH_MOMO_WHEEL2	0xca03
+ 
++#define USB_VENDOR_ID_LUMIO		0x202e
++#define USB_DEVICE_ID_CRYSTALTOUCH	0x0006
++#define USB_DEVICE_ID_CRYSTALTOUCH_DUAL	0x0007
++
+ #define USB_VENDOR_ID_MCC		0x09db
+ #define USB_DEVICE_ID_MCC_PMD1024LS	0x0076
+ #define USB_DEVICE_ID_MCC_PMD1208LS	0x007a
+@@ -424,6 +464,9 @@
+ #define USB_VENDOR_ID_PANTHERLORD	0x0810
+ #define USB_DEVICE_ID_PANTHERLORD_TWIN_USB_JOYSTICK	0x0001
+ 
++#define USB_VENDOR_ID_PENMOUNT		0x14e1
++#define USB_DEVICE_ID_PENMOUNT_PCI	0x3500
++
+ #define USB_VENDOR_ID_PETALYNX		0x18b1
+ #define USB_DEVICE_ID_PETALYNX_MAXTER_REMOTE	0x0037
+ 
+@@ -464,6 +507,12 @@
+ #define USB_VENDOR_ID_STANTUM		0x1f87
+ #define USB_DEVICE_ID_MTP		0x0002
+ 
++#define USB_VENDOR_ID_STANTUM_STM		0x0483
++#define USB_DEVICE_ID_MTP_STM		0x3261
++
++#define USB_VENDOR_ID_STANTUM_SITRONIX		0x1403
++#define USB_DEVICE_ID_MTP_SITRONIX		0x5001
++
+ #define USB_VENDOR_ID_SUN		0x0430
+ #define USB_DEVICE_ID_RARITAN_KVM_DONGLE	0xcdab
+ 
+@@ -481,8 +530,12 @@
+ #define USB_VENDOR_ID_TOPSEED		0x0766
+ #define USB_DEVICE_ID_TOPSEED_CYBERLINK	0x0204
+ 
++#define USB_VENDOR_ID_TOUCH_INTL	0x1e5e
++#define USB_DEVICE_ID_TOUCH_INTL_MULTI_TOUCH	0x0313
++
+ #define USB_VENDOR_ID_TURBOX		0x062a
+ #define USB_DEVICE_ID_TURBOX_KEYBOARD	0x0201
++#define USB_DEVICE_ID_TURBOX_TOUCHSCREEN_MOSART	0x7100
+ 
+ #define USB_VENDOR_ID_TWINHAN           0x6253
+ #define USB_DEVICE_ID_TWINHAN_IR_REMOTE 0x0100
+@@ -491,6 +544,10 @@
+ #define USB_DEVICE_ID_UCLOGIC_TABLET_PF1209	0x0042
+ #define USB_DEVICE_ID_UCLOGIC_TABLET_WP4030U	0x0003
+ 
++#define USB_VENDOR_ID_UNITEC	0x227d
++#define USB_DEVICE_ID_UNITEC_USB_TOUCH_0709	0x0709
++#define USB_DEVICE_ID_UNITEC_USB_TOUCH_0A19	0x0a19
++
+ #define USB_VENDOR_ID_VERNIER		0x08f7
+ #define USB_DEVICE_ID_VERNIER_LABPRO	0x0001
+ #define USB_DEVICE_ID_VERNIER_GOTEMP	0x0002
+diff --git a/drivers/hid/hid-input.c b/drivers/hid/hid-input.c
+index 7a0d2e4..1d41021 100644
+--- a/drivers/hid/hid-input.c
++++ b/drivers/hid/hid-input.c
+@@ -333,6 +333,10 @@ static void hidinput_configure_usage(struct hid_input *hidinput, struct hid_fiel
+ 			map_key_clear(BTN_STYLUS);
+ 			break;
+ 
++		case 0x51: /* ContactID */
++			device->quirks |= HID_QUIRK_MULTITOUCH;
++			goto unknown;
++
+ 		default:  goto unknown;
+ 		}
+ 		break;
+@@ -534,6 +538,9 @@ mapped:
+ 			input_set_abs_params(input, usage->code, a, b, (b - a) >> 8, (b - a) >> 4);
+ 		else	input_set_abs_params(input, usage->code, a, b, 0, 0);
+ 
++		/* use a larger default input buffer for MT devices */
++		if (usage->code == ABS_MT_POSITION_X && input->hint_events_per_packet == 0)
++			input_set_events_per_packet(input, 60);
+ 	}
+ 
+ 	if (usage->type == EV_ABS &&
+@@ -653,6 +660,9 @@ void hidinput_report_event(struct hid_device *hid, struct hid_report *report)
+ {
+ 	struct hid_input *hidinput;
+ 
++	if (hid->quirks & HID_QUIRK_NO_INPUT_SYNC)
++		return;
++
+ 	list_for_each_entry(hidinput, &hid->inputs, list)
+ 		input_sync(hidinput->input);
+ }
+@@ -689,6 +699,24 @@ static void hidinput_close(struct input_dev *dev)
+ 	hid->ll_driver->close(hid);
+ }
+ 
++static void report_features(struct hid_device *hid)
++{
++	struct hid_driver *drv = hid->driver;
++	struct hid_report_enum *rep_enum;
++	struct hid_report *rep;
++	int i, j;
++
++	if (!drv->feature_mapping)
++		return;
++
++	rep_enum = &hid->report_enum[HID_FEATURE_REPORT];
++	list_for_each_entry(rep, &rep_enum->report_list, list)
++		for (i = 0; i < rep->maxfield; i++)
++			for (j = 0; j < rep->field[i]->maxusage; j++)
++				drv->feature_mapping(hid, rep->field[i],
++						     rep->field[i]->usage + j);
++}
++
+ /*
+  * Register the input device; print a message.
+  * Configure the input layer interface
+@@ -701,7 +729,6 @@ int hidinput_connect(struct hid_device *hid, unsigned int force)
+ 	struct hid_input *hidinput = NULL;
+ 	struct input_dev *input_dev;
+ 	int i, j, k;
+-	int max_report_type = HID_OUTPUT_REPORT;
+ 
+ 	INIT_LIST_HEAD(&hid->inputs);
+ 
+@@ -718,10 +745,13 @@ int hidinput_connect(struct hid_device *hid, unsigned int force)
+ 			return -1;
+ 	}
+ 
+-	if (hid->quirks & HID_QUIRK_SKIP_OUTPUT_REPORTS)
+-		max_report_type = HID_INPUT_REPORT;
++	report_features(hid);
++
++	for (k = HID_INPUT_REPORT; k <= HID_OUTPUT_REPORT; k++) {
++		if (k == HID_OUTPUT_REPORT &&
++			hid->quirks & HID_QUIRK_SKIP_OUTPUT_REPORTS)
++			continue;
+ 
+-	for (k = HID_INPUT_REPORT; k <= max_report_type; k++)
+ 		list_for_each_entry(report, &hid->report_enum[k].report_list, list) {
+ 
+ 			if (!report->maxfield)
+@@ -774,6 +804,17 @@ int hidinput_connect(struct hid_device *hid, unsigned int force)
+ 				hidinput = NULL;
+ 			}
+ 		}
++	}
++
++	if (hid->quirks & HID_QUIRK_MULTITOUCH) {
++		if (!strncmp(hid->driver->name, "generic-", 8)) {
++			/* generic hid does not know how to handle multitouch devices */
++			if (hidinput)
++				goto out_cleanup;
++			goto out_unwind;
++		}
++		hid->quirks &= ~HID_QUIRK_MULTITOUCH;
++	}
+ 
+ 	if (hidinput && input_register_device(hidinput->input))
+ 		goto out_cleanup;
+@@ -781,6 +822,7 @@ int hidinput_connect(struct hid_device *hid, unsigned int force)
+ 	return 0;
+ 
+ out_cleanup:
++	list_del(&hidinput->list);
+ 	input_free_device(hidinput->input);
+ 	kfree(hidinput);
+ out_unwind:
+diff --git a/drivers/hid/hid-mosart.c b/drivers/hid/hid-mosart.c
+deleted file mode 100644
+index e91437c..0000000
+--- a/drivers/hid/hid-mosart.c
++++ /dev/null
+@@ -1,274 +0,0 @@
+-/*
+- *  HID driver for the multitouch panel on the ASUS EeePC T91MT
+- *
+- *  Copyright (c) 2009-2010 Stephane Chatty <chatty@enac.fr>
+- *  Copyright (c) 2010 Teemu Tuominen <teemu.tuominen@cybercom.com>
+- *
+- */
+-
+-/*
+- * This program is free software; you can redistribute it and/or modify it
+- * under the terms of the GNU General Public License as published by the Free
+- * Software Foundation; either version 2 of the License, or (at your option)
+- * any later version.
+- */
+-
+-#include <linux/device.h>
+-#include <linux/hid.h>
+-#include <linux/module.h>
+-#include <linux/slab.h>
+-#include <linux/usb.h>
+-#include "usbhid/usbhid.h"
+-
+-MODULE_AUTHOR("Stephane Chatty <chatty@enac.fr>");
+-MODULE_DESCRIPTION("MosArt dual-touch panel");
+-MODULE_LICENSE("GPL");
+-
+-#include "hid-ids.h"
+-
+-struct mosart_data {
+-	__u16 x, y;
+-	__u8 id;
+-	bool valid;		/* valid finger data, or just placeholder? */
+-	bool first;		/* is this the first finger in this frame? */
+-	bool activity_now;	/* at least one active finger in this frame? */
+-	bool activity;		/* at least one active finger previously? */
+-};
+-
+-static int mosart_input_mapping(struct hid_device *hdev, struct hid_input *hi,
+-		struct hid_field *field, struct hid_usage *usage,
+-		unsigned long **bit, int *max)
+-{
+-	switch (usage->hid & HID_USAGE_PAGE) {
+-
+-	case HID_UP_GENDESK:
+-		switch (usage->hid) {
+-		case HID_GD_X:
+-			hid_map_usage(hi, usage, bit, max,
+-					EV_ABS, ABS_MT_POSITION_X);
+-			/* touchscreen emulation */
+-			input_set_abs_params(hi->input, ABS_X,
+-						field->logical_minimum,
+-						field->logical_maximum, 0, 0);
+-			return 1;
+-		case HID_GD_Y:
+-			hid_map_usage(hi, usage, bit, max,
+-					EV_ABS, ABS_MT_POSITION_Y);
+-			/* touchscreen emulation */
+-			input_set_abs_params(hi->input, ABS_Y,
+-						field->logical_minimum,
+-						field->logical_maximum, 0, 0);
+-			return 1;
+-		}
+-		return 0;
+-
+-	case HID_UP_DIGITIZER:
+-		switch (usage->hid) {
+-		case HID_DG_CONFIDENCE:
+-		case HID_DG_TIPSWITCH:
+-		case HID_DG_INPUTMODE:
+-		case HID_DG_DEVICEINDEX:
+-		case HID_DG_CONTACTCOUNT:
+-		case HID_DG_CONTACTMAX:
+-		case HID_DG_TIPPRESSURE:
+-		case HID_DG_WIDTH:
+-		case HID_DG_HEIGHT:
+-			return -1;
+-		case HID_DG_INRANGE:
+-			/* touchscreen emulation */
+-			hid_map_usage(hi, usage, bit, max, EV_KEY, BTN_TOUCH);
+-			return 1;
+-
+-		case HID_DG_CONTACTID:
+-			hid_map_usage(hi, usage, bit, max,
+-					EV_ABS, ABS_MT_TRACKING_ID);
+-			return 1;
+-
+-		}
+-		return 0;
+-
+-	case 0xff000000:
+-		/* ignore HID features */
+-		return -1;
+-	}
+-
+-	return 0;
+-}
+-
+-static int mosart_input_mapped(struct hid_device *hdev, struct hid_input *hi,
+-		struct hid_field *field, struct hid_usage *usage,
+-		unsigned long **bit, int *max)
+-{
+-	if (usage->type == EV_KEY || usage->type == EV_ABS)
+-		clear_bit(usage->code, *bit);
+-
+-	return 0;
+-}
+-
+-/*
+- * this function is called when a whole finger has been parsed,
+- * so that it can decide what to send to the input layer.
+- */
+-static void mosart_filter_event(struct mosart_data *td, struct input_dev *input)
+-{
+-	td->first = !td->first; /* touchscreen emulation */
+-
+-	if (!td->valid) {
+-		/*
+-		 * touchscreen emulation: if no finger in this frame is valid
+-		 * and there previously was finger activity, this is a release
+-		 */ 
+-		if (!td->first && !td->activity_now && td->activity) {
+-			input_event(input, EV_KEY, BTN_TOUCH, 0);
+-			td->activity = false;
+-		}
+-		return;
+-	}
+-
+-	input_event(input, EV_ABS, ABS_MT_TRACKING_ID, td->id);
+-	input_event(input, EV_ABS, ABS_MT_POSITION_X, td->x);
+-	input_event(input, EV_ABS, ABS_MT_POSITION_Y, td->y);
+-
+-	input_mt_sync(input);
+-	td->valid = false;
+-
+-	/* touchscreen emulation: if first active finger in this frame... */
+-	if (!td->activity_now) {
+-		/* if there was no previous activity, emit touch event */
+-		if (!td->activity) {
+-			input_event(input, EV_KEY, BTN_TOUCH, 1);
+-			td->activity = true;
+-		}
+-		td->activity_now = true;
+-		/* and in any case this is our preferred finger */
+-		input_event(input, EV_ABS, ABS_X, td->x);
+-		input_event(input, EV_ABS, ABS_Y, td->y);
+-	}
+-}
+-
+-
+-static int mosart_event(struct hid_device *hid, struct hid_field *field,
+-				struct hid_usage *usage, __s32 value)
+-{
+-	struct mosart_data *td = hid_get_drvdata(hid);
+-
+-	if (hid->claimed & HID_CLAIMED_INPUT) {
+-		struct input_dev *input = field->hidinput->input;
+-		switch (usage->hid) {
+-		case HID_DG_INRANGE:
+-			td->valid = !!value;
+-			break;
+-		case HID_GD_X:
+-			td->x = value;
+-			break;
+-		case HID_GD_Y:
+-			td->y = value;
+-			mosart_filter_event(td, input);
+-			break;
+-		case HID_DG_CONTACTID:
+-			td->id = value;
+-			break;
+-		case HID_DG_CONTACTCOUNT:
+-			/* touch emulation: this is the last field in a frame */
+-			td->first = false;
+-			td->activity_now = false;
+-			break;
+-		case HID_DG_CONFIDENCE:
+-		case HID_DG_TIPSWITCH:
+-			/* avoid interference from generic hidinput handling */
+-			break;
+-
+-		default:
+-			/* fallback to the generic hidinput handling */
+-			return 0;
+-		}
+-	}
+-
+-	/* we have handled the hidinput part, now remains hiddev */
+-	if (hid->claimed & HID_CLAIMED_HIDDEV && hid->hiddev_hid_event)
+-		hid->hiddev_hid_event(hid, field, usage, value);
+-
+-	return 1;
+-}
+-
+-static int mosart_probe(struct hid_device *hdev, const struct hid_device_id *id)
+-{
+-	int ret;
+-	struct mosart_data *td;
+-
+-
+-	td = kmalloc(sizeof(struct mosart_data), GFP_KERNEL);
+-	if (!td) {
+-		dev_err(&hdev->dev, "cannot allocate MosArt data\n");
+-		return -ENOMEM;
+-	}
+-	td->valid = false;
+-	td->activity = false;
+-	td->activity_now = false;
+-	td->first = false;
+-	hid_set_drvdata(hdev, td);
+-
+-	/* currently, it's better to have one evdev device only */
+-#if 0
+-	hdev->quirks |= HID_QUIRK_MULTI_INPUT;
+-#endif
+-
+-	ret = hid_parse(hdev);
+-	if (ret == 0)
+-		ret = hid_hw_start(hdev, HID_CONNECT_DEFAULT);
+-
+-	if (ret == 0) {
+-		struct hid_report_enum *re = hdev->report_enum
+-						+ HID_FEATURE_REPORT;
+-		struct hid_report *r = re->report_id_hash[7];
+-
+-		r->field[0]->value[0] = 0x02;
+-		usbhid_submit_report(hdev, r, USB_DIR_OUT);
+-	} else 
+-		kfree(td);
+-
+-	return ret;
+-}
+-
+-static void mosart_remove(struct hid_device *hdev)
+-{
+-	hid_hw_stop(hdev);
+-	kfree(hid_get_drvdata(hdev));
+-	hid_set_drvdata(hdev, NULL);
+-}
+-
+-static const struct hid_device_id mosart_devices[] = {
+-	{ HID_USB_DEVICE(USB_VENDOR_ID_ASUS, USB_DEVICE_ID_ASUS_T91MT) },
+-	{ }
+-};
+-MODULE_DEVICE_TABLE(hid, mosart_devices);
+-
+-static const struct hid_usage_id mosart_grabbed_usages[] = {
+-	{ HID_ANY_ID, HID_ANY_ID, HID_ANY_ID },
+-	{ HID_ANY_ID - 1, HID_ANY_ID - 1, HID_ANY_ID - 1}
+-};
+-
+-static struct hid_driver mosart_driver = {
+-	.name = "mosart",
+-	.id_table = mosart_devices,
+-	.probe = mosart_probe,
+-	.remove = mosart_remove,
+-	.input_mapping = mosart_input_mapping,
+-	.input_mapped = mosart_input_mapped,
+-	.usage_table = mosart_grabbed_usages,
+-	.event = mosart_event,
+-};
+-
+-static int __init mosart_init(void)
+-{
+-	return hid_register_driver(&mosart_driver);
+-}
+-
+-static void __exit mosart_exit(void)
+-{
+-	hid_unregister_driver(&mosart_driver);
+-}
+-
+-module_init(mosart_init);
+-module_exit(mosart_exit);
+-
+diff --git a/drivers/hid/hid-multitouch.c b/drivers/hid/hid-multitouch.c
+new file mode 100644
+index 0000000..3f9e89c3
+--- /dev/null
++++ b/drivers/hid/hid-multitouch.c
+@@ -0,0 +1,852 @@
++/*
++ *  HID driver for multitouch panels
++ *
++ *  Copyright (c) 2010-2011 Stephane Chatty <chatty@enac.fr>
++ *  Copyright (c) 2010-2011 Benjamin Tissoires <benjamin.tissoires@gmail.com>
++ *  Copyright (c) 2010-2011 Ecole Nationale de l'Aviation Civile, France
++ *
++ *  This code is partly based on hid-egalax.c:
++ *
++ *  Copyright (c) 2010 Stephane Chatty <chatty@enac.fr>
++ *  Copyright (c) 2010 Henrik Rydberg <rydberg@euromail.se>
++ *  Copyright (c) 2010 Canonical, Ltd.
++ *
++ *  This code is partly based on hid-3m-pct.c:
++ *
++ *  Copyright (c) 2009-2010 Stephane Chatty <chatty@enac.fr>
++ *  Copyright (c) 2010      Henrik Rydberg <rydberg@euromail.se>
++ *  Copyright (c) 2010      Canonical, Ltd.
++ *
++ */
++
++/*
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License as published by the Free
++ * Software Foundation; either version 2 of the License, or (at your option)
++ * any later version.
++ */
++
++#include <linux/device.h>
++#include <linux/hid.h>
++#include <linux/module.h>
++#include <linux/slab.h>
++#include <linux/usb.h>
++#include <linux/input/mt.h>
++#include "usbhid/usbhid.h"
++
++
++MODULE_AUTHOR("Stephane Chatty <chatty@enac.fr>");
++MODULE_AUTHOR("Benjamin Tissoires <benjamin.tissoires@gmail.com>");
++MODULE_DESCRIPTION("HID multitouch panels");
++MODULE_LICENSE("GPL");
++
++#include "hid-ids.h"
++
++/* quirks to control the device */
++#define MT_QUIRK_NOT_SEEN_MEANS_UP	(1 << 0)
++#define MT_QUIRK_SLOT_IS_CONTACTID	(1 << 1)
++#define MT_QUIRK_CYPRESS		(1 << 2)
++#define MT_QUIRK_SLOT_IS_CONTACTNUMBER	(1 << 3)
++#define MT_QUIRK_VALID_IS_INRANGE	(1 << 4)
++#define MT_QUIRK_VALID_IS_CONFIDENCE	(1 << 5)
++#define MT_QUIRK_EGALAX_XYZ_FIXUP	(1 << 6)
++#define MT_QUIRK_SLOT_IS_CONTACTID_MINUS_ONE	(1 << 7)
++
++#ifdef MT_DBG
++static bool trace = false;
++module_param(trace, bool, 0644);
++MODULE_PARM_DESC(trace, "Enable trace mode");
++#endif /* MT_DBG */
++
++struct mt_slot {
++	__s32 x, y, p, w, h;
++	__s32 contactid;	/* the device ContactID assigned to this slot */
++	bool touch_state;	/* is the touch valid? */
++	bool seen_in_this_frame;/* has this slot been updated */
++};
++
++struct mt_device {
++	struct mt_slot curdata;	/* placeholder of incoming data */
++	struct mt_class *mtclass;	/* our mt device class */
++	unsigned last_field_index;	/* last field index of the report */
++	unsigned last_slot_field;	/* the last field of a slot */
++	int last_mt_collection;	/* last known mt-related collection */
++	__s8 inputmode;		/* InputMode HID feature, -1 if non-existent */
++	__u8 num_received;	/* how many contacts we received */
++	__u8 num_expected;	/* expected last contact index */
++	__u8 maxcontacts;
++	bool curvalid;		/* is the current contact valid? */
++	struct mt_slot *slots;
++};
++
++struct mt_class {
++	__s32 name;	/* MT_CLS */
++	__s32 quirks;
++	__s32 sn_move;	/* Signal/noise ratio for move events */
++	__s32 sn_width;	/* Signal/noise ratio for width events */
++	__s32 sn_height;	/* Signal/noise ratio for height events */
++	__s32 sn_pressure;	/* Signal/noise ratio for pressure events */
++	__u8 maxcontacts;
++};
++
++/* classes of device behavior */
++#define MT_CLS_DEFAULT				0x0001
++
++#define MT_CLS_CONFIDENCE			0x0002
++#define MT_CLS_CONFIDENCE_MINUS_ONE		0x0003
++#define MT_CLS_DUAL_INRANGE_CONTACTID		0x0004
++#define MT_CLS_DUAL_INRANGE_CONTACTNUMBER	0x0005
++#define MT_CLS_DUAL_NSMU_CONTACTID		0x0006
++
++/* vendor specific classes */
++#define MT_CLS_3M				0x0101
++#define MT_CLS_CYPRESS				0x0102
++#define MT_CLS_EGALAX				0x0103
++
++#define MT_DEFAULT_MAXCONTACT	10
++
++/*
++ * these device-dependent functions determine what slot corresponds
++ * to a valid contact that was just read.
++ */
++
++static int cypress_compute_slot(struct mt_device *td)
++{
++	if (td->curdata.contactid != 0 || td->num_received == 0)
++		return td->curdata.contactid;
++	else
++		return -1;
++}
++
++static int find_slot_from_contactid(struct mt_device *td)
++{
++	int i;
++	for (i = 0; i < td->maxcontacts; ++i) {
++		if (td->slots[i].contactid == td->curdata.contactid &&
++			td->slots[i].touch_state)
++			return i;
++	}
++	for (i = 0; i < td->maxcontacts; ++i) {
++		if (!td->slots[i].seen_in_this_frame &&
++			!td->slots[i].touch_state)
++			return i;
++	}
++	/* should not occurs. If this happens that means
++	 * that the device sent more touches that it says
++	 * in the report descriptor. It is ignored then. */
++	return -1;
++}
++
++struct mt_class mt_classes[] = {
++	{ .name = MT_CLS_DEFAULT,
++		.quirks = MT_QUIRK_NOT_SEEN_MEANS_UP },
++	{ .name = MT_CLS_CONFIDENCE,
++		.quirks = MT_QUIRK_VALID_IS_CONFIDENCE },
++	{ .name = MT_CLS_CONFIDENCE_MINUS_ONE,
++		.quirks = MT_QUIRK_VALID_IS_CONFIDENCE |
++			MT_QUIRK_SLOT_IS_CONTACTID_MINUS_ONE },
++	{ .name = MT_CLS_DUAL_INRANGE_CONTACTID,
++		.quirks = MT_QUIRK_VALID_IS_INRANGE |
++			MT_QUIRK_SLOT_IS_CONTACTID,
++		.maxcontacts = 2 },
++	{ .name = MT_CLS_DUAL_INRANGE_CONTACTNUMBER,
++		.quirks = MT_QUIRK_VALID_IS_INRANGE |
++			MT_QUIRK_SLOT_IS_CONTACTNUMBER,
++		.maxcontacts = 2 },
++	{ .name = MT_CLS_DUAL_NSMU_CONTACTID,
++		.quirks = MT_QUIRK_NOT_SEEN_MEANS_UP |
++			MT_QUIRK_SLOT_IS_CONTACTID,
++		.maxcontacts = 2 },
++
++	/*
++	 * vendor specific classes
++	 */
++	{ .name = MT_CLS_3M,
++		.quirks = MT_QUIRK_VALID_IS_CONFIDENCE |
++			MT_QUIRK_SLOT_IS_CONTACTID,
++		.sn_move = 2048,
++		.sn_width = 128,
++		.sn_height = 128 },
++	{ .name = MT_CLS_CYPRESS,
++		.quirks = MT_QUIRK_NOT_SEEN_MEANS_UP |
++			MT_QUIRK_CYPRESS,
++		.maxcontacts = 10 },
++	{ .name = MT_CLS_EGALAX,
++		.quirks =  MT_QUIRK_SLOT_IS_CONTACTID |
++			MT_QUIRK_VALID_IS_INRANGE |
++			MT_QUIRK_EGALAX_XYZ_FIXUP,
++		.maxcontacts = 2,
++		.sn_move = 4096,
++		.sn_pressure = 32,
++	},
++
++	{ }
++};
++
++static void mt_feature_mapping(struct hid_device *hdev,
++		struct hid_field *field, struct hid_usage *usage)
++{
++	struct mt_device *td = hid_get_drvdata(hdev);
++
++	switch (usage->hid) {
++	case HID_DG_INPUTMODE:
++		td->inputmode = field->report->id;
++		break;
++	case HID_DG_CONTACTMAX:
++		td->maxcontacts = field->value[0];
++		if (td->mtclass->maxcontacts)
++			/* check if the maxcontacts is given by the class */
++			td->maxcontacts = td->mtclass->maxcontacts;
++
++#ifdef MT_DBG
++		if (trace)
++			printk(KERN_ERR "max contacts was %d, now %d\n", field->value[0], td->maxcontacts);
++#endif /* MT_DBG */
++
++		break;
++	}
++}
++
++static void set_abs(struct input_dev *input, unsigned int code,
++		struct hid_field *field, int snratio)
++{
++	int fmin = field->logical_minimum;
++	int fmax = field->logical_maximum;
++	int fuzz = snratio ? (fmax - fmin) / snratio : 0;
++	input_set_abs_params(input, code, fmin, fmax, fuzz, 0);
++}
++
++static int mt_input_mapping(struct hid_device *hdev, struct hid_input *hi,
++		struct hid_field *field, struct hid_usage *usage,
++		unsigned long **bit, int *max)
++{
++	struct mt_device *td = hid_get_drvdata(hdev);
++	struct mt_class *cls = td->mtclass;
++	__s32 quirks = cls->quirks;
++
++	switch (usage->hid & HID_USAGE_PAGE) {
++
++	case HID_UP_GENDESK:
++		switch (usage->hid) {
++		case HID_GD_X:
++			if (quirks & MT_QUIRK_EGALAX_XYZ_FIXUP)
++				field->logical_maximum = 32760;
++			hid_map_usage(hi, usage, bit, max,
++					EV_ABS, ABS_MT_POSITION_X);
++			set_abs(hi->input, ABS_MT_POSITION_X, field,
++				cls->sn_move);
++			/* touchscreen emulation */
++			set_abs(hi->input, ABS_X, field, cls->sn_move);
++			if (td->last_mt_collection == usage->collection_index) {
++				td->last_slot_field = usage->hid;
++				td->last_field_index = field->index;
++			}
++			return 1;
++		case HID_GD_Y:
++			if (quirks & MT_QUIRK_EGALAX_XYZ_FIXUP)
++				field->logical_maximum = 32760;
++			hid_map_usage(hi, usage, bit, max,
++					EV_ABS, ABS_MT_POSITION_Y);
++			set_abs(hi->input, ABS_MT_POSITION_Y, field,
++				cls->sn_move);
++			/* touchscreen emulation */
++			set_abs(hi->input, ABS_Y, field, cls->sn_move);
++			if (td->last_mt_collection == usage->collection_index) {
++				td->last_slot_field = usage->hid;
++				td->last_field_index = field->index;
++			}
++			return 1;
++		}
++		return 0;
++
++	case HID_UP_DIGITIZER:
++		switch (usage->hid) {
++		case HID_DG_INRANGE:
++			if (td->last_mt_collection == usage->collection_index) {
++				td->last_slot_field = usage->hid;
++				td->last_field_index = field->index;
++			}
++			return 1;
++		case HID_DG_CONFIDENCE:
++			if (td->last_mt_collection == usage->collection_index) {
++				td->last_slot_field = usage->hid;
++				td->last_field_index = field->index;
++			}
++			return 1;
++		case HID_DG_TIPSWITCH:
++			hid_map_usage(hi, usage, bit, max, EV_KEY, BTN_TOUCH);
++			input_set_capability(hi->input, EV_KEY, BTN_TOUCH);
++			if (td->last_mt_collection == usage->collection_index) {
++				td->last_slot_field = usage->hid;
++				td->last_field_index = field->index;
++			}
++			return 1;
++		case HID_DG_CONTACTID:
++			if (!td->maxcontacts)
++				td->maxcontacts = MT_DEFAULT_MAXCONTACT;
++			input_mt_init_slots(hi->input, td->maxcontacts);
++			td->last_slot_field = usage->hid;
++			td->last_field_index = field->index;
++			td->last_mt_collection = usage->collection_index;
++			return 1;
++		case HID_DG_WIDTH:
++			hid_map_usage(hi, usage, bit, max,
++					EV_ABS, ABS_MT_TOUCH_MAJOR);
++			set_abs(hi->input, ABS_MT_TOUCH_MAJOR, field,
++				cls->sn_width);
++			if (td->last_mt_collection == usage->collection_index) {
++				td->last_slot_field = usage->hid;
++				td->last_field_index = field->index;
++			}
++			return 1;
++		case HID_DG_HEIGHT:
++			hid_map_usage(hi, usage, bit, max,
++					EV_ABS, ABS_MT_TOUCH_MINOR);
++			set_abs(hi->input, ABS_MT_TOUCH_MINOR, field,
++				cls->sn_height);
++			input_set_abs_params(hi->input,
++					ABS_MT_ORIENTATION, 0, 1, 0, 0);
++			if (td->last_mt_collection == usage->collection_index) {
++				td->last_slot_field = usage->hid;
++				td->last_field_index = field->index;
++			}
++			return 1;
++		case HID_DG_TIPPRESSURE:
++			if (quirks & MT_QUIRK_EGALAX_XYZ_FIXUP)
++				field->logical_minimum = 0;
++			hid_map_usage(hi, usage, bit, max,
++					EV_ABS, ABS_MT_PRESSURE);
++			set_abs(hi->input, ABS_MT_PRESSURE, field,
++				cls->sn_pressure);
++			/* touchscreen emulation */
++			set_abs(hi->input, ABS_PRESSURE, field,
++				cls->sn_pressure);
++			if (td->last_mt_collection == usage->collection_index) {
++				td->last_slot_field = usage->hid;
++				td->last_field_index = field->index;
++			}
++			return 1;
++		case HID_DG_CONTACTCOUNT:
++			if (td->last_mt_collection == usage->collection_index)
++				td->last_field_index = field->index;
++			return 1;
++		case HID_DG_CONTACTMAX:
++			/* we don't set td->last_slot_field as contactcount and
++			 * contact max are global to the report */
++			if (td->last_mt_collection == usage->collection_index)
++				td->last_field_index = field->index;
++			return -1;
++		}
++		/* let hid-input decide for the others */
++		return 0;
++
++	case 0xff000000:
++		/* we do not want to map these: no input-oriented meaning */
++		return -1;
++	}
++
++	return 0;
++}
++
++static int mt_input_mapped(struct hid_device *hdev, struct hid_input *hi,
++		struct hid_field *field, struct hid_usage *usage,
++		unsigned long **bit, int *max)
++{
++	if (usage->type == EV_KEY || usage->type == EV_ABS)
++		set_bit(usage->type, hi->input->evbit);
++
++	return -1;
++}
++
++static int mt_compute_slot(struct mt_device *td)
++{
++	__s32 quirks = td->mtclass->quirks;
++
++	if (quirks & MT_QUIRK_SLOT_IS_CONTACTID)
++		return td->curdata.contactid;
++
++	if (quirks & MT_QUIRK_CYPRESS)
++		return cypress_compute_slot(td);
++
++	if (quirks & MT_QUIRK_SLOT_IS_CONTACTNUMBER)
++		return td->num_received;
++
++	if (quirks & MT_QUIRK_SLOT_IS_CONTACTID_MINUS_ONE)
++		return td->curdata.contactid - 1;
++
++	return find_slot_from_contactid(td);
++}
++
++/*
++ * this function is called when a whole contact has been processed,
++ * so that it can assign it to a slot and store the data there
++ */
++static void mt_complete_slot(struct mt_device *td)
++{
++#ifdef MT_DBG
++	if (trace)
++		printk(KERN_ERR "--------------------\n");
++#endif /* MT_DBG */
++
++	td->curdata.seen_in_this_frame = true;
++	if (td->curvalid) {
++		int slotnum = mt_compute_slot(td);
++
++		if (slotnum >= 0 && slotnum < td->maxcontacts)
++			td->slots[slotnum] = td->curdata;
++	}
++	td->num_received++;
++}
++
++
++/*
++ * this function is called when a whole packet has been received and processed,
++ * so that it can decide what to send to the input layer.
++ */
++static void mt_emit_event(struct mt_device *td, struct input_dev *input)
++{
++	int i;
++
++#ifdef MT_DBG
++	if (trace)
++		printk(KERN_ERR "++++++++++++++++++++ count=%d expected=%d\n",
++			td->num_received, td->num_expected);
++#endif /* MT_DBG */
++
++	for (i = 0; i < td->maxcontacts; ++i) {
++		struct mt_slot *s = &(td->slots[i]);
++		if ((td->mtclass->quirks & MT_QUIRK_NOT_SEEN_MEANS_UP) &&
++			!s->seen_in_this_frame) {
++			s->touch_state = false;
++		}
++
++		input_mt_slot(input, i);
++		input_mt_report_slot_state(input, MT_TOOL_FINGER,
++			s->touch_state);
++		if (s->touch_state) {
++			/* this finger is on the screen */
++			int wide = (s->w > s->h);
++			/* divided by two to match visual scale of touch */
++			int major = max(s->w, s->h) >> 1;
++			int minor = min(s->w, s->h) >> 1;
++
++			input_event(input, EV_ABS, ABS_MT_POSITION_X, s->x);
++			input_event(input, EV_ABS, ABS_MT_POSITION_Y, s->y);
++			input_event(input, EV_ABS, ABS_MT_ORIENTATION, wide);
++			input_event(input, EV_ABS, ABS_MT_PRESSURE, s->p);
++			input_event(input, EV_ABS, ABS_MT_TOUCH_MAJOR, major);
++			input_event(input, EV_ABS, ABS_MT_TOUCH_MINOR, minor);
++		}
++		s->seen_in_this_frame = false;
++
++	}
++
++	input_mt_report_pointer_emulation(input, true);
++	input_sync(input);
++	td->num_received = 0;
++}
++
++#ifdef MT_DBG
++void mt_dbg(struct hid_device *hid, struct hid_field *field,
++				struct hid_usage *usage, __s32 value)
++{
++	char *human_readable_name;
++	switch (usage->hid) {
++	case HID_DG_INRANGE:
++		human_readable_name = "HID_DG_INRANGE";
++		break;
++	case HID_DG_TIPSWITCH:
++		human_readable_name = "HID_DG_TIPSWITCH";
++		break;
++	case HID_DG_CONFIDENCE:
++		human_readable_name = "HID_DG_CONFIDENCE";
++		break;
++	case HID_DG_CONTACTID:
++		human_readable_name = "HID_DG_CONTACTID";
++		break;
++	case HID_DG_TIPPRESSURE:
++		human_readable_name = "HID_DG_TIPPRESSURE";
++		break;
++	case HID_GD_X:
++		human_readable_name = "HID_GD_X";
++		break;
++	case HID_GD_Y:
++		human_readable_name = "HID_GD_Y";
++		break;
++	case HID_DG_WIDTH:
++		human_readable_name = "HID_DG_WIDTH";
++		break;
++	case HID_DG_HEIGHT:
++		human_readable_name = "HID_DG_HEIGHT";
++		break;
++	case HID_DG_CONTACTCOUNT:
++		human_readable_name = "HID_DG_CONTACTCOUNT";
++		break;
++	case HID_DG_CONTACTMAX:
++		human_readable_name = "HID_DG_CONTACTMAX";
++		break;
++	default:
++		human_readable_name = "UNKNOWN";
++	}
++	printk(KERN_ERR "hid->usage:0x%x (%s) v:%d\n",
++		usage->hid, human_readable_name, value);
++}
++#endif /* MT_DBG */
++
++
++static int mt_event(struct hid_device *hid, struct hid_field *field,
++				struct hid_usage *usage, __s32 value)
++{
++	struct mt_device *td = hid_get_drvdata(hid);
++	__s32 quirks = td->mtclass->quirks;
++
++#ifdef MT_DBG
++	if (trace)
++		mt_dbg(hid, field, usage, value);
++#endif /* MT_DBG */
++
++	if (hid->claimed & HID_CLAIMED_INPUT && td->slots) {
++		switch (usage->hid) {
++		case HID_DG_INRANGE:
++			if (quirks & MT_QUIRK_VALID_IS_INRANGE)
++				td->curvalid = value;
++			break;
++		case HID_DG_TIPSWITCH:
++			if (quirks & MT_QUIRK_NOT_SEEN_MEANS_UP)
++				td->curvalid = value;
++			td->curdata.touch_state = value;
++			break;
++		case HID_DG_CONFIDENCE:
++			if (quirks & MT_QUIRK_VALID_IS_CONFIDENCE)
++				td->curvalid = value;
++			break;
++		case HID_DG_CONTACTID:
++			td->curdata.contactid = value;
++			break;
++		case HID_DG_TIPPRESSURE:
++			td->curdata.p = value;
++			break;
++		case HID_GD_X:
++			td->curdata.x = value;
++			break;
++		case HID_GD_Y:
++			td->curdata.y = value;
++			break;
++		case HID_DG_WIDTH:
++			td->curdata.w = value;
++			break;
++		case HID_DG_HEIGHT:
++			td->curdata.h = value;
++			break;
++		case HID_DG_CONTACTCOUNT:
++			/*
++			 * Includes multi-packet support where subsequent
++			 * packets are sent with zero contactcount.
++			 */
++			if (value)
++				td->num_expected = value;
++			break;
++
++		default:
++			/* fallback to the generic hidinput handling */
++			return 0;
++		}
++
++		if (usage->hid == td->last_slot_field) {
++			mt_complete_slot(td);
++		}
++
++		if (field->index == td->last_field_index
++			&& td->num_received >= td->num_expected)
++			mt_emit_event(td, field->hidinput->input);
++
++	}
++
++	/* we have handled the hidinput part, now remains hiddev */
++	if (hid->claimed & HID_CLAIMED_HIDDEV && hid->hiddev_hid_event)
++		hid->hiddev_hid_event(hid, field, usage, value);
++
++	return 1;
++}
++
++static void mt_set_input_mode(struct hid_device *hdev)
++{
++	struct mt_device *td = hid_get_drvdata(hdev);
++	struct hid_report *r;
++	struct hid_report_enum *re;
++
++	if (td->inputmode < 0)
++		return;
++
++	re = &(hdev->report_enum[HID_FEATURE_REPORT]);
++	r = re->report_id_hash[td->inputmode];
++	if (r) {
++		r->field[0]->value[0] = 0x02;
++		usbhid_submit_report(hdev, r, USB_DIR_OUT);
++	}
++}
++
++static int mt_probe(struct hid_device *hdev, const struct hid_device_id *id)
++{
++	int ret, i;
++	struct mt_device *td;
++	struct mt_class *mtclass = mt_classes; /* MT_CLS_DEFAULT */
++
++	for (i = 0; mt_classes[i].name ; i++) {
++		if (id->driver_data == mt_classes[i].name) {
++			mtclass = &(mt_classes[i]);
++			break;
++		}
++	}
++
++#ifdef MT_DBG
++	if (trace)
++		printk(KERN_ERR "hid-multitouch: class=%d\n", mtclass->name);
++#endif /* MT_DBG */
++
++	/* This allows the driver to correctly support devices
++	 * that emit events over several HID messages.
++	 */
++	hdev->quirks |= HID_QUIRK_NO_INPUT_SYNC;
++
++	td = kzalloc(sizeof(struct mt_device), GFP_KERNEL);
++	if (!td) {
++		dev_err(&hdev->dev, "cannot allocate multitouch data\n");
++		return -ENOMEM;
++	}
++	td->mtclass = mtclass;
++	td->inputmode = -1;
++	td->last_mt_collection = -1;
++	hid_set_drvdata(hdev, td);
++
++	ret = hid_parse(hdev);
++	if (ret != 0)
++		goto fail;
++
++	ret = hid_hw_start(hdev, HID_CONNECT_DEFAULT);
++	if (ret)
++		goto fail;
++
++	td->slots = kzalloc(td->maxcontacts * sizeof(struct mt_slot),
++				GFP_KERNEL);
++	if (!td->slots) {
++		dev_err(&hdev->dev, "cannot allocate multitouch slots\n");
++		hid_hw_stop(hdev);
++		ret = -ENOMEM;
++		goto fail;
++	}
++
++	mt_set_input_mode(hdev);
++
++	return 0;
++
++fail:
++	kfree(td);
++	return ret;
++}
++
++#ifdef CONFIG_PM
++static int mt_reset_resume(struct hid_device *hdev)
++{
++	mt_set_input_mode(hdev);
++	return 0;
++}
++#endif
++
++static void mt_remove(struct hid_device *hdev)
++{
++	struct mt_device *td = hid_get_drvdata(hdev);
++	hid_hw_stop(hdev);
++	kfree(td->slots);
++	kfree(td);
++	hid_set_drvdata(hdev, NULL);
++}
++
++static const struct hid_device_id mt_devices[] = {
++
++	/* 3M panels */
++	{ .driver_data = MT_CLS_3M,
++		HID_USB_DEVICE(USB_VENDOR_ID_3M,
++			USB_DEVICE_ID_3M1968) },
++	{ .driver_data = MT_CLS_3M,
++		HID_USB_DEVICE(USB_VENDOR_ID_3M,
++			USB_DEVICE_ID_3M2256) },
++
++	/* ActionStar panels */
++	{ .driver_data = MT_CLS_DEFAULT,
++		HID_USB_DEVICE(USB_VENDOR_ID_ACTIONSTAR,
++			USB_DEVICE_ID_ACTIONSTAR_1011) },
++
++	/* Cando panels */
++	{ .driver_data = MT_CLS_DUAL_INRANGE_CONTACTNUMBER,
++		HID_USB_DEVICE(USB_VENDOR_ID_CANDO,
++			USB_DEVICE_ID_CANDO_MULTI_TOUCH) },
++	{ .driver_data = MT_CLS_DUAL_INRANGE_CONTACTNUMBER,
++		HID_USB_DEVICE(USB_VENDOR_ID_CANDO,
++			USB_DEVICE_ID_CANDO_MULTI_TOUCH_10_1) },
++	{ .driver_data = MT_CLS_DUAL_INRANGE_CONTACTNUMBER,
++		HID_USB_DEVICE(USB_VENDOR_ID_CANDO,
++			USB_DEVICE_ID_CANDO_MULTI_TOUCH_11_6) },
++	{ .driver_data = MT_CLS_DUAL_INRANGE_CONTACTNUMBER,
++		HID_USB_DEVICE(USB_VENDOR_ID_CANDO,
++			USB_DEVICE_ID_CANDO_MULTI_TOUCH_15_6) },
++
++	/* Chunghwa Telecom touch panels */
++	{  .driver_data = MT_CLS_DEFAULT,
++		HID_USB_DEVICE(USB_VENDOR_ID_CHUNGHWAT,
++			USB_DEVICE_ID_CHUNGHWAT_MULTITOUCH) },
++
++	/* CVTouch panels */
++	{ .driver_data = MT_CLS_DEFAULT,
++		HID_USB_DEVICE(USB_VENDOR_ID_CVTOUCH,
++			USB_DEVICE_ID_CVTOUCH_SCREEN) },
++
++	/* Cypress panel */
++	{ .driver_data = MT_CLS_CYPRESS,
++		HID_USB_DEVICE(USB_VENDOR_ID_CYPRESS,
++			USB_DEVICE_ID_CYPRESS_TRUETOUCH) },
++
++	/* eGalax devices (resistive) */
++	{  .driver_data = MT_CLS_EGALAX,
++		HID_USB_DEVICE(USB_VENDOR_ID_DWAV,
++			USB_DEVICE_ID_DWAV_EGALAX_MULTITOUCH) },
++	{  .driver_data = MT_CLS_EGALAX,
++		HID_USB_DEVICE(USB_VENDOR_ID_DWAV,
++			USB_DEVICE_ID_DWAV_EGALAX_MULTITOUCH3) },
++
++	/* eGalax devices (capacitive) */
++	{  .driver_data = MT_CLS_EGALAX,
++		HID_USB_DEVICE(USB_VENDOR_ID_DWAV,
++			USB_DEVICE_ID_DWAV_EGALAX_MULTITOUCH1) },
++	{  .driver_data = MT_CLS_EGALAX,
++		HID_USB_DEVICE(USB_VENDOR_ID_DWAV,
++			USB_DEVICE_ID_DWAV_EGALAX_MULTITOUCH2) },
++	{  .driver_data = MT_CLS_EGALAX,
++		HID_USB_DEVICE(USB_VENDOR_ID_DWAV,
++			USB_DEVICE_ID_DWAV_EGALAX_MULTITOUCH4) },
++	{  .driver_data = MT_CLS_EGALAX,
++		HID_USB_DEVICE(USB_VENDOR_ID_DWAV,
++			USB_DEVICE_ID_DWAV_EGALAX_MULTITOUCH5) },
++
++	/* Elo TouchSystems IntelliTouch Plus panel */
++	{ .driver_data = MT_CLS_DUAL_NSMU_CONTACTID,
++		HID_USB_DEVICE(USB_VENDOR_ID_ELO,
++			USB_DEVICE_ID_ELO_TS2515) },
++
++	/* GeneralTouch panel */
++	{ .driver_data = MT_CLS_DUAL_INRANGE_CONTACTNUMBER,
++		HID_USB_DEVICE(USB_VENDOR_ID_GENERAL_TOUCH,
++			USB_DEVICE_ID_GENERAL_TOUCH_WIN7_TWOFINGERS) },
++
++	/* GoodTouch panels */
++	{ .driver_data = MT_CLS_DEFAULT,
++		HID_USB_DEVICE(USB_VENDOR_ID_GOODTOUCH,
++			USB_DEVICE_ID_GOODTOUCH_000f) },
++
++	/* Hanvon panels */
++	{ .driver_data = MT_CLS_DUAL_INRANGE_CONTACTID,
++		HID_USB_DEVICE(USB_VENDOR_ID_HANVON_ALT,
++			USB_DEVICE_ID_HANVON_ALT_MULTITOUCH) },
++
++	/* Ilitek dual touch panel */
++	{  .driver_data = MT_CLS_DEFAULT,
++		HID_USB_DEVICE(USB_VENDOR_ID_ILITEK,
++			USB_DEVICE_ID_ILITEK_MULTITOUCH) },
++
++	/* IRTOUCH panels */
++	{ .driver_data = MT_CLS_DUAL_INRANGE_CONTACTID,
++		HID_USB_DEVICE(USB_VENDOR_ID_IRTOUCHSYSTEMS,
++			USB_DEVICE_ID_IRTOUCH_INFRARED_USB) },
++
++	/* Lumio panels */
++	{ .driver_data = MT_CLS_CONFIDENCE_MINUS_ONE,
++		HID_USB_DEVICE(USB_VENDOR_ID_LUMIO,
++			USB_DEVICE_ID_CRYSTALTOUCH) },
++	{ .driver_data = MT_CLS_CONFIDENCE_MINUS_ONE,
++		HID_USB_DEVICE(USB_VENDOR_ID_LUMIO,
++			USB_DEVICE_ID_CRYSTALTOUCH_DUAL) },
++
++	/* MosArt panels */
++	{ .driver_data = MT_CLS_CONFIDENCE_MINUS_ONE,
++		HID_USB_DEVICE(USB_VENDOR_ID_ASUS,
++			USB_DEVICE_ID_ASUS_T91MT)},
++	{ .driver_data = MT_CLS_CONFIDENCE_MINUS_ONE,
++		HID_USB_DEVICE(USB_VENDOR_ID_ASUS,
++			USB_DEVICE_ID_ASUSTEK_MULTITOUCH_YFO) },
++	{ .driver_data = MT_CLS_CONFIDENCE_MINUS_ONE,
++		HID_USB_DEVICE(USB_VENDOR_ID_TURBOX,
++			USB_DEVICE_ID_TURBOX_TOUCHSCREEN_MOSART) },
++
++	/* PenMount panels */
++	{ .driver_data = MT_CLS_CONFIDENCE,
++		HID_USB_DEVICE(USB_VENDOR_ID_PENMOUNT,
++			USB_DEVICE_ID_PENMOUNT_PCI) },
++
++	/* PixCir-based panels */
++	{ .driver_data = MT_CLS_DUAL_INRANGE_CONTACTID,
++		HID_USB_DEVICE(USB_VENDOR_ID_HANVON,
++			USB_DEVICE_ID_HANVON_MULTITOUCH) },
++	{ .driver_data = MT_CLS_DUAL_INRANGE_CONTACTID,
++		HID_USB_DEVICE(USB_VENDOR_ID_CANDO,
++			USB_DEVICE_ID_CANDO_PIXCIR_MULTI_TOUCH) },
++
++	/* Stantum panels */
++	{ .driver_data = MT_CLS_CONFIDENCE,
++		HID_USB_DEVICE(USB_VENDOR_ID_STANTUM,
++			USB_DEVICE_ID_MTP)},
++	{ .driver_data = MT_CLS_CONFIDENCE,
++		HID_USB_DEVICE(USB_VENDOR_ID_STANTUM_STM,
++			USB_DEVICE_ID_MTP_STM)},
++	{ .driver_data = MT_CLS_CONFIDENCE,
++		HID_USB_DEVICE(USB_VENDOR_ID_STANTUM_SITRONIX,
++			USB_DEVICE_ID_MTP_SITRONIX)},
++
++	/* Touch International panels */
++	{ .driver_data = MT_CLS_DEFAULT,
++		HID_USB_DEVICE(USB_VENDOR_ID_TOUCH_INTL,
++			USB_DEVICE_ID_TOUCH_INTL_MULTI_TOUCH) },
++
++	/* Unitec panels */
++	{ .driver_data = MT_CLS_DEFAULT,
++		HID_USB_DEVICE(USB_VENDOR_ID_UNITEC,
++			USB_DEVICE_ID_UNITEC_USB_TOUCH_0709) },
++	{ .driver_data = MT_CLS_DEFAULT,
++		HID_USB_DEVICE(USB_VENDOR_ID_UNITEC,
++			USB_DEVICE_ID_UNITEC_USB_TOUCH_0A19) },
++
++	{ }
++};
++MODULE_DEVICE_TABLE(hid, mt_devices);
++
++static const struct hid_usage_id mt_grabbed_usages[] = {
++	{ HID_ANY_ID, HID_ANY_ID, HID_ANY_ID },
++	{ HID_ANY_ID - 1, HID_ANY_ID - 1, HID_ANY_ID - 1}
++};
++
++static struct hid_driver mt_driver = {
++	.name = "hid-multitouch",
++	.id_table = mt_devices,
++	.probe = mt_probe,
++	.remove = mt_remove,
++	.input_mapping = mt_input_mapping,
++	.input_mapped = mt_input_mapped,
++	.feature_mapping = mt_feature_mapping,
++	.usage_table = mt_grabbed_usages,
++	.event = mt_event,
++#ifdef CONFIG_PM
++	.reset_resume = mt_reset_resume,
++#endif
++};
++
++static int __init mt_init(void)
++{
++	return hid_register_driver(&mt_driver);
++}
++
++static void __exit mt_exit(void)
++{
++	hid_unregister_driver(&mt_driver);
++}
++
++module_init(mt_init);
++module_exit(mt_exit);
+diff --git a/drivers/hid/hid-stantum.c b/drivers/hid/hid-stantum.c
+deleted file mode 100644
+index 90df886..0000000
+--- a/drivers/hid/hid-stantum.c
++++ /dev/null
+@@ -1,284 +0,0 @@
+-/*
+- *  HID driver for Stantum multitouch panels
+- *
+- *  Copyright (c) 2009 Stephane Chatty <chatty@enac.fr>
+- *
+- */
+-
+-/*
+- * This program is free software; you can redistribute it and/or modify it
+- * under the terms of the GNU General Public License as published by the Free
+- * Software Foundation; either version 2 of the License, or (at your option)
+- * any later version.
+- */
+-
+-#include <linux/device.h>
+-#include <linux/hid.h>
+-#include <linux/module.h>
+-#include <linux/slab.h>
+-
+-MODULE_AUTHOR("Stephane Chatty <chatty@enac.fr>");
+-MODULE_DESCRIPTION("Stantum HID multitouch panels");
+-MODULE_LICENSE("GPL");
+-
+-#include "hid-ids.h"
+-
+-struct stantum_data {
+-	__s32 x, y, z, w, h;	/* x, y, pressure, width, height */
+-	__u16 id;		/* touch id */
+-	bool valid;		/* valid finger data, or just placeholder? */
+-	bool first;		/* first finger in the HID packet? */
+-	bool activity;		/* at least one active finger so far? */
+-};
+-
+-static int stantum_input_mapping(struct hid_device *hdev, struct hid_input *hi,
+-		struct hid_field *field, struct hid_usage *usage,
+-		unsigned long **bit, int *max)
+-{
+-	switch (usage->hid & HID_USAGE_PAGE) {
+-
+-	case HID_UP_GENDESK:
+-		switch (usage->hid) {
+-		case HID_GD_X:
+-			hid_map_usage(hi, usage, bit, max,
+-					EV_ABS, ABS_MT_POSITION_X);
+-			/* touchscreen emulation */
+-			input_set_abs_params(hi->input, ABS_X,
+-						field->logical_minimum,
+-						field->logical_maximum, 0, 0);
+-			return 1;
+-		case HID_GD_Y:
+-			hid_map_usage(hi, usage, bit, max,
+-					EV_ABS, ABS_MT_POSITION_Y);
+-			/* touchscreen emulation */
+-			input_set_abs_params(hi->input, ABS_Y,
+-						field->logical_minimum,
+-						field->logical_maximum, 0, 0);
+-			return 1;
+-		}
+-		return 0;
+-
+-	case HID_UP_DIGITIZER:
+-		switch (usage->hid) {
+-		case HID_DG_INRANGE:
+-		case HID_DG_CONFIDENCE:
+-		case HID_DG_INPUTMODE:
+-		case HID_DG_DEVICEINDEX:
+-		case HID_DG_CONTACTCOUNT:
+-		case HID_DG_CONTACTMAX:
+-			return -1;
+-
+-		case HID_DG_TIPSWITCH:
+-			/* touchscreen emulation */
+-			hid_map_usage(hi, usage, bit, max, EV_KEY, BTN_TOUCH);
+-			return 1;
+-
+-		case HID_DG_WIDTH:
+-			hid_map_usage(hi, usage, bit, max,
+-					EV_ABS, ABS_MT_TOUCH_MAJOR);
+-			return 1;
+-		case HID_DG_HEIGHT:
+-			hid_map_usage(hi, usage, bit, max,
+-					EV_ABS, ABS_MT_TOUCH_MINOR);
+-			input_set_abs_params(hi->input, ABS_MT_ORIENTATION,
+-					1, 1, 0, 0);
+-			return 1;
+-		case HID_DG_TIPPRESSURE:
+-			hid_map_usage(hi, usage, bit, max,
+-					EV_ABS, ABS_MT_PRESSURE);
+-			return 1;
+-
+-		case HID_DG_CONTACTID:
+-			hid_map_usage(hi, usage, bit, max,
+-					EV_ABS, ABS_MT_TRACKING_ID);
+-			return 1;
+-
+-		}
+-		return 0;
+-
+-	case 0xff000000:
+-		/* no input-oriented meaning */
+-		return -1;
+-	}
+-
+-	return 0;
+-}
+-
+-static int stantum_input_mapped(struct hid_device *hdev, struct hid_input *hi,
+-		struct hid_field *field, struct hid_usage *usage,
+-		unsigned long **bit, int *max)
+-{
+-	if (usage->type == EV_KEY || usage->type == EV_ABS)
+-		clear_bit(usage->code, *bit);
+-
+-	return 0;
+-}
+-
+-/*
+- * this function is called when a whole finger has been parsed,
+- * so that it can decide what to send to the input layer.
+- */
+-static void stantum_filter_event(struct stantum_data *sd,
+-					struct input_dev *input)
+-{
+-	bool wide;
+-
+-	if (!sd->valid) {
+-		/*
+-		 * touchscreen emulation: if the first finger is not valid and
+-		 * there previously was finger activity, this is a release
+-		 */
+-		if (sd->first && sd->activity) {
+-			input_event(input, EV_KEY, BTN_TOUCH, 0);
+-			sd->activity = false;
+-		}
+-		return;
+-	}
+-
+-	input_event(input, EV_ABS, ABS_MT_TRACKING_ID, sd->id);
+-	input_event(input, EV_ABS, ABS_MT_POSITION_X, sd->x);
+-	input_event(input, EV_ABS, ABS_MT_POSITION_Y, sd->y);
+-
+-	wide = (sd->w > sd->h);
+-	input_event(input, EV_ABS, ABS_MT_ORIENTATION, wide);
+-	input_event(input, EV_ABS, ABS_MT_TOUCH_MAJOR, wide ? sd->w : sd->h);
+-	input_event(input, EV_ABS, ABS_MT_TOUCH_MINOR, wide ? sd->h : sd->w);
+-
+-	input_event(input, EV_ABS, ABS_MT_PRESSURE, sd->z);
+-
+-	input_mt_sync(input);
+-	sd->valid = false;
+-
+-	/* touchscreen emulation */
+-	if (sd->first) {
+-		if (!sd->activity) {
+-			input_event(input, EV_KEY, BTN_TOUCH, 1);
+-			sd->activity = true;
+-		}
+-		input_event(input, EV_ABS, ABS_X, sd->x);
+-		input_event(input, EV_ABS, ABS_Y, sd->y);
+-	}
+-	sd->first = false;
+-}
+-
+-
+-static int stantum_event(struct hid_device *hid, struct hid_field *field,
+-				struct hid_usage *usage, __s32 value)
+-{
+-	struct stantum_data *sd = hid_get_drvdata(hid);
+-
+-	if (hid->claimed & HID_CLAIMED_INPUT) {
+-		struct input_dev *input = field->hidinput->input;
+-
+-		switch (usage->hid) {
+-		case HID_DG_INRANGE:
+-			/* this is the last field in a finger */
+-			stantum_filter_event(sd, input);
+-			break;
+-		case HID_DG_WIDTH:
+-			sd->w = value;
+-			break;
+-		case HID_DG_HEIGHT:
+-			sd->h = value;
+-			break;
+-		case HID_GD_X:
+-			sd->x = value;
+-			break;
+-		case HID_GD_Y:
+-			sd->y = value;
+-			break;
+-		case HID_DG_TIPPRESSURE:
+-			sd->z = value;
+-			break;
+-		case HID_DG_CONTACTID:
+-			sd->id = value;
+-			break;
+-		case HID_DG_CONFIDENCE:
+-			sd->valid = !!value;
+-			break;
+-		case 0xff000002:
+-			/* this comes only before the first finger */
+-			sd->first = true;
+-			break;
+-
+-		default:
+-			/* ignore the others */
+-			return 1;
+-		}
+-	}
+-
+-	/* we have handled the hidinput part, now remains hiddev */
+-	if (hid->claimed & HID_CLAIMED_HIDDEV && hid->hiddev_hid_event)
+-		hid->hiddev_hid_event(hid, field, usage, value);
+-
+-	return 1;
+-}
+-
+-static int stantum_probe(struct hid_device *hdev,
+-				const struct hid_device_id *id)
+-{
+-	int ret;
+-	struct stantum_data *sd;
+-
+-	sd = kmalloc(sizeof(struct stantum_data), GFP_KERNEL);
+-	if (!sd) {
+-		dev_err(&hdev->dev, "cannot allocate Stantum data\n");
+-		return -ENOMEM;
+-	}
+-	sd->valid = false;
+-	sd->first = false;
+-	sd->activity = false;
+-	hid_set_drvdata(hdev, sd);
+-
+-	ret = hid_parse(hdev);
+-	if (!ret)
+-		ret = hid_hw_start(hdev, HID_CONNECT_DEFAULT);
+-
+-	if (ret)
+-		kfree(sd);
+-
+-	return ret;
+-}
+-
+-static void stantum_remove(struct hid_device *hdev)
+-{
+-	hid_hw_stop(hdev);
+-	kfree(hid_get_drvdata(hdev));
+-	hid_set_drvdata(hdev, NULL);
+-}
+-
+-static const struct hid_device_id stantum_devices[] = {
+-	{ HID_USB_DEVICE(USB_VENDOR_ID_STANTUM, USB_DEVICE_ID_MTP) },
+-	{ }
+-};
+-MODULE_DEVICE_TABLE(hid, stantum_devices);
+-
+-static const struct hid_usage_id stantum_grabbed_usages[] = {
+-	{ HID_ANY_ID, HID_ANY_ID, HID_ANY_ID },
+-	{ HID_ANY_ID - 1, HID_ANY_ID - 1, HID_ANY_ID - 1}
+-};
+-
+-static struct hid_driver stantum_driver = {
+-	.name = "stantum",
+-	.id_table = stantum_devices,
+-	.probe = stantum_probe,
+-	.remove = stantum_remove,
+-	.input_mapping = stantum_input_mapping,
+-	.input_mapped = stantum_input_mapped,
+-	.usage_table = stantum_grabbed_usages,
+-	.event = stantum_event,
+-};
+-
+-static int __init stantum_init(void)
+-{
+-	return hid_register_driver(&stantum_driver);
+-}
+-
+-static void __exit stantum_exit(void)
+-{
+-	hid_unregister_driver(&stantum_driver);
+-}
+-
+-module_init(stantum_init);
+-module_exit(stantum_exit);
+-
+diff --git a/drivers/hid/hid-wacom.c b/drivers/hid/hid-wacom.c
+index 1e051f1..1c4b4ca 100644
+--- a/drivers/hid/hid-wacom.c
++++ b/drivers/hid/hid-wacom.c
+@@ -230,7 +230,7 @@ static int wacom_raw_event(struct hid_device *hdev, struct hid_report *report,
+ 				input_report_key(input, BTN_RIGHT, 0);
+ 				input_report_key(input, BTN_MIDDLE, 0);
+ 				input_report_abs(input, ABS_DISTANCE,
+-						input->absmax[ABS_DISTANCE]);
++					input_abs_get_max(input, ABS_DISTANCE));
+ 			} else {
+ 				input_report_key(input, BTN_TOUCH, 0);
+ 				input_report_key(input, BTN_STYLUS, 0);
+@@ -383,38 +383,37 @@ move_on:
+ 
+ 	/* Basics */
+ 	input->evbit[0] |= BIT(EV_KEY) | BIT(EV_ABS) | BIT(EV_REL);
+-	input->absbit[0] |= BIT(ABS_X) | BIT(ABS_Y) |
+-		BIT(ABS_PRESSURE) | BIT(ABS_DISTANCE);
+-	input->relbit[0] |= BIT(REL_WHEEL);
+-	set_bit(BTN_TOOL_PEN, input->keybit);
+-	set_bit(BTN_TOUCH, input->keybit);
+-	set_bit(BTN_STYLUS, input->keybit);
+-	set_bit(BTN_STYLUS2, input->keybit);
+-	set_bit(BTN_LEFT, input->keybit);
+-	set_bit(BTN_RIGHT, input->keybit);
+-	set_bit(BTN_MIDDLE, input->keybit);
++
++	__set_bit(REL_WHEEL, input->relbit);
++
++	__set_bit(BTN_TOOL_PEN, input->keybit);
++	__set_bit(BTN_TOUCH, input->keybit);
++	__set_bit(BTN_STYLUS, input->keybit);
++	__set_bit(BTN_STYLUS2, input->keybit);
++	__set_bit(BTN_LEFT, input->keybit);
++	__set_bit(BTN_RIGHT, input->keybit);
++	__set_bit(BTN_MIDDLE, input->keybit);
+ 
+ 	/* Pad */
+ 	input->evbit[0] |= BIT(EV_MSC);
+-	input->mscbit[0] |= BIT(MSC_SERIAL);
+-	set_bit(BTN_0, input->keybit);
+-	set_bit(BTN_1, input->keybit);
+-	set_bit(BTN_TOOL_FINGER, input->keybit);
+ 
+-	/* Distance, rubber and mouse */
+-	input->absbit[0] |= BIT(ABS_DISTANCE);
+-	set_bit(BTN_TOOL_RUBBER, input->keybit);
+-	set_bit(BTN_TOOL_MOUSE, input->keybit);
++	__set_bit(MSC_SERIAL, input->mscbit);
+ 
+-	input->absmax[ABS_PRESSURE] = 511;
+-	input->absmax[ABS_DISTANCE] = 32;
++	__set_bit(BTN_0, input->keybit);
++	__set_bit(BTN_1, input->keybit);
++	__set_bit(BTN_TOOL_FINGER, input->keybit);
+ 
+-	input->absmax[ABS_X] = 16704;
+-	input->absmax[ABS_Y] = 12064;
+-	input->absfuzz[ABS_X] = 4;
+-	input->absfuzz[ABS_Y] = 4;
++	/* Distance, rubber and mouse */
++	__set_bit(BTN_TOOL_RUBBER, input->keybit);
++	__set_bit(BTN_TOOL_MOUSE, input->keybit);
++
++	input_set_abs_params(input, ABS_X, 0, 16704, 4, 0);
++	input_set_abs_params(input, ABS_Y, 0, 12064, 4, 0);
++	input_set_abs_params(input, ABS_PRESSURE, 0, 511, 0, 0);
++	input_set_abs_params(input, ABS_DISTANCE, 0, 32, 0, 0);
+ 
+ 	return 0;
++
+ err_free:
+ 	kfree(wdata);
+ 	return ret;
+diff --git a/drivers/input/Makefile b/drivers/input/Makefile
+index 7ad212d..569938b 100644
+--- a/drivers/input/Makefile
++++ b/drivers/input/Makefile
+@@ -5,7 +5,7 @@
+ # Each configuration option enables a list of files.
+ 
+ obj-$(CONFIG_INPUT)		+= input-core.o
+-input-core-objs := input.o input-compat.o ff-core.o
++input-core-objs := input.o input-compat.o ff-core.o input-mt.o
+ 
+ obj-$(CONFIG_INPUT_FF_MEMLESS)	+= ff-memless.o
+ obj-$(CONFIG_INPUT_POLLDEV)	+= input-polldev.o
+diff --git a/drivers/input/evdev.c b/drivers/input/evdev.c
+index 2ee6c7a..81b48b4 100644
+--- a/drivers/input/evdev.c
++++ b/drivers/input/evdev.c
+@@ -10,7 +10,8 @@
+ 
+ #define EVDEV_MINOR_BASE	64
+ #define EVDEV_MINORS		32
+-#define EVDEV_BUFFER_SIZE	64
++#define EVDEV_MIN_BUFFER_SIZE	64U
++#define EVDEV_BUF_PACKETS	8
+ 
+ #include <linux/poll.h>
+ #include <linux/sched.h>
+@@ -36,13 +37,14 @@ struct evdev {
+ };
+ 
+ struct evdev_client {
+-	struct input_event buffer[EVDEV_BUFFER_SIZE];
+ 	int head;
+ 	int tail;
+ 	spinlock_t buffer_lock; /* protects access to buffer, head and tail */
+ 	struct fasync_struct *fasync;
+ 	struct evdev *evdev;
+ 	struct list_head node;
++	int bufsize;
++	struct input_event buffer[];
+ };
+ 
+ static struct evdev *evdev_table[EVDEV_MINORS];
+@@ -52,11 +54,15 @@ static void evdev_pass_event(struct evdev_client *client,
+ 			     struct input_event *event)
+ {
+ 	/*
+-	 * Interrupts are disabled, just acquire the lock
++	 * Interrupts are disabled, just acquire the lock.
++	 * Make sure we don't leave with the client buffer
++	 * "empty" by having client->head == client->tail.
+ 	 */
+ 	spin_lock(&client->buffer_lock);
+-	client->buffer[client->head++] = *event;
+-	client->head &= EVDEV_BUFFER_SIZE - 1;
++	do {
++		client->buffer[client->head++] = *event;
++		client->head &= client->bufsize - 1;
++	} while (client->head == client->tail);
+ 	spin_unlock(&client->buffer_lock);
+ 
+ 	if (event->type == EV_SYN)
+@@ -242,11 +248,21 @@ static int evdev_release(struct inode *inode, struct file *file)
+ 	return 0;
+ }
+ 
++static unsigned int evdev_compute_buffer_size(struct input_dev *dev)
++{
++	unsigned int n_events =
++		max(dev->hint_events_per_packet * EVDEV_BUF_PACKETS,
++		    EVDEV_MIN_BUFFER_SIZE);
++
++	return roundup_pow_of_two(n_events);
++}
++
+ static int evdev_open(struct inode *inode, struct file *file)
+ {
+ 	struct evdev *evdev;
+ 	struct evdev_client *client;
+ 	int i = iminor(inode) - EVDEV_MINOR_BASE;
++	unsigned int bufsize;
+ 	int error;
+ 
+ 	if (i >= EVDEV_MINORS)
+@@ -263,12 +279,17 @@ static int evdev_open(struct inode *inode, struct file *file)
+ 	if (!evdev)
+ 		return -ENODEV;
+ 
+-	client = kzalloc(sizeof(struct evdev_client), GFP_KERNEL);
++	bufsize = evdev_compute_buffer_size(evdev->handle.dev);
++
++	client = kzalloc(sizeof(struct evdev_client) +
++				bufsize * sizeof(struct input_event),
++			 GFP_KERNEL);
+ 	if (!client) {
+ 		error = -ENOMEM;
+ 		goto err_put_evdev;
+ 	}
+ 
++	client->bufsize = bufsize;
+ 	spin_lock_init(&client->buffer_lock);
+ 	client->evdev = evdev;
+ 	evdev_attach_client(evdev, client);
+@@ -334,7 +355,7 @@ static int evdev_fetch_next_event(struct evdev_client *client,
+ 	have_event = client->head != client->tail;
+ 	if (have_event) {
+ 		*event = client->buffer[client->tail++];
+-		client->tail &= EVDEV_BUFFER_SIZE - 1;
++		client->tail &= client->bufsize - 1;
+ 	}
+ 
+ 	spin_unlock_irq(&client->buffer_lock);
+@@ -466,13 +487,15 @@ static int str_to_user(const char *str, unsigned int maxlen, void __user *p)
+ }
+ 
+ #define OLD_KEY_MAX	0x1ff
+-static int handle_eviocgbit(struct input_dev *dev, unsigned int cmd, void __user *p, int compat_mode)
++static int handle_eviocgbit(struct input_dev *dev,
++			    unsigned int type, unsigned int size,
++			    void __user *p, int compat_mode)
+ {
+ 	static unsigned long keymax_warn_time;
+ 	unsigned long *bits;
+ 	int len;
+ 
+-	switch (_IOC_NR(cmd) & EV_MAX) {
++	switch (type) {
+ 
+ 	case      0: bits = dev->evbit;  len = EV_MAX;  break;
+ 	case EV_KEY: bits = dev->keybit; len = KEY_MAX; break;
+@@ -491,7 +514,7 @@ static int handle_eviocgbit(struct input_dev *dev, unsigned int cmd, void __user
+ 	 * EVIOCGBIT(EV_KEY, KEY_MAX) and not realize that 'len'
+ 	 * should be in bytes, not in bits.
+ 	 */
+-	if ((_IOC_NR(cmd) & EV_MAX) == EV_KEY && _IOC_SIZE(cmd) == OLD_KEY_MAX) {
++	if (type == EV_KEY && size == OLD_KEY_MAX) {
+ 		len = OLD_KEY_MAX;
+ 		if (printk_timed_ratelimit(&keymax_warn_time, 10 * 1000))
+ 			printk(KERN_WARNING
+@@ -502,7 +525,7 @@ static int handle_eviocgbit(struct input_dev *dev, unsigned int cmd, void __user
+ 				BITS_TO_LONGS(OLD_KEY_MAX) * sizeof(long));
+ 	}
+ 
+-	return bits_to_user(bits, len, _IOC_SIZE(cmd), p, compat_mode);
++	return bits_to_user(bits, len, size, p, compat_mode);
+ }
+ #undef OLD_KEY_MAX
+ 
+@@ -516,8 +539,10 @@ static long evdev_do_ioctl(struct file *file, unsigned int cmd,
+ 	struct ff_effect effect;
+ 	int __user *ip = (int __user *)p;
+ 	unsigned int i, t, u, v;
++	unsigned int size;
+ 	int error;
+ 
++	/* First we check for fixed-length commands */
+ 	switch (cmd) {
+ 
+ 	case EVIOCGVERSION:
+@@ -584,108 +609,102 @@ static long evdev_do_ioctl(struct file *file, unsigned int cmd,
+ 			return evdev_grab(evdev, client);
+ 		else
+ 			return evdev_ungrab(evdev, client);
++	}
+ 
+-	default:
+-
+-		if (_IOC_TYPE(cmd) != 'E')
+-			return -EINVAL;
++	size = _IOC_SIZE(cmd);
+ 
+-		if (_IOC_DIR(cmd) == _IOC_READ) {
++	/* Now check variable-length commands */
++#define EVIOC_MASK_SIZE(nr)	((nr) & ~(_IOC_SIZEMASK << _IOC_SIZESHIFT))
+ 
+-			if ((_IOC_NR(cmd) & ~EV_MAX) == _IOC_NR(EVIOCGBIT(0, 0)))
+-				return handle_eviocgbit(dev, cmd, p, compat_mode);
++	switch (EVIOC_MASK_SIZE(cmd)) {
+ 
+-			if (_IOC_NR(cmd) == _IOC_NR(EVIOCGKEY(0)))
+-				return bits_to_user(dev->key, KEY_MAX, _IOC_SIZE(cmd),
+-						    p, compat_mode);
++	case EVIOCGKEY(0):
++		return bits_to_user(dev->key, KEY_MAX, size, p, compat_mode);
+ 
+-			if (_IOC_NR(cmd) == _IOC_NR(EVIOCGLED(0)))
+-				return bits_to_user(dev->led, LED_MAX, _IOC_SIZE(cmd),
+-						    p, compat_mode);
++	case EVIOCGLED(0):
++		return bits_to_user(dev->led, LED_MAX, size, p, compat_mode);
+ 
+-			if (_IOC_NR(cmd) == _IOC_NR(EVIOCGSND(0)))
+-				return bits_to_user(dev->snd, SND_MAX, _IOC_SIZE(cmd),
+-						    p, compat_mode);
++	case EVIOCGSND(0):
++		return bits_to_user(dev->snd, SND_MAX, size, p, compat_mode);
+ 
+-			if (_IOC_NR(cmd) == _IOC_NR(EVIOCGSW(0)))
+-				return bits_to_user(dev->sw, SW_MAX, _IOC_SIZE(cmd),
+-						    p, compat_mode);
++	case EVIOCGSW(0):
++		return bits_to_user(dev->sw, SW_MAX, size, p, compat_mode);
+ 
+-			if (_IOC_NR(cmd) == _IOC_NR(EVIOCGNAME(0)))
+-				return str_to_user(dev->name, _IOC_SIZE(cmd), p);
++	case EVIOCGNAME(0):
++		return str_to_user(dev->name, size, p);
+ 
+-			if (_IOC_NR(cmd) == _IOC_NR(EVIOCGPHYS(0)))
+-				return str_to_user(dev->phys, _IOC_SIZE(cmd), p);
++	case EVIOCGPHYS(0):
++		return str_to_user(dev->phys, size, p);
+ 
+-			if (_IOC_NR(cmd) == _IOC_NR(EVIOCGUNIQ(0)))
+-				return str_to_user(dev->uniq, _IOC_SIZE(cmd), p);
++	case EVIOCGUNIQ(0):
++		return str_to_user(dev->uniq, size, p);
+ 
+-			if ((_IOC_NR(cmd) & ~ABS_MAX) == _IOC_NR(EVIOCGABS(0))) {
++	case EVIOC_MASK_SIZE(EVIOCSFF):
++		if (input_ff_effect_from_user(p, size, &effect))
++			return -EFAULT;
+ 
+-				t = _IOC_NR(cmd) & ABS_MAX;
++		error = input_ff_upload(dev, &effect, file);
+ 
+-				abs.value = dev->abs[t];
+-				abs.minimum = dev->absmin[t];
+-				abs.maximum = dev->absmax[t];
+-				abs.fuzz = dev->absfuzz[t];
+-				abs.flat = dev->absflat[t];
+-				abs.resolution = dev->absres[t];
++		if (put_user(effect.id, &(((struct ff_effect __user *)p)->id)))
++			return -EFAULT;
+ 
+-				if (copy_to_user(p, &abs, min_t(size_t,
+-								_IOC_SIZE(cmd),
+-								sizeof(struct input_absinfo))))
+-					return -EFAULT;
++		return error;
++	}
+ 
+-				return 0;
+-			}
++	/* Multi-number variable-length handlers */
++	if (_IOC_TYPE(cmd) != 'E')
++		return -EINVAL;
+ 
+-		}
++	if (_IOC_DIR(cmd) == _IOC_READ) {
+ 
+-		if (_IOC_DIR(cmd) == _IOC_WRITE) {
++		if ((_IOC_NR(cmd) & ~EV_MAX) == _IOC_NR(EVIOCGBIT(0, 0)))
++			return handle_eviocgbit(dev,
++						_IOC_NR(cmd) & EV_MAX, size,
++						p, compat_mode);
+ 
+-			if (_IOC_NR(cmd) == _IOC_NR(EVIOCSFF)) {
++		if ((_IOC_NR(cmd) & ~ABS_MAX) == _IOC_NR(EVIOCGABS(0))) {
+ 
+-				if (input_ff_effect_from_user(p, _IOC_SIZE(cmd), &effect))
+-					return -EFAULT;
++			t = _IOC_NR(cmd) & ABS_MAX;
++			abs = dev->absinfo[t];
+ 
+-				error = input_ff_upload(dev, &effect, file);
++			if (copy_to_user(p, &abs, min_t(size_t,
++					size, sizeof(struct input_absinfo))))
++				return -EFAULT;
+ 
+-				if (put_user(effect.id, &(((struct ff_effect __user *)p)->id)))
+-					return -EFAULT;
++			return 0;
++		}
++	}
+ 
+-				return error;
+-			}
++	if (_IOC_DIR(cmd) == _IOC_READ) {
+ 
+-			if ((_IOC_NR(cmd) & ~ABS_MAX) == _IOC_NR(EVIOCSABS(0))) {
++		if ((_IOC_NR(cmd) & ~ABS_MAX) == _IOC_NR(EVIOCSABS(0))) {
+ 
+-				t = _IOC_NR(cmd) & ABS_MAX;
++			t = _IOC_NR(cmd) & ABS_MAX;
+ 
+-				if (copy_from_user(&abs, p, min_t(size_t,
+-								  _IOC_SIZE(cmd),
+-								  sizeof(struct input_absinfo))))
+-					return -EFAULT;
++			if (copy_from_user(&abs, p, min_t(size_t,
++					size, sizeof(struct input_absinfo))))
++				return -EFAULT;
+ 
+-				/*
+-				 * Take event lock to ensure that we are not
+-				 * changing device parameters in the middle
+-				 * of event.
+-				 */
+-				spin_lock_irq(&dev->event_lock);
++			if (size < sizeof(struct input_absinfo))
++				abs.resolution = 0;
+ 
+-				dev->abs[t] = abs.value;
+-				dev->absmin[t] = abs.minimum;
+-				dev->absmax[t] = abs.maximum;
+-				dev->absfuzz[t] = abs.fuzz;
+-				dev->absflat[t] = abs.flat;
+-				dev->absres[t] = _IOC_SIZE(cmd) < sizeof(struct input_absinfo) ?
+-							0 : abs.resolution;
++			/* We can't change number of reserved MT slots */
++			if (t == ABS_MT_SLOT)
++				return -EINVAL;
+ 
+-				spin_unlock_irq(&dev->event_lock);
++			/*
++			 * Take event lock to ensure that we are not
++			 * changing device parameters in the middle
++			 * of event.
++			 */
++			spin_lock_irq(&dev->event_lock);
++			dev->absinfo[t] = abs;
++			spin_unlock_irq(&dev->event_lock);
+ 
+-				return 0;
+-			}
++			return 0;
+ 		}
+ 	}
++
+ 	return -EINVAL;
+ }
+ 
+diff --git a/drivers/input/input-mt.c b/drivers/input/input-mt.c
+new file mode 100644
+index 0000000..c48c81f
+--- /dev/null
++++ b/drivers/input/input-mt.c
+@@ -0,0 +1,170 @@
++/*
++ * Input Multitouch Library
++ *
++ * Copyright (c) 2008-2010 Henrik Rydberg
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License version 2 as published by
++ * the Free Software Foundation.
++ */
++
++#include <linux/input/mt.h>
++#include <linux/slab.h>
++
++#define TRKID_SGN	((TRKID_MAX + 1) >> 1)
++
++/**
++ * input_mt_init_slots() - initialize MT input slots
++ * @dev: input device supporting MT events and finger tracking
++ * @num_slots: number of slots used by the device
++ *
++ * This function allocates all necessary memory for MT slot handling
++ * in the input device, prepares the ABS_MT_SLOT and
++ * ABS_MT_TRACKING_ID events for use and sets up appropriate buffers.
++ * May be called repeatedly. Returns -EINVAL if attempting to
++ * reinitialize with a different number of slots.
++ */
++int input_mt_init_slots(struct input_dev *dev, unsigned int num_slots)
++{
++	int i;
++
++	if (!num_slots)
++		return 0;
++	if (dev->mt)
++		return dev->mtsize != num_slots ? -EINVAL : 0;
++
++	dev->mt = kcalloc(num_slots, sizeof(struct input_mt_slot), GFP_KERNEL);
++	if (!dev->mt)
++		return -ENOMEM;
++
++	dev->mtsize = num_slots;
++	input_set_abs_params(dev, ABS_MT_SLOT, 0, num_slots - 1, 0, 0);
++	input_set_abs_params(dev, ABS_MT_TRACKING_ID, 0, TRKID_MAX, 0, 0);
++	input_set_events_per_packet(dev, 6 * num_slots);
++
++	/* Mark slots as 'unused' */
++	for (i = 0; i < num_slots; i++)
++		input_mt_set_value(&dev->mt[i], ABS_MT_TRACKING_ID, -1);
++
++	return 0;
++}
++EXPORT_SYMBOL(input_mt_init_slots);
++
++/**
++ * input_mt_destroy_slots() - frees the MT slots of the input device
++ * @dev: input device with allocated MT slots
++ *
++ * This function is only needed in error path as the input core will
++ * automatically free the MT slots when the device is destroyed.
++ */
++void input_mt_destroy_slots(struct input_dev *dev)
++{
++	kfree(dev->mt);
++	dev->mt = NULL;
++	dev->mtsize = 0;
++	dev->slot = 0;
++	dev->trkid = 0;
++}
++EXPORT_SYMBOL(input_mt_destroy_slots);
++
++/**
++ * input_mt_report_slot_state() - report contact state
++ * @dev: input device with allocated MT slots
++ * @tool_type: the tool type to use in this slot
++ * @active: true if contact is active, false otherwise
++ *
++ * Reports a contact via ABS_MT_TRACKING_ID, and optionally
++ * ABS_MT_TOOL_TYPE. If active is true and the slot is currently
++ * inactive, or if the tool type is changed, a new tracking id is
++ * assigned to the slot. The tool type is only reported if the
++ * corresponding absbit field is set.
++ */
++void input_mt_report_slot_state(struct input_dev *dev,
++				unsigned int tool_type, bool active)
++{
++	struct input_mt_slot *mt;
++	int id;
++
++	if (!dev->mt || !active) {
++		input_event(dev, EV_ABS, ABS_MT_TRACKING_ID, -1);
++		return;
++	}
++
++	mt = &dev->mt[dev->slot];
++	id = input_mt_get_value(mt, ABS_MT_TRACKING_ID);
++	if (id < 0 || input_mt_get_value(mt, ABS_MT_TOOL_TYPE) != tool_type)
++		id = input_mt_new_trkid(dev);
++
++	input_event(dev, EV_ABS, ABS_MT_TRACKING_ID, id);
++	input_event(dev, EV_ABS, ABS_MT_TOOL_TYPE, tool_type);
++}
++EXPORT_SYMBOL(input_mt_report_slot_state);
++
++/**
++ * input_mt_report_finger_count() - report contact count
++ * @dev: input device with allocated MT slots
++ * @count: the number of contacts
++ *
++ * Reports the contact count via BTN_TOOL_FINGER, BTN_TOOL_DOUBLETAP,
++ * BTN_TOOL_TRIPLETAP and BTN_TOOL_QUADTAP.
++ *
++ * The input core ensures only the KEY events already setup for
++ * this device will produce output.
++ */
++void input_mt_report_finger_count(struct input_dev *dev, int count)
++{
++	input_event(dev, EV_KEY, BTN_TOOL_FINGER, count == 1);
++	input_event(dev, EV_KEY, BTN_TOOL_DOUBLETAP, count == 2);
++	input_event(dev, EV_KEY, BTN_TOOL_TRIPLETAP, count == 3);
++	input_event(dev, EV_KEY, BTN_TOOL_QUADTAP, count == 4);
++}
++EXPORT_SYMBOL(input_mt_report_finger_count);
++
++/**
++ * input_mt_report_pointer_emulation() - common pointer emulation
++ * @dev: input device with allocated MT slots
++ * @use_count: report number of active contacts as finger count
++ *
++ * Performs legacy pointer emulation via BTN_TOUCH, ABS_X, ABS_Y and
++ * ABS_PRESSURE. Touchpad finger count is emulated if use_count is true.
++ *
++ * The input core ensures only the KEY and ABS axes already setup for
++ * this device will produce output.
++ */
++void input_mt_report_pointer_emulation(struct input_dev *dev, bool use_count)
++{
++	struct input_mt_slot *oldest = 0;
++	int oldid = dev->trkid;
++	int count = 0;
++	int i;
++
++	for (i = 0; i < dev->mtsize; ++i) {
++		struct input_mt_slot *ps = &dev->mt[i];
++		int id = input_mt_get_value(ps, ABS_MT_TRACKING_ID);
++
++		if (id < 0)
++			continue;
++		if ((id - oldid) & TRKID_SGN) {
++			oldest = ps;
++			oldid = id;
++		}
++		count++;
++	}
++
++	input_event(dev, EV_KEY, BTN_TOUCH, count > 0);
++	if (use_count)
++		input_mt_report_finger_count(dev, count);
++
++	if (oldest) {
++		int x = input_mt_get_value(oldest, ABS_MT_POSITION_X);
++		int y = input_mt_get_value(oldest, ABS_MT_POSITION_Y);
++		int p = input_mt_get_value(oldest, ABS_MT_PRESSURE);
++
++		input_event(dev, EV_ABS, ABS_X, x);
++		input_event(dev, EV_ABS, ABS_Y, y);
++		input_event(dev, EV_ABS, ABS_PRESSURE, p);
++	} else {
++		input_event(dev, EV_ABS, ABS_PRESSURE, 0);
++	}
++}
++EXPORT_SYMBOL(input_mt_report_pointer_emulation);
+diff --git a/drivers/input/input.c b/drivers/input/input.c
+index 9c79bd5..3978bf0 100644
+--- a/drivers/input/input.c
++++ b/drivers/input/input.c
+@@ -12,7 +12,7 @@
+ 
+ #include <linux/init.h>
+ #include <linux/types.h>
+-#include <linux/input.h>
++#include <linux/input/mt.h>
+ #include <linux/module.h>
+ #include <linux/slab.h>
+ #include <linux/random.h>
+@@ -33,25 +33,6 @@ MODULE_LICENSE("GPL");
+ 
+ #define INPUT_DEVICES	256
+ 
+-/*
+- * EV_ABS events which should not be cached are listed here.
+- */
+-static unsigned int input_abs_bypass_init_data[] __initdata = {
+-	ABS_MT_TOUCH_MAJOR,
+-	ABS_MT_TOUCH_MINOR,
+-	ABS_MT_WIDTH_MAJOR,
+-	ABS_MT_WIDTH_MINOR,
+-	ABS_MT_ORIENTATION,
+-	ABS_MT_POSITION_X,
+-	ABS_MT_POSITION_Y,
+-	ABS_MT_TOOL_TYPE,
+-	ABS_MT_BLOB_ID,
+-	ABS_MT_TRACKING_ID,
+-	ABS_MT_PRESSURE,
+-	0
+-};
+-static unsigned long input_abs_bypass[BITS_TO_LONGS(ABS_CNT)];
+-
+ static LIST_HEAD(input_dev_list);
+ static LIST_HEAD(input_handler_list);
+ 
+@@ -181,6 +162,56 @@ static void input_stop_autorepeat(struct input_dev *dev)
+ #define INPUT_PASS_TO_DEVICE	2
+ #define INPUT_PASS_TO_ALL	(INPUT_PASS_TO_HANDLERS | INPUT_PASS_TO_DEVICE)
+ 
++static int input_handle_abs_event(struct input_dev *dev,
++				  unsigned int code, int *pval)
++{
++	bool is_mt_event;
++	int *pold;
++
++	if (code == ABS_MT_SLOT) {
++		/*
++		 * "Stage" the event; we'll flush it later, when we
++		 * get actiual touch data.
++		 */
++		if (*pval >= 0 && *pval < dev->mtsize)
++			dev->slot = *pval;
++
++		return INPUT_IGNORE_EVENT;
++	}
++
++	is_mt_event = code >= ABS_MT_FIRST && code <= ABS_MT_LAST;
++
++	if (!is_mt_event) {
++		pold = &dev->absinfo[code].value;
++	} else if (dev->mt) {
++		struct input_mt_slot *mtslot = &dev->mt[dev->slot];
++		pold = &mtslot->abs[code - ABS_MT_FIRST];
++	} else {
++		/*
++		 * Bypass filtering for multitouch events when
++		 * not employing slots.
++		 */
++		pold = NULL;
++	}
++
++	if (pold) {
++		*pval = input_defuzz_abs_event(*pval, *pold,
++						dev->absinfo[code].fuzz);
++		if (*pold == *pval)
++			return INPUT_IGNORE_EVENT;
++
++		*pold = *pval;
++	}
++
++	/* Flush pending "slot" event */
++	if (is_mt_event && dev->slot != input_abs_get_val(dev, ABS_MT_SLOT)) {
++		input_abs_set_val(dev, ABS_MT_SLOT, dev->slot);
++		input_pass_event(dev, EV_ABS, ABS_MT_SLOT, dev->slot);
++	}
++
++	return INPUT_PASS_TO_HANDLERS;
++}
++
+ static void input_handle_event(struct input_dev *dev,
+ 			       unsigned int type, unsigned int code, int value)
+ {
+@@ -233,21 +264,9 @@ static void input_handle_event(struct input_dev *dev,
+ 		break;
+ 
+ 	case EV_ABS:
+-		if (is_event_supported(code, dev->absbit, ABS_MAX)) {
++		if (is_event_supported(code, dev->absbit, ABS_MAX))
++			disposition = input_handle_abs_event(dev, code, &value);
+ 
+-			if (test_bit(code, input_abs_bypass)) {
+-				disposition = INPUT_PASS_TO_HANDLERS;
+-				break;
+-			}
+-
+-			value = input_defuzz_abs_event(value,
+-					dev->abs[code], dev->absfuzz[code]);
+-
+-			if (dev->abs[code] != value) {
+-				dev->abs[code] = value;
+-				disposition = INPUT_PASS_TO_HANDLERS;
+-			}
+-		}
+ 		break;
+ 
+ 	case EV_REL:
+@@ -372,6 +391,43 @@ void input_inject_event(struct input_handle *handle,
+ EXPORT_SYMBOL(input_inject_event);
+ 
+ /**
++ * input_alloc_absinfo - allocates array of input_absinfo structs
++ * @dev: the input device emitting absolute events
++ *
++ * If the absinfo struct the caller asked for is already allocated, this
++ * functions will not do anything.
++ */
++void input_alloc_absinfo(struct input_dev *dev)
++{
++	if (!dev->absinfo)
++		dev->absinfo = kcalloc(ABS_CNT, sizeof(struct input_absinfo),
++					GFP_KERNEL);
++
++	WARN(!dev->absinfo, "%s(): kcalloc() failed?\n", __func__);
++}
++EXPORT_SYMBOL(input_alloc_absinfo);
++
++void input_set_abs_params(struct input_dev *dev, unsigned int axis,
++			  int min, int max, int fuzz, int flat)
++{
++	struct input_absinfo *absinfo;
++
++	input_alloc_absinfo(dev);
++	if (!dev->absinfo)
++		return;
++
++	absinfo = &dev->absinfo[axis];
++	absinfo->minimum = min;
++	absinfo->maximum = max;
++	absinfo->fuzz = fuzz;
++	absinfo->flat = flat;
++
++	dev->absbit[BIT_WORD(axis)] |= BIT_MASK(axis);
++}
++EXPORT_SYMBOL(input_set_abs_params);
++
++
++/**
+  * input_grab_device - grabs device for exclusive use
+  * @handle: input handle that wants to own the device
+  *
+@@ -1278,6 +1334,8 @@ static void input_dev_release(struct device *device)
+ 	struct input_dev *dev = to_input_dev(device);
+ 
+ 	input_ff_destroy(dev);
++	input_mt_destroy_slots(dev);
++	kfree(dev->absinfo);
+ 	kfree(dev);
+ 
+ 	module_put(THIS_MODULE);
+@@ -1926,20 +1984,10 @@ static const struct file_operations input_fops = {
+ 	.open = input_open_file,
+ };
+ 
+-static void __init input_init_abs_bypass(void)
+-{
+-	const unsigned int *p;
+-
+-	for (p = input_abs_bypass_init_data; *p; p++)
+-		input_abs_bypass[BIT_WORD(*p)] |= BIT_MASK(*p);
+-}
+-
+ static int __init input_init(void)
+ {
+ 	int err;
+ 
+-	input_init_abs_bypass();
+-
+ 	err = class_register(&input_class);
+ 	if (err) {
+ 		printk(KERN_ERR "input: unable to register input_dev class\n");
+diff --git a/drivers/input/joydev.c b/drivers/input/joydev.c
+index f5320b5..f82b261 100644
+--- a/drivers/input/joydev.c
++++ b/drivers/input/joydev.c
+@@ -533,7 +533,7 @@ static int joydev_ioctl_common(struct joydev *joydev,
+ {
+ 	struct input_dev *dev = joydev->handle.dev;
+ 	size_t len;
+-	int i, j;
++	int i;
+ 	const char *name;
+ 
+ 	/* Process fixed-sized commands. */
+@@ -565,12 +565,11 @@ static int joydev_ioctl_common(struct joydev *joydev,
+ 	case JSIOCSCORR:
+ 		if (copy_from_user(joydev->corr, argp,
+ 			      sizeof(joydev->corr[0]) * joydev->nabs))
+-		    return -EFAULT;
++			return -EFAULT;
+ 
+ 		for (i = 0; i < joydev->nabs; i++) {
+-			j = joydev->abspam[i];
+-			joydev->abs[i] = joydev_correct(dev->abs[j],
+-							&joydev->corr[i]);
++			int val = input_abs_get_val(dev, joydev->abspam[i]);
++			joydev->abs[i] = joydev_correct(val, &joydev->corr[i]);
+ 		}
+ 		return 0;
+ 
+@@ -852,25 +851,27 @@ static int joydev_connect(struct input_handler *handler, struct input_dev *dev,
+ 
+ 	for (i = 0; i < joydev->nabs; i++) {
+ 		j = joydev->abspam[i];
+-		if (dev->absmax[j] == dev->absmin[j]) {
++		if (input_abs_get_max(dev, j) == input_abs_get_min(dev, j)) {
+ 			joydev->corr[i].type = JS_CORR_NONE;
+-			joydev->abs[i] = dev->abs[j];
++			joydev->abs[i] = input_abs_get_val(dev, j);
+ 			continue;
+ 		}
+ 		joydev->corr[i].type = JS_CORR_BROKEN;
+-		joydev->corr[i].prec = dev->absfuzz[j];
+-		joydev->corr[i].coef[0] =
+-			(dev->absmax[j] + dev->absmin[j]) / 2 - dev->absflat[j];
+-		joydev->corr[i].coef[1] =
+-			(dev->absmax[j] + dev->absmin[j]) / 2 + dev->absflat[j];
++		joydev->corr[i].prec = input_abs_get_fuzz(dev, j);
++
++		t = (input_abs_get_max(dev, j) + input_abs_get_min(dev, j)) / 2;
++		joydev->corr[i].coef[0] = t - input_abs_get_flat(dev, j);
++		joydev->corr[i].coef[1] = t + input_abs_get_flat(dev, j);
+ 
+-		t = (dev->absmax[j] - dev->absmin[j]) / 2 - 2 * dev->absflat[j];
++		t = (input_abs_get_max(dev, j) - input_abs_get_min(dev, j)) / 2
++			- 2 * input_abs_get_flat(dev, j);
+ 		if (t) {
+ 			joydev->corr[i].coef[2] = (1 << 29) / t;
+ 			joydev->corr[i].coef[3] = (1 << 29) / t;
+ 
+-			joydev->abs[i] = joydev_correct(dev->abs[j],
+-							joydev->corr + i);
++			joydev->abs[i] =
++				joydev_correct(input_abs_get_val(dev, j),
++					       joydev->corr + i);
+ 		}
+ 	}
+ 
+diff --git a/drivers/input/joystick/a3d.c b/drivers/input/joystick/a3d.c
+index 6489f40..d259b41 100644
+--- a/drivers/input/joystick/a3d.c
++++ b/drivers/input/joystick/a3d.c
+@@ -342,7 +342,8 @@ static int a3d_connect(struct gameport *gameport, struct gameport_driver *drv)
+ 
+ 		for (i = 0; i < 4; i++) {
+ 			if (i < 2)
+-				input_set_abs_params(input_dev, axes[i], 48, input_dev->abs[axes[i]] * 2 - 48, 0, 8);
++				input_set_abs_params(input_dev, axes[i],
++					48, input_abs_get_val(input_dev, axes[i]) * 2 - 48, 0, 8);
+ 			else
+ 				input_set_abs_params(input_dev, axes[i], 2, 253, 0, 0);
+ 			input_set_abs_params(input_dev, ABS_HAT0X + i, -1, 1, 0, 0);
+diff --git a/drivers/input/joystick/adi.c b/drivers/input/joystick/adi.c
+index 89c4c08..b992fbf 100644
+--- a/drivers/input/joystick/adi.c
++++ b/drivers/input/joystick/adi.c
+@@ -452,7 +452,7 @@ static void adi_init_center(struct adi *adi)
+ 	for (i = 0; i < adi->axes10 + adi->axes8 + (adi->hats + (adi->pad != -1)) * 2; i++) {
+ 
+ 		t = adi->abs[i];
+-		x = adi->dev->abs[t];
++		x = input_abs_get_val(adi->dev, t);
+ 
+ 		if (t == ABS_THROTTLE || t == ABS_RUDDER || adi->id == ADI_ID_WGPE)
+ 			x = i < adi->axes10 ? 512 : 128;
+diff --git a/drivers/input/joystick/amijoy.c b/drivers/input/joystick/amijoy.c
+index 05022f0..e90694f 100644
+--- a/drivers/input/joystick/amijoy.c
++++ b/drivers/input/joystick/amijoy.c
+@@ -139,8 +139,8 @@ static int __init amijoy_init(void)
+ 		amijoy_dev[i]->keybit[BIT_WORD(BTN_LEFT)] = BIT_MASK(BTN_LEFT) |
+ 			BIT_MASK(BTN_MIDDLE) | BIT_MASK(BTN_RIGHT);
+ 		for (j = 0; j < 2; j++) {
+-			amijoy_dev[i]->absmin[ABS_X + j] = -1;
+-			amijoy_dev[i]->absmax[ABS_X + j] = 1;
++			XXinput_set_abs_params(amijoy_dev[i], ABS_X + j,
++					     -1, 1, 0, 0);
+ 		}
+ 
+ 		err = input_register_device(amijoy_dev[i]);
+diff --git a/drivers/input/joystick/gf2k.c b/drivers/input/joystick/gf2k.c
+index 45ac70ea..0536b1b 100644
+--- a/drivers/input/joystick/gf2k.c
++++ b/drivers/input/joystick/gf2k.c
+@@ -318,11 +318,8 @@ static int gf2k_connect(struct gameport *gameport, struct gameport_driver *drv)
+ 	for (i = 0; i < gf2k_axes[gf2k->id]; i++)
+ 		set_bit(gf2k_abs[i], input_dev->absbit);
+ 
+-	for (i = 0; i < gf2k_hats[gf2k->id]; i++) {
+-		set_bit(ABS_HAT0X + i, input_dev->absbit);
+-		input_dev->absmin[ABS_HAT0X + i] = -1;
+-		input_dev->absmax[ABS_HAT0X + i] = 1;
+-	}
++	for (i = 0; i < gf2k_hats[gf2k->id]; i++)
++		input_set_abs_params(input_dev, ABS_HAT0X + i, -1, 1, 0, 0);
+ 
+ 	for (i = 0; i < gf2k_joys[gf2k->id]; i++)
+ 		set_bit(gf2k_btn_joy[i], input_dev->keybit);
+@@ -334,11 +331,14 @@ static int gf2k_connect(struct gameport *gameport, struct gameport_driver *drv)
+ 	gf2k_read(gf2k, data);
+ 
+ 	for (i = 0; i < gf2k_axes[gf2k->id]; i++) {
+-		input_dev->absmax[gf2k_abs[i]] = (i < 2) ? input_dev->abs[gf2k_abs[i]] * 2 - 32 :
+-			  input_dev->abs[gf2k_abs[0]] + input_dev->abs[gf2k_abs[1]] - 32;
+-		input_dev->absmin[gf2k_abs[i]] = 32;
+-		input_dev->absfuzz[gf2k_abs[i]] = 8;
+-		input_dev->absflat[gf2k_abs[i]] = (i < 2) ? 24 : 0;
++		int max = i < 2 ?
++			input_abs_get_val(input_dev, gf2k_abs[i]) * 2 :
++			input_abs_get_val(input_dev, gf2k_abs[0]) +
++				input_abs_get_val(input_dev, gf2k_abs[1]);
++		int flat = i < 2 ? 24 : 0;
++
++		input_set_abs_params(input_dev, gf2k_abs[i],
++				     32, max - 32, 8, flat);
+ 	}
+ 
+ 	err = input_register_device(gf2k->dev);
+diff --git a/drivers/input/joystick/interact.c b/drivers/input/joystick/interact.c
+index 2478289..16fb19d 100644
+--- a/drivers/input/joystick/interact.c
++++ b/drivers/input/joystick/interact.c
+@@ -270,18 +270,14 @@ static int interact_connect(struct gameport *gameport, struct gameport_driver *d
+ 	input_dev->evbit[0] = BIT_MASK(EV_KEY) | BIT_MASK(EV_ABS);
+ 
+ 	for (i = 0; (t = interact_type[interact->type].abs[i]) >= 0; i++) {
+-		set_bit(t, input_dev->absbit);
+-		if (i < interact_type[interact->type].b8) {
+-			input_dev->absmin[t] = 0;
+-			input_dev->absmax[t] = 255;
+-		} else {
+-			input_dev->absmin[t] = -1;
+-			input_dev->absmax[t] = 1;
+-		}
++		if (i < interact_type[interact->type].b8)
++			input_set_abs_params(input_dev, t, 0, 255, 0, 0);
++		else
++			input_set_abs_params(input_dev, t, -1, 1, 0, 0);
+ 	}
+ 
+ 	for (i = 0; (t = interact_type[interact->type].btn[i]) >= 0; i++)
+-		set_bit(t, input_dev->keybit);
++		__set_bit(t, input_dev->keybit);
+ 
+ 	err = input_register_device(interact->dev);
+ 	if (err)
+diff --git a/drivers/input/joystick/sidewinder.c b/drivers/input/joystick/sidewinder.c
+index ca13a6b..b8d8611 100644
+--- a/drivers/input/joystick/sidewinder.c
++++ b/drivers/input/joystick/sidewinder.c
+@@ -761,17 +761,21 @@ static int sw_connect(struct gameport *gameport, struct gameport_driver *drv)
+ 		input_dev->evbit[0] = BIT_MASK(EV_KEY) | BIT_MASK(EV_ABS);
+ 
+ 		for (j = 0; (bits = sw_bit[sw->type][j]); j++) {
++			int min, max, fuzz, flat;
++
+ 			code = sw_abs[sw->type][j];
+-			set_bit(code, input_dev->absbit);
+-			input_dev->absmax[code] = (1 << bits) - 1;
+-			input_dev->absmin[code] = (bits == 1) ? -1 : 0;
+-			input_dev->absfuzz[code] = ((bits >> 1) >= 2) ? (1 << ((bits >> 1) - 2)) : 0;
+-			if (code != ABS_THROTTLE)
+-				input_dev->absflat[code] = (bits >= 5) ? (1 << (bits - 5)) : 0;
++			min = bits == 1 ? -1 : 0;
++			max = (1 << bits) - 1;
++			fuzz = (bits >> 1) >= 2 ? 1 << ((bits >> 1) - 2) : 0;
++			flat = code == ABS_THROTTLE || bits < 5 ?
++				0 : 1 << (bits - 5);
++
++			input_set_abs_params(input_dev, code,
++					     min, max, fuzz, flat);
+ 		}
+ 
+ 		for (j = 0; (code = sw_btn[sw->type][j]); j++)
+-			set_bit(code, input_dev->keybit);
++			__set_bit(code, input_dev->keybit);
+ 
+ 		dbg("%s%s [%d-bit id %d data %d]\n", sw->name, comment, m, l, k);
+ 
+diff --git a/drivers/input/keyboard/hil_kbd.c b/drivers/input/keyboard/hil_kbd.c
+index c83f4b2..ddd5afd 100644
+--- a/drivers/input/keyboard/hil_kbd.c
++++ b/drivers/input/keyboard/hil_kbd.c
+@@ -232,15 +232,16 @@ static void hil_dev_handle_ptr_events(struct hil_dev *ptr)
+ 		if (absdev) {
+ 			val = lo + (hi << 8);
+ #ifdef TABLET_AUTOADJUST
+-			if (val < dev->absmin[ABS_X + i])
+-				dev->absmin[ABS_X + i] = val;
+-			if (val > dev->absmax[ABS_X + i])
+-				dev->absmax[ABS_X + i] = val;
++			if (val < input_abs_min(dev, ABS_X + i))
++				input_abs_set_min(dev, ABS_X + i, val);
++			if (val > input_abs_max(dev, ABS_X + i))
++				XXinput_abs_set_max(dev, ABS_X + i, val);
+ #endif
+-			if (i%3) val = dev->absmax[ABS_X + i] - val;
++			if (i % 3)
++				val = input_abs_max(dev, ABS_X + i) - val;
+ 			input_report_abs(dev, ABS_X + i, val);
+ 		} else {
+-			val = (int) (((int8_t)lo) | ((int8_t)hi << 8));
++			val = (int) (((int8_t) lo) | ((int8_t) hi << 8));
+ 			if (i % 3)
+ 				val *= -1;
+ 			input_report_rel(dev, REL_X + i, val);
+@@ -387,9 +388,11 @@ static void hil_dev_pointer_setup(struct hil_dev *ptr)
+ 
+ #ifdef TABLET_AUTOADJUST
+ 		for (i = 0; i < ABS_MAX; i++) {
+-			int diff = input_dev->absmax[ABS_X + i] / 10;
+-			input_dev->absmin[ABS_X + i] += diff;
+-			input_dev->absmax[ABS_X + i] -= diff;
++			int diff = input_abs_max(input_dev, ABS_X + i) / 10;
++			input_abs_set_min(input_dev, ABS_X + i,
++				input_abs_min(input_dev, ABS_X + i) + diff)
++			XXinput_abs_set_max(input_dev, ABS_X + i,
++				input_abs_max(input_dev, ABS_X + i) - diff)
+ 		}
+ #endif
+ 
+diff --git a/drivers/input/misc/uinput.c b/drivers/input/misc/uinput.c
+index b71eb55..900a56e 100644
+--- a/drivers/input/misc/uinput.c
++++ b/drivers/input/misc/uinput.c
+@@ -37,6 +37,7 @@
+ #include <linux/fs.h>
+ #include <linux/miscdevice.h>
+ #include <linux/uinput.h>
++#include <linux/input/mt.h>
+ #include "../input-compat.h"
+ 
+ static int uinput_dev_event(struct input_dev *dev, unsigned int type, unsigned int code, int value)
+@@ -304,21 +305,25 @@ static int uinput_validate_absbits(struct input_dev *dev)
+ 		if (!test_bit(cnt, dev->absbit))
+ 			continue;
+ 
+-		if ((dev->absmax[cnt] <= dev->absmin[cnt])) {
++		if (input_abs_get_max(dev, cnt) <= input_abs_get_min(dev, cnt)) {
+ 			printk(KERN_DEBUG
+ 				"%s: invalid abs[%02x] min:%d max:%d\n",
+ 				UINPUT_NAME, cnt,
+-				dev->absmin[cnt], dev->absmax[cnt]);
++				input_abs_get_min(dev, cnt),
++				input_abs_get_max(dev, cnt));
+ 			retval = -EINVAL;
+ 			break;
+ 		}
+ 
+-		if (dev->absflat[cnt] > (dev->absmax[cnt] - dev->absmin[cnt])) {
++		if (input_abs_get_flat(dev, cnt) >
++		    input_abs_get_max(dev, cnt) - input_abs_get_min(dev, cnt)) {
+ 			printk(KERN_DEBUG
+-				"%s: absflat[%02x] out of range: %d "
++				"%s: abs_flat #%02x out of range: %d "
+ 				"(min:%d/max:%d)\n",
+-				UINPUT_NAME, cnt, dev->absflat[cnt],
+-				dev->absmin[cnt], dev->absmax[cnt]);
++				UINPUT_NAME, cnt,
++				input_abs_get_flat(dev, cnt),
++				input_abs_get_min(dev, cnt),
++				input_abs_get_max(dev, cnt));
+ 			retval = -EINVAL;
+ 			break;
+ 		}
+@@ -343,7 +348,7 @@ static int uinput_setup_device(struct uinput_device *udev, const char __user *bu
+ 	struct uinput_user_dev	*user_dev;
+ 	struct input_dev	*dev;
+ 	char			*name;
+-	int			size;
++	int			i, size;
+ 	int			retval;
+ 
+ 	if (count != sizeof(struct uinput_user_dev))
+@@ -387,11 +392,12 @@ static int uinput_setup_device(struct uinput_device *udev, const char __user *bu
+ 	dev->id.product	= user_dev->id.product;
+ 	dev->id.version	= user_dev->id.version;
+ 
+-	size = sizeof(int) * ABS_CNT;
+-	memcpy(dev->absmax, user_dev->absmax, size);
+-	memcpy(dev->absmin, user_dev->absmin, size);
+-	memcpy(dev->absfuzz, user_dev->absfuzz, size);
+-	memcpy(dev->absflat, user_dev->absflat, size);
++	for (i = 0; i < ABS_CNT; i++) {
++		input_abs_set_max(dev, i, user_dev->absmax[i]);
++		input_abs_set_min(dev, i, user_dev->absmin[i]);
++		input_abs_set_fuzz(dev, i, user_dev->absfuzz[i]);
++		input_abs_set_flat(dev, i, user_dev->absflat[i]);
++	}
+ 
+ 	/* check if absmin/absmax/absfuzz/absflat are filled as
+ 	 * told in Documentation/input/input-programming.txt */
+@@ -399,6 +405,12 @@ static int uinput_setup_device(struct uinput_device *udev, const char __user *bu
+ 		retval = uinput_validate_absbits(dev);
+ 		if (retval < 0)
+ 			goto exit;
++		if (test_bit(ABS_MT_SLOT, dev->absbit)) {
++			int nslot = input_abs_get_max(dev, ABS_MT_SLOT) + 1;
++			input_mt_init_slots(dev, nslot);
++		} else if (test_bit(ABS_MT_POSITION_X, dev->absbit)) {
++			input_set_events_per_packet(dev, 60);
++		}
+ 	}
+ 
+ 	udev->state = UIST_SETUP_COMPLETE;
+diff --git a/drivers/input/mouse/bcm5974.c b/drivers/input/mouse/bcm5974.c
+index 6dedded..84094bb 100644
+--- a/drivers/input/mouse/bcm5974.c
++++ b/drivers/input/mouse/bcm5974.c
+@@ -312,6 +312,8 @@ static void setup_events_to_report(struct input_dev *input_dev,
+ 	__set_bit(BTN_TOOL_TRIPLETAP, input_dev->keybit);
+ 	__set_bit(BTN_TOOL_QUADTAP, input_dev->keybit);
+ 	__set_bit(BTN_LEFT, input_dev->keybit);
++
++	input_set_events_per_packet(input_dev, 60);
+ }
+ 
+ /* report button data as logical button state */
+diff --git a/drivers/input/mouse/pc110pad.c b/drivers/input/mouse/pc110pad.c
+index 3941f97..7b02b65 100644
+--- a/drivers/input/mouse/pc110pad.c
++++ b/drivers/input/mouse/pc110pad.c
+@@ -145,8 +145,8 @@ static int __init pc110pad_init(void)
+ 	pc110pad_dev->absbit[0] = BIT_MASK(ABS_X) | BIT_MASK(ABS_Y);
+ 	pc110pad_dev->keybit[BIT_WORD(BTN_TOUCH)] = BIT_MASK(BTN_TOUCH);
+ 
+-	pc110pad_dev->absmax[ABS_X] = 0x1ff;
+-	pc110pad_dev->absmax[ABS_Y] = 0x0ff;
++	input_abs_set_max(pc110pad_dev, ABS_X, 0x1ff);
++	input_abs_set_max(pc110pad_dev, ABS_Y, 0x0ff);
+ 
+ 	pc110pad_dev->open = pc110pad_open;
+ 	pc110pad_dev->close = pc110pad_close;
+diff --git a/drivers/input/mouse/synaptics.c b/drivers/input/mouse/synaptics.c
+index 705589d..e7c260f 100644
+--- a/drivers/input/mouse/synaptics.c
++++ b/drivers/input/mouse/synaptics.c
+@@ -631,8 +631,8 @@ static void set_input_params(struct input_dev *dev, struct synaptics_data *priv)
+ 	__clear_bit(REL_X, dev->relbit);
+ 	__clear_bit(REL_Y, dev->relbit);
+ 
+-	dev->absres[ABS_X] = priv->x_res;
+-	dev->absres[ABS_Y] = priv->y_res;
++	input_abs_set_res(dev, ABS_X, priv->x_res);
++	input_abs_set_res(dev, ABS_Y, priv->y_res);
+ 
+ 	if (SYN_CAP_CLICKPAD(priv->ext_cap_0c)) {
+ 		/* Clickpads report only left button */
+diff --git a/drivers/input/mousedev.c b/drivers/input/mousedev.c
+index f34b22b..9e92826 100644
+--- a/drivers/input/mousedev.c
++++ b/drivers/input/mousedev.c
+@@ -22,6 +22,7 @@
+ #include <linux/random.h>
+ #include <linux/major.h>
+ #include <linux/device.h>
++#include <linux/kernel.h>
+ #ifdef CONFIG_INPUT_MOUSEDEV_PSAUX
+ #include <linux/miscdevice.h>
+ #endif
+@@ -134,11 +135,14 @@ static void mousedev_touchpad_event(struct input_dev *dev,
+ 	switch (code) {
+ 
+ 	case ABS_X:
++
+ 		fx(0) = value;
+ 		if (mousedev->touch && mousedev->pkt_count >= 2) {
+-			size = dev->absmax[ABS_X] - dev->absmin[ABS_X];
++			size = input_abs_get_min(dev, ABS_X) -
++					input_abs_get_max(dev, ABS_X);
+ 			if (size == 0)
+ 				size = 256 * 2;
++
+ 			tmp = ((value - fx(2)) * 256 * FRACTION_DENOM) / size;
+ 			tmp += mousedev->frac_dx;
+ 			mousedev->packet.dx = tmp / FRACTION_DENOM;
+@@ -150,10 +154,12 @@ static void mousedev_touchpad_event(struct input_dev *dev,
+ 	case ABS_Y:
+ 		fy(0) = value;
+ 		if (mousedev->touch && mousedev->pkt_count >= 2) {
+-			/* use X size to keep the same scale */
+-			size = dev->absmax[ABS_X] - dev->absmin[ABS_X];
++			/* use X size for ABS_Y to keep the same scale */
++			size = input_abs_get_min(dev, ABS_X) -
++					input_abs_get_max(dev, ABS_X);
+ 			if (size == 0)
+ 				size = 256 * 2;
++
+ 			tmp = -((value - fy(2)) * 256 * FRACTION_DENOM) / size;
+ 			tmp += mousedev->frac_dy;
+ 			mousedev->packet.dy = tmp / FRACTION_DENOM;
+@@ -167,33 +173,35 @@ static void mousedev_touchpad_event(struct input_dev *dev,
+ static void mousedev_abs_event(struct input_dev *dev, struct mousedev *mousedev,
+ 				unsigned int code, int value)
+ {
+-	int size;
++	int min, max, size;
+ 
+ 	switch (code) {
+ 
+ 	case ABS_X:
+-		size = dev->absmax[ABS_X] - dev->absmin[ABS_X];
++		min = input_abs_get_min(dev, ABS_X);
++		max = input_abs_get_max(dev, ABS_X);
++
++		size = max - min;
+ 		if (size == 0)
+ 			size = xres ? : 1;
+-		if (value > dev->absmax[ABS_X])
+-			value = dev->absmax[ABS_X];
+-		if (value < dev->absmin[ABS_X])
+-			value = dev->absmin[ABS_X];
+-		mousedev->packet.x =
+-			((value - dev->absmin[ABS_X]) * xres) / size;
++
++		clamp(value, min, max);
++
++		mousedev->packet.x = ((value - min) * xres) / size;
+ 		mousedev->packet.abs_event = 1;
+ 		break;
+ 
+ 	case ABS_Y:
+-		size = dev->absmax[ABS_Y] - dev->absmin[ABS_Y];
++		min = input_abs_get_min(dev, ABS_Y);
++		max = input_abs_get_max(dev, ABS_Y);
++
++		size = max - min;
+ 		if (size == 0)
+ 			size = yres ? : 1;
+-		if (value > dev->absmax[ABS_Y])
+-			value = dev->absmax[ABS_Y];
+-		if (value < dev->absmin[ABS_Y])
+-			value = dev->absmin[ABS_Y];
+-		mousedev->packet.y = yres -
+-			((value - dev->absmin[ABS_Y]) * yres) / size;
++
++		clamp(value, min, max);
++
++		mousedev->packet.y = yres - ((value - min) * yres) / size;
+ 		mousedev->packet.abs_event = 1;
+ 		break;
+ 	}
+diff --git a/drivers/input/tablet/aiptek.c b/drivers/input/tablet/aiptek.c
+index 51b80b0..57b25b8 100644
+--- a/drivers/input/tablet/aiptek.c
++++ b/drivers/input/tablet/aiptek.c
+@@ -987,20 +987,17 @@ static int aiptek_program_tablet(struct aiptek *aiptek)
+ 	/* Query getXextension */
+ 	if ((ret = aiptek_query(aiptek, 0x01, 0x00)) < 0)
+ 		return ret;
+-	aiptek->inputdev->absmin[ABS_X] = 0;
+-	aiptek->inputdev->absmax[ABS_X] = ret - 1;
++	input_set_abs_params(aiptek->inputdev, ABS_X, 0, ret - 1, 0, 0);
+ 
+ 	/* Query getYextension */
+ 	if ((ret = aiptek_query(aiptek, 0x01, 0x01)) < 0)
+ 		return ret;
+-	aiptek->inputdev->absmin[ABS_Y] = 0;
+-	aiptek->inputdev->absmax[ABS_Y] = ret - 1;
++	input_set_abs_params(aiptek->inputdev, ABS_Y, 0, ret - 1, 0, 0);
+ 
+ 	/* Query getPressureLevels */
+ 	if ((ret = aiptek_query(aiptek, 0x08, 0x00)) < 0)
+ 		return ret;
+-	aiptek->inputdev->absmin[ABS_PRESSURE] = 0;
+-	aiptek->inputdev->absmax[ABS_PRESSURE] = ret - 1;
++	input_set_abs_params(aiptek->inputdev, ABS_PRESSURE, 0, ret - 1, 0, 0);
+ 
+ 	/* Depending on whether we are in absolute or relative mode, we will
+ 	 * do a switchToTablet(absolute) or switchToMouse(relative) command.
+@@ -1054,8 +1051,8 @@ static ssize_t show_tabletSize(struct device *dev, struct device_attribute *attr
+ 	struct aiptek *aiptek = dev_get_drvdata(dev);
+ 
+ 	return snprintf(buf, PAGE_SIZE, "%dx%d\n",
+-			aiptek->inputdev->absmax[ABS_X] + 1,
+-			aiptek->inputdev->absmax[ABS_Y] + 1);
++			input_abs_get_max(aiptek->inputdev, ABS_X) + 1,
++			input_abs_get_max(aiptek->inputdev, ABS_Y) + 1);
+ }
+ 
+ /* These structs define the sysfs files, param #1 is the name of the
+@@ -1843,7 +1840,7 @@ aiptek_probe(struct usb_interface *intf, const struct usb_device_id *id)
+ 	for (i = 0; i < ARRAY_SIZE(speeds); ++i) {
+ 		aiptek->curSetting.programmableDelay = speeds[i];
+ 		(void)aiptek_program_tablet(aiptek);
+-		if (aiptek->inputdev->absmax[ABS_X] > 0) {
++		if (input_abs_get_max(aiptek->inputdev, ABS_X) > 0) {
+ 			dev_info(&intf->dev,
+ 				 "Aiptek using %d ms programming speed\n",
+ 				 aiptek->curSetting.programmableDelay);
+diff --git a/drivers/input/tablet/wacom_wac.c b/drivers/input/tablet/wacom_wac.c
+index 8a6a2a1..4b1c0fc 100644
+--- a/drivers/input/tablet/wacom_wac.c
++++ b/drivers/input/tablet/wacom_wac.c
+@@ -656,10 +656,10 @@ static void wacom_tpc_finger_in(struct wacom_wac *wacom, char *data, int idx)
+ 	 * protocol.
+ 	 */
+ 	if (wacom->last_finger != finger) {
+-		if (x == input->abs[ABS_X])
++		if (x == input_abs_get_val(input, ABS_X))
+ 			x++;
+ 
+-		if (y == input->abs[ABS_Y])
++		if (y == input_abs_get_val(input, ABS_Y))
+ 			y++;
+ 	}
+ 
+diff --git a/include/linux/hid.h b/include/linux/hid.h
+index 895001f..576d718 100644
+--- a/include/linux/hid.h
++++ b/include/linux/hid.h
+@@ -311,10 +311,12 @@ struct hid_item {
+ #define HID_QUIRK_HIDDEV_FORCE			0x00000010
+ #define HID_QUIRK_BADPAD			0x00000020
+ #define HID_QUIRK_MULTI_INPUT			0x00000040
++#define HID_QUIRK_MULTITOUCH			0x00000100
+ #define HID_QUIRK_SKIP_OUTPUT_REPORTS		0x00010000
+ #define HID_QUIRK_FULLSPEED_INTERVAL		0x10000000
+ #define HID_QUIRK_NO_INIT_REPORTS		0x20000000
+ #define HID_QUIRK_NO_IGNORE			0x40000000
++#define HID_QUIRK_NO_INPUT_SYNC			0x80000000
+ 
+ /*
+  * This is the global environment of the parser. This information is
+@@ -400,7 +402,7 @@ struct hid_field {
+ 	__u16 dpad;			/* dpad input code */
+ };
+ 
+-#define HID_MAX_FIELDS 64
++#define HID_MAX_FIELDS 128
+ 
+ struct hid_report {
+ 	struct list_head list;
+@@ -591,6 +593,7 @@ struct hid_usage_id {
+  * @report_fixup: called before report descriptor parsing (NULL means nop)
+  * @input_mapping: invoked on input registering before mapping an usage
+  * @input_mapped: invoked on input registering after mapping an usage
++ * @feature_mapping: invoked on feature registering
+  * @suspend: invoked on suspend (NULL means nop)
+  * @resume: invoked on resume if device was not reset (NULL means nop)
+  * @reset_resume: invoked on resume if device was reset (NULL means nop)
+@@ -634,6 +637,9 @@ struct hid_driver {
+ 	int (*input_mapped)(struct hid_device *hdev,
+ 			struct hid_input *hidinput, struct hid_field *field,
+ 			struct hid_usage *usage, unsigned long **bit, int *max);
++	void (*feature_mapping)(struct hid_device *hdev,
++			struct hid_field *field,
++			struct hid_usage *usage);
+ #ifdef CONFIG_PM
+ 	int (*suspend)(struct hid_device *hdev, pm_message_t message);
+ 	int (*resume)(struct hid_device *hdev);
+@@ -706,6 +712,7 @@ int hid_check_keys_pressed(struct hid_device *hid);
+ int hid_connect(struct hid_device *hid, unsigned int connect_mask);
+ void hid_disconnect(struct hid_device *hid);
+ 
++
+ /**
+  * hid_map_usage - map usage input bits
+  *
+diff --git a/include/linux/input.h b/include/linux/input.h
+index 6fcc910..9fae166 100644
+--- a/include/linux/input.h
++++ b/include/linux/input.h
+@@ -691,9 +691,12 @@ struct input_absinfo {
+ #define ABS_TILT_X		0x1a
+ #define ABS_TILT_Y		0x1b
+ #define ABS_TOOL_WIDTH		0x1c
++
+ #define ABS_VOLUME		0x20
++
+ #define ABS_MISC		0x28
+ 
++#define ABS_MT_SLOT		0x2f	/* MT slot being modified */
+ #define ABS_MT_TOUCH_MAJOR	0x30	/* Major axis of touching ellipse */
+ #define ABS_MT_TOUCH_MINOR	0x31	/* Minor axis (omit if circular) */
+ #define ABS_MT_WIDTH_MAJOR	0x32	/* Major axis of approaching ellipse */
+@@ -705,6 +708,13 @@ struct input_absinfo {
+ #define ABS_MT_BLOB_ID		0x38	/* Group a set of packets as a blob */
+ #define ABS_MT_TRACKING_ID	0x39	/* Unique ID of initiated contact */
+ #define ABS_MT_PRESSURE		0x3a	/* Pressure on contact area */
++#define ABS_MT_DISTANCE		0x3b	/* Contact hover distance */
++
++#ifdef __KERNEL__
++/* Implementation details, userspace should not care about these */
++#define ABS_MT_FIRST		ABS_MT_TOUCH_MAJOR
++#define ABS_MT_LAST		ABS_MT_DISTANCE
++#endif
+ 
+ #define ABS_MAX			0x3f
+ #define ABS_CNT			(ABS_MAX+1)
+@@ -767,6 +777,7 @@ struct input_absinfo {
+ #define REP_DELAY		0x00
+ #define REP_PERIOD		0x01
+ #define REP_MAX			0x01
++#define REP_CNT			(REP_MAX+1)
+ 
+ /*
+  * Sounds
+@@ -813,6 +824,7 @@ struct input_absinfo {
+  */
+ #define MT_TOOL_FINGER		0
+ #define MT_TOOL_PEN		1
++#define MT_TOOL_MAX		1
+ 
+ /*
+  * Values describing the status of a force-feedback effect
+@@ -1063,6 +1075,10 @@ struct ff_effect {
+  * @sndbit: bitmap of sound effects supported by the device
+  * @ffbit: bitmap of force feedback effects supported by the device
+  * @swbit: bitmap of switches present on the device
++ * @hint_events_per_packet: average number of events generated by the
++ *	device in a packet (between EV_SYN/SYN_REPORT events). Used by
++ *	event handlers to estimate size of the buffer needed to hold
++ *	events.
+  * @keycodemax: size of keycode table
+  * @keycodesize: size of elements in keycode table
+  * @keycode: map of scancodes to keycodes for this device
+@@ -1078,18 +1094,19 @@ struct ff_effect {
+  * @repeat_key: stores key code of the last key pressed; used to implement
+  *	software autorepeat
+  * @timer: timer for software autorepeat
+- * @sync: set to 1 when there were no new events since last EV_SYNC
+- * @abs: current values for reports from absolute axes
+  * @rep: current values for autorepeat parameters (delay, rate)
++ * @mt: pointer to array of struct input_mt_slot holding current values
++ *	of tracked contacts
++ * @mtsize: number of MT slots the device uses
++ * @slot: MT slot currently being transmitted
++ * @trkid: stores MT tracking ID for the current contact
++ * @absinfo: array of &struct absinfo elements holding information
++ *	about absolute axes (current value, min, max, flat, fuzz,
++ *	resolution)
+  * @key: reflects current state of device's keys/buttons
+  * @led: reflects current state of device's LEDs
+  * @snd: reflects current state of sound effects
+  * @sw: reflects current state of device's switches
+- * @absmax: maximum values for events coming from absolute axes
+- * @absmin: minimum values for events coming from absolute axes
+- * @absfuzz: describes noisiness for axes
+- * @absflat: size of the center flat position (used by joydev)
+- * @absres: resolution used for events coming form absolute axes
+  * @open: this method is called when the very first user calls
+  *	input_open_device(). The driver must prepare the device
+  *	to start generating events (start polling thread,
+@@ -1119,6 +1136,7 @@ struct ff_effect {
+  *	last user closes the device
+  * @going_away: marks devices that are in a middle of unregistering and
+  *	causes input_open_device*() fail with -ENODEV.
++ * @sync: set to %true when there were no new events since last EV_SYN
+  * @dev: driver model's view of this device
+  * @h_list: list of input handles associated with the device. When
+  *	accessing the list dev->mutex must be held
+@@ -1140,6 +1158,8 @@ struct input_dev {
+ 	unsigned long ffbit[BITS_TO_LONGS(FF_CNT)];
+ 	unsigned long swbit[BITS_TO_LONGS(SW_CNT)];
+ 
++	unsigned int hint_events_per_packet;
++
+ 	unsigned int keycodemax;
+ 	unsigned int keycodesize;
+ 	void *keycode;
+@@ -1153,22 +1173,20 @@ struct input_dev {
+ 	unsigned int repeat_key;
+ 	struct timer_list timer;
+ 
+-	int sync;
++	int rep[REP_CNT];
++
++	struct input_mt_slot *mt;
++	int mtsize;
++	int slot;
++	int trkid;
+ 
+-	int abs[ABS_CNT];
+-	int rep[REP_MAX + 1];
++	struct input_absinfo *absinfo;
+ 
+ 	unsigned long key[BITS_TO_LONGS(KEY_CNT)];
+ 	unsigned long led[BITS_TO_LONGS(LED_CNT)];
+ 	unsigned long snd[BITS_TO_LONGS(SND_CNT)];
+ 	unsigned long sw[BITS_TO_LONGS(SW_CNT)];
+ 
+-	int absmax[ABS_CNT];
+-	int absmin[ABS_CNT];
+-	int absfuzz[ABS_CNT];
+-	int absflat[ABS_CNT];
+-	int absres[ABS_CNT];
+-
+ 	int (*open)(struct input_dev *dev);
+ 	void (*close)(struct input_dev *dev);
+ 	int (*flush)(struct input_dev *dev, struct file *file);
+@@ -1182,6 +1200,8 @@ struct input_dev {
+ 	unsigned int users;
+ 	bool going_away;
+ 
++	bool sync;
++
+ 	struct device dev;
+ 
+ 	struct list_head	h_list;
+@@ -1408,16 +1428,47 @@ static inline void input_mt_sync(struct input_dev *dev)
+ 
+ void input_set_capability(struct input_dev *dev, unsigned int type, unsigned int code);
+ 
+-static inline void input_set_abs_params(struct input_dev *dev, int axis, int min, int max, int fuzz, int flat)
++/**
++ * input_set_events_per_packet - tell handlers about the driver event rate
++ * @dev: the input device used by the driver
++ * @n_events: the average number of events between calls to input_sync()
++ *
++ * If the event rate sent from a device is unusually large, use this
++ * function to set the expected event rate. This will allow handlers
++ * to set up an appropriate buffer size for the event stream, in order
++ * to minimize information loss.
++ */
++static inline void input_set_events_per_packet(struct input_dev *dev, int n_events)
+ {
+-	dev->absmin[axis] = min;
+-	dev->absmax[axis] = max;
+-	dev->absfuzz[axis] = fuzz;
+-	dev->absflat[axis] = flat;
++	dev->hint_events_per_packet = n_events;
++}
+ 
+-	dev->absbit[BIT_WORD(axis)] |= BIT_MASK(axis);
++void input_alloc_absinfo(struct input_dev *dev);
++void input_set_abs_params(struct input_dev *dev, unsigned int axis,
++			  int min, int max, int fuzz, int flat);
++
++#define INPUT_GENERATE_ABS_ACCESSORS(_suffix, _item)			\
++static inline int input_abs_get_##_suffix(struct input_dev *dev,	\
++					  unsigned int axis)		\
++{									\
++	return dev->absinfo ? dev->absinfo[axis]._item : 0;		\
++}									\
++									\
++static inline void input_abs_set_##_suffix(struct input_dev *dev,	\
++					   unsigned int axis, int val)	\
++{									\
++	input_alloc_absinfo(dev);					\
++	if (dev->absinfo)						\
++		dev->absinfo[axis]._item = val;				\
+ }
+ 
++INPUT_GENERATE_ABS_ACCESSORS(val, value)
++INPUT_GENERATE_ABS_ACCESSORS(min, minimum)
++INPUT_GENERATE_ABS_ACCESSORS(max, maximum)
++INPUT_GENERATE_ABS_ACCESSORS(fuzz, fuzz)
++INPUT_GENERATE_ABS_ACCESSORS(flat, flat)
++INPUT_GENERATE_ABS_ACCESSORS(res, resolution)
++
+ int input_get_keycode(struct input_dev *dev,
+ 		      unsigned int scancode, unsigned int *keycode);
+ int input_set_keycode(struct input_dev *dev,
+diff --git a/include/linux/input/mt.h b/include/linux/input/mt.h
+new file mode 100644
+index 0000000..b3ac06a4
+--- /dev/null
++++ b/include/linux/input/mt.h
+@@ -0,0 +1,57 @@
++#ifndef _INPUT_MT_H
++#define _INPUT_MT_H
++
++/*
++ * Input Multitouch Library
++ *
++ * Copyright (c) 2010 Henrik Rydberg
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License version 2 as published by
++ * the Free Software Foundation.
++ */
++
++#include <linux/input.h>
++
++#define TRKID_MAX	0xffff
++
++/**
++ * struct input_mt_slot - represents the state of an input MT slot
++ * @abs: holds current values of ABS_MT axes for this slot
++ */
++struct input_mt_slot {
++	int abs[ABS_MT_LAST - ABS_MT_FIRST + 1];
++};
++
++static inline void input_mt_set_value(struct input_mt_slot *slot,
++				      unsigned code, int value)
++{
++	slot->abs[code - ABS_MT_FIRST] = value;
++}
++
++static inline int input_mt_get_value(const struct input_mt_slot *slot,
++				     unsigned code)
++{
++	return slot->abs[code - ABS_MT_FIRST];
++}
++
++int input_mt_init_slots(struct input_dev *dev, unsigned int num_slots);
++void input_mt_destroy_slots(struct input_dev *dev);
++
++static inline int input_mt_new_trkid(struct input_dev *dev)
++{
++	return dev->trkid++ & TRKID_MAX;
++}
++
++static inline void input_mt_slot(struct input_dev *dev, int slot)
++{
++	input_event(dev, EV_ABS, ABS_MT_SLOT, slot);
++}
++
++void input_mt_report_slot_state(struct input_dev *dev,
++				unsigned int tool_type, bool active);
++
++void input_mt_report_finger_count(struct input_dev *dev, int count);
++void input_mt_report_pointer_emulation(struct input_dev *dev, bool use_count);
++
++#endif

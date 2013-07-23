@@ -1,0 +1,26 @@
+--- Python-2.4.3/Lib/tarfile.py.org  2006-06-21 14:33:19.000000000 +0300
++++ Python-2.4.3/Lib/tarfile.py      2006-06-21 14:33:59.000000000 +0300
+@@ -688,11 +688,6 @@
+             tarinfo.devmajor = tarinfo.devmajor = 0
+         tarinfo.prefix = buf[345:500]
+ 
+-        # Some old tar programs represent a directory as a regular
+-        # file with a trailing slash.
+-        if tarinfo.isreg() and tarinfo.name.endswith("/"):
+-            tarinfo.type = DIRTYPE
+-
+         # The prefix field is used for filenames > 100 in
+         # the POSIX standard.
+         # name = prefix + '/' + name
+@@ -1630,6 +1625,11 @@
+         if tarinfo.type in self.TYPE_METH:
+             return self.TYPE_METH[tarinfo.type](self, tarinfo)
+ 
++        # Some old tar programs represent a directory as a regular
++        # file with a trailing slash.
++        if tarinfo.isreg() and tarinfo.name.endswith("/"):
++            tarinfo.type = DIRTYPE
++
+         tarinfo.offset_data = self.offset
+         if tarinfo.isreg() or tarinfo.type not in SUPPORTED_TYPES:
+             # Skip the following data blocks.

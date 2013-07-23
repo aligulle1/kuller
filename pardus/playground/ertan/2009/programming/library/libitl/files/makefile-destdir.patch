@@ -1,0 +1,71 @@
+diff -Nuar libitl-0.7.0.orig/build/config.mk.in libitl-0.7.0/build/config.mk.in
+--- libitl-0.7.0.orig/build/config.mk.in	2006-09-21 19:32:39.000000000 +0300
++++ libitl-0.7.0/build/config.mk.in	2009-10-26 21:39:54.767412770 +0200
+@@ -11,5 +11,8 @@
+ CFLAGS=@CFLAGS@
+ LDFLAGS=@LDFLAGS@
+ PREFIX=@prefix@
++LIBDIR=@libdir@
++INCLUDEDIR=@includedir@
++DESTDIR=
+ VERSION=@PACKAGE_VERSION@
+ TARNAME=@PACKAGE_TARNAME@
+diff -Nuar libitl-0.7.0.orig/hijri/Makefile libitl-0.7.0/hijri/Makefile
+--- libitl-0.7.0.orig/hijri/Makefile	2006-09-21 19:34:31.000000000 +0300
++++ libitl-0.7.0/hijri/Makefile	2009-10-26 21:44:41.766412643 +0200
+@@ -10,10 +10,10 @@
+ 
+ install: all
+ 	@echo "==> Installing hijri component..."
+-	test -d $(PREFIX)/include/itl \
+-	|| install -d $(PREFIX)/include/itl \
++	test -d $(DESTDIR)/$(PREFIX)/$(INCLUDEDIR)/itl \
++	|| mkdir -p $(DESTDIR)/$(PREFIX)/$(INCLUDEDIR)/itl \
+ 	|| exit 1;
+-	install src/hijri.h $(PREFIX)/include/itl
++	install src/hijri.h $(DESTDIR)/$(PREFIX)/$(INCLUDEDIR)/itl
+ 
+ uninstall:
+ 	@echo "==> Uninstalling hijri component..."
+diff -Nuar libitl-0.7.0.orig/Makefile.in libitl-0.7.0/Makefile.in
+--- libitl-0.7.0.orig/Makefile.in	2009-10-26 21:35:16.000000000 +0200
++++ libitl-0.7.0/Makefile.in	2009-10-26 21:49:08.505411478 +0200
+@@ -83,15 +83,15 @@
+ 
+ install: build/libitl.so build/libitl.a
+ 	@echo "==> Installing libitl library..."
+-	test -d $(PREFIX)/lib/itl \
+-	|| install -d $(PREFIX)/lib/itl \
++	test -d $(DESTDIR)/$(PREFIX)/$(LIBDIR) \
++	|| mkdir -p $(DESTDIR)/$(PREFIX)/$(LIBDIR) \
+ 	|| exit 1;
+-	install build/$(FULLNAME) $(PREFIX)/lib/itl
+-	install build/libitl.a $(PREFIX)/lib/itl
++	install build/$(FULLNAME) $(DESTDIR)/$(PREFIX)/$(LIBDIR)
++	install build/libitl.a $(DESTDIR)/$(PREFIX)/$(LIBDIR)
+         # Using cp -P as cp --no-dereference is not POSIX
+         # or use --preserve=link instead.
+-	cp -P build/$(SONAME) $(PREFIX)/lib/itl
+-	cp -P build/libitl.so $(PREFIX)/lib/itl
++	cp -P build/$(SONAME) $(DESTDIR)/$(PREFIX)/$(LIBDIR)
++	cp -P build/libitl.so $(DESTDIR)/$(PREFIX)/$(LIBDIR)
+ 	@echo "==> Installing ITL components..."
+ 	for i in $(COMPONENTS); do \
+ 	  $(MAKE) -C $$i install || exit 1; \
+diff -Nuar libitl-0.7.0.orig/prayertime/Makefile libitl-0.7.0/prayertime/Makefile
+--- libitl-0.7.0.orig/prayertime/Makefile	2006-09-21 19:37:51.000000000 +0300
++++ libitl-0.7.0/prayertime/Makefile	2009-10-26 21:51:12.808411401 +0200
+@@ -10,10 +10,10 @@
+ 
+ install: all
+ 	@echo "==> Installing prayertime component..."
+-	test -d $(PREFIX)/include/itl \
+-	|| install $(PREFIX)/include/itl \
++	test -d $(DESTDIR)/$(PREFIX)/$(INCLUDEDIR)/itl \
++	|| mkdir -p $(DESTDIR)/$(PREFIX)/$(INCLUDEDIR)/itl \
+ 	|| exit 1;
+-	install src/prayer.h $(PREFIX)/include/itl
++	install src/prayer.h $(DESTDIR)/$(PREFIX)/$(INCLUDEDIR)/itl
+ 
+ uninstall:
+ 	@echo "==> Uninstalling prayertime component..."

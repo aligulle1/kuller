@@ -1,0 +1,49 @@
+commit f751aa125d1843ea4a9a264b451fd5b1639fab20
+Author: Adrian Bunk <bunk@kernel.org>
+Date:   Sun Jun 8 21:43:10 2008 +0300
+
+    fat_valid_media() isn't for userspace
+    
+    Commit 73f20e58b1d586e9f6d3ddc3aad872829aca7743 ("FAT_VALID_MEDIA():
+    remove pointless test") wrongly added the new fat_valid_media() function
+    to the userspace-visible part of include/linux/msdos_fs.h
+    
+    Move it to the part of include/linux/msdos_fs.h that is not exported to
+    userspace.
+    
+    Reported-by: Onur Küçük <onur@pardus.org.tr>
+    Reported-by: S.Çağlar Onur <caglar@pardus.org.tr>
+    Signed-off-by: Adrian Bunk <bunk@kernel.org>
+    Acked-by: OGAWA Hirofumi <hirofumi@mail.parknet.co.jp>
+    Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+
+Index: 2008-devel/include/linux/msdos_fs.h
+===================================================================
+--- 2008-devel.orig/include/linux/msdos_fs.h
++++ 2008-devel/include/linux/msdos_fs.h
+@@ -57,12 +57,6 @@
+ #define MSDOS_DOT	".          "	/* ".", padded to MSDOS_NAME chars */
+ #define MSDOS_DOTDOT	"..         "	/* "..", padded to MSDOS_NAME chars */
+ 
+-/* media of boot sector */
+-static inline int fat_valid_media(u8 media)
+-{
+-	return 0xf8 <= media || media == 0xf0;
+-}
+-
+ #define FAT_FIRST_ENT(s, x)	((MSDOS_SB(s)->fat_bits == 32 ? 0x0FFFFF00 : \
+ 	MSDOS_SB(s)->fat_bits == 16 ? 0xFF00 : 0xF00) | (x))
+ 
+@@ -332,6 +326,12 @@ static inline void fatwchar_to16(__u8 *d
+ #endif
+ }
+ 
++/* media of boot sector */
++static inline int fat_valid_media(u8 media)
++{
++	return 0xf8 <= media || media == 0xf0;
++}
++
+ /* fat/cache.c */
+ extern void fat_cache_inval_inode(struct inode *inode);
+ extern int fat_get_cluster(struct inode *inode, int cluster,

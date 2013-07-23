@@ -1,0 +1,62 @@
+Index: linux-2.6.18/sound/pci/hda/patch_sigmatel.c
+===================================================================
+--- linux-2.6.18.orig/sound/pci/hda/patch_sigmatel.c
++++ linux-2.6.18/sound/pci/hda/patch_sigmatel.c
+@@ -41,7 +41,7 @@
+ #define STAC_REF		0
+ #define STAC_D945GTP3		1
+ #define STAC_D945GTP5		2
+-#define STAC_MACMINI		3
++#define STAC_APPLE		3
+ #define STAC_D965_2112		4
+ #define STAC_D965_284B		5
+ #define STAC_922X_MODELS	6	/* number of 922x models */
+@@ -341,6 +341,12 @@ static unsigned int d945gtp5_pin_configs
+ 	0x02a19320, 0x40000100,
+ };
+ 
++static unsigned int apple_pin_configs[10] = {
++	0x0121E230, 0x90A70120, 0x9017E110, 0x400000FE,
++	0x400000FD, 0x0181E021, 0x1145E040, 0x400000FA,
++	0x400000FC, 0x400000FB,
++};
++
+ static unsigned int d965_2112_pin_configs[10] = {
+ 	0x0221401f, 0x40000100, 0x40000100, 0x01014011,
+ 	0x01a19021, 0x01813024, 0x01452130, 0x40000100,
+@@ -351,7 +357,7 @@ static unsigned int *stac922x_brd_tbl[ST
+ 	[STAC_REF] =	ref922x_pin_configs,
+ 	[STAC_D945GTP3] = d945gtp3_pin_configs,
+ 	[STAC_D945GTP5] = d945gtp5_pin_configs,
+-	[STAC_MACMINI] = d945gtp5_pin_configs,
++	[STAC_APPLE] = apple_pin_configs,
+ 	[STAC_D965_2112] = d965_2112_pin_configs,
+ };
+ 
+@@ -386,7 +392,7 @@ static struct hda_board_config stac922x_
+ 	  .config = STAC_D945GTP5 },	/* Intel D975XBK - 5 Stack */
+ 	{ .pci_subvendor = 0x8384,
+ 	  .pci_subdevice = 0x7680,
+-	  .config = STAC_MACMINI },	/* Apple Mac Mini (early 2006) */
++	  .config = STAC_APPLE },	/* Apple Mac Mini (early 2006), Macbook and Macbook Pro */
+ 	{ .pci_subvendor = PCI_VENDOR_ID_INTEL,
+ 	  .pci_subdevice = 0x2112,
+ 	  .config = STAC_D965_2112 },
+@@ -437,7 +443,7 @@ static void stac92xx_set_config_regs(str
+ 		pin_cfg = snd_hda_codec_read(codec, spec->pin_nids[i], 0,
+ 					     AC_VERB_GET_CONFIG_DEFAULT,
+ 					     0x00);	
+-		snd_printdd(KERN_INFO "hda_codec: pin nid %2.2x pin config %8.8x\n", spec->pin_nids[i], pin_cfg);
++		snd_printk(KERN_INFO "hda_codec: pin nid %2.2x pin config %8.8x\n", spec->pin_nids[i], pin_cfg);
+ 	}
+ }
+ 
+@@ -1306,7 +1312,7 @@ static int patch_stac922x(struct hda_cod
+ 		return err;
+ 	}
+ 
+-	if (spec->board_config == STAC_MACMINI)
++	if (spec->board_config == STAC_APPLE)
+ 		spec->gpio_mute = 1;
+ 
+ 	codec->patch_ops = stac92xx_patch_ops;

@@ -1,0 +1,26 @@
+Index: mozilla/security/nss/lib/ssl/sslsock.c
+===================================================================
+--- mozilla.orig/security/nss/lib/ssl/sslsock.c
++++ mozilla/security/nss/lib/ssl/sslsock.c
+@@ -185,7 +185,7 @@ static sslOptions ssl_defaults = {
+     3,          /* enableRenegotiation (default: transitional) */
+     PR_FALSE,   /* requireSafeNegotiation */
+     PR_FALSE,   /* enableFalseStart   */
+-    PR_TRUE     /* cbcRandomIV        */
++    PR_FALSE    /* cbcRandomIV        */ /* defaults to off for compatibility */
+ };
+ 
+ sslSessionIDLookupFunc  ssl_sid_lookup;
+@@ -2508,9 +2508,9 @@ ssl_SetDefaultsFromEnvironment(void)
+ 	                PR_TRUE));
+ 	}
+ 	ev = getenv("NSS_SSL_CBC_RANDOM_IV");
+-	if (ev && ev[0] == '0') {
+-	    ssl_defaults.cbcRandomIV = PR_FALSE;
+-	    SSL_TRACE(("SSL: cbcRandomIV set to 0"));
++	if (ev && ev[0] == '1') {
++	    ssl_defaults.cbcRandomIV = PR_TRUE;
++	    SSL_TRACE(("SSL: cbcRandomIV set to 1"));
+ 	}
+     }
+ #endif /* NSS_HAVE_GETENV */

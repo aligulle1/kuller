@@ -1,0 +1,17 @@
+Index: package-manager-1.1/src/package-manager.py
+===================================================================
+--- package-manager-1.1/src/package-manager.py	(revision 12623)
++++ package-manager-1.1/src/package-manager.py	(working copy)
+@@ -806,10 +806,8 @@
+         for key in self.componentDict.keys():
+             if self.componentDict[key].name == i18n("All"):
+                 continue
+-            for package in self.componentDict[key].packages:
+-                if query in package:
+-                    packages.append(package)
+-
++            packages.extend(pisi.api.search_in_packages(unicode(query).split(),
++                                                        self.componentDict[key].packages))
+         return packages
+ 
+     def showPreferences(self):

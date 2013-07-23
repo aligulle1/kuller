@@ -1,0 +1,49 @@
+qt-bugs@ issue : mail sent, waiting
+Trolltech task ID : none yet
+bugs.kde.org number : none
+applied: yes
+author: Benoit Jacob <jacob@math.jussieu.fr>
+
+
+
+Dear qt-bugs,
+
+Please consider merging the attached patch to QTestLib.
+
+It makes QTestLib's COMPARE_IMPL2 macro (which is used by QTestLib's toString) 
+use the %g and %lg format characters instead of %f and %lf for floating-point 
+types.
+
+This is better for two reasons:
+
+a. For small enough numbers, %f gives 0.00000, which amounts to say that %f 
+gives no information at all. %f only works for numbers of an order of 
+magnitude not-too-far from that of 1, and should only be used when one is 
+certain that all of the numbers that are to be displayed satisfy this. By 
+contrast, QTestLib's COMPARE_IMPL2 has a very general usage (for instance it 
+is used by QCOMPARE) so it should use %g instead.
+
+b. According to the Qt 4.2 online documentation, Qt itself uses g, not f, as 
+the default format character (for instance in QString::number). So there 
+seems to be currently an inconsistency between Qt and QTestLib.
+
+Cheers
+Benoit
+
+
+
+Index: tools/qtestlib/src/qtestcase.cpp
+===================================================================
+--- tools/qtestlib/src/qtestcase.cpp	(révision 602740)
++++ tools/qtestlib/src/qtestcase.cpp	(copie de travail)
+@@ -1440,8 +1440,8 @@
+ COMPARE_IMPL2(quint64, %llu)
+ COMPARE_IMPL2(bool, %d)
+ COMPARE_IMPL2(char, %c)
+-COMPARE_IMPL2(float, %f);
+-COMPARE_IMPL2(double, %lf);
++COMPARE_IMPL2(float, %g);
++COMPARE_IMPL2(double, %lg);
+ 
+ /*! \internal
+  */

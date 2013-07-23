@@ -1,0 +1,59 @@
+Index: stfl-0.21/Makefile
+===================================================================
+--- stfl-0.21.orig/Makefile
++++ stfl-0.21/Makefile
+@@ -20,8 +20,8 @@
+ 
+ include Makefile.cfg
+ 
+-export CC = gcc -pthread
+-export CFLAGS += -I. -Wall -Os -ggdb -D_GNU_SOURCE -fPIC
++export CC += -pthread
++export CFLAGS += -I. -Wall -D_GNU_SOURCE -fPIC
+ export LDLIBS += -lncursesw
+ 
+ SONAME  := libstfl.so.0
+@@ -39,7 +39,7 @@ libstfl.a: public.o base.o parser.o dump
+ 
+ libstfl.so.$(VERSION): public.o base.o parser.o dump.o style.o binding.o iconv.o \
+                        $(patsubst %.c,%.o,$(wildcard widgets/*.c))
+-	$(CC) -shared -Wl,-soname,$(SONAME) -o $@ $^
++	$(CC) -shared -Wl,-soname,$(SONAME) $(LDFLAGS) $(LDLIBS) -o $@ $^
+ 
+ clean:
+ 	rm -f libstfl.a example core core.* *.o Makefile.deps
+@@ -60,11 +60,11 @@ Makefile.deps: *.c widgets/*.c *.h
+ install: all stfl.pc
+ 	mkdir -p $(DESTDIR)$(prefix)/$(libdir)/pkgconfig
+ 	mkdir -p $(DESTDIR)$(prefix)/include
+-	install -m 644 libstfl.a $(DESTDIR)$(prefix)/$(libdir)
+ 	install -m 644 stfl.h $(DESTDIR)$(prefix)/include/
+ 	install -m 644 stfl.pc $(DESTDIR)$(prefix)/$(libdir)/pkgconfig/
+ 	install -m 644 libstfl.so.$(VERSION) $(DESTDIR)$(prefix)/$(libdir)
+-	ln -fs libstfl.so.$(VERSION) $(DESTDIR)$(prefix)/$(libdir)/libstfl.so
++	ln -fs libstfl.so.$(VERSION) $(DESTDIR)$(prefix)/$(libdir)/$(SONAME)
++	ln -fs $(SONAME) $(DESTDIR)$(prefix)/$(libdir)/libstfl.so
+ 
+ stfl.pc: stfl.pc.in
+ 	sed 's,@VERSION@,$(VERSION),g' < $< | sed 's,@PREFIX@,$(prefix),g' > $@
+Index: stfl-0.21/python/Makefile.snippet
+===================================================================
+--- stfl-0.21.orig/python/Makefile.snippet
++++ stfl-0.21/python/Makefile.snippet
+@@ -27,14 +27,13 @@ install: install_python
+ 
+ python/_stfl.so python/stfl.py python/stfl.pyc: libstfl.a stfl.h python/stfl.i swig/*.i
+ 	cd python && swig -python -threads stfl.i
+-	gcc -shared -pthread -fPIC python/stfl_wrap.c -I/usr/include/python$(PYTHON_VERSION) \
++	$(CC) -shared $(LDFLAGS) -pthread -fPIC python/stfl_wrap.c -I/usr/include/python$(PYTHON_VERSION) \
+ 		-I. libstfl.a -lncursesw -o python/_stfl.so
+ 	cd python && python -c 'import stfl'
+ 
+ install_python: python/_stfl.so python/stfl.py python/stfl.pyc
+ 	mkdir -p $(DESTDIR)$(PYTHON_SITEARCH)/
+-	mkdir -p $(DESTDIR)$(PYTHON_SITEARCH)/lib-dynload/
+-	cp python/_stfl.so $(DESTDIR)$(PYTHON_SITEARCH)/lib-dynload/
++	cp python/_stfl.so $(DESTDIR)$(PYTHON_SITEARCH)/
+ 	cp python/stfl.pyc $(DESTDIR)$(PYTHON_SITEARCH)/
+ 	cp python/stfl.py $(DESTDIR)$(PYTHON_SITEARCH)/
+ 

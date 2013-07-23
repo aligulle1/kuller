@@ -1,0 +1,56 @@
+diff -Nur AssaultCube_v1.0.4-old/source/src/Makefile AssaultCube_v1.0.4/source/src/Makefile
+--- AssaultCube_v1.0.4-old/source/src/Makefile	2009-09-01 15:03:15.260747429 +0300
++++ AssaultCube_v1.0.4/source/src/Makefile	2009-09-01 15:05:39.046747130 +0300
+@@ -1,12 +1,12 @@
+ CXXOPTFLAGS=-O3 -fomit-frame-pointer
+-INCLUDES1=-I/usr/X11R6/include -I../enet/include -I../src
++INCLUDES1=-I/usr/X11R6/include -I../src
+ INCLUDES2=`sdl-config --cflags`
+ CXXCUSTOMFLAGS=-fsigned-char -Wall -Wextra -Wno-missing-field-initializers -Wno-unused -Wpointer-arith -Wwrite-strings -Wconversion -rdynamic
+ CXXFLAGS=$(CXXOPTFLAGS) $(INCLUDES1) $(INCLUDES2) $(CUSTOMFLAGS)
+ CXXFLAGSSERVER=$(CXXOPTFLAGS) $(INCLUDES1) $(CUSTOMFLAGS)
+ 
+ PLATFORM_PREFIX=native
+-CLIENT_LIBS=-L/usr/X11R6/lib -L../enet -lenet `sdl-config --libs` -lSDL_image -lz -lGL -lopenal -lvorbisfile
++CLIENT_LIBS=-L/usr/X11R6/lib -lenet `sdl-config --libs` -lSDL_image -lz -lGL -lopenal -lvorbisfile
+ CLIENT_OBJS1= \
+ 	client.o \
+ 	clientgame.o \
+@@ -55,7 +55,7 @@
+ 	bot/ac_bot_ai.o 
+ 
+ 
+-SERVER_LIBS=-L../enet -lenet -lz
++SERVER_LIBS=-lenet -lz
+ SERVER_FILES= \
+ 	log.cpp \
+ 	serverms.cpp \
+@@ -66,26 +66,18 @@
+ 
+ default: all
+ 
+-all: libenet client server
+-
+-../enet/Makefile:
+-	cd ../enet; ./configure
+-
+-libenet: ../enet/Makefile
+-	-$(MAKE) -C ../enet all
++all: client server
+ 
+ clean:
+ 	-$(RM) -f $(SERVER_OBJS) $(CLIENT_OBJS1) ac_server ac_client
+-#	-$(MAKE) -C ../enet/ clean
+ 
+ mrproper: clean
+ 	-$(RM) -f $(CLIENT_OBJS2)
+-	-$(MAKE) -C ../enet/ clean
+ 
+ client: $(CLIENT_OBJS1) $(CLIENT_OBJS2)
+ 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o ac_client $(CLIENT_OBJS1) $(CLIENT_OBJS2) $(CLIENT_LIBS)
+ 
+-server: libenet $(SERVER_FILES)
++server: $(SERVER_FILES)
+ 	$(CXX) $(CXXFLAGSSERVER) $(LDFLAGS) -o ac_server -DSTANDALONE $(SERVER_FILES) $(SERVER_LIBS)
+ 
+ install: all

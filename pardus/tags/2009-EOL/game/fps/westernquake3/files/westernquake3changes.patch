@@ -1,0 +1,124 @@
+diff -Naur westernquake3-2.2.orig/code/q3_ui/ui_mods.c westernquake3-2.2/code/q3_ui/ui_mods.c
+--- westernquake3-2.2.orig/code/q3_ui/ui_mods.c	2005-10-29 04:53:09.000000000 +0300
++++ westernquake3-2.2/code/q3_ui/ui_mods.c	2007-07-09 22:21:26.000000000 +0300
+@@ -161,7 +161,7 @@
+ 
+ 	// always start off with baseq3
+ 	s_mods.list.numitems = 1;
+-	s_mods.list.itemnames[0] = s_mods.descriptionList[0] = "Quake III Arena";
++	s_mods.list.itemnames[0] = s_mods.descriptionList[0] = "WesternQuake3";
+ 	s_mods.fs_gameList[0] = "";
+ 
+ 	numdirs = trap_FS_GetFileList( "$modlist", "", dirlist, sizeof(dirlist) );
+diff -Naur westernquake3-2.2.orig/code/qcommon/files.c westernquake3-2.2/code/qcommon/files.c
+--- westernquake3-2.2.orig/code/qcommon/files.c	2006-12-30 18:16:25.000000000 +0200
++++ westernquake3-2.2/code/qcommon/files.c	2007-07-09 22:31:06.000000000 +0300
+@@ -2900,6 +2900,7 @@
+ */
+ static void FS_CheckPak0( void )
+ {
++/*
+ 	searchpath_t	*path;
+ 	qboolean founddemo = qfalse;
+ 	unsigned foundPak = 0;
+@@ -2972,6 +2973,7 @@
+ 		|| !Q_stricmp( fs_gamedirvar->string, "missionpack" ))
+ 			Com_Error(ERR_FATAL, "\n*** you need to install Quake III Arena in order to play ***");
+ 	}
++*/
+ }
+ 
+ /*
+@@ -3383,7 +3385,7 @@
+ 	// try to start up normally
+ 	FS_Startup( BASEGAME );
+ 
+-	FS_CheckPak0( );
++	// FS_CheckPak0( );
+ 
+ 	// if we can't find default.cfg, assume that the paths are
+ 	// busted and error out now, rather than getting an unreadable
+diff -Naur westernquake3-2.2.orig/code/qcommon/q_shared.h westernquake3-2.2/code/qcommon/q_shared.h
+--- westernquake3-2.2.orig/code/qcommon/q_shared.h	2007-02-17 01:50:37.000000000 +0200
++++ westernquake3-2.2/code/qcommon/q_shared.h	2007-07-09 22:27:14.000000000 +0300
+@@ -30,13 +30,13 @@
+ #ifndef SVN_VERSION
+   #define SVN_VERSION Q3_VERSION
+ #endif
+-#define CLIENT_WINDOW_TITLE   "ioquake3"
+-#define CLIENT_WINDOW_ICON    "ioq3"
+-#define CONSOLE_WINDOW_TITLE  "ioquake3 console"
+-#define CONSOLE_WINDOW_ICON   "ioq3 console"
++#define CLIENT_WINDOW_TITLE   "WesternQuake3"
++#define CLIENT_WINDOW_ICON    "WesternQuake3"
++#define CONSOLE_WINDOW_TITLE  "WesternQuake3 console"
++#define CONSOLE_WINDOW_ICON   "WesternQuake3 console"
+ // 1.32 released 7-10-2002
+ 
+-#define BASEGAME              "baseq3"
++#define BASEGAME              "basewq3"
+ 
+ #define MAX_TEAMNAME 32
+ 
+diff -Naur westernquake3-2.2.orig/code/server/sv_ccmds.c westernquake3-2.2/code/server/sv_ccmds.c
+--- westernquake3-2.2.orig/code/server/sv_ccmds.c	2006-05-03 00:20:07.000000000 +0300
++++ westernquake3-2.2/code/server/sv_ccmds.c	2007-07-09 22:24:49.000000000 +0300
+@@ -430,6 +430,12 @@
+ 		return;
+ 	}
+ 
++	if(strlen(AUTHORIZE_SERVER_NAME) < 1)
++	{
++		Com_Printf("Ban function disabled due to lack of authorizing server.\n");
++		return;
++	}
++
+ 	// look up the authorize server's IP
+ 	if ( !svs.authorizeAddress.ip[0] && svs.authorizeAddress.type != NA_BAD ) {
+ 		Com_Printf( "Resolving %s\n", AUTHORIZE_SERVER_NAME );
+diff -Naur westernquake3-2.2.orig/code/server/sv_client.c westernquake3-2.2/code/server/sv_client.c
+--- westernquake3-2.2.orig/code/server/sv_client.c	2007-02-15 01:14:25.000000000 +0200
++++ westernquake3-2.2/code/server/sv_client.c	2007-07-09 22:25:58.000000000 +0300
+@@ -88,6 +88,15 @@
+ 		return;
+ 	}
+ 
++	// if there's no authorize server defined, just let them in
++	if(strlen(AUTHORIZE_SERVER_NAME) < 1)
++	{
++		Com_Printf("Not authorizing client due to lack of auth server\n");
++		challenge->pingTime = svs.time;
++		NET_OutOfBandPrint( NS_SERVER, from, "challengeResponse %i", challenge->challenge );
++		return;
++	}
++
+ 	// look up the authorize server's IP
+ 	if ( !svs.authorizeAddress.ip[0] && svs.authorizeAddress.type != NA_BAD ) {
+ 		Com_Printf( "Resolving %s\n", AUTHORIZE_SERVER_NAME );
+diff -Naur westernquake3-2.2.orig/code/ui/ui_main.c westernquake3-2.2/code/ui/ui_main.c
+--- westernquake3-2.2.orig/code/ui/ui_main.c	2006-12-30 14:32:54.000000000 +0200
++++ westernquake3-2.2/code/ui/ui_main.c	2007-07-09 22:34:51.000000000 +0300
+@@ -64,7 +64,7 @@
+ 
+ static const serverFilter_t serverFilters[] = {
+ 	{"All", "" },
+-	{"Quake 3 Arena", "" },
++	{"WesternQuake3", "" },
+ 	{"Team Arena", "missionpack" },
+ 	{"Rocket Arena", "arena" },
+ 	{"Alliance", "alliance20" },
+diff -Naur westernquake3-2.2.orig/code/unix/unix_shared.c westernquake3-2.2/code/unix/unix_shared.c
+--- westernquake3-2.2.orig/code/unix/unix_shared.c	2007-02-17 01:50:37.000000000 +0200
++++ westernquake3-2.2/code/unix/unix_shared.c	2007-07-09 22:22:08.000000000 +0300
+@@ -407,9 +407,9 @@
+ 	if ((p = getenv("HOME")) != NULL) {
+ 		Q_strncpyz(homePath, p, sizeof(homePath));
+ #ifdef MACOS_X
+-		Q_strcat(homePath, sizeof(homePath), "/Library/Application Support/Quake3");
++		Q_strcat(homePath, sizeof(homePath), "/Library/Application Support/WesternQuake3");
+ #else
+-		Q_strcat(homePath, sizeof(homePath), "/.q3a");
++		Q_strcat(homePath, sizeof(homePath), "/.WesternQuake3");
+ #endif
+ 		if (mkdir(homePath, 0777)) {
+ 			if (errno != EEXIST) 

@@ -1,0 +1,15 @@
+diff -Nur ltmodem-8.31_alpha10-alk8-old/modules/serial.c ltmodem-8.31_alpha10-alk8/modules/serial.c
+--- ltmodem-8.31_alpha10-alk8-old/modules/serial.c	2008-03-22 18:29:41.000000000 +0200
++++ ltmodem-8.31_alpha10-alk8/modules/serial.c	2008-03-22 18:31:26.000000000 +0200
+@@ -830,7 +830,11 @@
+ 	*lt_modem_ops.virtual_isr_ptr = lt_virtual_rs_interrupt;
+ 
+ 	/* lets try to grap dsp interrupt here */
++#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
+ 	ret = request_irq(lt_modem_res.Irq, VMODEM_Hw_Int_Proc, SA_INTERRUPT | SA_SHIRQ,
++#else
++	ret = request_irq(lt_modem_res.Irq, VMODEM_Hw_Int_Proc, IRQF_DISABLED | IRQF_SHARED,
++#endif
+ 				ltserialstring, &lt_modem_res.BaseAddress);
+ 	if (ret<0)
+ 		goto out_port;

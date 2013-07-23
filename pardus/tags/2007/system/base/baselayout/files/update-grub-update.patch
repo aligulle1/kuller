@@ -1,0 +1,32 @@
+Index: src/update-grub
+===================================================================
+--- src/update-grub	(revision 10752)
++++ src/update-grub	(revision 11056)
+@@ -9,7 +9,12 @@
+ 
+ import os
+ import re
++import sys
+ 
++if not os.path.exists("/boot/grub/grub.conf"):
++    # if there is no grub.conf then exit silently
++    sys.exit()
++
+ # Determine latest kernel
+ kernel = os.readlink("/boot/latestkernel").split("kernel-")[1]
+ initramfs = os.readlink("/boot/latestinitramfs").split("initramfs-")[1]
+@@ -51,10 +56,12 @@
+ for l in container[0]:
+     if l.startswith("title"):
+         f.write("title %s [%s]\n" % (release.strip("\n"), kernel))
+-    if l.startswith("kernel"):
++    elif l.startswith("kernel"):
+         f.write(re.sub("(.*)(kernel-.*)(root=.*)", r"\1kernel-%s \3\n" % kernel, l))
+-    if l.startswith("initrd"):
++    elif l.startswith("initrd"):
+        f.write(re.sub("(.*)(initramfs-.*)", r"\1initramfs-%s\n" % initramfs, l))
++    else:
++        f.write("%s\n" % l)
+ f.write("\n")
+ 
+ for list in container:

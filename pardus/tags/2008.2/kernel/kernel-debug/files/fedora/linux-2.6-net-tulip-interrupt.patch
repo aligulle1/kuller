@@ -1,0 +1,22 @@
+https://bugzilla.redhat.com/show_bug.cgi?id=454575
+
+Signed-off-by: Dave Jones <davej@redhat.com>
+
+Index: 2008-devel/drivers/net/tulip/tulip_core.c
+===================================================================
+--- 2008-devel.orig/drivers/net/tulip/tulip_core.c
++++ 2008-devel/drivers/net/tulip/tulip_core.c
+@@ -504,11 +504,11 @@ tulip_open(struct net_device *dev)
+ {
+ 	int retval;
+ 
++	tulip_init_ring(dev);
++
+ 	if ((retval = request_irq(dev->irq, &tulip_interrupt, IRQF_SHARED, dev->name, dev)))
+ 		return retval;
+ 
+-	tulip_init_ring (dev);
+-
+ 	tulip_up (dev);
+ 
+ 	netif_start_queue (dev);

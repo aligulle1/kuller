@@ -1,0 +1,556 @@
+Index: abrt/configure.ac
+===================================================================
+--- abrt.orig/configure.ac
++++ abrt/configure.ac
+@@ -60,15 +60,14 @@ PKG_CHECK_MODULES([GTK], [gtk+-2.0])
+ PKG_CHECK_MODULES([GLIB], [glib-2.0 >= 2.21])
+ PKG_CHECK_MODULES([DBUS], [dbus-1])
+ PKG_CHECK_MODULES([LIBXML], [libxml-2.0])
+-PKG_CHECK_MODULES([RPM], [rpm])
+ PKG_CHECK_MODULES([LIBNOTIFY], [libnotify])
+ PKG_CHECK_MODULES([NSS], [nss])
+ PKG_CHECK_MODULES([BTPARSER], [btparser])
+ PKG_CHECK_MODULES([LIBREPORT], [libreport])
+ PKG_CHECK_MODULES([LIBREPORT_GTK], [libreport-gtk])
+-# Just PKG_CHECK_MODULES([PYTHON], [python]) works only with python2.7+
++# Just PKG_CHECK_MODULES([PYTHON], [python-2.7]) works only with python2.7+
+ # Below, if python is not found, we set up for python2.6 w/o checking:
+-PKG_CHECK_MODULES([PYTHON], [python],,[
++PKG_CHECK_MODULES([PYTHON], [python-2.7],,[
+     PYTHON_LIBS='-L/usr/lib64 -lpython2.6'
+     PYTHON_CFLAGS='-I/usr/include/python2.6'
+ ])
+@@ -80,6 +79,17 @@ AC_ARG_WITH([systemdsystemunitdir],
+ AC_SUBST([systemdsystemunitdir], [$with_systemdsystemunitdir])
+ AM_CONDITIONAL(HAVE_SYSTEMD, [test -n "$with_systemdsystemunitdir"])
+ 
++AC_ARG_WITH([pisi],
++        AS_HELP_STRING([--with-pisi],
++               [Use Pisi as package management system (default is NO)]),
++        [pisi=$withval], [pisi=no])
++if test "x$pisi" != xno ; then
++    AC_DEFINE([WITH_PISI], [1], [Define to 1 to use Pisi package management system])
++    AM_CONDITIONAL(PISI, true)
++else
++    PKG_CHECK_MODULES([RPM], [rpm])
++fi
++
+ AC_CHECK_HEADER([sys/inotify.h], [],
+    [AC_MSG_ERROR([sys/inotify.h is needed to build abrt])])
+ 
+Index: abrt/src/daemon/abrt-action-save-package-data.c
+===================================================================
+--- abrt.orig/src/daemon/abrt-action-save-package-data.c
++++ abrt/src/daemon/abrt-action-save-package-data.c
+@@ -18,7 +18,12 @@
+ */
+ #include <fnmatch.h>
+ #include "libabrt.h"
++
++#ifdef WITH_PISI
++#include "pisi.h"
++#else
+ #include "rpm.h"
++#endif
+ 
+ static bool   settings_bOpenGPGCheck = false;
+ static GList *settings_setOpenGPGPublicKeys = NULL;
+@@ -224,7 +229,11 @@ static int SavePackageDescriptionToDebug
+             goto ret; /* return 1 (failure) */
+         }
+ 
++#ifdef WITH_PISI
++        package_full_name = pisi_get_package_nvr(executable);
++#else
+         package_full_name = rpm_get_package_nvr(executable);
++#endif
+         if (!package_full_name)
+         {
+             if (settings_bProcessUnpackaged || remote)
+@@ -261,7 +270,11 @@ static int SavePackageDescriptionToDebug
+                 char *script_name = get_argv1_if_full_path(cmdline);
+                 if (script_name)
+                 {
++#ifdef WITH_PISI
++                    script_pkg = pisi_get_package_nvr(script_name);
++#else
+                     script_pkg = rpm_get_package_nvr(script_name);
++#endif
+                     if (script_pkg)
+                     {
+                         /* There is a well-formed script name in argv[1],
+@@ -304,7 +317,11 @@ static int SavePackageDescriptionToDebug
+ 
+         if (settings_bOpenGPGCheck && !remote)
+         {
++#ifdef WITH_PISI
++            if (!pisi_chk_fingerprint(package_short_name))
++#else
+             if (!rpm_chk_fingerprint(package_short_name))
++#endif
+             {
+                 log("Package '%s' isn't signed with proper key", package_short_name);
+                 goto ret; /* return 1 (failure) */
+@@ -317,7 +334,11 @@ static int SavePackageDescriptionToDebug
+              */
+         }
+ 
++#ifdef WITH_PISI
++        component = pisi_get_component(executable);
++#else
+         component = rpm_get_component(executable);
++#endif
+ 
+         dd = dd_opendir(dump_dir_name, /*flags:*/ 0);
+         if (!dd)
+@@ -381,14 +402,23 @@ int main(int argc, char **argv)
+     if (load_conf(conf_filename) != 0)
+         return 1; /* syntax error (logged already by load_conf) */
+ 
++#ifdef WITH_PISI
++    VERB1 log("Initializing python interpreter for Pisi");
++    pisi_init();
++#else
+     VERB1 log("Initializing rpm library");
+     rpm_init();
++#endif
+ 
+     GList *li;
+     for (li = settings_setOpenGPGPublicKeys; li != NULL; li = g_list_next(li))
+     {
+         VERB1 log("Loading GPG key '%s'", (char*)li->data);
++#ifdef WITH_PISI
++        pisi_load_gpgkey((char*)li->data);
++#else
+         rpm_load_gpgkey((char*)li->data);
++#endif
+     }
+ 
+     return SavePackageDescriptionToDebugDump(dump_dir_name);
+Index: abrt/src/daemon/Makefile.am
+===================================================================
+--- abrt.orig/src/daemon/Makefile.am
++++ abrt/src/daemon/Makefile.am
+@@ -62,10 +62,19 @@ abrt_handle_event_LDADD = \
+     ../lib/libabrt.la \
+     $(LIBREPORT_LIBS)
+ 
++if PISI
++abrt_action_save_package_data_SOURCES = \
++    pisi.h pisi.c \
++    abrt-action-save-package-data.c
++else
+ abrt_action_save_package_data_SOURCES = \
+     rpm.h rpm.c \
+     abrt-action-save-package-data.c
++endif
++
++if PISI
+ abrt_action_save_package_data_CPPFLAGS = \
++	-I/usr/include/python$(PYTHON_VERSION) \
+     -I$(srcdir)/../include \
+     -I$(srcdir)/../lib \
+     -DCONF_DIR=\"$(CONF_DIR)\" \
+@@ -73,10 +82,28 @@ abrt_action_save_package_data_CPPFLAGS =
+     $(LIBREPORT_CFLAGS) \
+     -D_GNU_SOURCE \
+     -Wall -Wwrite-strings -Werror
++else
++abrt_action_save_package_data_CPPFLAGS = \
++    -I$(srcdir)/../include \
++    -I$(srcdir)/../lib \
++    -DCONF_DIR=\"$(CONF_DIR)\" \
++    $(GLIB_CFLAGS) \
++    $(LIBREPORT_CFLAGS) \
++    -D_GNU_SOURCE \
++    -Wall -Wwrite-strings -Werror
++endif
++
++if PISI
++abrt_action_save_package_data_LDADD = \
++	-lpython$(PYTHON_VERSION) \
++    $(LIBREPORT_LIBS) \
++    ../lib/libabrt.la
++else
+ abrt_action_save_package_data_LDADD = \
+     $(RPM_LIBS) \
+     $(LIBREPORT_LIBS) \
+     ../lib/libabrt.la
++endif
+ 
+ dbusabrtconfdir = ${sysconfdir}/dbus-1/system.d/
+ dist_dbusabrtconf_DATA = dbus-abrt.conf
+Index: abrt/src/daemon/pisi.c
+===================================================================
+--- /dev/null
++++ abrt/src/daemon/pisi.c
+@@ -0,0 +1,320 @@
++/*
++    Copyright (C) 2011 TUBITAK/BILGEM
++
++    This program is free software; you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation; either version 2 of the License, or
++    (at your option) any later version.
++
++    This program is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License along
++    with this program; if not, write to the Free Software Foundation, Inc.,
++    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
++*/
++
++#include <Python.h>
++
++#include "libabrt.h"
++
++/* cuts the name from the NVR format: foo-1.2.3-1
++   returns a newly allocated string
++*/
++//TODO: Use Pisi functions to get package name
++char* get_package_name_from_NVR_or_NULL(const char* packageNVR)
++{
++    char* package_name = NULL;
++    if (packageNVR != NULL)
++    {
++        VERB1 log("packageNVR %s", packageNVR);
++        package_name = xstrdup(packageNVR);
++        char *pos = strrchr(package_name, '-');
++        if (pos != NULL)
++        {
++            *pos = 0;
++            pos = strrchr(package_name, '-');
++            if (pos != NULL)
++            {
++                *pos = 0;
++            }
++        }
++    }
++    return package_name;
++}
++
++static PyObject *pisi_get_package_object(const char *filePath)
++{
++    PyObject *filesDBModule;;
++    PyObject *packageDBModule;
++
++    PyObject *filesDBMethod;
++    PyObject *packageDBMethod;
++
++    PyObject *filesDB;
++    PyObject *packageDB;
++
++    PyObject *get_fileMethod;
++    PyObject *fileString;
++    PyObject *get_fileResult;
++    PyObject *binary_package_object;
++
++    PyObject *get_packageMethod;
++
++    PyObject *ret = NULL;
++
++    if (!filePath)
++    {
++        error_msg("NULL filepath given!");
++        goto error;
++    }
++
++    filesDBModule = PyImport_ImportModule("pisi.db.filesdb");
++
++    if (!filesDBModule)
++    {
++        error_msg("Cannot import Pisi filesdb module!");
++        goto error;
++    }
++
++    filesDBMethod = PyObject_GetAttrString(filesDBModule, "FilesDB");
++
++    if (!filesDBMethod || !PyCallable_Check(filesDBMethod))
++    {
++        error_msg("Cannot get pisi.db.filesdb.FilesDB callable!");
++        Py_DECREF(filesDBModule);
++        Py_XDECREF(filesDBMethod);
++        goto error;
++    }
++
++    filesDB = PyObject_CallObject(filesDBMethod, NULL);
++
++    if (!filesDB)
++    {
++        error_msg("Cannot call pisi.db.filesdb.FilesDB()");
++        Py_DECREF(filesDBModule);
++        Py_DECREF(filesDBMethod);
++        goto error;
++    }
++
++    get_fileMethod = PyObject_GetAttrString(filesDB, "get_file");
++
++    if (!get_fileMethod || !PyCallable_Check(get_fileMethod))
++    {
++        error_msg("get_file attribute of FilesDB() is not callable!");
++        Py_DECREF(filesDBModule);
++        Py_DECREF(filesDBMethod);
++        Py_DECREF(filesDB);
++        Py_XDECREF(get_fileMethod);
++        goto error;
++    }
++
++    //fileString = PyString_FromString(filePath[0] == '/' ? filePath + 1 : filePath);
++    fileString = PyString_FromString(filePath + 1);
++
++    get_fileResult = PyObject_CallObject(get_fileMethod, fileString);
++
++    if (!get_fileResult)
++    {
++        if (PyErr_Occurred() && PyErr_ExceptionMatches(PyExc_KeyError))
++        {
++            error_msg("File '%s' does not belong to any package!", filePath);
++        }
++        else
++        {
++            error_msg("get_file method cannot be called!");
++        }
++
++        Py_DECREF(filesDBModule);
++        Py_DECREF(filesDBMethod);
++        Py_DECREF(filesDB);
++        Py_DECREF(get_fileMethod);
++
++        goto error;
++    }
++
++    if (!PyTuple_Check(get_fileResult))
++    {
++        error_msg("get_file return value is not a tuple!");
++
++        Py_DECREF(filesDBModule);
++        Py_DECREF(filesDBMethod);
++        Py_DECREF(filesDB);
++        Py_DECREF(get_fileMethod);
++        Py_DECREF(get_fileResult);
++        goto error;
++    }
++
++    binary_package_object = PyTuple_GetItem(get_fileResult, 0);
++
++    if(!binary_package_object || !PyString_Check(binary_package_object))
++    {
++        error_msg("Cannot acces to the first element of the get_file return value!");
++        Py_DECREF(filesDBModule);
++        Py_DECREF(filesDBMethod);
++        Py_DECREF(filesDB);
++        Py_DECREF(get_fileMethod);
++        Py_DECREF(get_fileResult);
++        Py_XDECREF(binary_package_object);
++        goto error;
++    }
++
++    Py_DECREF(filesDBModule);
++    Py_DECREF(filesDBMethod);
++    Py_DECREF(filesDB);
++    Py_DECREF(get_fileMethod);
++    Py_DECREF(get_fileResult);
++
++    packageDBModule = PyImport_ImportModule("pisi.db.packagedb");
++
++    if (!packageDBModule)
++    {
++        error_msg("Cannot import Pisi packagedb module!");
++        goto error;
++    }
++
++    packageDBMethod = PyObject_GetAttrString(packageDBModule, "PackageDB");
++
++    if (!packageDBMethod|| !PyCallable_Check(packageDBMethod))
++    {
++        error_msg("Cannot get pisi.db.packagedb.PackageDB callable!");
++        Py_DECREF(packageDBModule);
++        Py_XDECREF(packageDBMethod);
++        goto error;
++    }
++
++    packageDB = PyObject_CallObject(packageDBMethod, NULL);
++
++    if (!packageDB)
++    {
++        error_msg("Cannot call pisi.db.packagedb.PackageDB()");
++        Py_DECREF(packageDBModule);
++        Py_DECREF(packageDBMethod);
++        goto error;
++    }
++
++    get_packageMethod = PyObject_GetAttrString(packageDB, "get_package");
++
++    if (!get_packageMethod || !PyCallable_Check(get_packageMethod))
++    {
++        error_msg("get_package attribute of PackageDB() is not callable!");
++        Py_DECREF(packageDBModule);
++        Py_DECREF(packageDBMethod);
++        Py_DECREF(packageDB);
++        Py_XDECREF(get_packageMethod);
++        goto error;
++    }
++
++    ret = PyObject_CallObject(get_packageMethod, binary_package_object);
++
++    if (!ret)
++    {
++        if (PyErr_Occurred())
++        {
++            error_msg("Package '%s' is not found in PackageDB!", PyString_AsString(binary_package_object));
++        }
++        else
++        {
++            error_msg("get_package method cannot be called!");
++        }
++
++        goto error;
++    }
++
++    Py_DECREF(packageDBModule);
++    Py_DECREF(packageDBMethod);
++    Py_DECREF(packageDB);
++    Py_DECREF(get_packageMethod);
++    Py_DECREF(binary_package_object);
++
++error:
++    return ret;
++}
++
++void pisi_init()
++{
++    Py_Initialize();
++}
++
++void pisi_destroy()
++{
++     Py_Finalize();
++}
++
++void pisi_load_gpgkey(const char* filename)
++{
++    return;
++}
++
++int pisi_chk_fingerprint(const char* pkg)
++{
++    return 1;
++}
++
++
++char* pisi_get_component(const char* filename)
++{
++    PyObject *sourcePackage;
++    PyObject *sourceName;
++    char *ret;
++
++    PyObject *binary_package_object = pisi_get_package_object(filename);
++
++    if(!binary_package_object)
++    {
++        return NULL;
++    }
++
++    sourcePackage = PyObject_GetAttrString(binary_package_object, "source");
++    if (!sourcePackage)
++    {
++        error_msg("source attribute of the package object is not accessible!");
++        Py_DECREF(binary_package_object);
++        return NULL;
++    }
++
++    sourceName = PyObject_GetAttrString(sourcePackage, "name");
++
++    if (!sourceName || !PyString_Check(sourceName))
++    {
++        error_msg("name attribute of the package object is not accessible!");
++        Py_DECREF(binary_package_object);
++        Py_DECREF(sourcePackage);
++        Py_XDECREF(sourceName);
++        return NULL;
++    }
++
++    ret = xstrdup(PyString_AsString(sourceName));
++    Py_DECREF(sourceName);
++    Py_DECREF(sourcePackage);
++    Py_DECREF(binary_package_object);
++    return ret;
++}
++
++char* pisi_get_package_nvr(const char* filename)
++{
++    PyObject* packageURI;
++    char *ret;
++
++    PyObject *binary_package_object = pisi_get_package_object(filename);
++
++    if(!binary_package_object)
++    {
++        return NULL;
++    }
++
++    packageURI = PyObject_GetAttrString(binary_package_object, "packageURI");
++    if (!packageURI || !PyString_Check(packageURI))
++    {
++        error_msg("packageURI attribute of the package is not accessible!");
++        Py_XDECREF(packageURI);
++        return NULL;
++    }
++
++    ret = xstrdup(PyString_AsString(packageURI));
++    Py_DECREF(packageURI);
++    Py_DECREF(binary_package_object);
++    return ret;
++}
+Index: abrt/src/daemon/pisi.h
+===================================================================
+--- /dev/null
++++ abrt/src/daemon/pisi.h
+@@ -0,0 +1,44 @@
++/*
++    Copyright (C) 2011 TUBITAK/BILGEM
++
++    This program is free software; you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation; either version 2 of the License, or
++    (at your option) any later version.
++
++    This program is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License along
++    with this program; if not, write to the Free Software Foundation, Inc.,
++    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
++*/
++
++#ifndef PISI_H_
++#define PISI_H_
++
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++void pisi_init();
++
++void pisi_destroy();
++
++void pisi_load_gpgkey(const char* filename);
++
++int pisi_chk_fingerprint(const char* pkg);
++
++char* pisi_get_package_nvr(const char* filename);
++char* pisi_get_component(const char* filename);
++
++char* get_package_name_from_NVR_or_NULL(const char* packageNVR);
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif

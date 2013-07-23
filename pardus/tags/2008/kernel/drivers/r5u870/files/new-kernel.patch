@@ -1,0 +1,113 @@
+diff -Nur r5u870-0.11.0-old/usbcam/usbcam_buf.c r5u870-0.11.0/usbcam/usbcam_buf.c
+--- r5u870-0.11.0-old/usbcam/usbcam_buf.c	2008-06-11 10:27:29.000000000 +0300
++++ r5u870-0.11.0/usbcam/usbcam_buf.c	2008-06-11 10:29:03.000000000 +0300
+@@ -58,10 +58,10 @@
+ 		framep = usbcam_capture_curframe(udp);
+ 		if (!framep)
+ 			break;
+-		usbcam_dbg(udp, VIDEOBUF, "completing frame %d STATE_ERROR",
++		usbcam_dbg(udp, VIDEOBUF, "completing frame %d VIDEOBUF_ERROR",
+ 			   framep->vbb.i);
+ 		list_del_init(&framep->cap_links);
+-		framep->vbb.state = STATE_ERROR;
++		framep->vbb.state = VIDEOBUF_ERROR;
+ 		wake_up_all(&framep->vbb.done);
+ 	}
+ }
+@@ -72,9 +72,9 @@
+ {
+ 	usbcam_chklock(udp);
+ 	usbcam_dbg(udp, VIDEOBUF, "completing frame %d/%p %s", framep->vbb.i,
+-		   framep, is_error ? "STATE_ERROR" : "STATE_DONE");
++		   framep, is_error ? "VIDEOBUF_ERROR" : "VIDEOBUF_DONE");
+ 	list_del_init(&framep->cap_links);
+-	framep->vbb.state = is_error ? STATE_ERROR : STATE_DONE;
++	framep->vbb.state = is_error ? VIDEOBUF_ERROR : VIDEOBUF_DONE;
+ 	wake_up_all(&framep->vbb.done);
+ }
+ 
+@@ -194,7 +194,7 @@
+ 		return;
+ 	}
+ 
+-	if (framep->vbb.state != STATE_ACTIVE) {
++	if (framep->vbb.state != VIDEOBUF_ACTIVE) {
+ 		usbcam_err(udp, "%s: current frame is in unexpected state %d",
+ 			   __FUNCTION__, framep->vbb.state);
+ 	}
+@@ -516,14 +516,14 @@
+ 	videobuf_waiton(&framep->vbb, 0, 0);
+ 	videobuf_dma_unmap(vq, dma);
+ 	videobuf_dma_free(dma);
+-	if (framep->vbb.state != STATE_NEEDS_INIT) {
++	if (framep->vbb.state != VIDEOBUF_NEEDS_INIT) {
+ 		if (framep->vmap_base) {
+ 			vunmap(framep->vmap_base);
+ 			framep->vmap_base = NULL;
+ 			framep->vmap_sof = NULL;
+ 		}
+ 		assert(list_empty(&framep->cap_links));
+-		framep->vbb.state = STATE_NEEDS_INIT;
++		framep->vbb.state = VIDEOBUF_NEEDS_INIT;
+ 	}
+ }
+ 
+@@ -546,7 +546,7 @@
+ 		return -EINVAL;
+ 	}
+ 
+-	if (framep->vbb.state == STATE_NEEDS_INIT) {
++	if (framep->vbb.state == VIDEOBUF_NEEDS_INIT) {
+ 		/*
+ 		 * This is the place where we initialize the rest of
+ 		 * the usbcam_frame structure.
+@@ -581,7 +581,7 @@
+ 	}
+ 
+ 	framep->vbb.field = field;
+-	framep->vbb.state = STATE_PREPARED;
++	framep->vbb.state = VIDEOBUF_PREPARED;
+ 	return 0;
+ 
+ fail:
+@@ -598,7 +598,7 @@
+ 		container_of(vb, struct usbcam_frame, vbb);
+ 	int was_empty = 0;
+ 
+-	assert(framep->vbb.state != STATE_NEEDS_INIT);
++	assert(framep->vbb.state != VIDEOBUF_NEEDS_INIT);
+ 
+ 	usbcam_lock(udp);
+ 
+@@ -609,11 +609,11 @@
+ 		   framep->vbb.i, framep);
+ 
+ 	/*
+-	 * We always set buffers to STATE_ACTIVE to prevent them from
++	 * We always set buffers to VIDEOBUF_ACTIVE to prevent them from
+ 	 * being manipulated / dequeued by the videobuf code.
+ 	 */
+ 	list_add_tail(&framep->cap_links, &udp->ud_frame_cap_queue);
+-	framep->vbb.state = STATE_ACTIVE;
++	framep->vbb.state = VIDEOBUF_ACTIVE;
+ 
+ 	if (was_empty && !udp->ud_capturing)
+ 		(void) usbcam_capture_start(udp);
+@@ -632,7 +632,7 @@
+ 
+ 	usbcam_lock(udp);
+ 
+-	if ((framep->vbb.state != STATE_NEEDS_INIT) &&
++	if ((framep->vbb.state != VIDEOBUF_NEEDS_INIT) &&
+ 	    !list_empty(&framep->cap_links)) {
+ 
+ 		usbcam_dbg(udp, VIDEOBUF,
+@@ -642,7 +642,7 @@
+ 		 * An active frame is being shot down here, most
+ 		 * likely by videobuf_queue_cancel.
+ 		 */
+-		assert(framep->vbb.state == STATE_ACTIVE);
++		assert(framep->vbb.state == VIDEOBUF_ACTIVE);
+ 
+ 		if (udp->ud_capturing &&
+ 		    !list_empty(&udp->ud_frame_cap_queue) &&

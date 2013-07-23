@@ -1,0 +1,27 @@
+Index: alsa-driver-1.0.14/alsa-kernel/pci/hda/patch_sigmatel.c
+===================================================================
+--- alsa-driver-1.0.14.orig/alsa-kernel/pci/hda/patch_sigmatel.c
++++ alsa-driver-1.0.14/alsa-kernel/pci/hda/patch_sigmatel.c
+@@ -1201,7 +1201,7 @@ static int is_in_dac_nids(struct sigmate
+  * and 9202/925x. For those, dac_nids[] must be hard-coded.
+  */
+ static int stac92xx_auto_fill_dac_nids(struct hda_codec *codec,
+-				       const struct auto_pin_cfg *cfg)
++				       struct auto_pin_cfg *cfg)
+ {
+ 	struct sigmatel_spec *spec = codec->spec;
+ 	int i, j, conn_len = 0; 
+@@ -1226,6 +1226,13 @@ static int stac92xx_auto_fill_dac_nids(s
+ 		}
+ 
+ 		if (j == conn_len) {
++			if (spec->multiout.num_dacs > 0) {
++				/* we have already working output pins,
++				 * so let's drop the broken ones again
++				 */
++				cfg->line_outs = spec->multiout.num_dacs;
++				break;
++			}
+ 			/* error out, no available DAC found */
+ 			snd_printk(KERN_ERR
+ 				   "%s: No available DAC for pin 0x%x\n",

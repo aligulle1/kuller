@@ -1,0 +1,132 @@
+diff -Nur mudur-1.13-old/bin/update-fstab.py mudur-1.13/bin/update-fstab.py
+--- mudur-1.13-old/bin/update-fstab.py	2007-03-09 14:03:23.719164770 +0200
++++ mudur-1.13/bin/update-fstab.py	2007-03-09 14:03:46.447709505 +0200
+@@ -1,7 +1,7 @@
+ #!/usr/bin/python
+ # -*- coding: utf-8 -*-
+ #
+-# Copyright (C) 2005, TUBITAK/UEKAE
++# Copyright (C) 2005-2007 TUBITAK/UEKAE
+ #
+ # This program is free software; you can redistribute it and/or modify it under
+ # the terms of the GNU General Public License as published by the Free
+@@ -18,12 +18,19 @@
+ 
+ comment="""# See the manpage fstab(5) for more information.
+ #
+-# <fs>      <mountpoint>         <type>    <opts>               <dump/pass>
++#   <fs>             <mountpoint>     <type>    <opts>               <dump/pass>
+ """
+ 
+ class DeviceError(Exception):
+     pass
+ 
++def getBlocknameByLabel(_f):
++    f = os.path.join("/dev/disk/by-label/%s" % _f)
++    if os.path.islink(f):
++        return "/dev/%s" % os.readlink(f)[6:]
++    else:
++        return None
++
+ def getPartitionsOfDevice(device_path):
+     """Returns all partitions of a given device but swap partition"""
+     def getPartitionInfo(part):
+@@ -68,6 +75,7 @@
+                 devlink = os.readlink(sysfs_dev + "/device")
+                 if not "/usb" in devlink:
+                     devices.append("/dev/" + os.path.basename(sysfs_dev))
++    devices.sort()
+     return devices
+ 
+ 
+@@ -78,6 +86,8 @@
+     def __init__(self, File = "/etc/fstab", debug = False):
+         self.File = File
+         self.Debug = debug
++        self.Label = {}
++
+         if os.path.isfile(File):
+             self.content = self.__emergeContent()
+         else:
+@@ -99,11 +109,17 @@
+         self.defaultFileSystemOptions["ext2"] = ["noatime"]
+         self.defaultFileSystemOptions["ntfs-3g"] = ["dmask=007", "fmask=117", "locale=tr_TR.UTF-8", "gid=6"]
+         self.defaultFileSystemOptions["reiserfs"] = ["noatime"]
+-        self.defaultFileSystemOptions["xfs"] = ["noatime"]
++        self.defaultFileSystemOptions["xfs"] = ["noatime", "nobarrier"]
+         self.defaultFileSystemOptions["defaults"] = ["defaults"]
+ 
++        self.maplabels()
+         self.update()
+ 
++    def maplabels(self):
++        if os.path.exists("/dev/disk/by-label"):
++            for f in os.listdir("/dev/disk/by-label/"):
++                self.Label[getBlocknameByLabel(f)] = f
++
+     def update(self):
+         self.__allPartitions, self.__fstabPartitions = {}, {}
+ 
+@@ -130,6 +146,7 @@
+                 f.write(line)
+             f.close()
+         else:
++            print comment
+             for line in self.content:
+                 print line.rstrip("\n")
+ 
+@@ -138,7 +155,7 @@
+ 
+     def __emergeAllPartitions(self):
+         for dev in self.allDevices:
+-            for info in [info for info in getPartitionsOfDevice(dev)]:
++            for info in getPartitionsOfDevice(dev):
+                 self.__allPartitions[info[0]] = info[1]
+ 
+     def __emergeFstabPartitions(self):
+@@ -156,13 +173,19 @@
+     def getAvailablePartitions(self):
+         ap = {}
+         for p in set(self.__allPartitions) - set(self.__fstabPartitions):
+-            ap[p] = copy.deepcopy(self.__allPartitions[p])
++            if p in self.Label:
++                if not "LABEL=%s" % self.Label[p] in self.__fstabPartitions:
++                    ap[p] = copy.deepcopy(self.__allPartitions[p])
++            else:
++                ap[p] = copy.deepcopy(self.__allPartitions[p])
+         return ap
+ 
+     def addAvailablePartitions(self):
+         """Adds all partitions that have no entries in fstab, 
+            into fstab with default parameters"""
+-        for p in self.getAvailablePartitions():
++        tmplist = self.getAvailablePartitions().keys()
++        tmplist.sort()
++        for p in tmplist:
+             self.addFstabEntry(p, self.__allPartitions[p])
+ 
+     def getDepartedPartitions(self):
+@@ -170,7 +193,13 @@
+         they do not exist anymore"""
+         dp = {}
+         for p in set(self.__fstabPartitions) - set(self.__allPartitions):
+-            dp[p] = copy.deepcopy(self.__fstabPartitions[p])
++            #if not (p.startswith("LABEL=") and getBlocknameByLabel(p[6:]) in self.__allPartitions):
++            if p.startswith("LABEL=PARDUS_ROOT") or p.startswith("LABEL=PARDUS_HOME") or p.startswith("LABEL=PARDUS_SWAP"):
++                continue
++            elif p.startswith("LABEL=") and getBlocknameByLabel(p[6:]) in self.__allPartitions:
++                continue
++            else:
++                dp[p] = copy.deepcopy(self.__fstabPartitions[p])
+         return dp
+ 
+     def delDepartedPartitions(self):
+@@ -234,7 +263,7 @@
+         else:
+             pass
+ 
+-        self.content.append("%-11s %-20s %-9s %-20s %s %s\n" % (partition, 
++        self.content.append("%-20s %-16s %-9s %-20s %s %s\n" % (partition, 
+                                                          attr_dict['mount_point'], 
+                                                          attr_dict['file_system'], 
+                                                          ','.join(attr_dict['options']), 

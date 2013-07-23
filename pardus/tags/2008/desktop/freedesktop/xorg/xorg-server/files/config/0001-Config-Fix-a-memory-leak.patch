@@ -1,0 +1,25 @@
+From 389e8917f66a489455f1d5c70f44c262717538ad Mon Sep 17 00:00:00 2001
+From: =?utf-8?q?Fatih=20A=C5=9F=C4=B1c=C4=B1?= <fatih@pardus.org.tr>
+Date: Tue, 25 Dec 2007 22:59:24 +0200
+Subject: [PATCH] Config: Fix a memory leak
+
+---
+ config/hal.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
+
+diff --git a/config/hal.c b/config/hal.c
+index 4427deb..45238c0 100644
+--- xorg-server-1.4.2/config/hal.c
++++ xorg-server-1.4.2/config/hal.c
+@@ -251,6 +251,8 @@ unwind:
+         xfree(xkb_model);
+     if (xkb_layout)
+         xfree(xkb_layout);
++    if (xkb_variant)
++        xfree(xkb_variant);
+     if (xkb_options)
+         xfree(xkb_options);
+     if (config_info)
+-- 
+1.5.3.7
+

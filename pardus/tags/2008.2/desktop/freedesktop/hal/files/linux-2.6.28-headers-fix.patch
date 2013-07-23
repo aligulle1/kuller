@@ -1,0 +1,23 @@
+From ae21157ff150db8bc87fc5fead10b5925812131c Mon Sep 17 00:00:00 2001
+From: Martin Pitt<martin.pitt@ubuntu.com>
+Date: Thu, 27  Nov  2008  18:32:35  +0000
+Subject: fix building on Linux 2.6.28
+
+2.6.28 changed linux/serial.h to use __32, which is provided by
+linux/types.h. While arguably a kernel bug, working around it by
+including it explicitly doesn't hurt.
+---
+diff --git a/hald/linux/probing/probe-serial.c b/hald/linux/probing/probe-serial.c
+index df5a749..048275f 100644
+--- a/hald/linux/probing/probe-serial.c
++++ b/hald/linux/probing/probe-serial.c
+@@ -29,6 +29,7 @@
+ #endif
+ 
+ #include <fcntl.h>
++#include <linux/types.h>
+ #include <linux/serial.h>
+ #include <stdint.h>
+ #include <stdio.h>
+--
+cgit v0.8.1-24-ge5fb

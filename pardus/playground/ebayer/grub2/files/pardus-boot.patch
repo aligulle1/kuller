@@ -1,0 +1,42 @@
+Index: grub-1.99/util/grub.d/10_linux.in
+===================================================================
+--- grub-1.99.orig/util/grub.d/10_linux.in
++++ grub-1.99/util/grub.d/10_linux.in
+@@ -116,7 +116,7 @@ EOF
+   message="$(gettext_printf "Loading Linux %s ..." ${version})"
+   cat << EOF
+ 	echo	'$message'
+-	linux	${rel_dirname}/${basename} root=${linux_root_device_thisversion} ro ${args}
++	linux	${rel_dirname}/${basename} root=${linux_root_device_thisversion} ${args}
+ EOF
+   if test -n "${initrd}" ; then
+     message="$(gettext_printf "Loading initial ramdisk ...")"
+@@ -159,6 +159,7 @@ while [ "x$list" != "x" ] ; do
+ 	   "initrd-${version}" "initramfs-${version}.img" \
+ 	   "initrd.img-${alt_version}" "initrd-${alt_version}.img" \
+ 	   "initrd-${alt_version}" "initramfs-${alt_version}.img" \
++	   "initramfs-${alt_version}" \
+ 	   "initramfs-genkernel-${version}" \
+ 	   "initramfs-genkernel-${alt_version}"; do
+     if test -e "${dirname}/${i}" ; then
+Index: grub-1.99/util/grub.d/20_linux_xen.in
+===================================================================
+--- grub-1.99.orig/util/grub.d/20_linux_xen.in
++++ grub-1.99/util/grub.d/20_linux_xen.in
+@@ -87,7 +87,7 @@ linux_entry ()
+ 	echo	'$xmessage'
+ 	multiboot	${rel_xen_dirname}/${xen_basename} placeholder ${xen_args}
+ 	echo	'$lmessage'
+-	module	${rel_dirname}/${basename} placeholder root=${linux_root_device_thisversion} ro ${args}
++	module	${rel_dirname}/${basename} placeholder root=${linux_root_device_thisversion} ${args}
+ EOF
+   if test -n "${initrd}" ; then
+     message="$(gettext_printf "Loading initial ramdisk ...")"
+@@ -146,6 +146,7 @@ while [ "x${xen_list}" != "x" ] ; do
+ 	for i in "initrd.img-${version}" "initrd-${version}.img" \
+ 	    "initrd-${version}" "initrd.img-${alt_version}" \
+ 	    "initrd-${alt_version}.img" "initrd-${alt_version}" \
++        "initramfs-${alt_version}" \
+ 	    "initramfs-genkernel-${version}" \
+ 	    "initramfs-genkernel-${alt_version}" ; do
+ 	    if test -e "${dirname}/${i}" ; then

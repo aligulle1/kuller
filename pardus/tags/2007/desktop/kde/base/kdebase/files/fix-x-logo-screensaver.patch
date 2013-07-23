@@ -1,0 +1,100 @@
+Index: kdesktop/lock/lockprocess.cc
+===================================================================
+--- kdesktop/lock/lockprocess.cc	(revision 607209)
++++ kdesktop/lock/lockprocess.cc	(revision 607210)
+@@ -170,7 +170,9 @@
+         if (on)
+         {
+             connect(&mCheckDPMS, SIGNAL(timeout()), SLOT(checkDPMSActive()));
+-            mCheckDPMS.start(60000);
++            // we can save CPU if we stop it as quickly as possible
++            // but we waste CPU if we check too often -> so take 10s
++            mCheckDPMS.start(10000);
+         }
+     }
+ #endif
+@@ -858,6 +860,7 @@
+         return; // no resuming with dialog visible or when not visible
+     if(mSuspended)
+     {
++        XForceScreenSaver(qt_xdisplay(), ScreenSaverReset );
+         bitBlt( this, 0, 0, &mSavedScreen );
+         QApplication::syncX();
+         mHackProc.kill(SIGCONT);
+@@ -1054,9 +1057,13 @@
+     BOOL on;
+     CARD16 state;
+     DPMSInfo(qt_xdisplay(), &state, &on);
++    //kdDebug() << "checkDPMSActive " << on << " " << state << endl;
+     if (state == DPMSModeStandby || state == DPMSModeSuspend || state == DPMSModeOff)
+     {
+        suspend();
++    } else if ( mSuspended )
++    {
++        resume( true );
+     }
+ #endif
+ }
+Index: kdesktop/lockeng.cc
+===================================================================
+--- kdesktop/lockeng.cc	(revision 607209)
++++ kdesktop/lockeng.cc	(revision 607210)
+@@ -160,7 +160,8 @@
+ 	//mXAutoLock->changeCornerLockStatus( mLockCornerTopLeft, mLockCornerTopRight, mLockCornerBottomLeft, mLockCornerBottomRight);
+ 
+         // We'll handle blanking
+-        XSetScreenSaver(qt_xdisplay(), mTimeout + 10, mXInterval, DontPreferBlanking, mXExposures);
++        XSetScreenSaver(qt_xdisplay(), mTimeout + 10, mXInterval, PreferBlanking, mXExposures);
++        kdDebug() << "XSetScreenSaver " << mTimeout + 10 << endl;
+ 
+         mXAutoLock->start();
+ 
+@@ -174,7 +175,8 @@
+ 	    mXAutoLock = 0;
+ 	}
+ 
+-	XSetScreenSaver(qt_xdisplay(), 0, mXInterval,  DontPreferBlanking, mXExposures);
++        XForceScreenSaver(qt_xdisplay(), ScreenSaverReset );
++        XSetScreenSaver(qt_xdisplay(), 0, mXInterval,  PreferBlanking, DontAllowExposures);
+         kdDebug(1204) << "Saver Engine disabled" << endl;
+     }
+ 
+@@ -273,7 +275,7 @@
+ 	kdDebug( 1204 ) << "Failed to start kdesktop_lock!" << endl;
+ 	return false;
+     }
+-    XSetScreenSaver(qt_xdisplay(), 0, mXInterval,  DontPreferBlanking, mXExposures);
++    XSetScreenSaver(qt_xdisplay(), 0, mXInterval,  PreferBlanking, mXExposures);
+ 
+     mState = Preparing;
+     if (mXAutoLock)
+@@ -305,7 +307,8 @@
+     }
+     processLockTransactions();
+     mState = Waiting;
+-    XSetScreenSaver(qt_xdisplay(), mTimeout + 10, mXInterval, DontPreferBlanking, mXExposures);
++    XForceScreenSaver(qt_xdisplay(), ScreenSaverReset );
++    XSetScreenSaver(qt_xdisplay(), mTimeout + 10, mXInterval, PreferBlanking, mXExposures);
+ }
+ 
+ void SaverEngine::lockProcessExited()
+@@ -320,7 +323,8 @@
+     }
+     processLockTransactions();
+     mState = Waiting;
+-    XSetScreenSaver(qt_xdisplay(), mTimeout + 10, mXInterval, DontPreferBlanking, mXExposures);
++    XForceScreenSaver(qt_xdisplay(), ScreenSaverReset );
++    XSetScreenSaver(qt_xdisplay(), mTimeout + 10, mXInterval, PreferBlanking, mXExposures);
+ }
+ 
+ //---------------------------------------------------------------------------
+@@ -330,7 +334,8 @@
+ void SaverEngine::idleTimeout()
+ {
+     // disable X screensaver
+-    XSetScreenSaver(qt_xdisplay(), 0, mXInterval, DontPreferBlanking, mXExposures);
++    XForceScreenSaver(qt_xdisplay(), ScreenSaverReset );
++    XSetScreenSaver(qt_xdisplay(), 0, mXInterval, PreferBlanking, DontAllowExposures);
+     startLockProcess( DefaultLock );
+ }
+ 

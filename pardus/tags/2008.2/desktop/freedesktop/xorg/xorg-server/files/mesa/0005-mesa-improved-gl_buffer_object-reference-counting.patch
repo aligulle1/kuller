@@ -1,0 +1,958 @@
+From 8d42d10440d37b30357fb5d72e2ac4b43e062cb6 Mon Sep 17 00:00:00 2001
+From: Brian Paul <brian.paul@tungstengraphics.com>
+Date: Thu, 4 Sep 2008 15:26:40 -0600
+Subject: [PATCH] mesa: improved gl_buffer_object reference counting
+
+Use new _mesa_reference_buffer_object() function wherever possible.
+Fixes buffer object/display list crash reported in ParaView.
+---
+ src/mesa/main/arrayobj.c     |   33 +++++---
+ src/mesa/main/attrib.c       |   87 +++++++++++--------
+ src/mesa/main/bufferobj.c    |  190 ++++++++++++++++++++---------------------
+ src/mesa/main/bufferobj.h    |   13 +--
+ src/mesa/main/varray.c       |   15 +--
+ src/mesa/vbo/vbo_exec_api.c  |   28 ++++---
+ src/mesa/vbo/vbo_exec_draw.c |   36 +++++---
+ src/mesa/vbo/vbo_save.c      |   24 ++++--
+ src/mesa/vbo/vbo_save_api.c  |   35 +++++---
+ src/mesa/vbo/vbo_save_draw.c |   42 ++++++----
+ 10 files changed, 279 insertions(+), 224 deletions(-)
+
+diff --git Mesa-7.0.4/src/mesa/main/arrayobj.c Mesa-7.0.4/src/mesa/main/arrayobj.c
+index d601ee4..949da3e 100644
+--- Mesa-7.0.4/src/mesa/main/arrayobj.c
++++ Mesa-7.0.4/src/mesa/main/arrayobj.c
+@@ -1,8 +1,8 @@
+ /*
+  * Mesa 3-D graphics library
+- * Version:  6.5
++ * Version:  7.2
+  *
+- * Copyright (C) 1999-2004  Brian Paul   All Rights Reserved.
++ * Copyright (C) 1999-2008  Brian Paul   All Rights Reserved.
+  * (C) Copyright IBM Corporation 2006
+  *
+  * Permission is hereby granted, free of charge, to any person obtaining a
+@@ -77,7 +77,7 @@ lookup_arrayobj(GLcontext *ctx, GLuint id)
+ struct gl_array_object *
+ _mesa_new_array_object( GLcontext *ctx, GLuint name )
+ {
+-   struct gl_array_object *obj = MALLOC_STRUCT(gl_array_object);
++   struct gl_array_object *obj = CALLOC_STRUCT(gl_array_object);
+    if (obj)
+       _mesa_initialize_array_object(ctx, obj, name);
+    return obj;
+@@ -210,6 +210,15 @@ _mesa_remove_array_object( GLcontext *ctx, struct gl_array_object *obj )
+ }
+ 
+ 
++static void
++unbind_buffer_object( GLcontext *ctx, struct gl_buffer_object *bufObj )
++{
++   if (bufObj != ctx->Array.NullBufferObj) {
++      _mesa_reference_buffer_object(ctx, &bufObj, NULL);
++   }
++}
++
++
+ /**********************************************************************/
+ /* API Functions                                                      */
+ /**********************************************************************/
+@@ -311,18 +320,18 @@ _mesa_DeleteVertexArraysAPPLE(GLsizei n, const GLuint *ids)
+ 	 /* Unbind any buffer objects that might be bound to arrays in
+ 	  * this array object.
+ 	  */
+-	 _mesa_unbind_buffer_object( ctx, obj->Vertex.BufferObj );
+-	 _mesa_unbind_buffer_object( ctx, obj->Normal.BufferObj );
+-	 _mesa_unbind_buffer_object( ctx, obj->Color.BufferObj );
+-	 _mesa_unbind_buffer_object( ctx, obj->SecondaryColor.BufferObj );
+-	 _mesa_unbind_buffer_object( ctx, obj->FogCoord.BufferObj );
+-	 _mesa_unbind_buffer_object( ctx, obj->Index.BufferObj );
++	 unbind_buffer_object( ctx, obj->Vertex.BufferObj );
++	 unbind_buffer_object( ctx, obj->Normal.BufferObj );
++	 unbind_buffer_object( ctx, obj->Color.BufferObj );
++	 unbind_buffer_object( ctx, obj->SecondaryColor.BufferObj );
++	 unbind_buffer_object( ctx, obj->FogCoord.BufferObj );
++	 unbind_buffer_object( ctx, obj->Index.BufferObj );
+ 	 for (i = 0; i < MAX_TEXTURE_UNITS; i++) {
+-	    _mesa_unbind_buffer_object( ctx, obj->TexCoord[i].BufferObj );
++	    unbind_buffer_object( ctx, obj->TexCoord[i].BufferObj );
+ 	 }
+-	 _mesa_unbind_buffer_object( ctx, obj->EdgeFlag.BufferObj );
++	 unbind_buffer_object( ctx, obj->EdgeFlag.BufferObj );
+ 	 for (i = 0; i < VERT_ATTRIB_MAX; i++) {
+-	    _mesa_unbind_buffer_object( ctx, obj->VertexAttrib[i].BufferObj );
++	    unbind_buffer_object( ctx, obj->VertexAttrib[i].BufferObj );
+ 	 }
+ #endif
+ 
+diff --git Mesa-7.0.4/src/mesa/main/attrib.c Mesa-7.0.4/src/mesa/main/attrib.c
+index 8ddfda8..9440826 100644
+--- Mesa-7.0.4/src/mesa/main/attrib.c
++++ Mesa-7.0.4/src/mesa/main/attrib.c
+@@ -1,8 +1,8 @@
+ /*
+  * Mesa 3-D graphics library
+- * Version:  7.0.2
++ * Version:  7.0.5
+  *
+- * Copyright (C) 1999-2007  Brian Paul   All Rights Reserved.
++ * Copyright (C) 1999-2008  Brian Paul   All Rights Reserved.
+  *
+  * Permission is hereby granted, free of charge, to any person obtaining a
+  * copy of this software and associated documentation files (the "Software"),
+@@ -1278,6 +1278,29 @@ adjust_buffer_object_ref_counts(struct gl_array_attrib *array, GLint step)
+ }
+ 
+ 
++/**
++ * Copy gl_pixelstore_attrib from src to dst, updating buffer
++ * object refcounts.
++ */
++static void
++copy_pixelstore(GLcontext *ctx,
++                struct gl_pixelstore_attrib *dst,
++                const struct gl_pixelstore_attrib *src)
++{
++   dst->Alignment = src->Alignment;
++   dst->RowLength = src->RowLength;
++   dst->SkipPixels = src->SkipPixels;
++   dst->SkipRows = src->SkipRows;
++   dst->ImageHeight = src->ImageHeight;
++   dst->SkipImages = src->SkipImages;
++   dst->SwapBytes = src->SwapBytes;
++   dst->LsbFirst = src->LsbFirst;
++   dst->ClientStorage = src->ClientStorage;
++   dst->Invert = src->Invert;
++   _mesa_reference_buffer_object(ctx, &dst->BufferObj, src->BufferObj);
++}
++
++
+ #define GL_CLIENT_PACK_BIT (1<<20)
+ #define GL_CLIENT_UNPACK_BIT (1<<21)
+ 
+@@ -1296,31 +1319,29 @@ _mesa_PushClientAttrib(GLbitfield mask)
+       return;
+    }
+ 
+-   /* Build linked list of attribute nodes which save all attribute */
+-   /* groups specified by the mask. */
++   /* Build linked list of attribute nodes which save all attribute
++    * groups specified by the mask.
++    */
+    head = NULL;
+ 
+    if (mask & GL_CLIENT_PIXEL_STORE_BIT) {
+       struct gl_pixelstore_attrib *attr;
+-#if FEATURE_EXT_pixel_buffer_object
+-      ctx->Pack.BufferObj->RefCount++;
+-      ctx->Unpack.BufferObj->RefCount++;
+-#endif
+       /* packing attribs */
+-      attr = MALLOC_STRUCT( gl_pixelstore_attrib );
+-      MEMCPY( attr, &ctx->Pack, sizeof(struct gl_pixelstore_attrib) );
++      attr = CALLOC_STRUCT( gl_pixelstore_attrib );
++      copy_pixelstore(ctx, attr, &ctx->Pack);
+       newnode = new_attrib_node( GL_CLIENT_PACK_BIT );
+       newnode->data = attr;
+       newnode->next = head;
+       head = newnode;
+       /* unpacking attribs */
+       attr = MALLOC_STRUCT( gl_pixelstore_attrib );
+-      MEMCPY( attr, &ctx->Unpack, sizeof(struct gl_pixelstore_attrib) );
++      copy_pixelstore(ctx, attr, &ctx->Unpack);
+       newnode = new_attrib_node( GL_CLIENT_UNPACK_BIT );
+       newnode->data = attr;
+       newnode->next = head;
+       head = newnode;
+    }
++
+    if (mask & GL_CLIENT_VERTEX_ARRAY_BIT) {
+       struct gl_array_attrib *attr;
+       struct gl_array_object *obj;
+@@ -1357,7 +1378,7 @@ _mesa_PushClientAttrib(GLbitfield mask)
+ void GLAPIENTRY
+ _mesa_PopClientAttrib(void)
+ {
+-   struct gl_attrib_node *attr, *next;
++   struct gl_attrib_node *node, *next;
+ 
+    GET_CURRENT_CONTEXT(ctx);
+    ASSERT_OUTSIDE_BEGIN_END_AND_FLUSH(ctx);
+@@ -1368,37 +1389,31 @@ _mesa_PopClientAttrib(void)
+    }
+ 
+    ctx->ClientAttribStackDepth--;
+-   attr = ctx->ClientAttribStack[ctx->ClientAttribStackDepth];
++   node = ctx->ClientAttribStack[ctx->ClientAttribStackDepth];
+ 
+-   while (attr) {
+-      switch (attr->kind) {
++   while (node) {
++      switch (node->kind) {
+          case GL_CLIENT_PACK_BIT:
+-#if FEATURE_EXT_pixel_buffer_object
+-            ctx->Pack.BufferObj->RefCount--;
+-            if (ctx->Pack.BufferObj->RefCount <= 0) {
+-               _mesa_remove_buffer_object( ctx, ctx->Pack.BufferObj );
+-               (*ctx->Driver.DeleteBuffer)( ctx, ctx->Pack.BufferObj );
++            {
++               struct gl_pixelstore_attrib *store =
++                  (struct gl_pixelstore_attrib *) node->data;
++               copy_pixelstore(ctx, &ctx->Pack, store);
++               _mesa_reference_buffer_object(ctx, &store->BufferObj, NULL);
+             }
+-#endif
+-            MEMCPY( &ctx->Pack, attr->data,
+-                    sizeof(struct gl_pixelstore_attrib) );
+ 	    ctx->NewState |= _NEW_PACKUNPACK;
+             break;
+          case GL_CLIENT_UNPACK_BIT:
+-#if FEATURE_EXT_pixel_buffer_object
+-            ctx->Unpack.BufferObj->RefCount--;
+-            if (ctx->Unpack.BufferObj->RefCount <= 0) {
+-               _mesa_remove_buffer_object( ctx, ctx->Unpack.BufferObj );
+-               (*ctx->Driver.DeleteBuffer)( ctx, ctx->Unpack.BufferObj );
++            {
++               struct gl_pixelstore_attrib *store =
++                  (struct gl_pixelstore_attrib *) node->data;
++               copy_pixelstore(ctx, &ctx->Unpack, store);
++               _mesa_reference_buffer_object(ctx, &store->BufferObj, NULL);
+             }
+-#endif
+-            MEMCPY( &ctx->Unpack, attr->data,
+-                    sizeof(struct gl_pixelstore_attrib) );
+ 	    ctx->NewState |= _NEW_PACKUNPACK;
+             break;
+          case GL_CLIENT_VERTEX_ARRAY_BIT: {
+ 	    struct gl_array_attrib * data =
+-	      (struct gl_array_attrib *) attr->data;
++	      (struct gl_array_attrib *) node->data;
+ 
+             adjust_buffer_object_ref_counts(&ctx->Array, -1);
+ 	 
+@@ -1433,10 +1448,10 @@ _mesa_PopClientAttrib(void)
+             break;
+       }
+ 
+-      next = attr->next;
+-      FREE( attr->data );
+-      FREE( attr );
+-      attr = next;
++      next = node->next;
++      FREE( node->data );
++      FREE( node );
++      node = next;
+    }
+ }
+ 
+diff --git Mesa-7.0.4/src/mesa/main/bufferobj.c Mesa-7.0.4/src/mesa/main/bufferobj.c
+index 009055a..88f9018 100644
+--- Mesa-7.0.4/src/mesa/main/bufferobj.c
++++ Mesa-7.0.4/src/mesa/main/bufferobj.c
+@@ -1,8 +1,8 @@
+ /*
+  * Mesa 3-D graphics library
+- * Version:  6.5.1
++ * Version:  7.2
+  *
+- * Copyright (C) 1999-2006  Brian Paul   All Rights Reserved.
++ * Copyright (C) 1999-2008  Brian Paul   All Rights Reserved.
+  *
+  * Permission is hereby granted, free of charge, to any person obtaining a
+  * copy of this software and associated documentation files (the "Software"),
+@@ -166,22 +166,75 @@ _mesa_delete_buffer_object( GLcontext *ctx, struct gl_buffer_object *bufObj )
+ 
+    if (bufObj->Data)
+       _mesa_free(bufObj->Data);
++
++   /* assign strange values here to help w/ debugging */
++   bufObj->RefCount = -1000;
++   bufObj->Name = ~0;
++
+    _mesa_free(bufObj);
+ }
+ 
+ 
++
++/**
++ * Set ptr to bufObj w/ reference counting.
++ */
+ void
+-_mesa_unbind_buffer_object( GLcontext *ctx, struct gl_buffer_object *bufObj )
++_mesa_reference_buffer_object(GLcontext *ctx,
++                              struct gl_buffer_object **ptr,
++                              struct gl_buffer_object *bufObj)
+ {
+-   if (bufObj != ctx->Array.NullBufferObj) {
+-      bufObj->RefCount--;
+-      if (bufObj->RefCount <= 0) {
++   if (*ptr == bufObj)
++      return;
++
++   if (*ptr) {
++      /* Unreference the old texture */
++      GLboolean deleteFlag = GL_FALSE;
++      struct gl_buffer_object *oldObj = *ptr;
++
++      /*_glthread_LOCK_MUTEX(oldObj->Mutex);*/
++      ASSERT(oldObj->RefCount > 0);
++      oldObj->RefCount--;
++#if 0
++      printf("BufferObj %p %d DECR to %d\n",
++             (void *) oldObj, oldObj->Name, oldObj->RefCount);
++#endif
++      deleteFlag = (oldObj->RefCount == 0);
++      /*_glthread_UNLOCK_MUTEX(oldObj->Mutex);*/
++
++      if (deleteFlag) {
++
++         /* some sanity checking: don't delete a buffer still in use */
+ 	 ASSERT(ctx->Array.ArrayBufferObj != bufObj);
+ 	 ASSERT(ctx->Array.ElementArrayBufferObj != bufObj);
+ 	 ASSERT(ctx->Array.ArrayObj->Vertex.BufferObj != bufObj);
+ 	 ASSERT(ctx->Driver.DeleteBuffer);
+-	 ctx->Driver.DeleteBuffer(ctx, bufObj);
++
++         ctx->Driver.DeleteBuffer(ctx, oldObj);
+       }
++
++      *ptr = NULL;
++   }
++   ASSERT(!*ptr);
++
++   if (bufObj) {
++      /* reference new texture */
++      /*_glthread_LOCK_MUTEX(tex->Mutex);*/
++      if (bufObj->RefCount == 0) {
++         /* this buffer's being deleted (look just above) */
++         /* Not sure this can every really happen.  Warn if it does. */
++         _mesa_problem(NULL, "referencing deleted buffer object");
++         *ptr = NULL;
++      }
++      else {
++         bufObj->RefCount++;
++#if 0
++         printf("BufferObj %p %d INCR to %d\n",
++                (void *) bufObj, bufObj->Name, bufObj->RefCount);
++#endif
++         *ptr = bufObj;
++      }
++      /*_glthread_UNLOCK_MUTEX(tex->Mutex);*/
+    }
+ }
+ 
+@@ -204,33 +257,6 @@ _mesa_initialize_buffer_object( struct gl_buffer_object *obj,
+ 
+ 
+ /**
+- * Add the given buffer object to the buffer object pool.
+- */
+-void
+-_mesa_save_buffer_object( GLcontext *ctx, struct gl_buffer_object *obj )
+-{
+-   if (obj->Name > 0) {
+-      /* insert into hash table */
+-      _mesa_HashInsert(ctx->Shared->BufferObjects, obj->Name, obj);
+-   }
+-}
+-
+-
+-/**
+- * Remove the given buffer object from the buffer object pool.
+- * Do not deallocate the buffer object though.
+- */
+-void
+-_mesa_remove_buffer_object( GLcontext *ctx, struct gl_buffer_object *bufObj )
+-{
+-   if (bufObj->Name > 0) {
+-      /* remove from hash table */
+-      _mesa_HashRemove(ctx->Shared->BufferObjects, bufObj->Name);
+-   }
+-}
+-
+-
+-/**
+  * Allocate space for and store data in a buffer object.  Any data that was
+  * previously stored in the buffer object is lost.  If \c data is \c NULL,
+  * memory will be allocated, but no copy will occur.
+@@ -400,6 +426,7 @@ _mesa_init_buffer_objects( GLcontext *ctx )
+ {
+    /* Allocate the default buffer object and set refcount so high that
+     * it never gets deleted.
++    * XXX with recent/improved refcounting this may not longer be needed.
+     */
+    ctx->Array.NullBufferObj = _mesa_new_buffer_object(ctx, 0, 0);
+    if (ctx->Array.NullBufferObj)
+@@ -484,6 +511,23 @@ _mesa_lookup_bufferobj(GLcontext *ctx, GLuint buffer)
+ }
+ 
+ 
++/**
++ * If *ptr points to obj, set ptr = the Null/default buffer object.
++ * This is a helper for buffer object deletion.
++ * The GL spec says that deleting a buffer object causes it to get
++ * unbound from all arrays in the current context.
++ */
++static void
++unbind(GLcontext *ctx,
++       struct gl_buffer_object **ptr,
++       struct gl_buffer_object *obj)
++{
++   if (*ptr == obj) {
++      _mesa_reference_buffer_object(ctx, ptr, ctx->Array.NullBufferObj);
++   }
++}
++
++
+ 
+ /**********************************************************************/
+ /* API Functions                                                      */
+@@ -541,28 +585,16 @@ _mesa_BindBufferARB(GLenum target, GLuint buffer)
+             _mesa_error(ctx, GL_OUT_OF_MEMORY, "glBindBufferARB");
+             return;
+          }
+-         _mesa_save_buffer_object(ctx, newBufObj);
++         _mesa_HashInsert(ctx->Shared->BufferObjects, buffer, newBufObj);
+       }
+    }
+    
+-   /* Make new binding */
+-   *bindTarget = newBufObj;
+-   newBufObj->RefCount++;
++   /* bind new buffer */
++   _mesa_reference_buffer_object(ctx, bindTarget, newBufObj);
+ 
+    /* Pass BindBuffer call to device driver */
+    if (ctx->Driver.BindBuffer && newBufObj)
+       ctx->Driver.BindBuffer( ctx, target, newBufObj );
+-
+-   /* decr ref count on old buffer obj, delete if needed */
+-   if (oldBufObj) {
+-      oldBufObj->RefCount--;
+-      assert(oldBufObj->RefCount >= 0);
+-      if (oldBufObj->RefCount == 0) {
+-	 assert(oldBufObj->Name != 0);
+-	 ASSERT(ctx->Driver.DeleteBuffer);
+-	 ctx->Driver.DeleteBuffer( ctx, oldBufObj );
+-      }
+-   }
+ }
+ 
+ 
+@@ -594,54 +626,18 @@ _mesa_DeleteBuffersARB(GLsizei n, const GLuint *ids)
+ 
+          ASSERT(bufObj->Name == ids[i]);
+ 
+-         if (ctx->Array.ArrayObj->Vertex.BufferObj == bufObj) {
+-            bufObj->RefCount--;
+-            ctx->Array.ArrayObj->Vertex.BufferObj = ctx->Array.NullBufferObj;
+-            ctx->Array.NullBufferObj->RefCount++;
+-         }
+-         if (ctx->Array.ArrayObj->Normal.BufferObj == bufObj) {
+-            bufObj->RefCount--;
+-            ctx->Array.ArrayObj->Normal.BufferObj = ctx->Array.NullBufferObj;
+-            ctx->Array.NullBufferObj->RefCount++;
+-         }
+-         if (ctx->Array.ArrayObj->Color.BufferObj == bufObj) {
+-            bufObj->RefCount--;
+-            ctx->Array.ArrayObj->Color.BufferObj = ctx->Array.NullBufferObj;
+-            ctx->Array.NullBufferObj->RefCount++;
+-         }
+-         if (ctx->Array.ArrayObj->SecondaryColor.BufferObj == bufObj) {
+-            bufObj->RefCount--;
+-            ctx->Array.ArrayObj->SecondaryColor.BufferObj = ctx->Array.NullBufferObj;
+-            ctx->Array.NullBufferObj->RefCount++;
+-         }
+-         if (ctx->Array.ArrayObj->FogCoord.BufferObj == bufObj) {
+-            bufObj->RefCount--;
+-            ctx->Array.ArrayObj->FogCoord.BufferObj = ctx->Array.NullBufferObj;
+-            ctx->Array.NullBufferObj->RefCount++;
+-         }
+-         if (ctx->Array.ArrayObj->Index.BufferObj == bufObj) {
+-            bufObj->RefCount--;
+-            ctx->Array.ArrayObj->Index.BufferObj = ctx->Array.NullBufferObj;
+-            ctx->Array.NullBufferObj->RefCount++;
+-         }
+-         if (ctx->Array.ArrayObj->EdgeFlag.BufferObj == bufObj) {
+-            bufObj->RefCount--;
+-            ctx->Array.ArrayObj->EdgeFlag.BufferObj = ctx->Array.NullBufferObj;
+-            ctx->Array.NullBufferObj->RefCount++;
+-         }
++         unbind(ctx, &ctx->Array.ArrayObj->Vertex.BufferObj, bufObj);
++         unbind(ctx, &ctx->Array.ArrayObj->Normal.BufferObj, bufObj);
++         unbind(ctx, &ctx->Array.ArrayObj->Color.BufferObj, bufObj);
++         unbind(ctx, &ctx->Array.ArrayObj->SecondaryColor.BufferObj, bufObj);
++         unbind(ctx, &ctx->Array.ArrayObj->FogCoord.BufferObj, bufObj);
++         unbind(ctx, &ctx->Array.ArrayObj->Index.BufferObj, bufObj);
++         unbind(ctx, &ctx->Array.ArrayObj->EdgeFlag.BufferObj, bufObj);
+          for (j = 0; j < MAX_TEXTURE_UNITS; j++) {
+-            if (ctx->Array.ArrayObj->TexCoord[j].BufferObj == bufObj) {
+-               bufObj->RefCount--;
+-               ctx->Array.ArrayObj->TexCoord[j].BufferObj = ctx->Array.NullBufferObj;
+-               ctx->Array.NullBufferObj->RefCount++;
+-            }
++            unbind(ctx, &ctx->Array.ArrayObj->TexCoord[j].BufferObj, bufObj);
+          }
+          for (j = 0; j < VERT_ATTRIB_MAX; j++) {
+-            if (ctx->Array.ArrayObj->VertexAttrib[j].BufferObj == bufObj) {
+-               bufObj->RefCount--;
+-               ctx->Array.ArrayObj->VertexAttrib[j].BufferObj = ctx->Array.NullBufferObj;
+-               ctx->Array.NullBufferObj->RefCount++;
+-            }
++            unbind(ctx, &ctx->Array.ArrayObj->VertexAttrib[j].BufferObj, bufObj);
+          }
+ 
+          if (ctx->Array.ArrayBufferObj == bufObj) {
+@@ -659,8 +655,8 @@ _mesa_DeleteBuffersARB(GLsizei n, const GLuint *ids)
+          }
+ 
+ 	 /* The ID is immediately freed for re-use */
+-	 _mesa_remove_buffer_object(ctx, bufObj);
+-	 _mesa_unbind_buffer_object(ctx, bufObj);
++         _mesa_HashRemove(ctx->Shared->BufferObjects, bufObj->Name);
++         _mesa_reference_buffer_object(ctx, &bufObj, NULL);
+       }
+    }
+ 
+@@ -709,7 +705,7 @@ _mesa_GenBuffersARB(GLsizei n, GLuint *buffer)
+          _mesa_error(ctx, GL_OUT_OF_MEMORY, "glGenBuffersARB");
+          return;
+       }
+-      _mesa_save_buffer_object(ctx, bufObj);
++      _mesa_HashInsert(ctx->Shared->BufferObjects, first + i, bufObj);
+       buffer[i] = first + i;
+    }
+ 
+diff --git Mesa-7.0.4/src/mesa/main/bufferobj.h Mesa-7.0.4/src/mesa/main/bufferobj.h
+index f54f9e9..73d18d7 100644
+--- Mesa-7.0.4/src/mesa/main/bufferobj.h
++++ Mesa-7.0.4/src/mesa/main/bufferobj.h
+@@ -1,8 +1,8 @@
+ /*
+  * Mesa 3-D graphics library
+- * Version:  6.3
++ * Version:  7.2
+  *
+- * Copyright (C) 1999-2004  Brian Paul   All Rights Reserved.
++ * Copyright (C) 1999-2008  Brian Paul   All Rights Reserved.
+  *
+  * Permission is hereby granted, free of charge, to any person obtaining a
+  * copy of this software and associated documentation files (the "Software"),
+@@ -52,10 +52,9 @@ _mesa_initialize_buffer_object( struct gl_buffer_object *obj,
+ 				GLuint name, GLenum target );
+ 
+ extern void
+-_mesa_save_buffer_object( GLcontext *ctx, struct gl_buffer_object *obj );
+-
+-extern void
+-_mesa_remove_buffer_object( GLcontext *ctx, struct gl_buffer_object *bufObj );
++_mesa_reference_buffer_object(GLcontext *ctx,
++                              struct gl_buffer_object **ptr,
++                              struct gl_buffer_object *bufObj);
+ 
+ extern void
+ _mesa_buffer_data( GLcontext *ctx, GLenum target, GLsizeiptrARB size,
+@@ -86,8 +85,6 @@ _mesa_validate_pbo_access(GLuint dimensions,
+                           GLsizei width, GLsizei height, GLsizei depth,
+                           GLenum format, GLenum type, const GLvoid *ptr);
+ 
+-extern void
+-_mesa_unbind_buffer_object( GLcontext *ctx, struct gl_buffer_object *bufObj );
+ 
+ /*
+  * API functions
+diff --git Mesa-7.0.4/src/mesa/main/varray.c Mesa-7.0.4/src/mesa/main/varray.c
+index 56772e5..2515641 100644
+--- Mesa-7.0.4/src/mesa/main/varray.c
++++ Mesa-7.0.4/src/mesa/main/varray.c
+@@ -1,8 +1,8 @@
+ /*
+  * Mesa 3-D graphics library
+- * Version:  6.5.1
++ * Version:  7.2
+  *
+- * Copyright (C) 1999-2006  Brian Paul   All Rights Reserved.
++ * Copyright (C) 1999-2008  Brian Paul   All Rights Reserved.
+  *
+  * Permission is hereby granted, free of charge, to any person obtaining a
+  * copy of this software and associated documentation files (the "Software"),
+@@ -62,14 +62,9 @@ update_array(GLcontext *ctx, struct gl_client_array *array,
+    array->Normalized = normalized;
+    array->Ptr = (const GLubyte *) ptr;
+ #if FEATURE_ARB_vertex_buffer_object
+-   array->BufferObj->RefCount--;
+-   if (array->BufferObj->RefCount <= 0) {
+-      ASSERT(array->BufferObj->Name);
+-      _mesa_remove_buffer_object( ctx, array->BufferObj );
+-      (*ctx->Driver.DeleteBuffer)( ctx, array->BufferObj );
+-   }
+-   array->BufferObj = ctx->Array.ArrayBufferObj;
+-   array->BufferObj->RefCount++;
++   _mesa_reference_buffer_object(ctx, &array->BufferObj,
++                                 ctx->Array.ArrayBufferObj);
++
+    /* Compute the index of the last array element that's inside the buffer.
+     * Later in glDrawArrays we'll check if start + count > _MaxElement to
+     * be sure we won't go out of bounds.
+diff --git Mesa-7.0.4/src/mesa/vbo/vbo_exec_api.c Mesa-7.0.4/src/mesa/vbo/vbo_exec_api.c
+index 6812f88..45971a4 100644
+--- Mesa-7.0.4/src/mesa/vbo/vbo_exec_api.c
++++ Mesa-7.0.4/src/mesa/vbo/vbo_exec_api.c
+@@ -1,6 +1,6 @@
+ /**************************************************************************
+ 
+-Copyright 2002 Tungsten Graphics Inc., Cedar Park, Texas.
++Copyright 2002-2008 Tungsten Graphics Inc., Cedar Park, Texas.
+ 
+ All Rights Reserved.
+ 
+@@ -30,16 +30,17 @@ USE OR OTHER DEALINGS IN THE SOFTWARE.
+  *   Keith Whitwell <keith@tungstengraphics.com>
+  */
+ 
+-#include "glheader.h"
+-#include "context.h"
+-#include "macros.h"
+-#include "vtxfmt.h"
+-#include "dlist.h"
+-#include "state.h"
+-#include "light.h"
+-#include "api_arrayelt.h"
+-#include "api_noop.h"
+-#include "dispatch.h"
++#include "main/glheader.h"
++#include "main/bufferobj.h"
++#include "main/context.h"
++#include "main/macros.h"
++#include "main/vtxfmt.h"
++#include "main/dlist.h"
++#include "main/state.h"
++#include "main/light.h"
++#include "main/api_arrayelt.h"
++#include "main/api_noop.h"
++#include "glapi/dispatch.h"
+ 
+ #include "vbo_context.h"
+ 
+@@ -655,7 +656,10 @@ void vbo_exec_vtx_init( struct vbo_exec_context *exec )
+    /* Allocate a buffer object.  Will just reuse this object
+     * continuously.
+     */
+-   exec->vtx.bufferobj = ctx->Array.NullBufferObj;
++   _mesa_reference_buffer_object(ctx,
++                                 &exec->vtx.bufferobj,
++                                 ctx->Array.NullBufferObj);
++
+    exec->vtx.buffer_map = ALIGN_MALLOC(VBO_VERT_BUFFER_SIZE * sizeof(GLfloat), 64);
+ 
+    vbo_exec_vtxfmt_init( exec );
+diff --git Mesa-7.0.4/src/mesa/vbo/vbo_exec_draw.c Mesa-7.0.4/src/mesa/vbo/vbo_exec_draw.c
+index 893a5e8..5f737fd 100644
+--- Mesa-7.0.4/src/mesa/vbo/vbo_exec_draw.c
++++ Mesa-7.0.4/src/mesa/vbo/vbo_exec_draw.c
+@@ -1,8 +1,8 @@
+ /*
+  * Mesa 3-D graphics library
+- * Version:  5.1
++ * Version:  7.2
+  *
+- * Copyright (C) 1999-2003  Brian Paul   All Rights Reserved.
++ * Copyright (C) 1999-2008  Brian Paul   All Rights Reserved.
+  *
+  * Permission is hereby granted, free of charge, to any person obtaining a
+  * copy of this software and associated documentation files (the "Software"),
+@@ -25,11 +25,12 @@
+  *    Keith Whitwell <keith@tungstengraphics.com>
+  */
+ 
+-#include "glheader.h"
+-#include "context.h"
+-#include "enums.h"
+-#include "state.h"
+-#include "macros.h"
++#include "main/glheader.h"
++#include "main/bufferobj.h"
++#include "main/context.h"
++#include "main/enums.h"
++#include "main/state.h"
++#include "main/macros.h"
+ 
+ #include "vbo_context.h"
+ 
+@@ -155,8 +156,12 @@ static void vbo_exec_bind_arrays( GLcontext *ctx )
+     */
+    switch (get_program_mode(exec->ctx)) {
+    case VP_NONE:
+-      memcpy(arrays,      vbo->legacy_currval, 16 * sizeof(arrays[0]));
+-      memcpy(arrays + 16, vbo->mat_currval,    MAT_ATTRIB_MAX * sizeof(arrays[0]));
++      for (attr = 0; attr < 16; attr++) {
++         exec->vtx.inputs[attr] = &vbo->legacy_currval[attr];
++      }
++      for (attr = 0; attr < MAT_ATTRIB_MAX; attr++) {
++         exec->vtx.inputs[attr + 16] = &vbo->mat_currval[attr];
++      }
+       map = vbo->map_vp_none;
+       break;
+    case VP_NV:
+@@ -165,8 +170,10 @@ static void vbo_exec_bind_arrays( GLcontext *ctx )
+        * occurred.  NV vertex programs cannot access material values,
+        * nor attributes greater than VERT_ATTRIB_TEX7.  
+        */
+-      memcpy(arrays,      vbo->legacy_currval,  16 * sizeof(arrays[0]));
+-      memcpy(arrays + 16, vbo->generic_currval, 16 * sizeof(arrays[0]));
++      for (attr = 0; attr < 16; attr++) {
++         exec->vtx.inputs[attr] = &vbo->legacy_currval[attr];
++         exec->vtx.inputs[attr + 16] = &vbo->generic_currval[attr];
++      }
+       map = vbo->map_vp_arb;
+       break;
+    }
+@@ -178,13 +185,18 @@ static void vbo_exec_bind_arrays( GLcontext *ctx )
+       GLuint src = map[attr];
+ 
+       if (exec->vtx.attrsz[src]) {
++         /* override the default array set above */
++         exec->vtx.inputs[attr] = &arrays[attr];
++
+ 	 arrays[attr].Ptr = (void *)data;
+ 	 arrays[attr].Size = exec->vtx.attrsz[src];
+ 	 arrays[attr].StrideB = exec->vtx.vertex_size * sizeof(GLfloat);
+ 	 arrays[attr].Stride = exec->vtx.vertex_size * sizeof(GLfloat);
+ 	 arrays[attr].Type = GL_FLOAT;
+ 	 arrays[attr].Enabled = 1;
+-	 arrays[attr].BufferObj = exec->vtx.bufferobj; /* NullBufferObj */
++         _mesa_reference_buffer_object(ctx,
++                                       &arrays[attr].BufferObj,
++                                       exec->vtx.bufferobj);
+ 	 arrays[attr]._MaxElement = count; /* ??? */
+ 
+ 	 data += exec->vtx.attrsz[src] * sizeof(GLfloat);
+diff --git Mesa-7.0.4/src/mesa/vbo/vbo_save.c Mesa-7.0.4/src/mesa/vbo/vbo_save.c
+index 38d9d3f..9757c3d 100644
+--- Mesa-7.0.4/src/mesa/vbo/vbo_save.c
++++ Mesa-7.0.4/src/mesa/vbo/vbo_save.c
+@@ -1,8 +1,8 @@
+ /*
+  * Mesa 3-D graphics library
+- * Version:  6.3
++ * Version:  7.2
+  *
+- * Copyright (C) 1999-2005  Brian Paul   All Rights Reserved.
++ * Copyright (C) 1999-2008  Brian Paul   All Rights Reserved.
+  *
+  * Permission is hereby granted, free of charge, to any person obtaining a
+  * copy of this software and associated documentation files (the "Software"),
+@@ -26,10 +26,11 @@
+  */
+ 
+ 
+-#include "mtypes.h"
+-#include "dlist.h"
+-#include "vtxfmt.h"
+-#include "imports.h"
++#include "main/mtypes.h"
++#include "main/bufferobj.h"
++#include "main/dlist.h"
++#include "main/vtxfmt.h"
++#include "main/imports.h"
+ 
+ #include "vbo_context.h"
+ 
+@@ -71,19 +72,24 @@ void vbo_save_destroy( GLcontext *ctx )
+ {
+    struct vbo_context *vbo = vbo_context(ctx);
+    struct vbo_save_context *save = &vbo->save;
++   GLuint i;
++
+    if (save->prim_store) {
+       if ( --save->prim_store->refcount == 0 ) {
+          FREE( save->prim_store );
+          save->prim_store = NULL;
+       }
+       if ( --save->vertex_store->refcount == 0 ) {
+-         if (save->vertex_store->bufferobj)
+-            ctx->Driver.DeleteBuffer( ctx, save->vertex_store->bufferobj );
+-
++         _mesa_reference_buffer_object(ctx,
++                                       &save->vertex_store->bufferobj, NULL);
+          FREE( save->vertex_store );
+          save->vertex_store = NULL;
+       }
+    }
++
++   for (i = 0; i < VBO_ATTRIB_MAX; i++) {
++      _mesa_reference_buffer_object(ctx, &save->arrays[i].BufferObj, NULL);
++   }
+ }
+ 
+ 
+diff --git Mesa-7.0.4/src/mesa/vbo/vbo_save_api.c Mesa-7.0.4/src/mesa/vbo/vbo_save_api.c
+index b68215c..88d573f 100644
+--- Mesa-7.0.4/src/mesa/vbo/vbo_save_api.c
++++ Mesa-7.0.4/src/mesa/vbo/vbo_save_api.c
+@@ -1,6 +1,6 @@
+ /**************************************************************************
+ 
+-Copyright 2002 Tungsten Graphics Inc., Cedar Park, Texas.
++Copyright 2002-2008 Tungsten Graphics Inc., Cedar Park, Texas.
+ 
+ All Rights Reserved.
+ 
+@@ -67,15 +67,16 @@ USE OR OTHER DEALINGS IN THE SOFTWARE.
+  */
+ 
+ 
+-#include "glheader.h"
+-#include "context.h"
+-#include "dlist.h"
+-#include "enums.h"
+-#include "macros.h"
+-#include "api_validate.h"
+-#include "api_arrayelt.h"
+-#include "vtxfmt.h"
+-#include "dispatch.h"
++#include "main/glheader.h"
++#include "main/bufferobj.h"
++#include "main/context.h"
++#include "main/dlist.h"
++#include "main/enums.h"
++#include "main/macros.h"
++#include "main/api_validate.h"
++#include "main/api_arrayelt.h"
++#include "main/vtxfmt.h"
++#include "glapi/dispatch.h"
+ 
+ #include "vbo_context.h"
+ 
+@@ -85,6 +86,10 @@ USE OR OTHER DEALINGS IN THE SOFTWARE.
+ #endif
+ 
+ 
++/* An interesting VBO number/name to help with debugging */
++#define VBO_BUF_ID  12345
++
++
+ /*
+  * NOTE: Old 'parity' issue is gone, but copying can still be
+  * wrong-footed on replay.
+@@ -170,7 +175,9 @@ static struct vbo_save_vertex_store *alloc_vertex_store( GLcontext *ctx )
+     * user.  Perhaps there could be a special number for internal
+     * buffers:
+     */
+-   vertex_store->bufferobj = ctx->Driver.NewBufferObject(ctx, 1, GL_ARRAY_BUFFER_ARB);
++   vertex_store->bufferobj = ctx->Driver.NewBufferObject(ctx,
++                                                         VBO_BUF_ID,
++                                                         GL_ARRAY_BUFFER_ARB);
+ 
+    ctx->Driver.BufferData( ctx, 
+ 			   GL_ARRAY_BUFFER_ARB, 
+@@ -190,8 +197,9 @@ static void free_vertex_store( GLcontext *ctx, struct vbo_save_vertex_store *ver
+ {
+    assert(!vertex_store->buffer);
+ 
+-   if (vertex_store->bufferobj)
+-      ctx->Driver.DeleteBuffer( ctx, vertex_store->bufferobj );
++   if (vertex_store->bufferobj) {
++      _mesa_reference_buffer_object(ctx, &vertex_store->bufferobj, NULL);
++   }
+ 
+    FREE( vertex_store );
+ }
+@@ -1139,6 +1147,7 @@ void vbo_save_api_init( struct vbo_save_context *save )
+    _save_vtxfmt_init( ctx );
+    _save_current_init( ctx );
+ 
++   /* These will actually get set again when binding/drawing */
+    for (i = 0; i < VBO_ATTRIB_MAX; i++)
+       save->inputs[i] = &save->arrays[i];
+ 
+diff --git Mesa-7.0.4/src/mesa/vbo/vbo_save_draw.c Mesa-7.0.4/src/mesa/vbo/vbo_save_draw.c
+index 95af854..ed82f09 100644
+--- Mesa-7.0.4/src/mesa/vbo/vbo_save_draw.c
++++ Mesa-7.0.4/src/mesa/vbo/vbo_save_draw.c
+@@ -1,8 +1,8 @@
+ /*
+  * Mesa 3-D graphics library
+- * Version:  6.1
++ * Version:  7.2
+  *
+- * Copyright (C) 1999-2004  Brian Paul   All Rights Reserved.
++ * Copyright (C) 1999-2008  Brian Paul   All Rights Reserved.
+  *
+  * Permission is hereby granted, free of charge, to any person obtaining a
+  * copy of this software and associated documentation files (the "Software"),
+@@ -26,13 +26,14 @@
+  *    Keith Whitwell <keith@tungstengraphics.com>
+  */
+ 
+-#include "glheader.h"
+-#include "context.h"
+-#include "imports.h"
+-#include "mtypes.h"
+-#include "macros.h"
+-#include "light.h"
+-#include "state.h"
++#include "main/glheader.h"
++#include "main/bufferobj.h"
++#include "main/context.h"
++#include "main/imports.h"
++#include "main/mtypes.h"
++#include "main/macros.h"
++#include "main/light.h"
++#include "main/state.h"
+ 
+ #include "vbo_context.h"
+ 
+@@ -115,8 +116,12 @@ static void vbo_bind_vertex_list( GLcontext *ctx,
+     */
+    switch (get_program_mode(ctx)) {
+    case VP_NONE:
+-      memcpy(arrays,      vbo->legacy_currval, 16 * sizeof(arrays[0]));
+-      memcpy(arrays + 16, vbo->mat_currval,    MAT_ATTRIB_MAX * sizeof(arrays[0]));
++      for (attr = 0; attr < 16; attr++) {
++         save->inputs[attr] = &vbo->legacy_currval[attr];
++      }
++      for (attr = 0; attr < MAT_ATTRIB_MAX; attr++) {
++         save->inputs[attr + 16] = &vbo->mat_currval[attr];
++      }
+       map = vbo->map_vp_none;
+       break;
+    case VP_NV:
+@@ -125,8 +130,10 @@ static void vbo_bind_vertex_list( GLcontext *ctx,
+        * occurred.  NV vertex programs cannot access material values,
+        * nor attributes greater than VERT_ATTRIB_TEX7.  
+        */
+-      memcpy(arrays,      vbo->legacy_currval,  16 * sizeof(arrays[0]));
+-      memcpy(arrays + 16, vbo->generic_currval, 16 * sizeof(arrays[0]));
++      for (attr = 0; attr < 16; attr++) {
++         save->inputs[attr] = &vbo->legacy_currval[attr];
++         save->inputs[attr + 16] = &vbo->generic_currval[attr];
++      }
+       map = vbo->map_vp_arb;
+       break;
+    }
+@@ -135,13 +142,18 @@ static void vbo_bind_vertex_list( GLcontext *ctx,
+       GLuint src = map[attr];
+ 
+       if (node->attrsz[src]) {
+-	 arrays[attr].Ptr = (const GLubyte *)data;
++         /* override the default array set above */
++         save->inputs[attr] = &arrays[attr];
++
++	 arrays[attr].Ptr = (const GLubyte *) data;
+ 	 arrays[attr].Size = node->attrsz[src];
+ 	 arrays[attr].StrideB = node->vertex_size * sizeof(GLfloat);
+ 	 arrays[attr].Stride = node->vertex_size * sizeof(GLfloat);
+ 	 arrays[attr].Type = GL_FLOAT;
+ 	 arrays[attr].Enabled = 1;
+-	 arrays[attr].BufferObj = node->vertex_store->bufferobj;
++         _mesa_reference_buffer_object(ctx,
++                                       &arrays[attr].BufferObj,
++                                       node->vertex_store->bufferobj);
+ 	 arrays[attr]._MaxElement = node->count; /* ??? */
+ 	 
+ 	 assert(arrays[attr].BufferObj->Name);
+-- 
+1.6.0.2
+

@@ -1,0 +1,31 @@
+diff -ur beagle-0.2.9.orig/glue/Makefile.am beagle-0.2.9/glue/Makefile.am
+--- beagle-0.2.9.orig/glue/Makefile.am	2006-08-17 19:16:29.000000000 +0300
++++ beagle-0.2.9/glue/Makefile.am	2006-09-05 23:21:45.000000000 +0300
+@@ -74,11 +74,13 @@
+ 
+ if ENABLE_WV1
+ INCLUDES += \
+-	$(WV1_CFLAGS)
++	$(WV1_CFLAGS) \
++	$(LIBBEAGLE_CFLAGS)
+ EXTRA_GLUE_SOURCES +=	\
+ 	wv1-glue.c
+ EXTRA_GLUE_LIBADD +=	\
+-	$(WV1_LIBS)
++	$(WV1_LIBS) \
++	$(LIBBEAGLE_LIBS)
+ endif
+ 
+ libbeagleglue_la_SOURCES = 		\
+diff -ur beagle-0.2.9.orig/po/Makefile.in.in beagle-0.2.9/po/Makefile.in.in
+--- beagle-0.2.9.orig/po/Makefile.in.in	2006-09-01 18:54:38.000000000 +0300
++++ beagle-0.2.9/po/Makefile.in.in	2006-09-05 23:21:52.000000000 +0300
+@@ -52,8 +52,6 @@
+ MSGMERGE = INTLTOOL_EXTRACT=$(INTLTOOL_EXTRACT) srcdir=$(srcdir) $(INTLTOOL_UPDATE) --gettext-package $(GETTEXT_PACKAGE) --dist
+ GENPOT   = INTLTOOL_EXTRACT=$(INTLTOOL_EXTRACT) srcdir=$(srcdir) $(INTLTOOL_UPDATE) --gettext-package $(GETTEXT_PACKAGE) --pot
+ 
+-ALL_LINGUAS = @ALL_LINGUAS@
+-
+ PO_LINGUAS=$(shell if test -r $(srcdir)/LINGUAS; then grep -v "^\#" $(srcdir)/LINGUAS; fi)
+ 
+ POFILES=$(shell if test -n "$(PO_LINGUAS)"; then LINGUAS="$(PO_LINGUAS)"; else LINGUAS="$(ALL_LINGUAS)"; fi; for lang in $$LINGUAS; do printf "$$lang.po "; done)

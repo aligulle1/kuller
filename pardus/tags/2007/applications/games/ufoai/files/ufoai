@@ -1,0 +1,41 @@
+#!/bin/bash
+
+MAIN="ufoai"
+DATADIR="/usr/share/$MAIN"
+TARGET="$HOME/.$MAIN-bin"
+TOSYMLINK="ref_glx.so ref_sdl.so snd_alsa.so snd_arts.so snd_oss.so snd_sdl.so ufo ufo2map ufoded"
+TOCOPY=""
+BASETOSYMLINK="i18n maps media models music pics shaders sound textures ufos game.so"
+BASETOCOPY="autoexec.cfg dedicated.cfg default.cfg keys.cfg mapshots.cfg save"
+
+if [ ! -e "$TARGET" ]; then
+	mkdir "$TARGET"
+fi
+if [ ! -e "$TARGET/base" ]; then
+	mkdir "$TARGET/base"
+fi
+
+for d in $TOSYMLINK; do
+	if [ ! -e "$TARGET/$d" ] ; then
+		ln -s "$DATADIR/$d" "$TARGET/$d"
+	fi
+done
+for f in $TOCOPY; do
+	if [ ! -e "$TARGET/$f" ] ; then
+		cp -R "$DATADIR/$f" "$TARGET/"
+	fi
+done
+
+for d in $BASETOSYMLINK; do
+	if [ ! -e "$TARGET/base/$d" ] ; then
+		ln -s "$DATADIR/base/$d" "$TARGET/base/$d"
+	fi
+done
+for f in $BASETOCOPY; do
+	if [ ! -e "$TARGET/base/$f" ] ; then
+		cp -R "$DATADIR/base/$f" "$TARGET/base/"
+	fi
+done
+
+cd "$TARGET"
+exec ./ufo "$@"

@@ -1,0 +1,173 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>nvidia-old</Name>
+        <Homepage>http://www.nvidia.com</Homepage>
+        <Packager>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Packager>
+        <License>EULA</License>
+        <IsA>library</IsA>
+        <Summary>nVIDIA kernel and glx drivers for old nVIDIA cards like TNT2</Summary>
+        <Summary xml:lang="tr">TNT2 ve benzeri eski kartlar için nVIDIA ekran kartı sürücüleri</Summary>
+        <Description>nVIDIA kernel and glx drivers giving optimized 2d/3d performance on Linux for old nVidia cards</Description>
+        <Description xml:lang="tr">TNT2 ve benzeri eski nVidia kartlarında 2d/3d performansı için gerekli nVIDIA sürücüleri</Description>
+        <Archive sha1sum="954dd1815a587b94e39458f284d0ad0c7b06abc7" type="tarbz2">http://cekirdek.pardus.org.tr/~ismail/dist/NVIDIA-Linux-x86-1.0-7185.tar.bz2</Archive>
+        <BuildDependencies>
+            <Dependency release="86">kernel-source</Dependency>
+            <Dependency>xorg-server</Dependency>
+        </BuildDependencies>
+    </Source>
+
+    <Package>
+        <Name>nvidia-kernel-old</Name>
+        <Summary>nVIDIA kernel driver [For TNT2 and such older cards]</Summary>
+        <Description>nVIDIA kernel driver for low level infrastracture [For TNT2 and such older cards].</Description>
+        <RuntimeDependencies>
+            <Dependency release="86">kernel</Dependency>
+        </RuntimeDependencies>
+        <Conflicts>
+          <Package>nvidia-kernel</Package>
+          <Package>nvidia-kernel-new</Package>
+        </Conflicts>
+        <Files>
+            <Path fileType="library" permanent="true">/lib/modules</Path>
+            <Path fileType="config">/etc</Path>
+        </Files>
+        <AdditionalFiles>
+            <AdditionalFile owner="root" permission="0644" target="/etc/modules.d/nvidia">nvidia-modules.d</AdditionalFile>
+        </AdditionalFiles>
+        <Provides>
+            <COMAR script="devices.py">System.Package</COMAR>
+        </Provides>
+    </Package>
+
+    <Package>
+        <Name>nvidia-glx-old</Name>
+        <Summary>nVIDIA glx module for X.org [For TNT2 and such older cards]</Summary>
+        <Description>nVIDIA glx module for X.org for optimized 2d/3d performance [For TNT2 and such older cards].</Description>
+        <RuntimeDependencies>
+            <Dependency version="1.0_7185">nvidia-kernel-old</Dependency>
+        </RuntimeDependencies>
+        <Conflicts>
+          <Package>nvidia-glx</Package>
+          <Package>nvidia-glx-new</Package>
+        </Conflicts>
+        <Files>
+            <Path fileType="library">/usr/lib</Path>
+            <Path fileType="header">/usr/include</Path>
+            <Path fileType="doc">/usr/share/doc</Path>
+            <Path fileType="man">/usr/share/man</Path>
+        </Files>
+        <Provides>
+            <COMAR script="opengl-update.py">System.Package</COMAR>
+        </Provides>
+    </Package>
+
+    <Package>
+        <Name>nvidia-tools-old</Name>
+        <Summary>nvidia-settings tool [For TNT2 and such older cards]</Summary>
+        <Description>GUI tool nvidia-settings for nVIDIA cards [For TNT2 and such older cards].</Description>
+        <Description xml:lang="tr">nVIDIA Ekran kartlarına için, GUI Araçları nVIDIA ayarları.</Description>
+        <RuntimeDependencies>
+            <Dependency version="1.0_7185">nvidia-glx-old</Dependency>
+            <Dependency>gtk2</Dependency>
+        </RuntimeDependencies>
+        <Conflicts>
+          <Package>nvidia-tools</Package>
+          <Package>nvidia-tools-new</Package>
+        </Conflicts>
+        <Files>
+            <Path fileType="executable">/usr/bin</Path>
+        </Files>
+    </Package>
+
+    <History>
+        <Update release="12">
+            <Date>2007-04-21</Date>
+            <Version>1.0_7185</Version>
+            <Comment>Stable update</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="11">
+            <Date>2007-02-05</Date>
+            <Version>1.0_7184</Version>
+            <Comment>Add missing file</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="10">
+            <Date>2006-11-04</Date>
+            <Version>1.0_7184</Version>
+            <Comment>Use udev</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="9">
+            <Date>2006-10-17</Date>
+            <Version>1.0_7184</Version>
+            <Comment>Tighten version dependency</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="8">
+            <Date>2006-08-25</Date>
+            <Version>1.0_7184</Version>
+            <Comment>New stable release</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="7">
+            <Date>2006-08-08</Date>
+            <Version>1.0_7182</Version>
+            <Comment>Version bump and fix compile with 2.6.18 kernel</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="6">
+            <Date>2006-07-04</Date>
+            <Version>1.0_7174</Version>
+            <Comment>Don't update modules manually</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="5">
+            <Date>2006-04-24</Date>
+            <Version>1.0_7174</Version>
+            <Comment>Mudur script added</Comment>
+            <Name>Bahadır Kandemir</Name>
+            <Email>bahadir@pardus.org.tr</Email>
+        </Update>
+        <Update release="4">
+            <Date>2006-03-31</Date>
+            <Version>1.0_7174</Version>
+            <Comment>Fix compile with 2.6.16 kernel</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="3">
+            <Date>2006-03-21</Date>
+            <Version>1.0_7174</Version>
+            <Comment>Fix auto-load logic</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="2">
+            <Date>2006-01-14</Date>
+            <Version>1.0_7174</Version>
+            <Comment>Auto load nvidia kernel module</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="1">
+            <Date>2005-12-06</Date>
+            <Version>1.0_7174</Version>
+            <Comment>First release.</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+    </History>
+</PISI>

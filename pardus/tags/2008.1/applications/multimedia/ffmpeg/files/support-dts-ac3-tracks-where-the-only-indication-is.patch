@@ -1,0 +1,37 @@
+From 24494f2b3d6f67ca238fac413e5270a9406685a4 Mon Sep 17 00:00:00 2001
+From: elupus <elupus@ecce.se>
+Date: Thu, 14 Aug 2008 01:10:53 +0200
+Subject: [PATCH] support dts/ac3 tracks where the only indication is DTS1/2/3 or AC-3 in registration descriptor
+
+---
+ libavformat/mpegts.c |   11 +++++++++++
+ 1 files changed, 11 insertions(+), 0 deletions(-)
+
+diff --git a/libavformat/mpegts.c b/libavformat/mpegts.c
+index a8d60ea..b896062 100644
+--- a/libavformat/mpegts.c
++++ b/libavformat/mpegts.c
+@@ -597,9 +597,20 @@ static void pmt_cb(MpegTSFilter *filter, const uint8_t *section, int section_len
+                     bytes[1] = get8(&p, desc_end);
+                     bytes[2] = get8(&p, desc_end);
+                     bytes[3] = get8(&p, desc_end);
++
++                    if (stream_type == STREAM_TYPE_PRIVATE_DATA) {
++                        if(bytes[0] == 'A' && bytes[1] == 'C' &&
++                           bytes[2] == '-' && bytes[3] == '3')
++                            stream_type = STREAM_TYPE_AUDIO_AC3;
++
++                        if(bytes[0] == 'D' && bytes[1] == 'T' && bytes[2] == 'S' && 
++                          (bytes[3] == '1' || bytes[3] == '2' || bytes[3] == '3'))
++                            stream_type = STREAM_TYPE_AUDIO_DTS;
++                    } else {
+                     if(bytes[0] == 'd' && bytes[1] == 'r' &&
+                        bytes[2] == 'a' && bytes[3] == 'c')
+                         has_dirac_descr = 1;
++                    }
+                     break;
+                 }
+             default:
+-- 
+1.5.5.1015.g9d258
+

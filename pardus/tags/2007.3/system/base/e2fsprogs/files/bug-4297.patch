@@ -1,0 +1,90 @@
+commit 1a191d6648c8511d389cd9bea11dedb671f64456
+Author: Theodore Ts'o <tytso@mit.edu>
+Date:   Mon Jul 2 19:04:31 2007 -0400
+
+    e2fsck: Detect recursive loops in @-expansions
+    
+    The Turkish translation has a bug in it where it has the translation
+    of "E@e '%Dn' in %p (%i)" to "E@E".  This causes @E to be expanded at
+    @E, recursively, forever, until the stack fills up e2fsck core dumps.
+    
+    Fix it by stopping after a recursive depth of 10, which is far more
+    than we need.
+    
+    Addresses-Sourceforge-Bug: 1646081
+    
+    Signed-off-by: "Theodore Ts'o" <tytso@mit.edu>
+
+diff --git a/e2fsck/message.c b/e2fsck/message.c
+index 22c7163..b2e3e0f 100644
+--- a/e2fsck/message.c
++++ b/e2fsck/message.c
+@@ -214,7 +214,7 @@ static void print_pathname(ext2_filsys fs, ext2_ino_t dir, ext2_ino_t ino)
+  */
+ static _INLINE_ void expand_at_expression(e2fsck_t ctx, char ch,
+ 					  struct problem_context *pctx,
+-					  int *first)
++					  int *first, int recurse)
+ {
+ 	const char **cpp, *str;
+ 	
+@@ -223,13 +223,13 @@ static _INLINE_ void expand_at_expression(e2fsck_t ctx, char ch,
+ 		if (ch == *cpp[0])
+ 			break;
+ 	}
+-	if (*cpp) {
++	if (*cpp && recurse < 10) {
+ 		str = _(*cpp) + 1;
+ 		if (*first && islower(*str)) {
+ 			*first = 0;
+ 			fputc(toupper(*str++), stdout);
+ 		}
+-		print_e2fsck_message(ctx, str, pctx, *first);
++		print_e2fsck_message(ctx, str, pctx, *first, recurse+1);
+ 	} else
+ 		printf("@%c", ch);
+ }
+@@ -456,7 +456,8 @@ static _INLINE_ void expand_percent_expression(ext2_filsys fs, char ch,
+ }	
+ 
+ void print_e2fsck_message(e2fsck_t ctx, const char *msg,
+-			  struct problem_context *pctx, int first)
++			  struct problem_context *pctx, int first,
++			  int recurse)
+ {
+ 	ext2_filsys fs = ctx->fs;
+ 	const char *	cp;
+@@ -466,7 +467,7 @@ void print_e2fsck_message(e2fsck_t ctx, const char *msg,
+ 	for (cp = msg; *cp; cp++) {
+ 		if (cp[0] == '@') {
+ 			cp++;
+-			expand_at_expression(ctx, *cp, pctx, &first);
++			expand_at_expression(ctx, *cp, pctx, &first, recurse);
+ 		} else if (cp[0] == '%' && cp[1] == 'I') {
+ 			cp += 2;
+ 			expand_inode_expression(*cp, pctx);
+diff --git a/e2fsck/problem.c b/e2fsck/problem.c
+index 87de645..0b6fd39 100644
+--- a/e2fsck/problem.c
++++ b/e2fsck/problem.c
+@@ -1675,7 +1675,7 @@ int fix_problem(e2fsck_t ctx, problem_t code, struct problem_context *pctx)
+ 			       ctx->device_name : ctx->filesystem_name);
+ 		}
+ 		if (*message)
+-			print_e2fsck_message(ctx, _(message), pctx, 1);
++			print_e2fsck_message(ctx, _(message), pctx, 1, 0);
+ 	}
+ 	if (!(ptr->flags & PR_PREEN_OK) && (ptr->prompt != PROMPT_NONE))
+ 		preenhalt(ctx);
+diff --git a/e2fsck/problem.h b/e2fsck/problem.h
+index 28fe964..f5f7212 100644
+--- a/e2fsck/problem.h
++++ b/e2fsck/problem.h
+@@ -918,5 +918,6 @@ void clear_problem_context(struct problem_context *ctx);
+ 
+ /* message.c */
+ void print_e2fsck_message(e2fsck_t ctx, const char *msg,
+-			  struct problem_context *pctx, int first);
++			  struct problem_context *pctx, int first, 
++			  int recurse);
+ 

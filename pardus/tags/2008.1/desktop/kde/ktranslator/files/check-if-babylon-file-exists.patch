@@ -1,0 +1,16 @@
+diff -Nur ktranslator-0.4.orig/ktranslator/plugins/babylon/babylonplugin.cpp ktranslator-0.4/ktranslator/plugins/babylon/babylonplugin.cpp
+--- ktranslator-0.4.orig/ktranslator/plugins/babylon/babylonplugin.cpp  2006-02-10 01:54:56.000000000 +0200
++++ ktranslator-0.4/ktranslator/plugins/babylon/babylonplugin.cpp       2007-02-10 20:15:40.000000000 +0200
+@@ -46,6 +46,12 @@
+   KURL url( args[0] );
+   name = args[1];
+   babDic = 0;
++
++  if( name.isEmpty() || args[0].isEmpty() || !QFile::exists( url.path() ) ) {
++    setOk( false );
++    return;
++  }
++
+   babDic = new Babylon;
+   babDic->setPath( url.directory().ascii() );
+   if( !babDic->open( url.fileName().ascii() ) )

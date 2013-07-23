@@ -1,0 +1,70 @@
+--- ./mozilla/nsprpub/pr/src/pthreads/ptthread.c.pre2nd	2007-06-27 22:05:30.000000000 +0200
++++ ./mozilla/nsprpub/pr/src/pthreads/ptthread.c	2007-06-27 22:10:33.000000000 +0200
+@@ -75,6 +75,7 @@
+ } pt_book = {0};
+ 
+ static void _pt_thread_death(void *arg);
++static void _pt_thread_death_internal(void *arg, PRBool callDestructors);
+ static void init_pthread_gc_support(void);
+ 
+ #if defined(_PR_DCETHREADS) || defined(_POSIX_THREAD_PRIORITY_SCHEDULING)
+@@ -797,6 +798,12 @@
+ 
+ static void _pt_thread_death(void *arg)
+ {
++    /* PR_TRUE for: call destructors */ 
++    _pt_thread_death_internal(arg, PR_TRUE);
++}
++
++static void _pt_thread_death_internal(void *arg, PRBool callDestructors)
++{
+     PRThread *thred = (PRThread*)arg;
+ 
+     if (thred->state & (PT_THREAD_FOREIGN|PT_THREAD_PRIMORD))
+@@ -812,7 +819,8 @@
+             thred->next->prev = thred->prev;
+         PR_Unlock(pt_book.ml);
+     }
+-    _PR_DestroyThreadPrivate(thred);
++    if (callDestructors)
++        _PR_DestroyThreadPrivate(thred);
+     PR_Free(thred->privateData);
+     if (NULL != thred->errorString)
+         PR_Free(thred->errorString);
+@@ -924,6 +932,36 @@
+     PR_SetThreadPriority(thred, priority);
+ }  /* _PR_InitThreads */
+ 
++#ifdef __GNUC__
++/*
++ * GCC supports the constructor and destructor attributes as of
++ * version 2.5.
++ */
++static void _PR_Fini(void) __attribute__ ((destructor));
++
++static void _PR_Fini(void)
++{
++    void *thred;
++    int rv;
++
++    if (!_pr_initialized) return;
++
++    _PT_PTHREAD_GETSPECIFIC(pt_book.key, thred);
++    if (NULL != thred)
++    {
++        /*
++         * PR_FALSE, because it is unsafe to call back to the 
++         * thread private data destructors at final cleanup.
++         */
++        _pt_thread_death_internal(thred, PR_FALSE);
++        rv = pthread_setspecific(pt_book.key, NULL);
++        PR_ASSERT(0 == rv);
++    }
++    /* TODO: free other resources used by NSPR */
++    /* _pr_initialized = PR_FALSE; */
++}  /* _PR_Fini */
++#endif
++
+ PR_IMPLEMENT(PRStatus) PR_Cleanup(void)
+ {
+     PRThread *me = PR_CurrentThread();

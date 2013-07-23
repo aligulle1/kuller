@@ -1,0 +1,63 @@
+
+## 01_check_x11-driver.diff by Thierry Randrianiriana  <randrianiriana@gmail.com>
+## Only print warning about missing x11-driver
+## See bugs #244655, #245428 and #243189
+--- gnuplot-4.2.0-orig/src/term.c	2006-10-06 02:52:18.000000000 +0300
++++ gnuplot-4.2.0/src/term.c	2007-03-24 07:35:45.236795706 +0300
+@@ -1568,6 +1568,33 @@
+     return (t);
+ }
+ 
++#ifdef X11
++int
++x11driver_found()
++{
++  char *binname = "/gnuplot_x11";
++  char *fullname;
++  struct stat buf;
++
++  fullname = (char*)malloc(strlen(X11_DRIVER_DIR) + strlen(binname) + 1);
++  strcpy(fullname, X11_DRIVER_DIR);
++  strcat(fullname, binname);
++
++  /* exists? */
++  if (stat(fullname, &buf)) {
++    free(fullname);
++    return 0;
++  }
++
++  free(fullname);
++  /* executable? */
++  if (buf.st_mode && S_IXOTH)
++    return 1;
++
++  return 0;
++}
++#endif
++
+ /*
+  * Routine to detect what terminal is being used (or do anything else
+  * that would be nice).  One anticipated (or allowed for) side effect
+@@ -1658,12 +1685,18 @@
+         env_term = getenv("TERM");      /* try $TERM */
+         if (term_name == (char *) NULL
+             && env_term != (char *) NULL && strcmp(env_term, "xterm") == 0)
+-            term_name = "x11";
++	  term_name = "x11";
+         display = getenv("DISPLAY");
+         if (term_name == (char *) NULL && display != (char *) NULL)
+-            term_name = "x11";
++	  term_name = "x11";
+         if (X11_Display)
+-            term_name = "x11";
++	  term_name = "x11";
++	/* if x11 was selected check for driver */
++	if (term_name && (strcmp(term_name, "x11") == 0) && !x11driver_found() && isatty(fileno(stdin))) {
++	  printf("*** X11 output driver not found, switching to dumb terminal!\n");
++	  printf("*** If you want to use the X11 output, please install the ""gnuplot-x11"" package.\n");
++	  term_name = "dumb";
++	};
+ #endif /* x11 */
+ 
+ #ifdef AMIGA
+

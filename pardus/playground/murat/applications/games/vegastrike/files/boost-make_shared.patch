@@ -1,0 +1,36 @@
+*** vegastrike-source-0.5.0/src/networking/lowlevel/vsnet_socketset.cpp.orig	2008-12-19 22:27:11.000000000 -0800
+--- vegastrike-source-0.5.0/src/networking/lowlevel/vsnet_socketset.cpp	2008-12-19 22:27:35.000000000 -0800
+*************** int SocketSet::private_select( timeval* 
+*** 180,186 ****
+      
+      if( !_client_mgr.expired() )
+      {
+!         boost::shared_ptr<VsnetDownload::Client::Manager> mgr( boost::make_shared(_client_mgr) );
+          if( (bool)mgr )
+          {
+              mgr->lower_check_queues( );
+--- 180,186 ----
+      
+      if( !_client_mgr.expired() )
+      {
+!       boost::shared_ptr<VsnetDownload::Client::Manager> mgr( _client_mgr.lock() );
+          if( (bool)mgr )
+          {
+              mgr->lower_check_queues( );
+*************** int SocketSet::private_select( timeval* 
+*** 189,195 ****
+  
+      if( !_server_mgr.expired() )
+      {
+!         boost::shared_ptr<VsnetDownload::Server::Manager> mgr( boost::make_shared(_server_mgr) );
+          if( (bool)mgr )
+          {
+              mgr->lower_check_queues( );
+--- 189,195 ----
+  
+      if( !_server_mgr.expired() )
+      {
+!       boost::shared_ptr<VsnetDownload::Server::Manager> mgr( _server_mgr.lock() );
+          if( (bool)mgr )
+          {
+              mgr->lower_check_queues( );

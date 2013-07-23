@@ -1,0 +1,59 @@
+diff -ur xorg-server-7.2_rc2.orig/xorg-server-1.1.99.903/hw/xfree86/xaa/xaaInit.c xorg-server-7.2_rc2/xorg-server-1.1.99.903/hw/xfree86/xaa/xaaInit.c
+--- xorg-server-7.2_rc2.orig/xorg-server-1.1.99.903/hw/xfree86/xaa/xaaInit.c	2006-11-19 02:12:23.000000000 +0200
++++ xorg-server-7.2_rc2/xorg-server-1.1.99.903/hw/xfree86/xaa/xaaInit.c	2006-11-19 02:12:38.000000000 +0200
+@@ -3,6 +3,7 @@
+ #include <xorg-config.h>
+ #endif
+ 
++#include <string.h>
+ #include "misc.h"
+ #include "xf86.h"
+ #include "xf86_OSproc.h"
+@@ -19,6 +20,7 @@
+ #include "xaawrap.h"
+ #include "xf86fbman.h"
+ #include "servermd.h"
++#include "selection.h"
+ 
+ #define MAX_PREALLOC_MEM	65536	/* MUST be >= 1024 */
+ 
+@@ -254,6 +256,29 @@
+     return TRUE;
+ }
+ 
++static void
++SelectionChangedCallback (CallbackListPtr *list,
++			  pointer xaaData, pointer callData)
++{
++    static char atom_name[] = "_COMPIZ_GL_INCLUDE_INFERIORS";
++
++    SelectionInfoRec *info = callData;
++    XAAInfoRecPtr infoRec = xaaData;
++    ScreenPtr pScreen = infoRec->pScrn->pScreen;
++    Atom atom;
++
++    atom = MakeAtom(atom_name, strlen(atom_name), 0);
++    if (info->selection->selection == atom &&
++	info->kind == SelectionSetOwner &&
++	info->selection->window != None)
++    {
++	infoRec->offscreenDepths = 0;
++	infoRec->Flags &= ~OFFSCREEN_PIXMAPS;
++       
++	XAAMoveOutOffscreenPixmaps(pScreen);
++	XAAInvalidatePixmapCache(pScreen);
++    }
++}
+ 
+ 
+ static Bool
+@@ -287,6 +312,9 @@
+ 
+     xfree ((pointer) pScreenPriv);
+ 
++    DeleteCallback(&SelectionCallback, SelectionChangedCallback,
++		   pScreenPriv->AccelInfoRec);
++
+     return (*pScreen->CloseScreen) (i, pScreen);
+ }
+ 

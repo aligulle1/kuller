@@ -1,0 +1,637 @@
+--- src/Dialogs.py
++++ src/Dialogs.py
+@@ -43,7 +43,7 @@
+ import Player
+ import Guitar
+ 
+-def wrapText(font, pos, text, rightMargin = 0.9, scale = 0.002, visibility = 0.0):
++def wrapText(font, pos, text, rightMargin = 0.9, scale = 0.002, visibility = 0.0, hide = 0, hidestring = ""):
+   """
+   Wrap a piece of text inside given margins.
+   
+@@ -52,13 +52,17 @@
+   @param rightMargin: Right margin
+   @param scale:       Text scale
+   @param visibility:  Visibility factor [0..1], 0 is fully visible
++  @param hide:        Hide text instead of line wrap
+   """
+   x, y = pos
+   space = font.getStringSize(" ", scale = scale)[0]
+-
++  hidew, hideh = font.getStringSize(hidestring, scale = scale)
++  rightMargin = rightMargin - hidew
+   for n, word in enumerate(text.split(" ")):
+     w, h = font.getStringSize(word, scale = scale)
+-    if x + w > rightMargin or word == "\n":
++    if x + w > rightMargin and hide:
++      word = hidestring
++    if (x + w > rightMargin and not hide) or word == "\n":
+       x = pos[0]
+       y += h
+     if word == "\n":
+@@ -67,6 +71,9 @@
+     glRotate(visibility * (n + 1) * -45, 0, 0, 1)
+     font.render(word, (x, y + visibility * n), scale = scale)
+     glPopMatrix()
++    if x + w > rightMargin and hide:
++      x += hidew + space
++      break
+     x += w + space
+   return (x - space, y)
+ 
+@@ -122,7 +129,7 @@
+     elif key == pygame.K_BACKSPACE and not self.accepted:
+       self.text = self.text[:-1]
+     elif unicode and ord(unicode) > 31 and not self.accepted:
+-      self.text += unicode
++      self.text += str(unicode)
+     return True
+     
+   def run(self, ticks):
+@@ -338,7 +345,11 @@
+     self.initialItem    = selectedSong
+     self.library        = selectedLibrary
+     self.searchText     = ""
++    self.playSongName   = ""
+ 
++    self.cassetteShow   = self.engine.config.get("game", "casseteview")
++    self.autoPreview    = self.engine.config.get("game", "autopreview")
++    self.artistSort     = self.engine.config.get("game", "artistsort")
+     # Use the default library if this one doesn't exist
+     if not self.library or not os.path.isdir(self.engine.resource.fileName(self.library)):
+       self.library = Song.DEFAULT_LIBRARY
+@@ -433,7 +444,7 @@
+         else:
+           self.engine.view.popLayer(self)
+           self.accepted = True
+-        if not self.song:
++        if not self.song and self.autoPreview:
+           self.engine.data.acceptSound.play()
+     elif c in [Player.CANCEL, Player.KEY2]:
+       if self.library != Song.DEFAULT_LIBRARY:
+@@ -453,7 +464,7 @@
+           if self.matchesSearch(self.items[self.selectedIndex]):
+             break
+       self.updateSelection()
+-      if not self.song:
++      if not self.song and self.autoPreview:
+         self.engine.data.selectSound.play()
+     elif c in [Player.DOWN, Player.ACTION2]:
+       if self.matchesSearch(self.items[self.selectedIndex]):
+@@ -462,12 +473,45 @@
+           if self.matchesSearch(self.items[self.selectedIndex]):
+             break
+       self.updateSelection()
+-      if not self.song:
++      if not self.song and self.autoPreview:
++        self.engine.data.selectSound.play()
++    elif key == pygame.K_PAGEUP:
++      if self.matchesSearch(self.items[self.selectedIndex]):
++        while 1:
++          self.selectedIndex = (self.selectedIndex - 10) % len(self.items)
++          if self.matchesSearch(self.items[self.selectedIndex]):
++            break
++      self.updateSelection()
++      if not self.song and self.autoPreview:
+         self.engine.data.selectSound.play()
++    elif key == pygame.K_PAGEDOWN:
++      if self.matchesSearch(self.items[self.selectedIndex]):
++        while 1:
++          self.selectedIndex = (self.selectedIndex + 10) % len(self.items)
++          if self.matchesSearch(self.items[self.selectedIndex]):
++            break
++      self.updateSelection()
++      if not self.song and self.autoPreview:
++       self.engine.data.selectSound.play()
+     elif key == pygame.K_BACKSPACE and not self.accepted:
+       self.searchText = self.searchText[:-1]
++      self.doSearch()
++    elif key == pygame.K_SPACE:
++      if self.playSongName == self.getSelectedSong():
++        self.playSongName = ""
++        self.song.fadeout(1000)
++      else:
++        self.playSelectedSong(forceplay=1)
++    elif key == pygame.K_HOME:
++      self.artistSort = (self.artistSort + 1) % 2
++      if self.artistSort:
++        self.items.sort(key=lambda l: (l.artist.lower() if isinstance(l, Song.SongInfo) else '0'))
++      else:
++        self.items.sort(key=lambda l: (l.name.lower()))
++    elif key == pygame.K_TAB:
++      self.cassetteShow = not self.cassetteShow
+     elif unicode and ord(unicode) > 31 and not self.accepted:
+-      self.searchText += unicode
++      self.searchText += str(unicode)
+       self.doSearch()
+     return True
+ 
+@@ -504,9 +548,9 @@
+     song.play()
+     self.song = song
+ 
+-  def playSelectedSong(self):
++  def playSelectedSong(self, forceplay = 0):
+     song = self.getSelectedSong()
+-    if not song:
++    if not song or (not self.autoPreview and not forceplay):
+       return
+     
+     if self.songLoader:
+@@ -517,10 +561,12 @@
+         return
+ 
+     if self.song:
++      self.playSongName = ""
+       self.song.fadeout(1000)
+ 
+     self.songLoader = self.engine.resource.load(self, None, lambda: Song.loadSong(self.engine, song, playbackOnly = True, library = self.library),
+                                                 onLoad = self.songLoaded)
++    self.playSongName = self.getSelectedSong()
+     
+   def run(self, ticks):
+     self.time += ticks / 50.0
+@@ -608,73 +654,160 @@
+     self.background.transform.scale(math.sin(t / 8) + 2, math.sin(t / 8) + 2)
+     self.background.draw()
+       
+-    # render the item list
+-    try:
+-      glMatrixMode(GL_PROJECTION)
+-      glPushMatrix()
+-      glLoadIdentity()
+-      gluPerspective(60, self.engine.view.aspectRatio, 0.1, 1000)
+-      glMatrixMode(GL_MODELVIEW)
+-      glLoadIdentity()
+-      
+-      glEnable(GL_DEPTH_TEST)
+-      glDisable(GL_CULL_FACE)
+-      glDepthMask(1)
+-      
+-      offset = 10 * (v ** 2)
+-      self.camera.origin = (-10 + offset, -self.cameraOffset, 4   + offset)
+-      self.camera.target = (  0 + offset, -self.cameraOffset, 2.5 + offset)
+-      self.camera.apply()
+-      
+-      y = 0.0
+-      for i, item in enumerate(self.items):
+-        if not self.matchesSearch(item):
+-          continue
++    x = .6
++    y = .15
++
++    if self.cassetteShow:
++      # render the item list
++      try:
++        glMatrixMode(GL_PROJECTION)
++        glPushMatrix()
++        glLoadIdentity()
++        gluPerspective(60, self.engine.view.aspectRatio, 0.1, 1000)
++        glMatrixMode(GL_MODELVIEW)
++        glLoadIdentity()
++      
++        glEnable(GL_DEPTH_TEST)
++        glDisable(GL_CULL_FACE)
++        glDepthMask(1)
++      
++        offset = 10 * (v ** 2)
++        self.camera.origin = (-10 + offset, -self.cameraOffset, 4   + offset)
++        self.camera.target = (  0 + offset, -self.cameraOffset, 2.5 + offset)
++        self.camera.apply()
++      
++        y = 0.0
++        for i, item in enumerate(self.items):
++          if not self.matchesSearch(item):
++            continue
+         
+-        c = math.sin(self.itemAngles[i] * math.pi / 180)
++          c = math.sin(self.itemAngles[i] * math.pi / 180)
+         
+-        if isinstance(item, Song.SongInfo):
+-          h = c * self.cassetteWidth + (1 - c) * self.cassetteHeight
+-        else:
+-          h = c * self.libraryWidth + (1 - c) * self.libraryHeight
++          if isinstance(item, Song.SongInfo):
++            h = c * self.cassetteWidth + (1 - c) * self.cassetteHeight
++          else:
++            h = c * self.libraryWidth + (1 - c) * self.libraryHeight
+         
+-        d = (y + h * .5 + self.camera.origin[1]) / (4 * (self.camera.target[2] - self.camera.origin[2]))
++          d = (y + h * .5 + self.camera.origin[1]) / (4 * (self.camera.target[2] - self.camera.origin[2]))
+ 
+-        if i == self.selectedIndex:
+-          self.selectedOffset = y + h / 2
+-          Theme.setSelectedColor()
+-        else:
+-          Theme.setBaseColor()
++          if i == self.selectedIndex:
++            self.selectedOffset = y + h / 2
++            Theme.setSelectedColor()
++          else:
++            Theme.setBaseColor()
+           
+-        glTranslatef(0, -h / 2, 0)
++          glTranslatef(0, -h / 2, 0)
+         
+-        glPushMatrix()
+-        if abs(d) < 1.2:
+-          if isinstance(item, Song.SongInfo):
+-            glRotate(self.itemAngles[i], 0, 0, 1)
+-            self.renderCassette(item.cassetteColor, self.itemLabels[i])
+-          elif isinstance(item, Song.LibraryInfo):
+-            glRotate(-self.itemAngles[i], 0, 0, 1)
+-            if i == self.selectedIndex:
+-              glRotate(self.time * 4, 1, 0, 0)
+-            self.renderLibrary(item.color, self.itemLabels[i])
+-        glPopMatrix()
++          glPushMatrix()
++          if abs(d) < 1.2:
++            if isinstance(item, Song.SongInfo):
++              glRotate(self.itemAngles[i], 0, 0, 1)
++              self.renderCassette(item.cassetteColor, self.itemLabels[i])
++            elif isinstance(item, Song.LibraryInfo):
++              glRotate(-self.itemAngles[i], 0, 0, 1)
++              if i == self.selectedIndex:
++                glRotate(self.time * 4, 1, 0, 0)
++              self.renderLibrary(item.color, self.itemLabels[i])
++          glPopMatrix()
+         
+-        glTranslatef(0, -h / 2, 0)
+-        y += h
+-      glDisable(GL_DEPTH_TEST)
+-      glDisable(GL_CULL_FACE)
+-      glDepthMask(0)
++          glTranslatef(0, -h / 2, 0)
++          y += h
++
++        glDisable(GL_DEPTH_TEST)
++        glDisable(GL_CULL_FACE)
++        glDepthMask(0)
+       
+-    finally:
+-      glMatrixMode(GL_PROJECTION)
+-      glPopMatrix()
+-      glMatrixMode(GL_MODELVIEW)
++      finally:
++        glMatrixMode(GL_PROJECTION)
++        glPopMatrix()
++        glMatrixMode(GL_MODELVIEW)
++    else:
++      self.engine.view.setOrthogonalProjection(normalize = True)
++      font = self.engine.data.font
+     
+-    # render the song info
++      try:
++        glEnable(GL_BLEND)
++        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
++        glEnable(GL_COLOR_MATERIAL)
++        Theme.setBaseColor(1 - v)
++        n = (0, 0)
++        glBegin(GL_QUADS)
++        glColor4f(0,0,0, .2)
++        glVertex2f(.04, .02)
++        glVertex2f(.04, .652)
++        glVertex2f(.58, .652)
++        glVertex2f(.58, .02)
++        glEnd()
++        glBegin(GL_LINE_LOOP)
++        glColor4f(.7,.7,.7,1)
++        glVertex2f(.04, .02)
++        glVertex2f(.04, .652)
++        glVertex2f(.58, .652)
++        glVertex2f(.58, .02)
++        glEnd()
++
++        length = 0
++        select = 0
++        it = 0
++        for i, item in enumerate(self.items):
++          if not self.matchesSearch(item):
++            continue
++          if isinstance(item, Song.SongInfo) or isinstance(item, Song.LibraryInfo):
++            length+=1
++            if self.selectedIndex == i:
++              select = length
++
++        Theme.setSelectedColor(1 - v)
++        scale = 0.0008
++        for i, item in enumerate(self.items):
++          if not self.matchesSearch(item):
++            continue
++          if isinstance(item, Song.SongInfo) or isinstance(item, Song.LibraryInfo):
++            it+=1
++            if it >= (select - 5) or it >= (select + 11):
++              if self.selectedIndex == i:
++                glBegin(GL_QUADS)
++                glColor4f(1,1,1, .1)
++              else:
++                glBegin(GL_QUADS)
++                if it % 2 == 0:
++                  glColor4f(0,0,0, .3)
++                else:
++                  glColor4f(0,0,0, .5)
++              glVertex2f(.045, n[1] + font.getHeight() * scale)
++              glVertex2f(.045, n[1] + 3*font.getHeight() * scale)
++              glVertex2f(.575, n[1] + 3*font.getHeight() * scale)
++              glVertex2f(.575, n[1] + font.getHeight() * scale)
++              glEnd()
++              Theme.setSelectedColor(1 - v)
++              if self.artistSort:
++                n = wrapText(font, (.05, n[1] + font.getHeight() * scale), item.artist if isinstance(item, Song.SongInfo) else _("Songs library"), 0.57, visibility = 0.0, scale = scale, hide = 1, hidestring = "...")
++                Theme.setBaseColor(1 - v)
++                n = wrapText(font, (.07, n[1] + font.getHeight() * scale), item.name, 0.57, visibility = 0.0, scale = scale, hide = 1, hidestring = "..." )
++              else:
++                n = wrapText(font, (.05, n[1] + font.getHeight() * scale), item.name, 0.57, visibility = 0.0, scale = scale, hide = 1, hidestring = "...")
++                Theme.setBaseColor(1 - v)
++                n = wrapText(font, (.07, n[1] + font.getHeight() * scale), item.artist if isinstance(item, Song.SongInfo) else _("Songs library"), 0.57, visibility = 0.0, scale = scale, hide = 1, hidestring = "..." )
++              if ((n[1] + 2*font.getHeight() * scale) >= .65):
++                break
++
++        perc = float(select)/float(length) if length > 0 else 0
++        glBegin(GL_QUADS)
++        glColor4f(1,1,1,.8)
++        glVertex2f(.575, .02 + .59*perc)
++        glColor4f(.3,.3,.3,.8)
++        glVertex2f(.575, .02 + .59*perc + .04)
++        glColor4f(1,1,1,.8)
++        glVertex2f(.586, .02 + .59*perc + .04)
++        glColor4f(.3,.3,.3,.8)
++        glVertex2f(.586, .02 + .59*perc)
++        glEnd()
++
++      finally:
++        self.engine.view.resetProjection()
+     self.engine.view.setOrthogonalProjection(normalize = True)
+     font = self.engine.data.font
+-    
++    # render the song info
+     try:
+       glEnable(GL_BLEND)
+       glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+--- src/fretsonfire.pot
++++ src/fretsonfire.pot
+@@ -120,63 +120,67 @@
+ msgid "__lefttoright__"
+ msgstr ""
+ 
+-#: Dialogs.py:271
++#: Dialogs.py:278
+ msgid "<OK>"
+ msgstr ""
+ 
+-#: Dialogs.py:357
++#: Dialogs.py:368
+ msgid "Browsing Collection..."
+ msgstr ""
+ 
+-#: Dialogs.py:683
++#: Dialogs.py:784 Dialogs.py:790
++msgid "Songs library"
++msgstr ""
++
++#: Dialogs.py:818
+ msgid "Filter: %s"
+ msgstr ""
+ 
+-#: Dialogs.py:685
++#: Dialogs.py:820
+ msgid "Not found"
+ msgstr ""
+ 
+-#: Dialogs.py:688
++#: Dialogs.py:823
+ msgid "Loading Preview..."
+ msgstr ""
+ 
+-#: Dialogs.py:731
++#: Dialogs.py:866
+ msgid "One song in this library"
+ msgstr ""
+ 
+-#: Dialogs.py:733
++#: Dialogs.py:868
+ msgid "%d songs in this library"
+ msgstr ""
+ 
+-#: Dialogs.py:758
++#: Dialogs.py:893
+ msgid "[Parent Folder]"
+ msgstr ""
+ 
+-#: Dialogs.py:760
++#: Dialogs.py:895
+ msgid "%s [Folder]"
+ msgstr ""
+ 
+-#: Dialogs.py:966
++#: Dialogs.py:1101
+ msgid "%.2f beats per minute"
+ msgstr ""
+ 
+-#: Dialogs.py:1030
++#: Dialogs.py:1165
+ msgid "Pick!"
+ msgstr ""
+ 
+-#: Dialogs.py:1069
++#: Dialogs.py:1204
+ msgid "Choose a Song"
+ msgstr ""
+ 
+-#: Dialogs.py:1084
++#: Dialogs.py:1219
+ msgid "Choose a File"
+ msgstr ""
+ 
+-#: Dialogs.py:1110
++#: Dialogs.py:1245
+ msgid "Play with the keys and press Escape when you're done."
+ msgstr ""
+ 
+-#: Dialogs.py:1120
++#: Dialogs.py:1255
+ msgid "Loading..."
+ msgstr ""
+ 
+@@ -392,11 +396,11 @@
+ msgid "Upload Highscores"
+ msgstr ""
+ 
+-#: GameEngine.py:51 GameEngine.py:53 GameEngine.py:54 GameEngine.py:55
++#: GameEngine.py:51 GameEngine.py:53 GameEngine.py:54 GameEngine.py:55 GameEngine.py:56 GameEngine.py:57 GameEngine.py:58
+ msgid "No"
+ msgstr ""
+ 
+-#: GameEngine.py:51 GameEngine.py:53 GameEngine.py:54 GameEngine.py:55
++#: GameEngine.py:51 GameEngine.py:53 GameEngine.py:54 GameEngine.py:55 GameEngine.py:56 GameEngine.py:57 GameEngine.py:58
+ msgid "Yes"
+ msgstr ""
+ 
+@@ -409,106 +413,118 @@
+ msgstr ""
+ 
+ #: GameEngine.py:55
+-msgid "Fullscreen Mode"
++msgid "Cassete list mode"
+ msgstr ""
+ 
+ #: GameEngine.py:56
++msgid "Song auto preview"
++msgstr ""
++
++#: GameEngine.py:57
++msgid "Sort by artist"
++msgstr ""
++
++#: GameEngine.py:58
++msgid "Fullscreen Mode"
++msgstr ""
++
++#: GameEngine.py:59
+ msgid "2x"
+ msgstr ""
+ 
+-#: GameEngine.py:56
++#: GameEngine.py:59
+ msgid "4x"
+ msgstr ""
+ 
+-#: GameEngine.py:56
++#: GameEngine.py:59
+ msgid "6x"
+ msgstr ""
+ 
+-#: GameEngine.py:56
++#: GameEngine.py:59
+ msgid "8x"
+ msgstr ""
+ 
+-#: GameEngine.py:56
++#: GameEngine.py:59
+ msgid "Antialiasing Quality"
+ msgstr ""
+ 
+-#: GameEngine.py:56
++#: GameEngine.py:59
+ msgid "None"
+ msgstr ""
+ 
+-#: GameEngine.py:58
++#: GameEngine.py:61
+ msgid "Frames per Second"
+ msgstr ""
+ 
+-#: GameEngine.py:59
++#: GameEngine.py:62
+ msgid "High"
+ msgstr ""
+ 
+-#: GameEngine.py:59
++#: GameEngine.py:62
+ msgid "Low"
+ msgstr ""
+ 
+-#: GameEngine.py:59
++#: GameEngine.py:62
+ msgid "Normal"
+ msgstr ""
+ 
+-#: GameEngine.py:59
++#: GameEngine.py:62
+ msgid "SVG Quality"
+ msgstr ""
+ 
+-#: GameEngine.py:60
++#: GameEngine.py:63
+ msgid "Sample Frequency"
+ msgstr ""
+ 
+-#: GameEngine.py:61
++#: GameEngine.py:64
+ msgid "Sample Bits"
+ msgstr ""
+ 
+-#: GameEngine.py:63
++#: GameEngine.py:66
+ msgid "Buffer Size"
+ msgstr ""
+ 
+-#: GameEngine.py:64
++#: GameEngine.py:67
+ msgid "A/V delay"
+ msgstr ""
+ 
+-#: GameEngine.py:65
++#: GameEngine.py:68
+ msgid "Loud"
+ msgstr ""
+ 
+-#: GameEngine.py:65
++#: GameEngine.py:68
+ msgid "Painful"
+ msgstr ""
+ 
+-#: GameEngine.py:65
++#: GameEngine.py:68
+ msgid "Quiet"
+ msgstr ""
+ 
+-#: GameEngine.py:65
++#: GameEngine.py:68
+ msgid "Screw Up Sounds"
+ msgstr ""
+ 
+-#: GameEngine.py:65 Mod.py:33
++#: GameEngine.py:68 Mod.py:33
+ msgid "Off"
+ msgstr ""
+ 
+-#: GameEngine.py:66
++#: GameEngine.py:69
+ msgid "Guitar Volume"
+ msgstr ""
+ 
+-#: GameEngine.py:67
++#: GameEngine.py:70
+ msgid "Song Volume"
+ msgstr ""
+ 
+-#: GameEngine.py:68
++#: GameEngine.py:71
+ msgid "Rhythm Volume"
+ msgstr ""
+ 
+-#: GameEngine.py:69
++#: GameEngine.py:72
+ msgid "Text scale"
+ msgstr ""
+ 
+-#: GameEngine.py:135
++#: GameEngine.py:138
+ msgid "Frets on Fire"
+ msgstr ""
+ 
+--- src/GameEngine.py
++++ src/GameEngine.py
+@@ -52,6 +52,9 @@
+ Config.define("game",   "uploadurl",    str,   "http://fretsonfire.sourceforge.net/play")
+ Config.define("game",   "leftymode",    bool,  False, text = _("Lefty mode"),           options = {False: _("No"), True: _("Yes")})
+ Config.define("game",   "tapping",      bool,  True,  text = _("Tappable notes"),       options = {False: _("No"), True: _("Yes")})
++Config.define("game",   "casseteview",  bool,  True,  text = _("Cassete list mode"),    options = {False: _("No"), True: _("Yes")})
++Config.define("game",   "autopreview",  bool,  True,  text = _("Song auto preview"),    options = {False: _("No"), True: _("Yes")})
++Config.define("game",   "artistsort",   bool,  False, text = _("Sort by artist"),       options = {False: _("No"), True: _("Yes")})
+ Config.define("video",  "fullscreen",   bool,  False, text = _("Fullscreen Mode"),      options = {False: _("No"), True: _("Yes")})
+ Config.define("video",  "multisamples", int,   4,     text = _("Antialiasing Quality"), options = {0: _("None"), 2: _("2x"), 4: _("4x"), 6: _("6x"), 8: _("8x")})
+ Config.define("video",  "resolution",   str,   "640x480")
+--- src/Settings.py
++++ src/Settings.py
+@@ -140,6 +140,9 @@
+       ConfigChoice(engine.config, "game",  "leftymode", autoApply = True),
+       ConfigChoice(engine.config, "game",  "tapping", autoApply = True),
+       ConfigChoice(engine.config, "game",  "uploadscores", autoApply = True),
++      ConfigChoice(engine.config, "game",  "casseteview", autoApply = True),
++      ConfigChoice(engine.config, "game",  "autopreview", autoApply = True),
++      ConfigChoice(engine.config, "game",  "artistsort", autoApply = True),
+     ]
+     gameSettingsMenu = Menu.Menu(engine, gameSettings + applyItem)
+ 

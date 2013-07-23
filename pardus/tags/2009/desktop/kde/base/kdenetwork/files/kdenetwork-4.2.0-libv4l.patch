@@ -1,0 +1,81 @@
+diff -up kdenetwork-4.2.0/kopete/libkopete/avdevice/CMakeLists.txt.libv4l kdenetwork-4.2.0/kopete/libkopete/avdevice/CMakeLists.txt
+--- kdenetwork-4.2.0/kopete/libkopete/avdevice/CMakeLists.txt.libv4l	2009-01-26 16:03:03.000000000 +0100
++++ kdenetwork-4.2.0/kopete/libkopete/avdevice/CMakeLists.txt	2009-01-26 16:02:26.000000000 +0100
+@@ -18,7 +18,7 @@ set(kopete_videodevice_LIB_SRCS 
+ 
+ kde4_add_library(kopete_videodevice SHARED ${kopete_videodevice_LIB_SRCS})
+ 
+-target_link_libraries(kopete_videodevice ${QT_QTGUI_LIBRARY} ${KDE4_KDECORE_LIBS} ${KDE4_SOLID_LIBS})
++target_link_libraries(kopete_videodevice ${QT_QTGUI_LIBRARY} ${KDE4_KDECORE_LIBS} ${KDE4_SOLID_LIBS} -lv4l2)
+ 
+ set_target_properties(kopete_videodevice PROPERTIES VERSION ${GENERIC_LIB_VERSION} SOVERSION ${GENERIC_LIB_SOVERSION} )
+ install(TARGETS kopete_videodevice ${INSTALL_TARGETS_DEFAULT_ARGS})
+diff -up kdenetwork-4.2.0/kopete/libkopete/avdevice/videodevice.cpp.libv4l kdenetwork-4.2.0/kopete/libkopete/avdevice/videodevice.cpp
+--- kdenetwork-4.2.0/kopete/libkopete/avdevice/videodevice.cpp.libv4l	2009-01-01 17:27:59.000000000 +0100
++++ kdenetwork-4.2.0/kopete/libkopete/avdevice/videodevice.cpp	2009-01-26 16:47:23.000000000 +0100
+@@ -147,7 +147,7 @@ int VideoDevice::xioctl(int request, voi
+ {
+ 	int r;
+ 
+-	do r = ioctl (descriptor, request, arg);
++	do r = v4l2_ioctl (descriptor, request, arg);
+ 	while (-1 == r && EINTR == errno);
+ 	return r;
+ }
+@@ -185,7 +185,7 @@ int VideoDevice::open()
+ 		kDebug() << "Device is already open";
+ 		return EXIT_SUCCESS;
+ 	}
+-	descriptor = ::open (QFile::encodeName(full_filename), O_RDWR, 0);
++	descriptor = ::v4l2_open (QFile::encodeName(full_filename), O_RDWR, 0);
+ 	if(isOpen())
+ 	{
+ 		kDebug() << "File " << full_filename << " was opened successfuly";
+@@ -988,7 +988,7 @@ int VideoDevice::getFrame()
+ 				if (m_currentbuffer.data.isEmpty())
+ 					return EXIT_FAILURE;
+ 
+-				bytesread = read (descriptor, &m_currentbuffer.data[0], m_currentbuffer.data.size());
++				bytesread = v4l2_read (descriptor, &m_currentbuffer.data[0], m_currentbuffer.data.size());
+ 				if (-1 == bytesread) // must verify this point with ov511 driver.
+ 				{
+ 					kDebug() << "IO_METHOD_READ failed.";
+@@ -1434,7 +1434,7 @@ int VideoDevice::stopCapturing()
+ 						unsigned int loop;
+ 						for (loop = 0; loop < m_streambuffers; ++loop)
+ 						{
+-							if (munmap(m_rawbuffers[loop].start,m_rawbuffers[loop].length) != 0)
++							if (v4l2_munmap(m_rawbuffers[loop].start,m_rawbuffers[loop].length) != 0)
+ 							{
+ 								kDebug() << "unable to munmap.";
+ 							}
+@@ -1462,7 +1462,7 @@ int VideoDevice::close()
+ 	{
+ 		kDebug() << " Device is open. Trying to properly shutdown the device.";
+ 		stopCapturing();
+-		int ret = ::close(descriptor);
++		int ret = ::v4l2_close(descriptor);
+ 		kDebug() << "::close() returns " << ret;
+ 	}
+ 	descriptor = -1;
+@@ -2749,7 +2749,7 @@ int VideoDevice::initMmap()
+ 				return errnoReturn ("VIDIOC_QUERYBUF");
+ 
+ 			m_rawbuffers[m_streambuffers].length = v4l2buffer.length;
+-			m_rawbuffers[m_streambuffers].start = (uchar *) mmap (NULL /* start anywhere */, v4l2buffer.length, PROT_READ | PROT_WRITE /* required */, MAP_SHARED /* recommended */, descriptor, v4l2buffer.m.offset);
++			m_rawbuffers[m_streambuffers].start = (uchar *) v4l2_mmap (NULL /* start anywhere */, v4l2buffer.length, PROT_READ | PROT_WRITE /* required */, MAP_SHARED /* recommended */, descriptor, v4l2buffer.m.offset);
+ 
+ 			if (MAP_FAILED == m_rawbuffers[m_streambuffers].start)
+ 			return errnoReturn ("mmap");
+diff -up kdenetwork-4.2.0/kopete/libkopete/avdevice/videodevice.h.libv4l kdenetwork-4.2.0/kopete/libkopete/avdevice/videodevice.h
+--- kdenetwork-4.2.0/kopete/libkopete/avdevice/videodevice.h.libv4l	2009-01-06 18:27:30.000000000 +0100
++++ kdenetwork-4.2.0/kopete/libkopete/avdevice/videodevice.h	2009-01-26 16:05:53.000000000 +0100
+@@ -31,6 +31,8 @@
+ #include <unistd.h>
+ #include <signal.h>
+ 
++#include <libv4l2.h>
++
+ #if defined(__linux__) && defined(ENABLE_AV)
+ 
+ #include <asm/types.h>

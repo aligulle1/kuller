@@ -1,0 +1,14 @@
+--- poppler-0.10.7/poppler/Annot.cc	2009-05-02 14:14:57.000000000 +0200
++++ poppler-0.10.7/poppler/Annot.cc	2010-03-04 13:59:13.000000000 +0100
+@@ -2882,7 +2882,10 @@ void AnnotWidget::generateFieldAppearanc
+   obj1.free();
+ 
+   // get the default appearance string
+-  if (Form::fieldLookup(field, "DA", &obj1)->isNull()) {
++  if (Form::fieldLookup(annot, "DA", &obj1)->isNull()) {
++    obj1.free();
++  }
++  if (!obj1.isString() && Form::fieldLookup(field, "DA", &obj1)->isNull()) {
+     obj1.free();
+     acroForm->lookup("DA", &obj1);
+   }

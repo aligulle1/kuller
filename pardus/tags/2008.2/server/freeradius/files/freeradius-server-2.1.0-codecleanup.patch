@@ -1,0 +1,56 @@
+--- src/modules/rlm_smb/rfcnb-util.c
++++ src/modules/rlm_smb/rfcnb-util.c
+@@ -208,7 +208,7 @@
+ 
+ /* Free up a packet */
+ 
+-int RFCNB_Free_Pkt(struct RFCNB_Pkt *pkt)
++void RFCNB_Free_Pkt(struct RFCNB_Pkt *pkt)
+ 
+ { struct RFCNB_Pkt *pkt_next; char *data_ptr;
+ 
+--- src/modules/rlm_smb/rfcnb-util.h
++++ src/modules/rlm_smb/rfcnb-util.h
+@@ -52,3 +52,4 @@
+ 		      struct in_addr *Dest_IP,
+ 		      int * port);
+ 
++void RFCNB_Free_Pkt(struct RFCNB_Pkt *pkt);
+--- src/modules/rlm_smb/session.c
++++ src/modules/rlm_smb/session.c
+@@ -41,6 +41,7 @@
+ 
+ #include "rfcnb-priv.h"
+ #include "rfcnb-util.h"
++#include "rfcnb-io.h"
+ 
+ int RFCNB_Stats[RFCNB_MAX_STATS];
+ 
+@@ -315,7 +316,7 @@
+ void *RFCNB_Listen()
+ 
+ {
+-
++  return NULL;
+ }
+ 
+ /* Pick up the last error response as a string, hmmm, this routine should */
+@@ -357,7 +358,7 @@
+ 
+ /* Pick up the last error response and return in string ...             */
+ 
+-int RFCNB_Get_Error_Msg(int code, char *msg_buf, int len)
++void RFCNB_Get_Error_Msg(int code, char *msg_buf, int len)
+ 
+ {
+ 
+--- src/modules/rlm_smb/smbencrypt.c
++++ src/modules/rlm_smb/smbencrypt.c
+@@ -25,6 +25,7 @@
+ RCSID("$Id$")
+ 
+ #include <string.h>
++#include <ctype.h>
+ #ifdef HAVE_SYS_VFS_H
+ #include <sys/vfs.h>
+ #endif

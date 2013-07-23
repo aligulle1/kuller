@@ -1,0 +1,25 @@
+commit 1032141bd580b20bfe6c5efe737eb6e3fa595d06
+Author: Lennart Poettering <lennart@poettering.net>
+Date:   Tue Sep 1 04:47:16 2009 +0200
+
+    pci-db: make sure we actually read the pci.ids file instead of usb.ids
+    
+    Since the recent Makefile.am rework both usb-db and pci-db were built to
+    read the usb.ids database file. This fix makes sure pci-db properly
+    reads pci.ids instead.
+    
+    Originally pointed out by Marco d'Itri.
+
+diff --git a/Makefile.am b/Makefile.am
+index d785f05..61fbf22 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -439,7 +439,7 @@ libexec_PROGRAMS += extras/usb-db/usb-db
+ # pci-db - read PCI vendor/device string database
+ # ------------------------------------------------------------------------------
+ extras_usb_db_pci_db_SOURCES = extras/usb-db/usb-db.c
+-extras_usb_db_pci_db_CPPFLAGS = $(AM_CPPFLAGS) -DPCI_DATABASE=\"$(USB_DATABASE)\" -DBUILD_FOR_PCI
++extras_usb_db_pci_db_CPPFLAGS = $(AM_CPPFLAGS) -DPCI_DATABASE=\"$(PCI_DATABASE)\" -DBUILD_FOR_PCI
+ extras_usb_db_pci_db_LDADD = libudev/libudev-private.la
+ libexec_PROGRAMS += extras/usb-db/pci-db
+ 

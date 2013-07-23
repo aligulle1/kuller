@@ -1,0 +1,219 @@
+--- a/stubdom/Makefile	2010-08-21 02:41:28.625102883 +0300
++++ b/stubdom/Makefile	2010-08-21 02:42:12.970041743 +0300
+@@ -97,6 +97,8 @@
+ 
+ newlib-$(NEWLIB_VERSION): newlib-$(NEWLIB_VERSION).tar.gz
+ 	tar xzf $<
++	patch -d $@ -p0 < newlib-configure.patch
++	patch -d $@ -p0 < newlib-prototype.patch
+ 	patch -d $@ -p0 < newlib.patch
+ 	patch -d $@ -p0 < newlib-chk.patch
+ 	patch -d $@ -p1 < newlib-stdint-size_max-fix-from-1.17.0.patch
+
+--- /dev/null
++++ a/stubdom/newlib-configure.patch
+@@ -0,0 +1,63 @@
++--- configure	2010-08-21 01:37:23.889043255 +0300
+++++ configure	2010-08-21 01:38:22.150100140 +0300
++@@ -1445,7 +1445,7 @@
++ ac_ext=c
++ ac_cpp='$CPP $CPPFLAGS'
++ ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
++-ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
+++ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS conftest.$ac_ext $LIBS >&5'
++ ac_compiler_gnu=$ac_cv_c_compiler_gnu
++ 
++ 
++@@ -2836,7 +2836,7 @@
++ ac_ext=c
++ ac_cpp='$CPP $CPPFLAGS'
++ ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
++-ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
+++ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS conftest.$ac_ext $LIBS >&5'
++ ac_compiler_gnu=$ac_cv_c_compiler_gnu
++ if test -n "$ac_tool_prefix"; then
++   # Extract the first word of "${ac_tool_prefix}gcc", so it can be a program name with args.
++@@ -3760,13 +3760,13 @@
++ ac_ext=c
++ ac_cpp='$CPP $CPPFLAGS'
++ ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
++-ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
+++ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS conftest.$ac_ext $LIBS >&5'
++ ac_compiler_gnu=$ac_cv_c_compiler_gnu
++ 
++ ac_ext=cc
++ ac_cpp='$CXXCPP $CPPFLAGS'
++ ac_compile='$CXX -c $CXXFLAGS $CPPFLAGS conftest.$ac_ext >&5'
++-ac_link='$CXX -o conftest$ac_exeext $CXXFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
+++ac_link='$CXX -o conftest$ac_exeext $CXXFLAGS $CPPFLAGS conftest.$ac_ext $LIBS >&5'
++ ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
++ if test -n "$ac_tool_prefix"; then
++   for ac_prog in $CCC g++ c++ gpp aCC CC cxx cc++ cl FCC KCC RCC xlC_r xlC
++@@ -4115,7 +4115,7 @@
++ ac_ext=c
++ ac_cpp='$CPP $CPPFLAGS'
++ ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
++-ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
+++ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS conftest.$ac_ext $LIBS >&5'
++ ac_compiler_gnu=$ac_cv_c_compiler_gnu
++ 
++ 
++@@ -5403,7 +5403,7 @@
++ # can be created.  At this point the main configure script has set CC.
++ we_are_ok=no
++ echo "int main () { return 0; }" > conftest.c
++-${CC} -o conftest ${CFLAGS} ${CPPFLAGS} ${LDFLAGS} conftest.c
+++${CC} -o conftest ${CFLAGS} ${CPPFLAGS} conftest.c
++ if test $? = 0 ; then
++   if test -s conftest || test -s conftest.exe ; then
++     we_are_ok=yes
++@@ -5411,7 +5411,7 @@
++ fi
++ case $we_are_ok in
++   no)
++-    echo 1>&2 "*** The command '${CC} -o conftest ${CFLAGS} ${CPPFLAGS} ${LDFLAGS} conftest.c' failed."
+++    echo 1>&2 "*** The command '${CC} -o conftest ${CFLAGS} ${CPPFLAGS} conftest.c' failed."
++     echo 1>&2 "*** You must set the environment variable CC to a working compiler."
++     rm -f conftest*
++     exit 1
+
+--- /dev/null
++++ a/stubdom/newlib-prototype.patch
+@@ -0,0 +1,137 @@
++--- configure	2010-09-06 09:25:46.806614806 +0300
+++++ configure	2010-09-06 09:26:03.755232886 +0300
++@@ -3176,7 +3176,7 @@
++ /* end confdefs.h.  */
++ 
++ int
++-main ()
+++main (void)
++ {
++ 
++   ;
++@@ -3332,7 +3332,7 @@
++ /* end confdefs.h.  */
++ 
++ int
++-main ()
+++main (void)
++ {
++ 
++   ;
++@@ -3382,7 +3382,7 @@
++ /* end confdefs.h.  */
++ 
++ int
++-main ()
+++main (void)
++ {
++ #ifndef __GNUC__
++        choke me
++@@ -3444,7 +3444,7 @@
++ /* end confdefs.h.  */
++ 
++ int
++-main ()
+++main (void)
++ {
++ 
++   ;
++@@ -3551,7 +3551,7 @@
++ int argc;
++ char **argv;
++ int
++-main ()
+++main (void)
++ {
++ return f (e, argv, 0) != argv[0]  ||  f (e, argv, 1) != argv[1];
++   ;
++@@ -3662,7 +3662,7 @@
++ $ac_declaration
++ #include <stdlib.h>
++ int
++-main ()
+++main (void)
++ {
++ exit (42);
++   ;
++@@ -3707,7 +3707,7 @@
++ /* end confdefs.h.  */
++ $ac_declaration
++ int
++-main ()
+++main (void)
++ {
++ exit (42);
++   ;
++@@ -3889,7 +3889,7 @@
++ /* end confdefs.h.  */
++ 
++ int
++-main ()
+++main (void)
++ {
++ #ifndef __GNUC__
++        choke me
++@@ -3951,7 +3951,7 @@
++ /* end confdefs.h.  */
++ 
++ int
++-main ()
+++main (void)
++ {
++ 
++   ;
++@@ -4023,7 +4023,7 @@
++ $ac_declaration
++ #include <stdlib.h>
++ int
++-main ()
+++main (void)
++ {
++ exit (42);
++   ;
++@@ -4068,7 +4068,7 @@
++ /* end confdefs.h.  */
++ $ac_declaration
++ int
++-main ()
+++main (void)
++ {
++ exit (42);
++   ;
++@@ -4489,7 +4489,7 @@
++ /* end confdefs.h.  */
++ #include "gmp.h"
++ int
++-main ()
+++main (void)
++ {
++ 
++   #if __GNU_MP_VERSION < 4 || (__GNU_MP_VERSION == 4 && __GNU_MP_VERSION_MINOR < 1)
++@@ -4547,7 +4547,7 @@
++ #include <gmp.h>
++     #include <mpfr.h>
++ int
++-main ()
+++main (void)
++ {
++ 
++     #if MPFR_VERSION < MPFR_VERSION_NUM(2,2,1)
++@@ -4597,7 +4597,7 @@
++ #include <gmp.h>
++     #include <mpfr.h>
++ int
++-main ()
+++main (void)
++ {
++ 
++     #if MPFR_VERSION < MPFR_VERSION_NUM(2,3,0)
++@@ -12021,7 +12021,7 @@
++ #endif
++ 
++ int
++-main ()
+++main (void)
++ {
++ 
++   ;

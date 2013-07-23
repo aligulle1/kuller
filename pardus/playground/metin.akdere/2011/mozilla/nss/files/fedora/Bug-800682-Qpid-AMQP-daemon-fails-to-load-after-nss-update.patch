@@ -1,0 +1,16 @@
+Index: mozilla/security/nss/lib/nss/nssinit.c
+===================================================================
+--- mozilla.orig/security/nss/lib/nss/nssinit.c
++++ mozilla/security/nss/lib/nss/nssinit.c
+@@ -1155,6 +1155,11 @@ SECStatus
+ NSS_Shutdown(void)
+ {
+     SECStatus rv;
++    /* make sure our lock and condition variable are initialized one and only
++     * one time */ 
++    if (PR_CallOnce(&nssInitOnce, nss_doLockInit) != PR_SUCCESS) {
++	return SECFailure;
++    }
+     PZ_Lock(nssInitLock);
+ 
+     if (!nssIsInitted) {

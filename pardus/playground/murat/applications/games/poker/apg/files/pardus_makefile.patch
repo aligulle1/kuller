@@ -1,0 +1,99 @@
+--- Makefile.orig	2003-08-07 18:40:39.000000000 +0300
++++ Makefile	2008-06-29 12:12:32.000000000 +0300
+@@ -7,7 +7,7 @@
+ APG_BIN_DIR = /bin
+ 
+ # Full default path is /usr/local/man/man1
+-APG_MAN_DIR = /man/man1
++APG_MAN_DIR = /share/man/man1
+ 
+ # Full default path is /usr/local/sbin
+ APGD_BIN_DIR = /sbin
+@@ -44,18 +44,18 @@
+ # If you want to use cracklib for password quality check then you
+ # must uncomment the folowing 4 lines (you must not do this for WIN32)
+ #
+-#CRACKLIB_DICTPATH = "/usr/local/lib/pw_dict"
+-#STANDALONE_OPTIONS += -DAPG_USE_CRACKLIB '-DCRACKLIB_DICTPATH=${CRACKLIB_DICTPATH}' -I/usr/local/include -L/usr/local/lib
+-#CLISERV_OPTIONS += -DAPG_USE_CRACKLIB '-DCRACKLIB_DICTPATH=${CRACKLIB_DICTPATH}' -I/usr/local/include -L/usr/local/lib
+-#APG_CLIBS += -lcrack
++CRACKLIB_DICTPATH = "/usr/share/cracklib"
++STANDALONE_OPTIONS += -DAPG_USE_CRACKLIB '-DCRACKLIB_DICTPATH=${CRACKLIB_DICTPATH}' -I/usr/include -L/usr/lib
++CLISERV_OPTIONS += -DAPG_USE_CRACKLIB '-DCRACKLIB_DICTPATH=${CRACKLIB_DICTPATH}' -I/usr/include -L/usr/lib
++APG_CLIBS += -lcrack
+ 
+ ##################################################################
+ # Support for ANSI X9.17/SHA1 PRNG
+ # If you want to use SHA1 for random number genetation then you
+ # must uncomment the folowing 2 lines
+ #
+-#STANDALONE_OPTIONS += -DAPG_USE_SHA
+-#CLISERV_OPTIONS += -DAPG_USE_SHA
++STANDALONE_OPTIONS += -DAPG_USE_SHA
++CLISERV_OPTIONS += -DAPG_USE_SHA
+ 
+ ##################################################################
+ # You can modify CC variable if you have compiler other than GCC
+@@ -65,7 +65,7 @@
+ ##################################################################
+ # Compilation flags
+ # You should comment the line below for AIX+native cc
+-CFLAGS = -Wall
++CFLAGS += -Wall
+ 
+ ####################################################################
+ # If you plan to install APG daemon you should look at lines below #
+@@ -81,7 +81,7 @@
+ # Linux
+ #
+ # Uncoment line below for LINUX
+-#APG_CS_CLIBS += -lnsl
++APG_CS_CLIBS += -lnsl
+ 
+ ####################################################################
+ # Solaris
+@@ -137,11 +137,6 @@
+ apgbfm:
+ 	${CC} ${FLAGS} -DAPGBFM -o ${BFM_PROGNAME} ${BFM_SOURCES} ${APGBFM_CLIBS}
+ 
+-strip:
+-	strip ${PROGNAME}
+-	strip ${CS_PROGNAME}
+-	strip ${BFM_PROGNAME}
+-
+ install:
+ 	if test -x ./apg; then \
+ ./mkinstalldirs ${INSTALL_PREFIX}${APG_BIN_DIR}; \
+@@ -162,6 +157,11 @@
+ ./install-sh -c -m 0444 ./doc/man/apgbfm.1 ${INSTALL_PREFIX}${APG_MAN_DIR}; \
+ fi
+ 
++	if test -x ./bfconvert/bfconvert; then \
++./mkinstalldirs ${INSTALL_PREFIX}${APG_BIN_DIR}; \
++./install-sh -c -m 0755 -o root -g ${FIND_GROUP} ./bfconvert/bfconvert ${INSTALL_PREFIX}${APG_BIN_DIR}; \
++fi
++
+ install-cygwin:
+ 	if test -x ./apg.exe; then \
+ ./mkinstalldirs ${INSTALL_PREFIX}${APG_BIN_DIR}; \
+--- bfconvert/Makefile.orig	2003-08-07 18:40:39.000000000 +0300
++++ bfconvert/Makefile	2008-06-29 12:08:38.000000000 +0300
+@@ -6,7 +6,7 @@
+ ##################################################################
+ # Compilation flags
+ # You should comment the line below for AIX+native cc
+-FLAGS = -Wall
++FLAGS = $(CFLAGS) -Wall
+ 
+ ECHO = echo
+ PROGNAME = bfconvert
+@@ -15,9 +15,6 @@
+ all:
+ 	${CC} ${FLAGS} -o ${PROGNAME} ${SOURCES}
+ 
+-strip:
+-	strip ${PROGNAME}
+-
+ install:
+ 	@${ECHO} "**********************************************"
+ 	@${ECHO} "* This program shold be used to convert your *"  

@@ -1,0 +1,32 @@
+qt-bugs@ issue : awaiting
+Trolltech task ID : None
+bugs.kde.org number : None
+applied: no
+
+Revert the change made in Qt snapshot 20060902. Since dbus_shutdown is
+no longer called (see patch 0148), there's no need to close the
+connection when it's removed. It's closed automatically when the last
+reference is dropped.
+
+Unlike patch 0148, this patch hasn't been accepted yet by Trolltech.
+
+=== tools/qdbus/src/qdbusconnection.cpp
+==================================================================
+--- tools/qdbus/src/qdbusconnection.cpp	(revision 72)
++++ tools/qdbus/src/qdbusconnection.cpp	(local)
+@@ -82,14 +82,8 @@
+ 
+     QDBusConnectionPrivate *d = 0;
+     d = connectionHash.take(name);
+-    if (d && !d->ref.deref()) {
++    if (d && !d->ref.deref())
+         delete d;
+-    } else if (d) {
+-        d->closeConnection();
+-        qWarning("QDBusConnection: closed connection %s"
+-                 "is still referred to by other QDBusConnection objects",
+-                 name.toLocal8Bit().constData());
+-    }
+ }
+ 
+ QDBusConnectionManager::~QDBusConnectionManager()

@@ -1,0 +1,44 @@
+diff -Naur nepomuk-orig/services/strigi/strigiserviceconfig.cpp nepomuk/services/strigi/strigiserviceconfig.cpp
+--- nepomuk-orig/services/strigi/strigiserviceconfig.cpp	2009-06-01 15:51:38.533199415 +0300
++++ nepomuk/services/strigi/strigiserviceconfig.cpp	2009-06-01 15:47:59.414078683 +0300
+@@ -57,6 +57,10 @@
+     return m_config.group( "General" ).readPathEntry( "folders", QStringList() << QDir::homePath() );
+ }
+ 
++bool Nepomuk::StrigiServiceConfig::systrayEnabled() const
++{
++    return m_config.group( "General" ).readEntry( "enable systray applet", false );
++}
+ 
+ QStringList Nepomuk::StrigiServiceConfig::excludeFolders() const
+ {
+diff -Naur nepomuk-orig/services/strigi/strigiserviceconfig.h nepomuk/services/strigi/strigiserviceconfig.h
+--- nepomuk-orig/services/strigi/strigiserviceconfig.h	2009-06-01 15:51:38.533199415 +0300
++++ nepomuk/services/strigi/strigiserviceconfig.h	2009-06-01 15:48:23.550043860 +0300
+@@ -51,6 +51,7 @@
+ 
+         QStringList excludeFilters() const;
+         QStringList includeFilters() const;
++        bool systrayEnabled() const;
+ 
+         bool showGui() const;
+         void setShowGui( bool showGui );
+diff -Naur nepomuk-orig/services/strigi/strigiservice.cpp nepomuk/services/strigi/strigiservice.cpp
+--- nepomuk-orig/services/strigi/strigiservice.cpp	2009-06-01 15:51:38.534199616 +0300
++++ nepomuk/services/strigi/strigiservice.cpp	2009-06-01 15:50:44.657254981 +0300
+@@ -85,9 +85,12 @@
+             // create the status widget (hidden)
+             StatusWidget* sw = new StatusWidget( mainModel(), this );
+ 
+-            // create the systray
+-            SystemTray* tray =  new SystemTray( this, sw );
+-            tray->show();
++            if (StrigiServiceConfig::self()->systrayEnabled())
++            {
++                // create the systray
++                SystemTray* tray =  new SystemTray( this, sw );
++                tray->show();
++            }
+ 
+             // setup status connections
+             connect( m_indexScheduler, SIGNAL( indexingStarted() ),

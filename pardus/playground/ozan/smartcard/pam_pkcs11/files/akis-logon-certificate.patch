@@ -1,0 +1,186 @@
+Index: pam_pkcs11-0.6.6/src/common/pkcs11_lib.c
+===================================================================
+--- pam_pkcs11-0.6.6.orig/src/common/pkcs11_lib.c
++++ pam_pkcs11-0.6.6/src/common/pkcs11_lib.c
+@@ -1349,6 +1349,40 @@ int wait_for_token(pkcs11_handle_t *h,
+   return rv;
+ }
+ 
++int read_container_name(pkcs11_handle_t *h, unsigned char **default_container) {
++  int rv;
++  int dataLen;
++  unsigned char *data;
++
++  int (*ReadContainerName_ptr)(CK_SESSION_HANDLE, unsigned char*, int*);
++
++  DBG("Checking whether the card supports ReadContainerName()");
++  *(void **) (&ReadContainerName_ptr) = dlsym(h->module_handle, "ReadContainerName");
++
++  if (ReadContainerName_ptr) {
++      DBG("ReadContainerName() supported, the token is AKIS");
++
++      rv = (*ReadContainerName_ptr)(h->session, NULL, &dataLen);
++
++      if (rv != CKR_OK) {
++          set_error("ReadContainerName() failed: 0x%08lX", rv);
++          return -1;
++      }
++
++      *default_container = malloc(dataLen + 1);
++      rv = (*ReadContainerName_ptr)(h->session, *default_container, &dataLen);
++
++      if (rv != CKR_OK) {
++          set_error("ReadContainerName() failed: 0x%08lX", rv);
++          return -1;
++      }
++
++      (*default_container)[dataLen] = '\0';
++
++      return 0;
++  }
++}
++
+ int open_pkcs11_session(pkcs11_handle_t *h, unsigned int slot)
+ {
+   int rv;
+Index: pam_pkcs11-0.6.6/src/common/pkcs11_lib.h
+===================================================================
+--- pam_pkcs11-0.6.6.orig/src/common/pkcs11_lib.h
++++ pam_pkcs11-0.6.6/src/common/pkcs11_lib.h
+@@ -72,6 +72,7 @@ PKCS11_EXTERN int wait_for_token_by_slot
+ PKCS11_EXTERN const X509 *get_X509_certificate(cert_object_t *cert);
+ PKCS11_EXTERN void release_pkcs11_module(pkcs11_handle_t *h);
+ PKCS11_EXTERN int open_pkcs11_session(pkcs11_handle_t *h, unsigned int slot);
++PKCS11_EXTERN int read_container_name(pkcs11_handle_t *h, unsigned char **container);
+ PKCS11_EXTERN int close_pkcs11_session(pkcs11_handle_t *h);
+ PKCS11_EXTERN int pkcs11_login(pkcs11_handle_t *h, char *password);
+ PKCS11_EXTERN int pkcs11_pass_login(pkcs11_handle_t *h, int nullok);
+Index: pam_pkcs11-0.6.6/src/tools/pkcs11_inspect.c
+===================================================================
+--- pam_pkcs11-0.6.6.orig/src/tools/pkcs11_inspect.c
++++ pam_pkcs11-0.6.6/src/tools/pkcs11_inspect.c
+@@ -38,6 +38,7 @@ int main(int argc, const char **argv) {
+   struct configuration_st *configuration;
+   unsigned int slot_num = 0;
+   cert_object_t **certs;
++  unsigned char **container;
+   int cert_count;
+ 
+   /* first of all check whether debugging should be enabled */
+@@ -103,6 +104,12 @@ int main(int argc, const char **argv) {
+     return 1;
+   }
+ 
++  container = malloc(sizeof(unsigned char*));
++  read_container_name(ph, container);
++  if (*container) {
++      DBG1("(AKIS) Default container is '%s'", *container);
++  }
++
+ #ifdef HAVE_NSS
+   /* not really needed, but.... */
+   rv = pkcs11_pass_login(ph,configuration->nullok);
+Index: pam_pkcs11-0.6.6/src/pam_pkcs11/pam_pkcs11.c
+===================================================================
+--- pam_pkcs11-0.6.6.orig/src/pam_pkcs11/pam_pkcs11.c
++++ pam_pkcs11-0.6.6/src/pam_pkcs11/pam_pkcs11.c
+@@ -37,6 +37,7 @@
+ #include "../common/debug.h"
+ #include "../common/error.h"
+ #include "../common/pkcs11_lib.h"
++//#include "../common/rsaref/pkcs11.h"
+ #include "../common/cert_vfy.h"
+ #include "../common/cert_info.h"
+ #include "../common/cert_st.h"
+@@ -187,6 +188,7 @@ PAM_EXTERN int pam_sm_authenticate(pam_h
+   int ncert;
+   unsigned char random_value[128];
+   unsigned char *signature;
++  unsigned char **container;
+   unsigned long signature_length;
+   /* enough space to hold an issuer DN */
+   char env_temp[256] = "";
+@@ -501,24 +503,38 @@ PAM_EXTERN int pam_sm_authenticate(pam_h
+   /* load mapper modules */
+   load_mappers(configuration->ctx);
+ 
++  /* Try to read default container from AKIS cards */
++  container = malloc(sizeof(unsigned char *));
++  read_container_name(ph, container);
++
++  if (*container)
++      DBG1("(AKIS) Default container is '%s'", *container);
++
+   /* find a valid and matching certificates */
+   for (i = 0; i < ncert; i++) {
+     X509 *x509 = (X509 *)get_X509_certificate(cert_list[i]);
+     if (!x509 ) continue; /* sanity check */
++
++    /* AKIS provides the logon certificate manually. Check for that first */
++    if (*container && memcmp(*container, cert_list[i]->label, cert_list[i]->label_length) != 0) {
++        DBG2("(AKIS) Found not matching certificate('%s') for default container '%s', skipping.", cert_list[i]->label, *container);
++        continue;
++    }
++
+     DBG1("verifying the certificate #%d", i + 1);
+ 
+-      /* verify certificate (date, signature, CRL, ...) */
+-      rv = verify_certificate(x509,&configuration->policy);
+-      if (rv < 0) {
++    /* verify certificate (date, signature, CRL, ...) */
++    rv = verify_certificate(x509,&configuration->policy);
++    if (rv < 0) {
+         ERR1("verify_certificate() failed: %s", get_error());
+         if (!configuration->quiet)
+-          pam_syslog(pamh, LOG_ERR,
+-                   "verify_certificate() failed: %s", get_error());
+-	goto auth_failed_nopw;
+-      } else if (rv != 1) {
++            pam_syslog(pamh, LOG_ERR,
++                    "verify_certificate() failed: %s", get_error());
++        goto auth_failed_nopw;
++    } else if (rv != 1) {
+         ERR1("verify_certificate() failed: %s", get_error());
+         continue; /* try next certificate */
+-      }
++    }
+ 
+     /* CA and CRL verified, now check/find user */
+ 
+Index: pam_pkcs11-0.6.6/src/tools/pklogin_finder.c
+===================================================================
+--- pam_pkcs11-0.6.6.orig/src/tools/pklogin_finder.c
++++ pam_pkcs11-0.6.6/src/tools/pklogin_finder.c
+@@ -38,6 +38,7 @@ int main(int argc, const char **argv) {
+   pkcs11_handle_t *ph;
+   struct configuration_st *configuration;
+   cert_object_t **certs;
++  unsigned char **container;
+   int cert_count;
+   unsigned int slot_num = 0;
+ 
+@@ -123,11 +124,24 @@ int main(int argc, const char **argv) {
+   /* load mapper modules */
+   load_mappers(configuration->ctx);
+ 
++  /* Try to read default container from AKIS cards */
++  container = malloc(sizeof(unsigned char *));
++  read_container_name(ph, container);
++
++  if (*container)
++      DBG1("(AKIS) Default container is '%s'", *container);
++
+   /* find a valid and matching certificates */
+   DBG1("Found '%d' certificate(s)", cert_count);
+   for (i = 0; i < cert_count; i++) {
+     X509 *x509 = get_X509_certificate(certs[i]);
+     if (x509 != NULL) {
++      /* AKIS provides the logon certificate manually. Check for that first */
++      if (*container && memcmp(*container, certs[i]->label, certs[i]->label_length) != 0) {
++        DBG2("(AKIS) Found not matching certificate('%s') for default container '%s', skipping.", certs[i]->label, *container);
++        continue;
++      }
++
+       DBG1("verifying the certificate #%d", i + 1);
+       /* verify certificate (date, signature, CRL, ...) */
+       rv = verify_certificate(x509,&configuration->policy);

@@ -1,0 +1,60 @@
+diff -up urlgrabber-3.0.0/urlgrabber/progress.py.type urlgrabber-3.0.0/urlgrabber/progress.py
+--- urlgrabber-3.0.0/urlgrabber/progress.py.type	2007-10-10 11:34:55.000000000 -0400
++++ urlgrabber-3.0.0/urlgrabber/progress.py	2007-10-10 11:36:50.000000000 -0400
+@@ -23,6 +23,7 @@ import sys
+ import time
+ import math
+ import thread
++import types
+     
+ class BaseMeter:
+     def __init__(self):
+@@ -343,7 +344,7 @@ class TextMultiFileMeter(MultiFileMeter)
+         try:
+             format = "%-30.30s %6.6s %s"
+             fn = meter.basename
+-            if type(message) in (type(''), type(u'')):
++            if type(message) in types.StringTypes:
+                 message = message.splitlines()
+             if not message: message = ['']
+             out = '%-79s' % (format % (fn, 'FAILED', message[0] or ''))
+diff -up urlgrabber-3.0.0/urlgrabber/mirror.py.type urlgrabber-3.0.0/urlgrabber/mirror.py
+--- urlgrabber-3.0.0/urlgrabber/mirror.py.type	2007-10-10 11:35:22.000000000 -0400
++++ urlgrabber-3.0.0/urlgrabber/mirror.py	2007-10-10 11:36:14.000000000 -0400
+@@ -90,6 +90,7 @@ CUSTOMIZATION
+ 
+ import random
+ import thread  # needed for locking to make this threadsafe
++import types
+ 
+ from grabber import URLGrabError, CallbackObject, DEBUG
+ 
+@@ -266,7 +267,7 @@ class MirrorGroup:
+     def _parse_mirrors(self, mirrors):
+         parsed_mirrors = []
+         for m in mirrors:
+-            if type(m) == type(''): m = {'mirror': m}
++            if type(m) in types.StringTypes: m = {'mirror': m}
+             parsed_mirrors.append(m)
+         return parsed_mirrors
+     
+diff -up urlgrabber-3.0.0/urlgrabber/grabber.py.type urlgrabber-3.0.0/urlgrabber/grabber.py
+--- urlgrabber-3.0.0/urlgrabber/grabber.py.type	2007-10-10 11:34:50.000000000 -0400
++++ urlgrabber-3.0.0/urlgrabber/grabber.py	2007-10-10 11:35:51.000000000 -0400
+@@ -372,6 +372,7 @@ import sys
+ import urlparse
+ import rfc822
+ import time
++import types
+ import string
+ import urllib
+ import urllib2
+@@ -1128,7 +1129,7 @@ class URLGrabberFileObject:
+         self.append = 0
+         reget_length = 0
+         rt = None
+-        if have_range and self.opts.reget and type(self.filename) == type(''):
++        if have_range and self.opts.reget and type(self.filename) in types.StringTypes:
+             # we have reget turned on and we're dumping to a file
+             try:
+                 s = os.stat(self.filename)

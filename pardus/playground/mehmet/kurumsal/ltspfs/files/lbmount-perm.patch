@@ -1,0 +1,47 @@
+--- a/src/lbmount.c.old	2008-05-17 17:55:37.000000000 +0530
++++ b/src/lbmount.c	2008-05-17 17:57:26.000000000 +0530
+@@ -98,7 +98,7 @@
+     return 0;
+ }
+ 
+-void mkdir_safe(char *dir)
++void mkdir_safe(char *dir, int owner)
+ {
+     if (mkdir(dir, 0750)) {
+         if (errno == EEXIST) {
+@@ -116,6 +116,17 @@
+             exit(1);
+         }
+     }
++    if (chown(dir,owner,0)) {
++	if (errno == EINVAL) {
++           fprintf(stderr,
++                 "Error: can't change ownership to %s: invalid uid\n",
++                 owner);
++	  exit(1);
++        } else {
++          perror("Unable to chown() in /media");
++          exit(1);	     
++	}
++    }
+ }
+ 
+ /*
+@@ -257,15 +268,14 @@
+ 
+         snprintf(mediamount, sizeof(mediamount), "%s/%s", mediadir,
+                  pwent->pw_name);
+-
+-        mkdir_safe(mediamount);
++        mkdir_safe(mediamount,uidReal);
+ 
+         /* Now, create the media dir underneath the uid dir */
+ 
+         snprintf(mediamount, sizeof(mediamount), "%s/%s/%s", mediadir,
+                  pwent->pw_name, mountpoint);
+ 
+-        mkdir_safe(mediamount);
++        mkdir_safe(mediamount,uidReal);
+ 
+         return root_mounter(ltspfsmount, mediamount);
+     } else {

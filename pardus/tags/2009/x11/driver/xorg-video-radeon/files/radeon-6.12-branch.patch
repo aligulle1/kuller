@@ -1,0 +1,1520 @@
+diff --git a/src/ati_pciids_gen.h b/src/ati_pciids_gen.h
+index 3304e84..92ae397 100644
+--- a/src/ati_pciids_gen.h
++++ b/src/ati_pciids_gen.h
+@@ -60,6 +60,8 @@
+ #define PCI_CHIP_R420_JN 0x4A4E
+ #define PCI_CHIP_R420_4A4F 0x4A4F
+ #define PCI_CHIP_R420_JP 0x4A50
++#define PCI_CHIP_R420_JT 0x4A54
++#define PCI_CHIP_R481_4B48 0x4B48
+ #define PCI_CHIP_R481_4B49 0x4B49
+ #define PCI_CHIP_R481_4B4A 0x4B4A
+ #define PCI_CHIP_R481_4B4B 0x4B4B
+@@ -334,6 +336,7 @@
+ #define PCI_CHIP_RV770_9440 0x9440
+ #define PCI_CHIP_RV770_9441 0x9441
+ #define PCI_CHIP_RV770_9442 0x9442
++#define PCI_CHIP_RV770_9443 0x9443
+ #define PCI_CHIP_RV770_9444 0x9444
+ #define PCI_CHIP_RV770_9446 0x9446
+ #define PCI_CHIP_RV770_944A 0x944A
+@@ -351,7 +354,9 @@
+ #define PCI_CHIP_RV770_946B 0x946B
+ #define PCI_CHIP_RV770_947A 0x947A
+ #define PCI_CHIP_RV770_947B 0x947B
++#define PCI_CHIP_RV730_9480 0x9480
+ #define PCI_CHIP_RV730_9487 0x9487
++#define PCI_CHIP_RV730_9488 0x9488
+ #define PCI_CHIP_RV730_9489 0x9489
+ #define PCI_CHIP_RV730_948F 0x948F
+ #define PCI_CHIP_RV730_9490 0x9490
+@@ -360,6 +365,11 @@
+ #define PCI_CHIP_RV730_949C 0x949C
+ #define PCI_CHIP_RV730_949E 0x949E
+ #define PCI_CHIP_RV730_949F 0x949F
++#define PCI_CHIP_RV740_94A0 0x94A0
++#define PCI_CHIP_RV740_94A1 0x94A1
++#define PCI_CHIP_RV740_94B1 0x94B1
++#define PCI_CHIP_RV740_94B3 0x94B3
++#define PCI_CHIP_RV740_94B5 0x94B5
+ #define PCI_CHIP_RV610_94C0 0x94C0
+ #define PCI_CHIP_RV610_94C1 0x94C1
+ #define PCI_CHIP_RV610_94C3 0x94C3
+diff --git a/src/atombios_crtc.c b/src/atombios_crtc.c
+index 31c032b..f060d8d 100644
+--- a/src/atombios_crtc.c
++++ b/src/atombios_crtc.c
+@@ -167,13 +167,13 @@ atombios_crtc_dpms(xf86CrtcPtr crtc, int mode)
+     RADEONInfoPtr  info = RADEONPTR(crtc->scrn);
+     switch (mode) {
+     case DPMSModeOn:
+-    case DPMSModeStandby:
+-    case DPMSModeSuspend:
+ 	if (IS_DCE3_VARIANT)
+ 	    atombios_enable_crtc_memreq(info->atomBIOS, radeon_crtc->crtc_id, 1);
+ 	atombios_enable_crtc(info->atomBIOS, radeon_crtc->crtc_id, 1);
+ 	atombios_blank_crtc(info->atomBIOS, radeon_crtc->crtc_id, 0);
+ 	break;
++    case DPMSModeStandby:
++    case DPMSModeSuspend:
+     case DPMSModeOff:
+ 	atombios_blank_crtc(info->atomBIOS, radeon_crtc->crtc_id, 1);
+ 	atombios_enable_crtc(info->atomBIOS, radeon_crtc->crtc_id, 0);
+diff --git a/src/legacy_crtc.c b/src/legacy_crtc.c
+index 829b453..5ea13bc 100644
+--- a/src/legacy_crtc.c
++++ b/src/legacy_crtc.c
+@@ -649,6 +649,9 @@ radeon_crtc_modeset_ioctl(xf86CrtcPtr crtc, Bool post)
+     if (!info->directRenderingEnabled)
+ 	return;
+ 
++    if (info->ChipFamily >= CHIP_FAMILY_R600)
++	return;
++
+     modeset.crtc = radeon_crtc->crtc_id;
+     modeset.cmd = post ? _DRM_POST_MODESET : _DRM_PRE_MODESET;
+ 
+@@ -661,55 +664,42 @@ radeon_crtc_modeset_ioctl(xf86CrtcPtr crtc, Bool post)
+ void
+ legacy_crtc_dpms(xf86CrtcPtr crtc, int mode)
+ {
+-    int mask;
++    uint32_t mask;
+     RADEONCrtcPrivatePtr radeon_crtc = crtc->driver_private;
+     RADEONEntPtr pRADEONEnt = RADEONEntPriv(crtc->scrn);
+     unsigned char *RADEONMMIO = pRADEONEnt->MMIO;
+ 
+-    mask = radeon_crtc->crtc_id ? (RADEON_CRTC2_DISP_DIS | RADEON_CRTC2_VSYNC_DIS | RADEON_CRTC2_HSYNC_DIS | RADEON_CRTC2_DISP_REQ_EN_B) : (RADEON_CRTC_DISPLAY_DIS | RADEON_CRTC_HSYNC_DIS | RADEON_CRTC_VSYNC_DIS);
+-
+-    if (mode == DPMSModeOff)
+-	radeon_crtc_modeset_ioctl(crtc, FALSE);
++    if (radeon_crtc->crtc_id)
++	mask = (RADEON_CRTC2_EN |
++		RADEON_CRTC2_DISP_DIS |
++		RADEON_CRTC2_VSYNC_DIS |
++		RADEON_CRTC2_HSYNC_DIS |
++		RADEON_CRTC2_DISP_REQ_EN_B);
++    else
++	mask = (RADEON_CRTC_DISPLAY_DIS |
++		RADEON_CRTC_HSYNC_DIS |
++		RADEON_CRTC_VSYNC_DIS);
+ 
+     switch(mode) {
+     case DPMSModeOn:
+ 	if (radeon_crtc->crtc_id) {
+-	    OUTREGP(RADEON_CRTC2_GEN_CNTL, 0, ~mask);
++	    OUTREGP(RADEON_CRTC2_GEN_CNTL, RADEON_CRTC2_EN, ~mask);
+ 	} else {
+-	    OUTREGP(RADEON_CRTC_GEN_CNTL, 0, ~RADEON_CRTC_DISP_REQ_EN_B);
++	    OUTREGP(RADEON_CRTC_GEN_CNTL, RADEON_CRTC_EN, ~(RADEON_CRTC_EN | RADEON_CRTC_DISP_REQ_EN_B));
+ 	    OUTREGP(RADEON_CRTC_EXT_CNTL, 0, ~mask);
+ 	}
+ 	break;
+     case DPMSModeStandby:
+-	if (radeon_crtc->crtc_id) {
+-	    OUTREGP(RADEON_CRTC2_GEN_CNTL, (RADEON_CRTC2_DISP_DIS | RADEON_CRTC2_HSYNC_DIS), ~mask);
+-	} else {
+-	    OUTREGP(RADEON_CRTC_GEN_CNTL, 0, ~RADEON_CRTC_DISP_REQ_EN_B);
+-	    OUTREGP(RADEON_CRTC_EXT_CNTL, (RADEON_CRTC_DISPLAY_DIS | RADEON_CRTC_HSYNC_DIS), ~mask);
+-	}
+-	break;
+     case DPMSModeSuspend:
+-	if (radeon_crtc->crtc_id) {
+-	    OUTREGP(RADEON_CRTC2_GEN_CNTL, (RADEON_CRTC2_DISP_DIS | RADEON_CRTC2_VSYNC_DIS), ~mask);
+-	} else {
+-	    OUTREGP(RADEON_CRTC_GEN_CNTL, 0, ~RADEON_CRTC_DISP_REQ_EN_B);
+-	    OUTREGP(RADEON_CRTC_EXT_CNTL, (RADEON_CRTC_DISPLAY_DIS | RADEON_CRTC_VSYNC_DIS), ~mask);
+-	}
+-	break;
+     case DPMSModeOff:
+ 	if (radeon_crtc->crtc_id) {
+ 	    OUTREGP(RADEON_CRTC2_GEN_CNTL, mask, ~mask);
+ 	} else {
+-	    OUTREGP(RADEON_CRTC_GEN_CNTL, RADEON_CRTC_DISP_REQ_EN_B, ~RADEON_CRTC_DISP_REQ_EN_B);
++	    OUTREGP(RADEON_CRTC_GEN_CNTL, RADEON_CRTC_DISP_REQ_EN_B, ~(RADEON_CRTC_EN | RADEON_CRTC_DISP_REQ_EN_B));
+ 	    OUTREGP(RADEON_CRTC_EXT_CNTL, mask, ~mask);
+ 	}
+ 	break;
+     }
+-  
+-    if (mode != DPMSModeOff) {
+-	radeon_crtc_modeset_ioctl(crtc, TRUE);
+-	radeon_crtc_load_lut(crtc);
+-    }
+ }
+ 
+ 
+@@ -912,7 +902,6 @@ RADEONInitCrtcRegisters(xf86CrtcPtr crtc, RADEONSavePtr save,
+ 
+     /*save->bios_4_scratch = info->SavedReg->bios_4_scratch;*/
+     save->crtc_gen_cntl = (RADEON_CRTC_EXT_DISP_EN
+-			   | RADEON_CRTC_EN
+ 			   | (format << 8)
+ 			   | ((mode->Flags & V_DBLSCAN)
+ 			      ? RADEON_CRTC_DBL_SCAN_EN
+@@ -1160,8 +1149,7 @@ RADEONInitCrtc2Registers(xf86CrtcPtr crtc, RADEONSavePtr save,
+     else
+ 	save->crtc2_gen_cntl = 0;
+ 
+-    save->crtc2_gen_cntl |= (RADEON_CRTC2_EN
+-			     | (format << 8)
++    save->crtc2_gen_cntl |= ((format << 8)
+ 			     | RADEON_CRTC2_VSYNC_DIS
+ 			     | RADEON_CRTC2_HSYNC_DIS
+ 			     | RADEON_CRTC2_DISP_DIS
+diff --git a/src/legacy_output.c b/src/legacy_output.c
+index 423a3e2..7134ee1 100644
+--- a/src/legacy_output.c
++++ b/src/legacy_output.c
+@@ -150,7 +150,6 @@ void
+ RADEONGetExtTMDSInfo(ScrnInfoPtr pScrn, radeon_dvo_ptr dvo)
+ {
+     RADEONInfoPtr  info       = RADEONPTR(pScrn);
+-    I2CBusPtr pDVOBus;
+ 
+     if (!info->IsAtomBios) {
+ #if defined(__powerpc__)
+@@ -162,11 +161,11 @@ RADEONGetExtTMDSInfo(ScrnInfoPtr pScrn, radeon_dvo_ptr dvo)
+ 	    dvo->dvo_i2c_slave_addr = 0x70;
+ 	}
+ #endif
+-	if (RADEONI2CInit(pScrn, &pDVOBus, "DVO", &dvo->dvo_i2c)) {
++	if (RADEONI2CInit(pScrn, &dvo->pI2CBus, "DVO", &dvo->dvo_i2c)) {
+ 	    dvo->DVOChip =
+-		RADEONDVODeviceInit(pDVOBus, dvo->dvo_i2c_slave_addr);
++		RADEONDVODeviceInit(dvo->pI2CBus, dvo->dvo_i2c_slave_addr);
+ 	    if (!dvo->DVOChip)
+-		xfree(pDVOBus);
++		xfree(dvo->pI2CBus);
+ 	}
+     }
+ }
+@@ -481,7 +480,7 @@ RADEONRestoreDVOChip(ScrnInfoPtr pScrn, xf86OutputPtr output)
+     if (!dvo->DVOChip)
+ 	return;
+ 
+-    RADEONI2CDoLock(output, TRUE);
++    RADEONI2CDoLock(output, dvo->pI2CBus, TRUE);
+     if (!RADEONInitExtTMDSInfoFromBIOS(output)) {
+ 	if (dvo->DVOChip) {
+ 	    switch(info->ext_tmds_chip) {
+@@ -511,7 +510,7 @@ RADEONRestoreDVOChip(ScrnInfoPtr pScrn, xf86OutputPtr output)
+ 	    }
+ 	}
+     }
+-    RADEONI2CDoLock(output, FALSE);
++    RADEONI2CDoLock(output, dvo->pI2CBus, FALSE);
+ }
+ 
+ #if 0
+diff --git a/src/pcidb/ati_pciids.csv b/src/pcidb/ati_pciids.csv
+index b361d9d..5e78bda 100644
+--- a/src/pcidb/ati_pciids.csv
++++ b/src/pcidb/ati_pciids.csv
+@@ -61,6 +61,8 @@
+ "0x4A4E","R420_JN","R420",1,,,,,"ATI Radeon Mobility 9800 (M18) JN (AGP)"
+ "0x4A4F","R420_4A4F","R420",,,,,,"ATI Radeon X800 SE (R420) (AGP)"
+ "0x4A50","R420_JP","R420",,,,,,"ATI Radeon X800XT (R420) JP (AGP)"
++"0x4A54","R420_JT","R420",,,,,,"ATI Radeon X800 VE (R420) JT (AGP)"
++"0x4B48","R481_4B48","R420",,,,,,"ATI Radeon X850 (R480) (AGP)"
+ "0x4B49","R481_4B49","R420",,,,,,"ATI Radeon X850 XT (R480) (AGP)"
+ "0x4B4A","R481_4B4A","R420",,,,,,"ATI Radeon X850 SE (R480) (AGP)"
+ "0x4B4B","R481_4B4B","R420",,,,,,"ATI Radeon X850 PRO (R480) (AGP)"
+@@ -335,6 +337,7 @@
+ "0x9440","RV770_9440","RV770",,,,,,"ATI Radeon 4800 Series"
+ "0x9441","RV770_9441","RV770",,,,,,"ATI Radeon HD 4870 x2"
+ "0x9442","RV770_9442","RV770",,,,,,"ATI Radeon 4800 Series"
++"0x9443","RV770_9443","RV770",,,,,,"ATI Radeon HD 4850 x2"
+ "0x9444","RV770_9444","RV770",,,,,,"ATI FirePro V8750 (FireGL)"
+ "0x9446","RV770_9446","RV770",,,,,,"ATI FirePro V7760 (FireGL)"
+ "0x944A","RV770_944A","RV770",1,,,,,"ATI Mobility RADEON HD 4850"
+@@ -352,7 +355,9 @@
+ "0x946B","RV770_946B","RV770",1,,,,,"ATI M98"
+ "0x947A","RV770_947A","RV770",1,,,,,"ATI M98"
+ "0x947B","RV770_947B","RV770",1,,,,,"ATI M98"
++"0x9480","RV730_9480","RV730",1,,,,,"ATI Mobility Radeon HD 4650"
+ "0x9487","RV730_9487","RV730",,,,,,"ATI Radeon RV730 (AGP)"
++"0x9488","RV730_9488","RV730",1,,,,,"ATI Mobility Radeon HD 4670"
+ "0x9489","RV730_9489","RV730",1,,,,,"ATI FirePro M5750"
+ "0x948F","RV730_948F","RV730",,,,,,"ATI Radeon RV730 (AGP)"
+ "0x9490","RV730_9490","RV730",,,,,,"ATI RV730XT [Radeon HD 4670]"
+@@ -361,6 +366,11 @@
+ "0x949C","RV730_949C","RV730",,,,,,"ATI FirePro V7750 (FireGL)"
+ "0x949E","RV730_949E","RV730",,,,,,"ATI FirePro V5700 (FireGL)"
+ "0x949F","RV730_949F","RV730",,,,,,"ATI FirePro V3750 (FireGL)"
++"0x94A0","RV740_94A0","RV740",1,,,,,"ATI Mobility Radeon HD 4830"
++"0x94A1","RV740_94A1","RV740",1,,,,,"ATI Mobility Radeon HD 4850"
++"0x94B1","RV740_94B1","RV740",,,,,,"ATI RV740"
++"0x94B3","RV740_94B3","RV740",,,,,,"ATI Radeon HD 4770"
++"0x94B5","RV740_94B5","RV740",,,,,,"ATI Radeon HD 4770"
+ "0x94C0","RV610_94C0","RV610",,,,,,"ATI RV610"
+ "0x94C1","RV610_94C1","RV610",,,,,,"ATI Radeon HD 2400 XT"
+ "0x94C3","RV610_94C3","RV610",,,,,,"ATI Radeon HD 2400 Pro"
+diff --git a/src/r600_state.h b/src/r600_state.h
+index 181e167..44e7600 100644
+--- a/src/r600_state.h
++++ b/src/r600_state.h
+@@ -195,10 +195,10 @@ do {                                                                    \
+ do {                                                                    \
+     if ((reg) >= SET_CONFIG_REG_offset && (reg) < SET_CONFIG_REG_end) {	\
+ 	PACK3((ib), IT_SET_CONFIG_REG, (num) + 1);			\
+-        E32(ib, ((reg) - SET_CONFIG_REG_offset) >> 2);                  \
++	E32(ib, ((reg) - SET_CONFIG_REG_offset) >> 2);                  \
+     } else if ((reg) >= SET_CONTEXT_REG_offset && (reg) < SET_CONTEXT_REG_end) { \
+-        PACK3((ib), IT_SET_CONTEXT_REG, (num) + 1);			\
+-	E32(ib, ((reg) - 0x28000) >> 2);				\
++	PACK3((ib), IT_SET_CONTEXT_REG, (num) + 1);			\
++	E32(ib, ((reg) - SET_CONTEXT_REG_offset) >> 2);			\
+     } else if ((reg) >= SET_ALU_CONST_offset && (reg) < SET_ALU_CONST_end) { \
+ 	PACK3((ib), IT_SET_ALU_CONST, (num) + 1);			\
+ 	E32(ib, ((reg) - SET_ALU_CONST_offset) >> 2);			\
+diff --git a/src/r6xx_accel.c b/src/r6xx_accel.c
+index bce597b..65834bf 100644
+--- a/src/r6xx_accel.c
++++ b/src/r6xx_accel.c
+@@ -784,6 +784,7 @@ set_default_state(ScrnInfoPtr pScrn, drmBufPtr ib)
+ 	sq_conf.num_es_stack_entries = 0;
+ 	break;
+     case CHIP_FAMILY_RV730:
++    case CHIP_FAMILY_RV740:
+ 	sq_conf.num_ps_gprs = 84;
+ 	sq_conf.num_vs_gprs = 36;
+ 	sq_conf.num_temp_gprs = 4;
+@@ -973,7 +974,7 @@ set_default_state(ScrnInfoPtr pScrn, drmBufPtr ib)
+     EREG(ib, PA_SU_POLY_OFFSET_FRONT_OFFSET,      0);
+ 
+     EREG(ib, PA_SU_LINE_CNTL,                     (8 << PA_SU_LINE_CNTL__WIDTH_shift)); /* Line width 1 pixel */
+-    EREG(ib, PA_SU_VTX_CNTL,                      ((2 << PA_SU_VTX_CNTL__ROUND_MODE_shift) |
++    EREG(ib, PA_SU_VTX_CNTL,                      ((2 << PA_SU_VTX_CNTL__ROUND_MODE_shift) | PIX_CENTER_bit |
+ 						   (5 << QUANT_MODE_shift))); /* Round to Even, fixed point 1/256 */
+     EREG(ib, PA_SU_POLY_OFFSET_CLAMP,             0);
+ 
+diff --git a/src/radeon.h b/src/radeon.h
+index d488429..3826696 100644
+--- a/src/radeon.h
++++ b/src/radeon.h
+@@ -318,7 +318,6 @@ typedef enum {
+     CHIP_FAMILY_RS690,
+     CHIP_FAMILY_RS740,
+     CHIP_FAMILY_R600,    /* r600 */
+-    CHIP_FAMILY_R630,
+     CHIP_FAMILY_RV610,
+     CHIP_FAMILY_RV630,
+     CHIP_FAMILY_RV670,
+@@ -329,6 +328,7 @@ typedef enum {
+     CHIP_FAMILY_RV770,
+     CHIP_FAMILY_RV730,
+     CHIP_FAMILY_RV710,
++    CHIP_FAMILY_RV740,
+     CHIP_FAMILY_LAST
+ } RADEONChipFamily;
+ 
+@@ -1115,7 +1115,7 @@ extern void RADEONPrintPortMap(ScrnInfoPtr pScrn);
+ extern void RADEONSetOutputType(ScrnInfoPtr pScrn,
+ 				RADEONOutputPrivatePtr radeon_output);
+ extern Bool RADEONSetupConnectors(ScrnInfoPtr pScrn);
+-extern Bool RADEONI2CDoLock(xf86OutputPtr output, Bool lock_state);
++extern Bool RADEONI2CDoLock(xf86OutputPtr output, I2CBusPtr b, Bool lock_state);
+ 
+ 
+ /* radeon_tv.c */
+diff --git a/src/radeon_accel.c b/src/radeon_accel.c
+index a9a4848..f90b386 100644
+--- a/src/radeon_accel.c
++++ b/src/radeon_accel.c
+@@ -87,6 +87,8 @@
+ #include "radeon_drm.h"
+ #endif
+ 
++#include "ati_pciids_gen.h"
++
+ 				/* Line support */
+ #include "miline.h"
+ 
+@@ -481,12 +483,17 @@ void RADEONEngineInit(ScrnInfoPtr pScrn)
+ 	}
+     }
+ 
++    /* RV410 SE cards only have 1 quadpipe */
++    if ((info->Chipset == PCI_CHIP_RV410_5E4C) ||
++	(info->Chipset == PCI_CHIP_RV410_5E4F))
++	info->accel_state->num_gb_pipes = 1;
++
+     if (IS_R300_3D || IS_R500_3D)
+ 	xf86DrvMsg(pScrn->scrnIndex, X_INFO,
+ 		   "num quad-pipes is %d\n", info->accel_state->num_gb_pipes);
+ 
+     if (IS_R300_3D || IS_R500_3D) {
+-	uint32_t gb_tile_config = (R300_ENABLE_TILING | R300_TILE_SIZE_16 | R300_SUBPIXEL_1_16);
++	uint32_t gb_tile_config = (R300_ENABLE_TILING | R300_TILE_SIZE_16);
+ 
+ 	switch(info->accel_state->num_gb_pipes) {
+ 	case 2: gb_tile_config |= R300_PIPE_COUNT_R300; break;
+diff --git a/src/radeon_atombios.c b/src/radeon_atombios.c
+index a657fac..e740e59 100644
+--- a/src/radeon_atombios.c
++++ b/src/radeon_atombios.c
+@@ -1534,6 +1534,7 @@ static void RADEONApplyATOMQuirks(ScrnInfoPtr pScrn, int index)
+ 	    info->BiosConnector[index].ConnectorType = CONNECTOR_DVI_D;
+ 	}
+     }
++
+     /* a-bit f-i90hd - ciaranm on #radeonhd - this board has no DVI */
+     if ((info->Chipset == PCI_CHIP_RS600_7941) &&
+ 	(PCI_SUB_VENDOR_ID(info->PciInfo) == 0x147b) &&
+@@ -1565,12 +1566,6 @@ static void RADEONApplyATOMQuirks(ScrnInfoPtr pScrn, int index)
+ 	}
+     }
+ 
+-    /* some BIOSes seem to report DAC on HDMI - they hurt me with their lies */
+-    if ((info->BiosConnector[index].ConnectorType == CONNECTOR_HDMI_TYPE_A) ||
+-    	(info->BiosConnector[index].ConnectorType == CONNECTOR_HDMI_TYPE_B)) {
+-	info->BiosConnector[index].devices &= ~(ATOM_DEVICE_CRT_SUPPORT);
+-    }
+-
+     /* ASUS HD 3600 XT board lists the DVI port as HDMI */
+     if ((info->Chipset == PCI_CHIP_RV635_9598) &&
+ 	(PCI_SUB_VENDOR_ID(info->PciInfo) == 0x1043) &&
+@@ -1579,6 +1574,26 @@ static void RADEONApplyATOMQuirks(ScrnInfoPtr pScrn, int index)
+ 	    info->BiosConnector[index].ConnectorType = CONNECTOR_DVI_D;
+     }
+ 
++    /* ASUS HD 3450 board lists the DVI port as HDMI */
++    if ((info->Chipset == PCI_CHIP_RV620_95C5) &&
++	(PCI_SUB_VENDOR_ID(info->PciInfo) == 0x1043) &&
++	(PCI_SUB_DEVICE_ID(info->PciInfo) == 0x01e2)) {
++	if (info->BiosConnector[index].ConnectorType == CONNECTOR_HDMI_TYPE_B)
++	    info->BiosConnector[index].ConnectorType = CONNECTOR_DVI_D;
++    }
++
++    /* some BIOSes seem to report DAC on HDMI - usually this is a board with
++     * HDMI + VGA reporting as HDMI
++     */
++    if ((info->BiosConnector[index].ConnectorType == CONNECTOR_HDMI_TYPE_A) ||
++	(info->BiosConnector[index].ConnectorType == CONNECTOR_HDMI_TYPE_B)) {
++	if (info->BiosConnector[index].devices & (ATOM_DEVICE_CRT_SUPPORT)) {
++	    info->BiosConnector[index].devices &= ~(ATOM_DEVICE_DFP_SUPPORT);
++	    info->BiosConnector[index].ConnectorType = CONNECTOR_VGA;
++	    info->BiosConnector[index].connector_object = 0;
++	} else
++	    info->BiosConnector[index].devices &= ~(ATOM_DEVICE_CRT_SUPPORT);
++    }
+ 
+ }
+ 
+@@ -1761,17 +1776,17 @@ RADEONGetATOMConnectorInfoFromBIOSObject (ScrnInfoPtr pScrn)
+ 	ATOM_DISPLAY_OBJECT_PATH *path;
+ 	addr += path_size;
+ 	path = (ATOM_DISPLAY_OBJECT_PATH *)addr;
+-	path_size += path->usSize;
++	path_size += le16_to_cpu(path->usSize);
+ 
+-	if (device_support & path->usDeviceTag) {
++	if (device_support & le16_to_cpu(path->usDeviceTag)) {
+ 	    uint8_t con_obj_id, con_obj_num, con_obj_type;
+ 
+-	    con_obj_id = (path->usConnObjectId & OBJECT_ID_MASK) >> OBJECT_ID_SHIFT;
+-	    con_obj_num = (path->usConnObjectId & ENUM_ID_MASK) >> ENUM_ID_SHIFT;
+-	    con_obj_type = (path->usConnObjectId & OBJECT_TYPE_MASK) >> OBJECT_TYPE_SHIFT;
++	    con_obj_id = (le16_to_cpu(path->usConnObjectId) & OBJECT_ID_MASK) >> OBJECT_ID_SHIFT;
++	    con_obj_num = (le16_to_cpu(path->usConnObjectId) & ENUM_ID_MASK) >> ENUM_ID_SHIFT;
++	    con_obj_type = (le16_to_cpu(path->usConnObjectId) & OBJECT_TYPE_MASK) >> OBJECT_TYPE_SHIFT;
+ 
+-	    if ((path->usDeviceTag == ATOM_DEVICE_TV1_SUPPORT) ||
+-		(path->usDeviceTag == ATOM_DEVICE_TV2_SUPPORT)) {
++	    if ((le16_to_cpu(path->usDeviceTag) == ATOM_DEVICE_TV1_SUPPORT) ||
++		(le16_to_cpu(path->usDeviceTag) == ATOM_DEVICE_TV2_SUPPORT)) {
+ 		if (!enable_tv) {
+ 		    info->BiosConnector[i].valid = FALSE;
+ 		    continue;
+@@ -1779,7 +1794,7 @@ RADEONGetATOMConnectorInfoFromBIOSObject (ScrnInfoPtr pScrn)
+ 	    }
+ 
+ 	    /* don't support CV yet */
+-	    if (path->usDeviceTag == ATOM_DEVICE_CV_SUPPORT) {
++	    if (le16_to_cpu(path->usDeviceTag) == ATOM_DEVICE_CV_SUPPORT) {
+ 		info->BiosConnector[i].valid = FALSE;
+ 		continue;
+ 	    }
+@@ -1810,15 +1825,15 @@ RADEONGetATOMConnectorInfoFromBIOSObject (ScrnInfoPtr pScrn)
+ 		continue;
+ 	    } else
+ 		info->BiosConnector[i].valid = TRUE;
+-	    info->BiosConnector[i].devices = path->usDeviceTag;
+-	    info->BiosConnector[i].connector_object = path->usConnObjectId;
++	    info->BiosConnector[i].devices = le16_to_cpu(path->usDeviceTag);
++	    info->BiosConnector[i].connector_object = le16_to_cpu(path->usConnObjectId);
+ 
+-	    for (j = 0; j < ((path->usSize - 8) / 2); j++) {
++	    for (j = 0; j < ((le16_to_cpu(path->usSize) - 8) / 2); j++) {
+ 		uint8_t enc_obj_id, enc_obj_num, enc_obj_type;
+ 
+-		enc_obj_id = (path->usGraphicObjIds[j] & OBJECT_ID_MASK) >> OBJECT_ID_SHIFT;
+-		enc_obj_num = (path->usGraphicObjIds[j] & ENUM_ID_MASK) >> ENUM_ID_SHIFT;
+-		enc_obj_type = (path->usGraphicObjIds[j] & OBJECT_TYPE_MASK) >> OBJECT_TYPE_SHIFT;
++		enc_obj_id = (le16_to_cpu(path->usGraphicObjIds[j]) & OBJECT_ID_MASK) >> OBJECT_ID_SHIFT;
++		enc_obj_num = (le16_to_cpu(path->usGraphicObjIds[j]) & ENUM_ID_MASK) >> ENUM_ID_SHIFT;
++		enc_obj_type = (le16_to_cpu(path->usGraphicObjIds[j]) & OBJECT_TYPE_MASK) >> OBJECT_TYPE_SHIFT;
+ 
+ 		if (enc_obj_type == GRAPH_OBJECT_TYPE_ENCODER) {
+ 		    if (enc_obj_num == 2)
+@@ -1826,15 +1841,15 @@ RADEONGetATOMConnectorInfoFromBIOSObject (ScrnInfoPtr pScrn)
+ 		    else
+ 			info->BiosConnector[i].linkb = FALSE;
+ 
+-		    if (!radeon_add_encoder(pScrn, enc_obj_id, path->usDeviceTag))
++		    if (!radeon_add_encoder(pScrn, enc_obj_id, le16_to_cpu(path->usDeviceTag)))
+ 			return FALSE;
+ 		}
+ 	    }
+ 
+ 	    /* look up gpio for ddc */
+-	    if ((path->usDeviceTag & (ATOM_DEVICE_TV_SUPPORT | ATOM_DEVICE_CV_SUPPORT)) == 0) {
++	    if ((le16_to_cpu(path->usDeviceTag) & (ATOM_DEVICE_TV_SUPPORT | ATOM_DEVICE_CV_SUPPORT)) == 0) {
+ 		for (j = 0; j < con_obj->ucNumberOfObjects; j++) {
+-		    if (path->usConnObjectId == le16_to_cpu(con_obj->asObjects[j].usObjectID)) {
++		    if (le16_to_cpu(path->usConnObjectId) == le16_to_cpu(con_obj->asObjects[j].usObjectID)) {
+ 			ATOM_COMMON_RECORD_HEADER *Record = (ATOM_COMMON_RECORD_HEADER *)
+ 			    ((char *)&atomDataPtr->Object_Header->sHeader
+ 			     + le16_to_cpu(con_obj->asObjects[j].usRecordOffset));
+@@ -2240,8 +2255,11 @@ RADEONGetATOMConnectorInfoFromBIOSConnectorTable (ScrnInfoPtr pScrn)
+ 	    info->BiosConnector[i].ddc_i2c.valid = FALSE;
+ 	else if ((info->ChipFamily == CHIP_FAMILY_RS690) ||
+ 		 (info->ChipFamily == CHIP_FAMILY_RS740)) {
+-	    /* IGP DFP ports use non-standard gpio entries */
+-	    if ((i == ATOM_DEVICE_DFP2_INDEX) || (i == ATOM_DEVICE_DFP3_INDEX))
++	    /* IGP DFP ports sometimes use non-standard gpio entries */
++	    if ((i == ATOM_DEVICE_DFP2_INDEX) && (ci.sucI2cId.sbfAccess.bfI2C_LineMux == 2))
++		info->BiosConnector[i].ddc_i2c =
++		    RADEONLookupGPIOLineForDDC(pScrn, ci.sucI2cId.sbfAccess.bfI2C_LineMux + 1);
++	    else if ((i == ATOM_DEVICE_DFP3_INDEX) && (ci.sucI2cId.sbfAccess.bfI2C_LineMux == 1))
+ 		info->BiosConnector[i].ddc_i2c =
+ 		    RADEONLookupGPIOLineForDDC(pScrn, ci.sucI2cId.sbfAccess.bfI2C_LineMux + 1);
+ 	    else
+@@ -2303,6 +2321,8 @@ RADEONGetATOMConnectorInfoFromBIOSConnectorTable (ScrnInfoPtr pScrn)
+ 			    ((j == ATOM_DEVICE_CRT1_INDEX) ||
+ 			     (j == ATOM_DEVICE_CRT2_INDEX))) {
+ 			    info->BiosConnector[i].devices |= info->BiosConnector[j].devices;
++			    if (info->BiosConnector[i].ConnectorType == CONNECTOR_DVI_D)
++				info->BiosConnector[i].ConnectorType = CONNECTOR_DVI_I;
+ 			    info->BiosConnector[j].valid = FALSE;
+ 			} else if (((j == ATOM_DEVICE_DFP1_INDEX) ||
+ 				    (j == ATOM_DEVICE_DFP2_INDEX) ||
+@@ -2310,6 +2330,8 @@ RADEONGetATOMConnectorInfoFromBIOSConnectorTable (ScrnInfoPtr pScrn)
+ 				   ((i == ATOM_DEVICE_CRT1_INDEX) ||
+ 				    (i == ATOM_DEVICE_CRT2_INDEX))) {
+ 			    info->BiosConnector[j].devices |= info->BiosConnector[i].devices;
++			    if (info->BiosConnector[j].ConnectorType == CONNECTOR_DVI_D)
++				info->BiosConnector[j].ConnectorType = CONNECTOR_DVI_I;
+ 			    info->BiosConnector[i].valid = FALSE;
+ 			} else {
+ 			    info->BiosConnector[i].shared_ddc = TRUE;
+diff --git a/src/radeon_bios.c b/src/radeon_bios.c
+index 9b5cb88..2bacc40 100644
+--- a/src/radeon_bios.c
++++ b/src/radeon_bios.c
+@@ -273,6 +273,7 @@ radeon_card_posted(ScrnInfoPtr pScrn)
+     unsigned char *RADEONMMIO = info->MMIO;
+     uint32_t reg;
+ 
++    /* first check CRTCs */
+     if (IS_AVIVO_VARIANT) {
+ 	reg = INREG(AVIVO_D1CRTC_CONTROL) | INREG(AVIVO_D2CRTC_CONTROL);
+ 	if (reg & AVIVO_CRTC_EN)
+@@ -283,6 +284,15 @@ radeon_card_posted(ScrnInfoPtr pScrn)
+ 	    return TRUE;
+     }
+ 
++    /* then check MEM_SIZE, in case something turned the crtcs off */
++    if (info->ChipFamily >= CHIP_FAMILY_R600)
++	reg = INREG(R600_CONFIG_MEMSIZE);
++    else
++	reg = INREG(RADEON_CONFIG_MEMSIZE);
++
++    if (reg)
++	return TRUE;
++
+     return FALSE;
+ }
+ 
+diff --git a/src/radeon_chipinfo_gen.h b/src/radeon_chipinfo_gen.h
+index 6321246..bffe88e 100644
+--- a/src/radeon_chipinfo_gen.h
++++ b/src/radeon_chipinfo_gen.h
+@@ -40,6 +40,8 @@ RADEONCardInfo RADEONCards[] = {
+  { 0x4A4E, CHIP_FAMILY_R420, 1, 0, 0, 0, 0 },
+  { 0x4A4F, CHIP_FAMILY_R420, 0, 0, 0, 0, 0 },
+  { 0x4A50, CHIP_FAMILY_R420, 0, 0, 0, 0, 0 },
++ { 0x4A54, CHIP_FAMILY_R420, 0, 0, 0, 0, 0 },
++ { 0x4B48, CHIP_FAMILY_R420, 0, 0, 0, 0, 0 },
+  { 0x4B49, CHIP_FAMILY_R420, 0, 0, 0, 0, 0 },
+  { 0x4B4A, CHIP_FAMILY_R420, 0, 0, 0, 0, 0 },
+  { 0x4B4B, CHIP_FAMILY_R420, 0, 0, 0, 0, 0 },
+@@ -254,6 +256,7 @@ RADEONCardInfo RADEONCards[] = {
+  { 0x9440, CHIP_FAMILY_RV770, 0, 0, 0, 0, 0 },
+  { 0x9441, CHIP_FAMILY_RV770, 0, 0, 0, 0, 0 },
+  { 0x9442, CHIP_FAMILY_RV770, 0, 0, 0, 0, 0 },
++ { 0x9443, CHIP_FAMILY_RV770, 0, 0, 0, 0, 0 },
+  { 0x9444, CHIP_FAMILY_RV770, 0, 0, 0, 0, 0 },
+  { 0x9446, CHIP_FAMILY_RV770, 0, 0, 0, 0, 0 },
+  { 0x944A, CHIP_FAMILY_RV770, 1, 0, 0, 0, 0 },
+@@ -271,7 +274,9 @@ RADEONCardInfo RADEONCards[] = {
+  { 0x946B, CHIP_FAMILY_RV770, 1, 0, 0, 0, 0 },
+  { 0x947A, CHIP_FAMILY_RV770, 1, 0, 0, 0, 0 },
+  { 0x947B, CHIP_FAMILY_RV770, 1, 0, 0, 0, 0 },
++ { 0x9480, CHIP_FAMILY_RV730, 1, 0, 0, 0, 0 },
+  { 0x9487, CHIP_FAMILY_RV730, 0, 0, 0, 0, 0 },
++ { 0x9488, CHIP_FAMILY_RV730, 1, 0, 0, 0, 0 },
+  { 0x9489, CHIP_FAMILY_RV730, 1, 0, 0, 0, 0 },
+  { 0x948F, CHIP_FAMILY_RV730, 0, 0, 0, 0, 0 },
+  { 0x9490, CHIP_FAMILY_RV730, 0, 0, 0, 0, 0 },
+@@ -280,6 +285,11 @@ RADEONCardInfo RADEONCards[] = {
+  { 0x949C, CHIP_FAMILY_RV730, 0, 0, 0, 0, 0 },
+  { 0x949E, CHIP_FAMILY_RV730, 0, 0, 0, 0, 0 },
+  { 0x949F, CHIP_FAMILY_RV730, 0, 0, 0, 0, 0 },
++ { 0x94A0, CHIP_FAMILY_RV740, 1, 0, 0, 0, 0 },
++ { 0x94A1, CHIP_FAMILY_RV740, 1, 0, 0, 0, 0 },
++ { 0x94B1, CHIP_FAMILY_RV740, 0, 0, 0, 0, 0 },
++ { 0x94B3, CHIP_FAMILY_RV740, 0, 0, 0, 0, 0 },
++ { 0x94B5, CHIP_FAMILY_RV740, 0, 0, 0, 0, 0 },
+  { 0x94C0, CHIP_FAMILY_RV610, 0, 0, 0, 0, 0 },
+  { 0x94C1, CHIP_FAMILY_RV610, 0, 0, 0, 0, 0 },
+  { 0x94C3, CHIP_FAMILY_RV610, 0, 0, 0, 0, 0 },
+diff --git a/src/radeon_chipset_gen.h b/src/radeon_chipset_gen.h
+index 631eda8..76966bf 100644
+--- a/src/radeon_chipset_gen.h
++++ b/src/radeon_chipset_gen.h
+@@ -40,6 +40,8 @@ static SymTabRec RADEONChipsets[] = {
+   { PCI_CHIP_R420_JN, "ATI Radeon Mobility 9800 (M18) JN (AGP)" },
+   { PCI_CHIP_R420_4A4F, "ATI Radeon X800 SE (R420) (AGP)" },
+   { PCI_CHIP_R420_JP, "ATI Radeon X800XT (R420) JP (AGP)" },
++  { PCI_CHIP_R420_JT, "ATI Radeon X800 VE (R420) JT (AGP)" },
++  { PCI_CHIP_R481_4B48, "ATI Radeon X850 (R480) (AGP)" },
+   { PCI_CHIP_R481_4B49, "ATI Radeon X850 XT (R480) (AGP)" },
+   { PCI_CHIP_R481_4B4A, "ATI Radeon X850 SE (R480) (AGP)" },
+   { PCI_CHIP_R481_4B4B, "ATI Radeon X850 PRO (R480) (AGP)" },
+@@ -254,6 +256,7 @@ static SymTabRec RADEONChipsets[] = {
+   { PCI_CHIP_RV770_9440, "ATI Radeon 4800 Series" },
+   { PCI_CHIP_RV770_9441, "ATI Radeon HD 4870 x2" },
+   { PCI_CHIP_RV770_9442, "ATI Radeon 4800 Series" },
++  { PCI_CHIP_RV770_9443, "ATI Radeon HD 4850 x2" },
+   { PCI_CHIP_RV770_9444, "ATI FirePro V8750 (FireGL)" },
+   { PCI_CHIP_RV770_9446, "ATI FirePro V7760 (FireGL)" },
+   { PCI_CHIP_RV770_944A, "ATI Mobility RADEON HD 4850" },
+@@ -271,7 +274,9 @@ static SymTabRec RADEONChipsets[] = {
+   { PCI_CHIP_RV770_946B, "ATI M98" },
+   { PCI_CHIP_RV770_947A, "ATI M98" },
+   { PCI_CHIP_RV770_947B, "ATI M98" },
++  { PCI_CHIP_RV730_9480, "ATI Mobility Radeon HD 4650" },
+   { PCI_CHIP_RV730_9487, "ATI Radeon RV730 (AGP)" },
++  { PCI_CHIP_RV730_9488, "ATI Mobility Radeon HD 4670" },
+   { PCI_CHIP_RV730_9489, "ATI FirePro M5750" },
+   { PCI_CHIP_RV730_948F, "ATI Radeon RV730 (AGP)" },
+   { PCI_CHIP_RV730_9490, "ATI RV730XT [Radeon HD 4670]" },
+@@ -280,6 +285,11 @@ static SymTabRec RADEONChipsets[] = {
+   { PCI_CHIP_RV730_949C, "ATI FirePro V7750 (FireGL)" },
+   { PCI_CHIP_RV730_949E, "ATI FirePro V5700 (FireGL)" },
+   { PCI_CHIP_RV730_949F, "ATI FirePro V3750 (FireGL)" },
++  { PCI_CHIP_RV740_94A0, "ATI Mobility Radeon HD 4830" },
++  { PCI_CHIP_RV740_94A1, "ATI Mobility Radeon HD 4850" },
++  { PCI_CHIP_RV740_94B1, "ATI RV740" },
++  { PCI_CHIP_RV740_94B3, "ATI Radeon HD 4770" },
++  { PCI_CHIP_RV740_94B5, "ATI Radeon HD 4770" },
+   { PCI_CHIP_RV610_94C0, "ATI RV610" },
+   { PCI_CHIP_RV610_94C1, "ATI Radeon HD 2400 XT" },
+   { PCI_CHIP_RV610_94C3, "ATI Radeon HD 2400 Pro" },
+diff --git a/src/radeon_commonfuncs.c b/src/radeon_commonfuncs.c
+index a9bc7d2..13b6533 100644
+--- a/src/radeon_commonfuncs.c
++++ b/src/radeon_commonfuncs.c
+@@ -69,7 +69,7 @@ static void FUNC_NAME(RADEONInit3DEngine)(ScrnInfoPtr pScrn)
+ 	OUT_ACCEL_REG(RADEON_WAIT_UNTIL, RADEON_WAIT_2D_IDLECLEAN | RADEON_WAIT_3D_IDLECLEAN);
+ 	FINISH_ACCEL();
+ 
+-	gb_tile_config = (R300_ENABLE_TILING | R300_TILE_SIZE_16 | R300_SUBPIXEL_1_16);
++	gb_tile_config = (R300_ENABLE_TILING | R300_TILE_SIZE_16);
+ 
+ 	switch(info->accel_state->num_gb_pipes) {
+ 	case 2: gb_tile_config |= R300_PIPE_COUNT_R300; break;
+@@ -105,21 +105,21 @@ static void FUNC_NAME(RADEONInit3DEngine)(ScrnInfoPtr pScrn)
+ 	OUT_ACCEL_REG(R300_GB_AA_CONFIG, 0);
+ 	OUT_ACCEL_REG(R300_RB3D_DSTCACHE_CTLSTAT, R300_DC_FLUSH_3D | R300_DC_FREE_3D);
+ 	OUT_ACCEL_REG(R300_RB3D_ZCACHE_CTLSTAT, R300_ZC_FLUSH | R300_ZC_FREE);
+-	OUT_ACCEL_REG(R300_GB_MSPOS0, ((8 << R300_MS_X0_SHIFT) |
+-				       (8 << R300_MS_Y0_SHIFT) |
+-				       (8 << R300_MS_X1_SHIFT) |
+-				       (8 << R300_MS_Y1_SHIFT) |
+-				       (8 << R300_MS_X2_SHIFT) |
+-				       (8 << R300_MS_Y2_SHIFT) |
+-				       (8 << R300_MSBD0_Y_SHIFT) |
+-				       (7 << R300_MSBD0_X_SHIFT)));
+-	OUT_ACCEL_REG(R300_GB_MSPOS1, ((8 << R300_MS_X3_SHIFT) |
+-				       (8 << R300_MS_Y3_SHIFT) |
+-				       (8 << R300_MS_X4_SHIFT) |
+-				       (8 << R300_MS_Y4_SHIFT) |
+-				       (8 << R300_MS_X5_SHIFT) |
+-				       (8 << R300_MS_Y5_SHIFT) |
+-				       (8 << R300_MSBD1_SHIFT)));
++	OUT_ACCEL_REG(R300_GB_MSPOS0, ((6 << R300_MS_X0_SHIFT) |
++				       (6 << R300_MS_Y0_SHIFT) |
++				       (6 << R300_MS_X1_SHIFT) |
++				       (6 << R300_MS_Y1_SHIFT) |
++				       (6 << R300_MS_X2_SHIFT) |
++				       (6 << R300_MS_Y2_SHIFT) |
++				       (6 << R300_MSBD0_Y_SHIFT) |
++				       (6 << R300_MSBD0_X_SHIFT)));
++	OUT_ACCEL_REG(R300_GB_MSPOS1, ((6 << R300_MS_X3_SHIFT) |
++				       (6 << R300_MS_Y3_SHIFT) |
++				       (6 << R300_MS_X4_SHIFT) |
++				       (6 << R300_MS_Y4_SHIFT) |
++				       (6 << R300_MS_X5_SHIFT) |
++				       (6 << R300_MS_Y5_SHIFT) |
++				       (6 << R300_MSBD1_SHIFT)));
+ 	FINISH_ACCEL();
+ 
+ 	BEGIN_ACCEL(5);
+@@ -552,10 +552,10 @@ static void FUNC_NAME(RADEONInit3DEngine)(ScrnInfoPtr pScrn)
+ 	OUT_ACCEL_REG(R300_SC_EDGERULE, 0xA5294A5);
+ 	if (IS_R300_3D) {
+ 	    /* clip has offset 1440 */
+-	    OUT_ACCEL_REG(R300_SC_CLIP_0_A, ((1088 << R300_CLIP_X_SHIFT) |
+-					     (1088 << R300_CLIP_Y_SHIFT)));
+-	    OUT_ACCEL_REG(R300_SC_CLIP_0_B, (((1080 + 2920) << R300_CLIP_X_SHIFT) |
+-					     ((1080 + 2920) << R300_CLIP_Y_SHIFT)));
++	    OUT_ACCEL_REG(R300_SC_CLIP_0_A, ((1440 << R300_CLIP_X_SHIFT) |
++					     (1440 << R300_CLIP_Y_SHIFT)));
++	    OUT_ACCEL_REG(R300_SC_CLIP_0_B, ((4080 << R300_CLIP_X_SHIFT) |
++					     (4080 << R300_CLIP_Y_SHIFT)));
+ 	} else {
+ 	    OUT_ACCEL_REG(R300_SC_CLIP_0_A, ((0 << R300_CLIP_X_SHIFT) |
+ 					     (0 << R300_CLIP_Y_SHIFT)));
+diff --git a/src/radeon_crtc.c b/src/radeon_crtc.c
+index 4b508ce..6080e7e 100644
+--- a/src/radeon_crtc.c
++++ b/src/radeon_crtc.c
+@@ -77,6 +77,9 @@ radeon_crtc_dpms(xf86CrtcPtr crtc, int mode)
+     if ((mode == DPMSModeOn) && radeon_crtc->enabled)
+ 	return;
+ 
++    if (mode == DPMSModeOff)
++	radeon_crtc_modeset_ioctl(crtc, FALSE);
++
+     if (IS_AVIVO_VARIANT || info->r4xx_atom) {
+ 	atombios_crtc_dpms(crtc, mode);
+     } else {
+@@ -97,6 +100,11 @@ radeon_crtc_dpms(xf86CrtcPtr crtc, int mode)
+ 	}
+     }
+ 
++    if (mode != DPMSModeOff) {
++	radeon_crtc_modeset_ioctl(crtc, TRUE);
++	radeon_crtc_load_lut(crtc);
++    }
++
+     if (mode == DPMSModeOn)
+ 	radeon_crtc->enabled = TRUE;
+     else
+@@ -115,9 +123,6 @@ radeon_crtc_mode_prepare(xf86CrtcPtr crtc)
+ {
+     RADEONCrtcPrivatePtr radeon_crtc = crtc->driver_private;
+ 
+-    if (radeon_crtc->initialized)
+-	radeon_crtc_dpms(crtc, DPMSModeOff);
+-
+     if (radeon_crtc->enabled)
+ 	crtc->funcs->hide_cursor(crtc);
+ }
+@@ -286,8 +291,6 @@ radeon_crtc_mode_commit(xf86CrtcPtr crtc)
+ {
+     if (crtc->scrn->pScreen != NULL)
+ 	xf86_reload_cursors(crtc->scrn->pScreen);
+-
+-    radeon_crtc_dpms(crtc, DPMSModeOn);
+ }
+ 
+ void
+diff --git a/src/radeon_cursor.c b/src/radeon_cursor.c
+index 0fcdcf0..5ecdfad 100644
+--- a/src/radeon_cursor.c
++++ b/src/radeon_cursor.c
+@@ -73,14 +73,17 @@
+ #define CURSOR_SWAPPING_DECL_MMIO   unsigned char *RADEONMMIO = info->MMIO;
+ #define CURSOR_SWAPPING_START() \
+   do { \
++  if (info->ChipFamily < CHIP_FAMILY_R600) \
+     OUTREG(RADEON_SURFACE_CNTL, \
+ 	   (info->ModeReg->surface_cntl | \
+ 	     RADEON_NONSURF_AP0_SWP_32BPP | RADEON_NONSURF_AP1_SWP_32BPP) & \
+ 	   ~(RADEON_NONSURF_AP0_SWP_16BPP | RADEON_NONSURF_AP1_SWP_16BPP)); \
+   } while (0)
+-#define CURSOR_SWAPPING_END()	(OUTREG(RADEON_SURFACE_CNTL, \
+-					info->ModeReg->surface_cntl))
+-
++#define CURSOR_SWAPPING_END()	\
++  do { \
++  if (info->ChipFamily < CHIP_FAMILY_R600) \
++      OUTREG(RADEON_SURFACE_CNTL, info->ModeReg->surface_cntl); \
++  } while (0)
+ #else
+ 
+ #define CURSOR_SWAPPING_DECL_MMIO
+@@ -97,13 +100,14 @@ avivo_setup_cursor(xf86CrtcPtr crtc, Bool enable)
+     RADEONInfoPtr  info = RADEONPTR(crtc->scrn);
+     unsigned char     *RADEONMMIO = info->MMIO;
+ 
+-    OUTREG(AVIVO_D1CUR_CONTROL + radeon_crtc->crtc_offset, 0);
++    /* always use the same cursor mode even if the cursor is disabled,
++     * otherwise you may end up with cursor curruption bands
++     */
++    OUTREG(AVIVO_D1CUR_CONTROL + radeon_crtc->crtc_offset, (AVIVO_D1CURSOR_MODE_24BPP << AVIVO_D1CURSOR_MODE_SHIFT));
+ 
+     if (enable) {
+ 	OUTREG(AVIVO_D1CUR_SURFACE_ADDRESS + radeon_crtc->crtc_offset,
+ 	       info->fbLocation + radeon_crtc->cursor_offset + pScrn->fbOffset);
+-	OUTREG(AVIVO_D1CUR_SIZE + radeon_crtc->crtc_offset,
+-	       ((CURSOR_WIDTH - 1) << 16) | (CURSOR_HEIGHT - 1));
+ 	OUTREG(AVIVO_D1CUR_CONTROL + radeon_crtc->crtc_offset,
+ 	       AVIVO_D1CURSOR_EN | (AVIVO_D1CURSOR_MODE_24BPP << AVIVO_D1CURSOR_MODE_SHIFT));
+     }
+@@ -138,9 +142,6 @@ radeon_crtc_show_cursor (xf86CrtcPtr crtc)
+ 
+     if (IS_AVIVO_VARIANT) {
+ 	avivo_lock_cursor(crtc, TRUE);
+-	OUTREG(AVIVO_D1CUR_CONTROL + radeon_crtc->crtc_offset,
+-	       INREG(AVIVO_D1CUR_CONTROL + radeon_crtc->crtc_offset)
+-	       | AVIVO_D1CURSOR_EN);
+ 	avivo_setup_cursor(crtc, TRUE);
+ 	avivo_lock_cursor(crtc, FALSE);
+     } else {
+@@ -171,9 +172,6 @@ radeon_crtc_hide_cursor (xf86CrtcPtr crtc)
+ 
+     if (IS_AVIVO_VARIANT) {
+ 	avivo_lock_cursor(crtc, TRUE);
+-	OUTREG(AVIVO_D1CUR_CONTROL+ radeon_crtc->crtc_offset,
+-	       INREG(AVIVO_D1CUR_CONTROL + radeon_crtc->crtc_offset)
+-	       & ~(AVIVO_D1CURSOR_EN));
+ 	avivo_setup_cursor(crtc, FALSE);
+ 	avivo_lock_cursor(crtc, FALSE);
+     } else {
+@@ -196,6 +194,7 @@ void
+ radeon_crtc_set_cursor_position (xf86CrtcPtr crtc, int x, int y)
+ {
+     ScrnInfoPtr pScrn = crtc->scrn;
++    RADEONEntPtr pRADEONEnt = RADEONEntPriv(pScrn);
+     RADEONCrtcPrivatePtr radeon_crtc = crtc->driver_private;
+     int crtc_id = radeon_crtc->crtc_id;
+     RADEONInfoPtr      info       = RADEONPTR(pScrn);
+@@ -210,15 +209,38 @@ radeon_crtc_set_cursor_position (xf86CrtcPtr crtc, int x, int y)
+     if (yorigin >= CURSOR_HEIGHT) yorigin = CURSOR_HEIGHT - 1;
+ 
+     if (IS_AVIVO_VARIANT) {
++	int w = CURSOR_WIDTH;
++
+ 	/* avivo cursor spans the full fb width */
+ 	if (crtc->rotatedData == NULL) {
+ 	    x += crtc->x;
+ 	    y += crtc->y;
+ 	}
++
++	if (pRADEONEnt->Controller[0]->enabled &&
++	    pRADEONEnt->Controller[1]->enabled) {
++	    int cursor_end, frame_end;
++
++	    cursor_end = x - xorigin + w;
++	    frame_end = crtc->x + mode->CrtcHDisplay;
++
++	    if (cursor_end >= frame_end) {
++		w = w - (cursor_end - frame_end);
++		if (!(frame_end & 0x7f))
++		    w--;
++	    } else {
++		if (!(cursor_end & 0x7f))
++		    w--;
++	    }
++	    if (w <= 0)
++		w = 1;
++	}
++
+ 	avivo_lock_cursor(crtc, TRUE);
+ 	OUTREG(AVIVO_D1CUR_POSITION + radeon_crtc->crtc_offset, ((xorigin ? 0 : x) << 16)
+ 	       | (yorigin ? 0 : y));
+ 	OUTREG(AVIVO_D1CUR_HOT_SPOT + radeon_crtc->crtc_offset, (xorigin << 16) | yorigin);
++	OUTREG(AVIVO_D1CUR_SIZE + radeon_crtc->crtc_offset, ((w - 1) << 16) | (CURSOR_HEIGHT - 1));
+ 	avivo_lock_cursor(crtc, FALSE);
+     } else {
+ 	if (mode->Flags & V_DBLSCAN)
+@@ -320,23 +342,17 @@ Bool RADEONCursorInit(ScreenPtr pScreen)
+ {
+     ScrnInfoPtr        pScrn   = xf86Screens[pScreen->myNum];
+     RADEONInfoPtr      info    = RADEONPTR(pScrn);
++    unsigned char     *RADEONMMIO = info->MMIO;
+     xf86CrtcConfigPtr  xf86_config = XF86_CRTC_CONFIG_PTR(pScrn);
+-    int                width;
+-    int		       width_bytes;
+-    int                height;
+-    int                size_bytes;
+     int                c;
+ 
+-    size_bytes  = CURSOR_WIDTH * 4 * CURSOR_HEIGHT;
+-    width       = pScrn->displayWidth;
+-    width_bytes = width * (pScrn->bitsPerPixel / 8);
+-    height      = ((size_bytes * xf86_config->num_crtc) + width_bytes - 1) / width_bytes;
+-    int align = IS_AVIVO_VARIANT ? 4096 : 256;
++    for (c = 0; c < xf86_config->num_crtc; c++) {
++	xf86CrtcPtr crtc = xf86_config->crtc[c];
++	RADEONCrtcPrivatePtr radeon_crtc = crtc->driver_private;
+ 
+-    if (!info->useEXA) {
+-	for (c = 0; c < xf86_config->num_crtc; c++) {
+-	    xf86CrtcPtr crtc = xf86_config->crtc[c];
+-	    RADEONCrtcPrivatePtr radeon_crtc = crtc->driver_private;
++	if (!info->useEXA) {
++	    int size_bytes  = CURSOR_WIDTH * 4 * CURSOR_HEIGHT;
++	    int align = IS_AVIVO_VARIANT ? 4096 : 256;
+ 
+ 	    radeon_crtc->cursor_offset =
+ 		radeon_legacy_allocate_memory(pScrn, &radeon_crtc->cursor_mem, size_bytes, align);
+@@ -350,6 +366,10 @@ Bool RADEONCursorInit(ScreenPtr pScreen)
+ 		       c,
+ 		       (unsigned int)radeon_crtc->cursor_offset);
+ 	}
++	/* set the cursor mode the same on both crtcs to avoid corruption */
++	if (IS_AVIVO_VARIANT)
++	    OUTREG(AVIVO_D1CUR_CONTROL + radeon_crtc->crtc_offset,
++		   (AVIVO_D1CURSOR_MODE_24BPP << AVIVO_D1CURSOR_MODE_SHIFT));
+     }
+ 
+     return xf86_cursors_init (pScreen, CURSOR_WIDTH, CURSOR_HEIGHT,
+diff --git a/src/radeon_dri.c b/src/radeon_dri.c
+index f6c6261..77a3ff7 100644
+--- a/src/radeon_dri.c
++++ b/src/radeon_dri.c
+@@ -767,6 +767,8 @@ static radeon_agpmode_quirk radeon_agpmode_quirk_list[] = {
+     { PCI_VENDOR_INTEL,0x3580,  PCI_VENDOR_ATI,0x4e50,  PCI_VENDOR_ASUS,0x1942,  1 },
+     /* Intel 82852/82855 host bridge / Mobility 9600/9700 Needs AGPMode 1 (deb #510208) */
+     { PCI_VENDOR_INTEL,0x3580,  PCI_VENDOR_ATI,0x4e50,  0x10cf,0x127f,           1 },
++    /* Intel 82443BX/ZX/DX Host bridge / RV280 [Radeon 9200] Needs AGPMode 1 (lp #370205) */
++    { PCI_VENDOR_INTEL,0x7190,  PCI_VENDOR_ATI,0x5961,  0x174b,0x7c13,           1 },
+ 
+     /* ASRock K7VT4A+ AGP 8x / ATI Radeon 9250 AGP Needs AGPMode 4 (lp #133192) */
+     { 0x1849,0x3189,            PCI_VENDOR_ATI,0x5960,  0x1787,0x5960,           4 },
+@@ -787,6 +789,8 @@ static radeon_agpmode_quirk radeon_agpmode_quirk_list[] = {
+     { PCI_VENDOR_VIA,0x3189,    PCI_VENDOR_ATI,0x5960,  0x1462,0x0380,           4 },
+     /* VIA VT8377 Host Bridge / RV280 Needs AGPMode 4 (ati ML) */
+     { PCI_VENDOR_VIA,0x3189,    PCI_VENDOR_ATI,0x5964,  0x148c,0x2073,           4 },
++    /* VIA VT8377 Host Bridge / RV280 Needs AGPMode 4 (fdo #12544) */
++    { PCI_VENDOR_VIA,0x3189,    PCI_VENDOR_ATI,0x5964,  0x1043,0xc008,           4 },
+ 
+     /* ATI Host Bridge / RV280 [M9+] Needs AGPMode 1 (phoronix forum) */
+     { PCI_VENDOR_ATI,0xcbb2,    PCI_VENDOR_ATI,0x5c61,  PCI_VENDOR_SONY,0x8175,  1 },
+@@ -794,6 +798,9 @@ static radeon_agpmode_quirk radeon_agpmode_quirk_list[] = {
+     /* HP Host Bridge / R300 [FireGL X1] Needs AGPMode 2 (fdo #7770) */
+     { PCI_VENDOR_HP,0x122e,    PCI_VENDOR_ATI,0x4e47,  PCI_VENDOR_ATI,0x0152,    2 },
+ 
++    /* nVidia Host Bridge / R420 [X800 Pro] Needs AGPMode 4 (fdo #22726) */
++    { 0x10de,0x00e1,           PCI_VENDOR_ATI,0x4a49,  PCI_VENDOR_ATI,0x0002,    4 },
++
+     { 0, 0, 0, 0, 0, 0, 0 },
+ };
+ 
+@@ -1556,12 +1563,13 @@ Bool RADEONDRIScreenInit(ScreenPtr pScreen)
+     info->dri->pDRIInfo                       = pDRIInfo;
+     pDRIInfo->drmDriverName              = RADEON_DRIVER_NAME;
+ 
+-    if ( (info->ChipFamily >= CHIP_FAMILY_R300) ) {
++    if ( (info->ChipFamily >= CHIP_FAMILY_R600) )
++       pDRIInfo->clientDriverName        = R600_DRIVER_NAME;
++    else if ( (info->ChipFamily >= CHIP_FAMILY_R300) )
+        pDRIInfo->clientDriverName        = R300_DRIVER_NAME;
+-    } else    
+-    if ( info->ChipFamily >= CHIP_FAMILY_R200 )
++    else if ( info->ChipFamily >= CHIP_FAMILY_R200 )
+        pDRIInfo->clientDriverName	 = R200_DRIVER_NAME;
+-    else 
++    else
+        pDRIInfo->clientDriverName	 = RADEON_DRIVER_NAME;
+ 
+     if (xf86LoaderCheckSymbol("DRICreatePCIBusID")) {
+diff --git a/src/radeon_driver.c b/src/radeon_driver.c
+index 8673f5e..83a3374 100644
+--- a/src/radeon_driver.c
++++ b/src/radeon_driver.c
+@@ -1814,16 +1814,6 @@ static Bool RADEONPreInitChipType(ScrnInfoPtr pScrn)
+ 	break;
+     }
+ 
+-    if (info->ChipFamily >= CHIP_FAMILY_R600) {
+-        xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
+-                   "R600 support is mostly incomplete and very experimental\n");
+-    }
+-
+-    if ((info->ChipFamily >= CHIP_FAMILY_RV515) && (info->ChipFamily < CHIP_FAMILY_R600)) {
+-	xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
+-                   "R500 support is under development. Please report any issues to xorg-driver-ati@lists.x.org\n");
+-    }
+-
+     from               = X_PROBED;
+     info->LinearAddr   = PCI_REGION_BASE(info->PciInfo, 0, REGION_MEM) & ~0x1ffffffULL;
+     pScrn->memPhysBase = info->LinearAddr;
+@@ -2778,7 +2768,6 @@ Bool RADEONPreInit(ScrnInfoPtr pScrn, int flags)
+     xf86Int10InfoPtr  pInt10 = NULL;
+     void *int10_save = NULL;
+     const char *s;
+-    int crtc_max_X, crtc_max_Y;
+     RADEONEntPtr pRADEONEnt;
+     DevUnion* pPriv;
+ 
+@@ -2984,51 +2973,10 @@ Bool RADEONPreInit(ScrnInfoPtr pScrn, int flags)
+ 
+     RADEONPreInitColorTiling(pScrn);
+ 
+-    /* we really need an FB manager... */
+-    if (pScrn->display->virtualX) {
+-	crtc_max_X = pScrn->display->virtualX;
+-	crtc_max_Y = pScrn->display->virtualY;
+-	if (info->allowColorTiling) {
+-	    if (crtc_max_X > info->MaxSurfaceWidth ||
+-		crtc_max_Y > info->MaxLines) {
+-		info->allowColorTiling = FALSE;
+-		xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
+-			   "Requested desktop size exceeds surface limts for tiling, ColorTiling disabled\n");
+-	    }
+-	}
+-	if (crtc_max_X > 8192)
+-	    crtc_max_X = 8192;
+-	if (crtc_max_Y > 8192)
+-	    crtc_max_Y = 8192;
+-    } else {
+-	/*
+-	 * note that these aren't really the CRTC limits, they're just
+-	 * heuristics until we have a better memory manager.
+-	 */
+-	if (pScrn->videoRam <= 16384) {
+-	    crtc_max_X = 1600;
+-	    crtc_max_Y = 1200;
+-	} else if (IS_R300_VARIANT) {
+-	    crtc_max_X = 2560;
+-	    crtc_max_Y = 1200;
+-	} else if (IS_AVIVO_VARIANT) {
+-	    crtc_max_X = 2560;
+-	    crtc_max_Y = 1600;
+-	} else {
+-	    crtc_max_X = 2048;
+-	    crtc_max_Y = 1200;
+-	}
+-    }
+-    xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Max desktop size set to %dx%d\n",
+-	       crtc_max_X, crtc_max_Y);
+-    xf86DrvMsg(pScrn->scrnIndex, X_INFO,
+-	       "For a larger or smaller max desktop size, add a Virtual line to your xorg.conf\n");
+-    xf86DrvMsg(pScrn->scrnIndex, X_INFO,
+-	       "If you are having trouble with 3D, "
+-	       "reduce the desktop size by adjusting the Virtual line to your xorg.conf\n");
+-
+-    /*xf86CrtcSetSizeRange (pScrn, 320, 200, info->MaxSurfaceWidth, info->MaxLines);*/
+-    xf86CrtcSetSizeRange (pScrn, 320, 200, crtc_max_X, crtc_max_Y);
++    if (IS_AVIVO_VARIANT)
++	xf86CrtcSetSizeRange (pScrn, 320, 200, 8192, 8192);
++    else
++	xf86CrtcSetSizeRange (pScrn, 320, 200, 4096, 4096);
+ 
+     RADEONPreInitDDC(pScrn);
+ 
+@@ -3764,6 +3712,10 @@ Bool RADEONScreenInit(int scrnIndex, ScreenPtr pScreen,
+         }
+     }
+ 
++    /* Clear the framebuffer */
++    memset(info->FB + pScrn->fbOffset, 0,
++           pScrn->virtualY * pScrn->displayWidth * info->CurrentLayout.pixel_bytes);
++
+     /* set the modes with desired rotation, etc. */
+     if (!xf86SetDesiredModes (pScrn))
+ 	return FALSE;
+@@ -5660,6 +5612,10 @@ Bool RADEONEnterVT(int scrnIndex, int flags)
+ 
+     pScrn->vtSema = TRUE;
+ 
++    /* Clear the framebuffer */
++    memset(info->FB + pScrn->fbOffset, 0,
++           pScrn->virtualY * pScrn->displayWidth * info->CurrentLayout.pixel_bytes);
++
+     if (!xf86SetDesiredModes(pScrn))
+ 	return FALSE;
+ 
+diff --git a/src/radeon_exa_funcs.c b/src/radeon_exa_funcs.c
+index 59cb46f..482abcd 100644
+--- a/src/radeon_exa_funcs.c
++++ b/src/radeon_exa_funcs.c
+@@ -532,11 +532,11 @@ Bool FUNC_NAME(RADEONDrawInit)(ScreenPtr pScreen)
+     xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Setting EXA maxPitchBytes\n");
+ 
+     info->accel_state->exa->maxPitchBytes = 16320;
+-    info->accel_state->exa->maxX = 8192;
++    info->accel_state->exa->maxX = 8191;
+ #else
+     info->accel_state->exa->maxX = 16320 / 4;
+ #endif
+-    info->accel_state->exa->maxY = 8192;
++    info->accel_state->exa->maxY = 8191;
+ 
+     if (xf86ReturnOptValBool(info->Options, OPTION_EXA_VSYNC, FALSE)) {
+ 	xf86DrvMsg(pScrn->scrnIndex, X_INFO, "EXA VSync enabled\n");
+diff --git a/src/radeon_exa_render.c b/src/radeon_exa_render.c
+index 571204a..65197c0 100644
+--- a/src/radeon_exa_render.c
++++ b/src/radeon_exa_render.c
+@@ -803,6 +803,10 @@ static Bool R200CheckComposite(int op, PicturePtr pSrcPicture, PicturePtr pMaskP
+ 
+     TRACE;
+ 
++    /* Check for unsupported compositing operations. */
++    if (op >= sizeof(RadeonBlendOp) / sizeof(RadeonBlendOp[0]))
++	RADEON_FALLBACK(("Unsupported Composite op 0x%x\n", op));
++
+     if (!pSrcPicture->pDrawable)
+ 	return FALSE;
+ 
+@@ -1492,7 +1496,7 @@ static Bool FUNC_NAME(R300PrepareComposite)(int op, PicturePtr pSrcPicture,
+ 			   R300_RS_COUNT_HIRES_EN));
+ 
+ 	    /* R300_INST_COUNT_RS - highest RS instruction used */
+-	    OUT_ACCEL_REG(R300_RS_INST_COUNT, R300_INST_COUNT_RS(1) | R300_TX_OFFSET_RS(6));
++	    OUT_ACCEL_REG(R300_RS_INST_COUNT, R300_INST_COUNT_RS(1));
+ 
+ 	    OUT_ACCEL_REG(R300_US_CODE_OFFSET, (R300_ALU_CODE_OFFSET(0) |
+ 						R300_ALU_CODE_SIZE(0) |
+@@ -1514,7 +1518,7 @@ static Bool FUNC_NAME(R300PrepareComposite)(int op, PicturePtr pSrcPicture,
+ 			  ((2 << R300_RS_COUNT_IT_COUNT_SHIFT) |
+ 			   R300_RS_COUNT_HIRES_EN));
+ 
+-	    OUT_ACCEL_REG(R300_RS_INST_COUNT, R300_INST_COUNT_RS(0) | R300_TX_OFFSET_RS(6));
++	    OUT_ACCEL_REG(R300_RS_INST_COUNT, R300_INST_COUNT_RS(0));
+ 
+ 	    OUT_ACCEL_REG(R300_US_CODE_OFFSET, (R300_ALU_CODE_OFFSET(0) |
+ 						R300_ALU_CODE_SIZE(0) |
+@@ -1741,7 +1745,7 @@ static Bool FUNC_NAME(R300PrepareComposite)(int op, PicturePtr pSrcPicture,
+ 			   R300_RS_COUNT_HIRES_EN));
+ 
+ 	    /* 2 RS instructions: 1 for tex0 (src), 1 for tex1 (mask) */
+-	    OUT_ACCEL_REG(R300_RS_INST_COUNT, R300_INST_COUNT_RS(1) | R300_TX_OFFSET_RS(6));
++	    OUT_ACCEL_REG(R300_RS_INST_COUNT, R300_INST_COUNT_RS(1));
+ 
+ 	    OUT_ACCEL_REG(R500_US_CODE_ADDR, (R500_US_CODE_START_ADDR(0) |
+ 					      R500_US_CODE_END_ADDR(2)));
+@@ -1753,7 +1757,7 @@ static Bool FUNC_NAME(R300PrepareComposite)(int op, PicturePtr pSrcPicture,
+ 			  ((2 << R300_RS_COUNT_IT_COUNT_SHIFT) |
+ 			   R300_RS_COUNT_HIRES_EN));
+ 
+-	    OUT_ACCEL_REG(R300_RS_INST_COUNT, R300_INST_COUNT_RS(0) | R300_TX_OFFSET_RS(6));
++	    OUT_ACCEL_REG(R300_RS_INST_COUNT, R300_INST_COUNT_RS(0));
+ 
+ 	    OUT_ACCEL_REG(R500_US_CODE_ADDR, (R500_US_CODE_START_ADDR(0) |
+ 					      R500_US_CODE_END_ADDR(1)));
+@@ -1933,8 +1937,12 @@ static Bool FUNC_NAME(R300PrepareComposite)(int op, PicturePtr pSrcPicture,
+ 
+     /* Clear out scissoring */
+     BEGIN_ACCEL(2);
+-    OUT_ACCEL_REG(R300_SC_SCISSOR0, ((0 << R300_SCISSOR_X_SHIFT) |
+-				     (0 << R300_SCISSOR_Y_SHIFT)));
++    if (IS_R300_3D)
++	OUT_ACCEL_REG(R300_SC_SCISSOR0, ((1440 << R300_SCISSOR_X_SHIFT) |
++					 (1440 << R300_SCISSOR_Y_SHIFT)));
++    else
++	OUT_ACCEL_REG(R300_SC_SCISSOR0, ((0 << R300_SCISSOR_X_SHIFT) |
++					 (0 << R300_SCISSOR_Y_SHIFT)));
+     OUT_ACCEL_REG(R300_SC_SCISSOR1, ((8191 << R300_SCISSOR_X_SHIFT) |
+ 				     (8191 << R300_SCISSOR_Y_SHIFT)));
+     FINISH_ACCEL();
+diff --git a/src/radeon_output.c b/src/radeon_output.c
+index 712ac5f..ee8de6a 100644
+--- a/src/radeon_output.c
++++ b/src/radeon_output.c
+@@ -219,24 +219,12 @@ radeon_ddc_connected(xf86OutputPtr output)
+     RADEONOutputPrivatePtr radeon_output = output->driver_private;
+ 
+     if (radeon_output->pI2CBus) {
+-	/* RV410 RADEON_GPIO_VGA_DDC seems to only work via hw i2c
+-	 * We may want to extend this to other cases if the need arises...
+-	 */
+-	if ((info->ChipFamily == CHIP_FAMILY_RV410) &&
+-	    (radeon_output->ddc_i2c.mask_clk_reg == RADEON_GPIO_VGA_DDC) &&
+-	    info->IsAtomBios)
+-	    MonInfo = radeon_atom_get_edid(output);
+-	else if (info->get_hardcoded_edid_from_bios) {
++	if (info->get_hardcoded_edid_from_bios)
+ 	    MonInfo = RADEONGetHardCodedEDIDFromBIOS(output);
+-	    if (MonInfo == NULL) {
+-		RADEONI2CDoLock(output, TRUE);
+-		MonInfo = xf86OutputGetEDID(output, radeon_output->pI2CBus);
+-		RADEONI2CDoLock(output, FALSE);
+-	    }
+-	} else {
+-	    RADEONI2CDoLock(output, TRUE);
++	if (MonInfo == NULL) {
++	    RADEONI2CDoLock(output, radeon_output->pI2CBus, TRUE);
+ 	    MonInfo = xf86OutputGetEDID(output, radeon_output->pI2CBus);
+-	    RADEONI2CDoLock(output, FALSE);
++	    RADEONI2CDoLock(output, radeon_output->pI2CBus, FALSE);
+ 	}
+     }
+     if (MonInfo) {
+@@ -520,8 +508,32 @@ radeon_mode_fixup(xf86OutputPtr output, DisplayModePtr mode,
+ static void
+ radeon_mode_prepare(xf86OutputPtr output)
+ {
++    RADEONInfoPtr info = RADEONPTR(output->scrn);
++    xf86CrtcConfigPtr	config = XF86_CRTC_CONFIG_PTR (output->scrn);
++    int o;
++
++    for (o = 0; o < config->num_output; o++) {
++	xf86OutputPtr loop_output = config->output[o];
++	if (loop_output == output)
++	    continue;
++	else if (loop_output->crtc) {
++	    xf86CrtcPtr other_crtc = loop_output->crtc;
++	    RADEONCrtcPrivatePtr other_radeon_crtc = other_crtc->driver_private;
++	    if (other_crtc->enabled) {
++		if (other_radeon_crtc->initialized) {
++		    radeon_crtc_dpms(other_crtc, DPMSModeOff);
++		    if (IS_AVIVO_VARIANT || info->r4xx_atom)
++			atombios_lock_crtc(info->atomBIOS, other_radeon_crtc->crtc_id, 1);
++		    radeon_dpms(loop_output, DPMSModeOff);
++		}
++	    }
++	}
++    }
++
+     radeon_bios_output_lock(output, TRUE);
+     radeon_dpms(output, DPMSModeOff);
++    radeon_crtc_dpms(output->crtc, DPMSModeOff);
++
+ }
+ 
+ static void
+@@ -541,7 +553,30 @@ radeon_mode_set(xf86OutputPtr output, DisplayModePtr mode,
+ static void
+ radeon_mode_commit(xf86OutputPtr output)
+ {
++    RADEONInfoPtr info = RADEONPTR(output->scrn);
++    xf86CrtcConfigPtr	config = XF86_CRTC_CONFIG_PTR (output->scrn);
++    int o;
++
++    for (o = 0; o < config->num_output; o++) {
++	xf86OutputPtr loop_output = config->output[o];
++	if (loop_output == output)
++	    continue;
++	else if (loop_output->crtc) {
++	    xf86CrtcPtr other_crtc = loop_output->crtc;
++	    RADEONCrtcPrivatePtr other_radeon_crtc = other_crtc->driver_private;
++	    if (other_crtc->enabled) {
++		if (other_radeon_crtc->initialized) {
++		    radeon_crtc_dpms(other_crtc, DPMSModeOn);
++		    if (IS_AVIVO_VARIANT || info->r4xx_atom)
++			atombios_lock_crtc(info->atomBIOS, other_radeon_crtc->crtc_id, 0);
++		    radeon_dpms(loop_output, DPMSModeOn);
++		}
++	    }
++	}
++    }
++
+     radeon_dpms(output, DPMSModeOn);
++    radeon_crtc_dpms(output->crtc, DPMSModeOn);
+     radeon_bios_output_lock(output, FALSE);
+ }
+ 
+@@ -1174,7 +1209,7 @@ radeon_create_resources(xf86OutputPtr output)
+ 	}
+     }
+ 
+-    if ((!IS_AVIVO_VARIANT) && (radeon_output->devices & (ATOM_DEVICE_DFP2_SUPPORT))) {
++    if ((!IS_AVIVO_VARIANT) && (radeon_output->devices & (ATOM_DEVICE_DFP1_SUPPORT))) {
+ 	tmds_pll_atom = MAKE_ATOM("tmds_pll");
+ 
+ 	err = RRConfigureOutputProperty(output->randr_output, tmds_pll_atom,
+@@ -1608,16 +1643,27 @@ static const xf86OutputFuncsRec radeon_output_funcs = {
+ };
+ 
+ Bool
+-RADEONI2CDoLock(xf86OutputPtr output, int lock_state)
++RADEONI2CDoLock(xf86OutputPtr output, I2CBusPtr b, int lock_state)
+ {
+     ScrnInfoPtr pScrn = output->scrn;
+     RADEONInfoPtr  info       = RADEONPTR(pScrn);
+-    RADEONOutputPrivatePtr radeon_output = output->driver_private;
+-    RADEONI2CBusPtr pRADEONI2CBus = radeon_output->pI2CBus->DriverPrivate.ptr;
++    RADEONI2CBusPtr pRADEONI2CBus = b->DriverPrivate.ptr;
+     unsigned char *RADEONMMIO = info->MMIO;
+     uint32_t temp;
+ 
+     if (lock_state) {
++	/* RV410 appears to have a bug where the hw i2c in reset
++	 * holds the i2c port in a bad state - switch hw i2c away before
++	 * doing DDC - do this for all r200s/r300s for safety sakes */
++	if ((info->ChipFamily >= CHIP_FAMILY_R200) && (!IS_AVIVO_VARIANT)) {
++	    if (pRADEONI2CBus->mask_clk_reg == RADEON_GPIO_MONID)
++                OUTREG(RADEON_DVI_I2C_CNTL_0, (RADEON_I2C_SOFT_RST |
++					       R200_DVI_I2C_PIN_SEL(R200_SEL_DDC1)));
++	    else
++                OUTREG(RADEON_DVI_I2C_CNTL_0, (RADEON_I2C_SOFT_RST |
++					       R200_DVI_I2C_PIN_SEL(R200_SEL_DDC3)));
++	}
++
+ 	temp = INREG(pRADEONI2CBus->a_clk_reg);
+ 	temp &= ~(pRADEONI2CBus->a_clk_mask);
+ 	OUTREG(pRADEONI2CBus->a_clk_reg, temp);
+diff --git a/src/radeon_pci_chipset_gen.h b/src/radeon_pci_chipset_gen.h
+index d61c57d..4995b4b 100644
+--- a/src/radeon_pci_chipset_gen.h
++++ b/src/radeon_pci_chipset_gen.h
+@@ -40,6 +40,8 @@ PciChipsets RADEONPciChipsets[] = {
+  { PCI_CHIP_R420_JN, PCI_CHIP_R420_JN, RES_SHARED_VGA },
+  { PCI_CHIP_R420_4A4F, PCI_CHIP_R420_4A4F, RES_SHARED_VGA },
+  { PCI_CHIP_R420_JP, PCI_CHIP_R420_JP, RES_SHARED_VGA },
++ { PCI_CHIP_R420_JT, PCI_CHIP_R420_JT, RES_SHARED_VGA },
++ { PCI_CHIP_R481_4B48, PCI_CHIP_R481_4B48, RES_SHARED_VGA },
+  { PCI_CHIP_R481_4B49, PCI_CHIP_R481_4B49, RES_SHARED_VGA },
+  { PCI_CHIP_R481_4B4A, PCI_CHIP_R481_4B4A, RES_SHARED_VGA },
+  { PCI_CHIP_R481_4B4B, PCI_CHIP_R481_4B4B, RES_SHARED_VGA },
+@@ -254,6 +256,7 @@ PciChipsets RADEONPciChipsets[] = {
+  { PCI_CHIP_RV770_9440, PCI_CHIP_RV770_9440, RES_SHARED_VGA },
+  { PCI_CHIP_RV770_9441, PCI_CHIP_RV770_9441, RES_SHARED_VGA },
+  { PCI_CHIP_RV770_9442, PCI_CHIP_RV770_9442, RES_SHARED_VGA },
++ { PCI_CHIP_RV770_9443, PCI_CHIP_RV770_9443, RES_SHARED_VGA },
+  { PCI_CHIP_RV770_9444, PCI_CHIP_RV770_9444, RES_SHARED_VGA },
+  { PCI_CHIP_RV770_9446, PCI_CHIP_RV770_9446, RES_SHARED_VGA },
+  { PCI_CHIP_RV770_944A, PCI_CHIP_RV770_944A, RES_SHARED_VGA },
+@@ -271,7 +274,9 @@ PciChipsets RADEONPciChipsets[] = {
+  { PCI_CHIP_RV770_946B, PCI_CHIP_RV770_946B, RES_SHARED_VGA },
+  { PCI_CHIP_RV770_947A, PCI_CHIP_RV770_947A, RES_SHARED_VGA },
+  { PCI_CHIP_RV770_947B, PCI_CHIP_RV770_947B, RES_SHARED_VGA },
++ { PCI_CHIP_RV730_9480, PCI_CHIP_RV730_9480, RES_SHARED_VGA },
+  { PCI_CHIP_RV730_9487, PCI_CHIP_RV730_9487, RES_SHARED_VGA },
++ { PCI_CHIP_RV730_9488, PCI_CHIP_RV730_9488, RES_SHARED_VGA },
+  { PCI_CHIP_RV730_9489, PCI_CHIP_RV730_9489, RES_SHARED_VGA },
+  { PCI_CHIP_RV730_948F, PCI_CHIP_RV730_948F, RES_SHARED_VGA },
+  { PCI_CHIP_RV730_9490, PCI_CHIP_RV730_9490, RES_SHARED_VGA },
+@@ -280,6 +285,11 @@ PciChipsets RADEONPciChipsets[] = {
+  { PCI_CHIP_RV730_949C, PCI_CHIP_RV730_949C, RES_SHARED_VGA },
+  { PCI_CHIP_RV730_949E, PCI_CHIP_RV730_949E, RES_SHARED_VGA },
+  { PCI_CHIP_RV730_949F, PCI_CHIP_RV730_949F, RES_SHARED_VGA },
++ { PCI_CHIP_RV740_94A0, PCI_CHIP_RV740_94A0, RES_SHARED_VGA },
++ { PCI_CHIP_RV740_94A1, PCI_CHIP_RV740_94A1, RES_SHARED_VGA },
++ { PCI_CHIP_RV740_94B1, PCI_CHIP_RV740_94B1, RES_SHARED_VGA },
++ { PCI_CHIP_RV740_94B3, PCI_CHIP_RV740_94B3, RES_SHARED_VGA },
++ { PCI_CHIP_RV740_94B5, PCI_CHIP_RV740_94B5, RES_SHARED_VGA },
+  { PCI_CHIP_RV610_94C0, PCI_CHIP_RV610_94C0, RES_SHARED_VGA },
+  { PCI_CHIP_RV610_94C1, PCI_CHIP_RV610_94C1, RES_SHARED_VGA },
+  { PCI_CHIP_RV610_94C3, PCI_CHIP_RV610_94C3, RES_SHARED_VGA },
+diff --git a/src/radeon_pci_device_match_gen.h b/src/radeon_pci_device_match_gen.h
+index a06b4a6..b087239 100644
+--- a/src/radeon_pci_device_match_gen.h
++++ b/src/radeon_pci_device_match_gen.h
+@@ -40,6 +40,8 @@ static const struct pci_id_match radeon_device_match[] = {
+  ATI_DEVICE_MATCH( PCI_CHIP_R420_JN, 0 ),
+  ATI_DEVICE_MATCH( PCI_CHIP_R420_4A4F, 0 ),
+  ATI_DEVICE_MATCH( PCI_CHIP_R420_JP, 0 ),
++ ATI_DEVICE_MATCH( PCI_CHIP_R420_JT, 0 ),
++ ATI_DEVICE_MATCH( PCI_CHIP_R481_4B48, 0 ),
+  ATI_DEVICE_MATCH( PCI_CHIP_R481_4B49, 0 ),
+  ATI_DEVICE_MATCH( PCI_CHIP_R481_4B4A, 0 ),
+  ATI_DEVICE_MATCH( PCI_CHIP_R481_4B4B, 0 ),
+@@ -254,6 +256,7 @@ static const struct pci_id_match radeon_device_match[] = {
+  ATI_DEVICE_MATCH( PCI_CHIP_RV770_9440, 0 ),
+  ATI_DEVICE_MATCH( PCI_CHIP_RV770_9441, 0 ),
+  ATI_DEVICE_MATCH( PCI_CHIP_RV770_9442, 0 ),
++ ATI_DEVICE_MATCH( PCI_CHIP_RV770_9443, 0 ),
+  ATI_DEVICE_MATCH( PCI_CHIP_RV770_9444, 0 ),
+  ATI_DEVICE_MATCH( PCI_CHIP_RV770_9446, 0 ),
+  ATI_DEVICE_MATCH( PCI_CHIP_RV770_944A, 0 ),
+@@ -271,7 +274,9 @@ static const struct pci_id_match radeon_device_match[] = {
+  ATI_DEVICE_MATCH( PCI_CHIP_RV770_946B, 0 ),
+  ATI_DEVICE_MATCH( PCI_CHIP_RV770_947A, 0 ),
+  ATI_DEVICE_MATCH( PCI_CHIP_RV770_947B, 0 ),
++ ATI_DEVICE_MATCH( PCI_CHIP_RV730_9480, 0 ),
+  ATI_DEVICE_MATCH( PCI_CHIP_RV730_9487, 0 ),
++ ATI_DEVICE_MATCH( PCI_CHIP_RV730_9488, 0 ),
+  ATI_DEVICE_MATCH( PCI_CHIP_RV730_9489, 0 ),
+  ATI_DEVICE_MATCH( PCI_CHIP_RV730_948F, 0 ),
+  ATI_DEVICE_MATCH( PCI_CHIP_RV730_9490, 0 ),
+@@ -280,6 +285,11 @@ static const struct pci_id_match radeon_device_match[] = {
+  ATI_DEVICE_MATCH( PCI_CHIP_RV730_949C, 0 ),
+  ATI_DEVICE_MATCH( PCI_CHIP_RV730_949E, 0 ),
+  ATI_DEVICE_MATCH( PCI_CHIP_RV730_949F, 0 ),
++ ATI_DEVICE_MATCH( PCI_CHIP_RV740_94A0, 0 ),
++ ATI_DEVICE_MATCH( PCI_CHIP_RV740_94A1, 0 ),
++ ATI_DEVICE_MATCH( PCI_CHIP_RV740_94B1, 0 ),
++ ATI_DEVICE_MATCH( PCI_CHIP_RV740_94B3, 0 ),
++ ATI_DEVICE_MATCH( PCI_CHIP_RV740_94B5, 0 ),
+  ATI_DEVICE_MATCH( PCI_CHIP_RV610_94C0, 0 ),
+  ATI_DEVICE_MATCH( PCI_CHIP_RV610_94C1, 0 ),
+  ATI_DEVICE_MATCH( PCI_CHIP_RV610_94C3, 0 ),
+diff --git a/src/radeon_probe.h b/src/radeon_probe.h
+index 6479972..3e4f47c 100644
+--- a/src/radeon_probe.h
++++ b/src/radeon_probe.h
+@@ -216,6 +216,7 @@ typedef struct _radeon_lvds {
+ 
+ typedef struct _radeon_dvo {
+     /* dvo */
++    I2CBusPtr         pI2CBus;
+     I2CDevPtr         DVOChip;
+     RADEONI2CBusRec   dvo_i2c;
+     int               dvo_i2c_slave_addr;
+diff --git a/src/radeon_reg.h b/src/radeon_reg.h
+index d74a30a..914fe51 100644
+--- a/src/radeon_reg.h
++++ b/src/radeon_reg.h
+@@ -936,11 +936,11 @@
+ #define RADEON_GENMO_WT                     0x03c2 /* VGA */
+ #define RADEON_GENS0                        0x03c2 /* VGA */
+ #define RADEON_GENS1                        0x03da /* VGA, 0x03ba */
+-#define RADEON_GPIO_MONID                   0x0068 /* DDC interface via I2C */
++#define RADEON_GPIO_MONID                   0x0068 /* DDC interface via I2C */ /* DDC3 */
+ #define RADEON_GPIO_MONIDB                  0x006c
+ #define RADEON_GPIO_CRT2_DDC                0x006c
+-#define RADEON_GPIO_DVI_DDC                 0x0064
+-#define RADEON_GPIO_VGA_DDC                 0x0060
++#define RADEON_GPIO_DVI_DDC                 0x0064 /* DDC2 */
++#define RADEON_GPIO_VGA_DDC                 0x0060 /* DDC1 */
+ #       define RADEON_GPIO_A_0              (1 <<  0)
+ #       define RADEON_GPIO_A_1              (1 <<  1)
+ #       define RADEON_GPIO_Y_0              (1 <<  8)
+@@ -979,24 +979,28 @@
+ 
+        /* Multimedia I2C bus */
+ #define RADEON_I2C_CNTL_0		    0x0090
+-#define RADEON_I2C_DONE (1<<0)
+-#define RADEON_I2C_NACK (1<<1)
+-#define RADEON_I2C_HALT (1<<2)
+-#define RADEON_I2C_SOFT_RST (1<<5)
+-#define RADEON_I2C_DRIVE_EN (1<<6)
+-#define RADEON_I2C_DRIVE_SEL (1<<7)
+-#define RADEON_I2C_START (1<<8)
+-#define RADEON_I2C_STOP (1<<9)
+-#define RADEON_I2C_RECEIVE (1<<10)
+-#define RADEON_I2C_ABORT (1<<11)
+-#define RADEON_I2C_GO (1<<12)
++#define RADEON_I2C_DONE                     (1 << 0)
++#define RADEON_I2C_NACK                     (1 << 1)
++#define RADEON_I2C_HALT                     (1 << 2)
++#define RADEON_I2C_SOFT_RST                 (1 << 5)
++#define RADEON_I2C_DRIVE_EN                 (1 << 6)
++#define RADEON_I2C_DRIVE_SEL                (1 << 7)
++#define RADEON_I2C_START                    (1 << 8)
++#define RADEON_I2C_STOP                     (1 << 9)
++#define RADEON_I2C_RECEIVE                  (1 << 10)
++#define RADEON_I2C_ABORT                    (1 << 11)
++#define RADEON_I2C_GO                       (1 << 12)
+ #define RADEON_I2C_CNTL_1                   0x0094
+-#define RADEON_I2C_SEL         (1<<16)
+-#define RADEON_I2C_EN          (1<<17)
++#define RADEON_I2C_SEL                      (1 << 16)
++#define RADEON_I2C_EN                       (1 << 17)
+ #define RADEON_I2C_DATA			    0x0098
+ 
+ #define RADEON_DVI_I2C_CNTL_0		    0x02e0
+-#define RADEON_DVI_I2C_CNTL_1               0x02e4 /* ? */
++#       define R200_DVI_I2C_PIN_SEL(x)      ((x) << 3)
++#       define R200_SEL_DDC1                0 /* 0x60 - VGA_DDC */
++#       define R200_SEL_DDC2                1 /* 0x64 - DVI_DDC */
++#       define R200_SEL_DDC3                2 /* 0x68 - MONID_DDC */
++#define RADEON_DVI_I2C_CNTL_1               0x02e4
+ #define RADEON_DVI_I2C_DATA		    0x02e8
+ 
+ #define RADEON_INTERRUPT_LINE               0x0f3c /* PCI */
+diff --git a/src/radeon_textured_videofuncs.c b/src/radeon_textured_videofuncs.c
+index 6cb2870..9f7cd4c 100644
+--- a/src/radeon_textured_videofuncs.c
++++ b/src/radeon_textured_videofuncs.c
+@@ -393,7 +393,7 @@ FUNC_NAME(RADEONDisplayTexturedVideo)(ScrnInfoPtr pScrn, RADEONPortPrivPtr pPriv
+ 						   R300_RS_COUNT_HIRES_EN));
+ 
+ 		/* R300_INST_COUNT_RS - highest RS instruction used */
+-		OUT_ACCEL_REG(R300_RS_INST_COUNT, R300_INST_COUNT_RS(1) | R300_TX_OFFSET_RS(6));
++		OUT_ACCEL_REG(R300_RS_INST_COUNT, R300_INST_COUNT_RS(1));
+ 
+ 		/* Pixel stack frame size. */
+ 		OUT_ACCEL_REG(R300_US_PIXSIZE, 5);
+@@ -770,7 +770,7 @@ FUNC_NAME(RADEONDisplayTexturedVideo)(ScrnInfoPtr pScrn, RADEONPortPrivPtr pPriv
+ 			  ((2 << R300_RS_COUNT_IT_COUNT_SHIFT) |
+ 			   R300_RS_COUNT_HIRES_EN));
+ 		/* R300_INST_COUNT_RS - highest RS instruction used */
+-		OUT_ACCEL_REG(R300_RS_INST_COUNT, R300_INST_COUNT_RS(0) | R300_TX_OFFSET_RS(6));
++		OUT_ACCEL_REG(R300_RS_INST_COUNT, R300_INST_COUNT_RS(0));
+ 
+ 		OUT_ACCEL_REG(R300_US_PIXSIZE, 2); /* highest temp used */
+ 
+@@ -902,7 +902,7 @@ FUNC_NAME(RADEONDisplayTexturedVideo)(ScrnInfoPtr pScrn, RADEONPortPrivPtr pPriv
+ 			  ((2 << R300_RS_COUNT_IT_COUNT_SHIFT) |
+ 			   R300_RS_COUNT_HIRES_EN));
+ 		/* R300_INST_COUNT_RS - highest RS instruction used */
+-		OUT_ACCEL_REG(R300_RS_INST_COUNT, R300_INST_COUNT_RS(0) | R300_TX_OFFSET_RS(6));
++		OUT_ACCEL_REG(R300_RS_INST_COUNT, R300_INST_COUNT_RS(0));
+ 
+ 		OUT_ACCEL_REG(R300_US_PIXSIZE, 0); /* highest temp used */
+ 
+@@ -975,7 +975,7 @@ FUNC_NAME(RADEONDisplayTexturedVideo)(ScrnInfoPtr pScrn, RADEONPortPrivPtr pPriv
+ 			       R300_RS_COUNT_HIRES_EN));
+ 
+ 		/* R300_INST_COUNT_RS - highest RS instruction used */
+-		OUT_ACCEL_REG(R300_RS_INST_COUNT, R300_INST_COUNT_RS(1) | R300_TX_OFFSET_RS(6));
++		OUT_ACCEL_REG(R300_RS_INST_COUNT, R300_INST_COUNT_RS(1));
+ 
+ 		/* Pixel stack frame size. */
+ 		OUT_ACCEL_REG(R300_US_PIXSIZE, 5);
+@@ -1447,7 +1447,7 @@ FUNC_NAME(RADEONDisplayTexturedVideo)(ScrnInfoPtr pScrn, RADEONPortPrivPtr pPriv
+ 			       R300_RS_COUNT_HIRES_EN));
+ 
+ 		/* R300_INST_COUNT_RS - highest RS instruction used */
+-		OUT_ACCEL_REG(R300_RS_INST_COUNT, R300_INST_COUNT_RS(0) | R300_TX_OFFSET_RS(6));
++		OUT_ACCEL_REG(R300_RS_INST_COUNT, R300_INST_COUNT_RS(0));
+ 
+ 		/* Pixel stack frame size. */
+ 		OUT_ACCEL_REG(R300_US_PIXSIZE, 0); /* highest temp used */
+@@ -2014,7 +2014,7 @@ FUNC_NAME(RADEONDisplayTexturedVideo)(ScrnInfoPtr pScrn, RADEONPortPrivPtr pPriv
+      *     We render a single, large triangle and use the scissor
+      *     functionality to restrict it to the desired rectangle.
+      *     Due to guardband limits on r3xx/r4xx, we can only use
+-     *     the single triangle up to 2880 pixels; above that we
++     *     the single triangle up to 4021 pixels; above that we
+      *     render as a quad.
+      */
+ 
+@@ -2041,7 +2041,7 @@ FUNC_NAME(RADEONDisplayTexturedVideo)(ScrnInfoPtr pScrn, RADEONPortPrivPtr pPriv
+ #endif
+ 
+ 	if (IS_R300_3D || IS_R500_3D) {
+-	    if (IS_R300_3D && ((dstw+dsth) > 2880))
++	    if (IS_R300_3D && ((dstw+dsth) > 4021))
+ 		use_quad = TRUE;
+ 	    /*
+ 	     * Set up the scissor area to that of the output size.
+@@ -2049,10 +2049,10 @@ FUNC_NAME(RADEONDisplayTexturedVideo)(ScrnInfoPtr pScrn, RADEONPortPrivPtr pPriv
+ 	    BEGIN_ACCEL(2);
+ 	    if (IS_R300_3D) {
+ 		/* R300 has an offset */
+-		OUT_ACCEL_REG(R300_SC_SCISSOR0, (((dstX + 1088) << R300_SCISSOR_X_SHIFT) |
+-						 ((dstY + 1088) << R300_SCISSOR_Y_SHIFT)));
+-		OUT_ACCEL_REG(R300_SC_SCISSOR1, (((dstX + dstw + 1088 - 1) << R300_SCISSOR_X_SHIFT) |
+-						 ((dstY + dsth + 1088 - 1) << R300_SCISSOR_Y_SHIFT)));
++		OUT_ACCEL_REG(R300_SC_SCISSOR0, (((dstX + 1440) << R300_SCISSOR_X_SHIFT) |
++						 ((dstY + 1440) << R300_SCISSOR_Y_SHIFT)));
++		OUT_ACCEL_REG(R300_SC_SCISSOR1, (((dstX + dstw + 1440 - 1) << R300_SCISSOR_X_SHIFT) |
++						 ((dstY + dsth + 1440 - 1) << R300_SCISSOR_Y_SHIFT)));
+ 	    } else {
+ 		OUT_ACCEL_REG(R300_SC_SCISSOR0, (((dstX) << R300_SCISSOR_X_SHIFT) |
+ 						 ((dstY) << R300_SCISSOR_Y_SHIFT)));
+diff --git a/src/radeon_version.h b/src/radeon_version.h
+index 5717ead..129046d 100644
+--- a/src/radeon_version.h
++++ b/src/radeon_version.h
+@@ -38,6 +38,7 @@
+ #define RADEON_DRIVER_NAME   "radeon"
+ #define R200_DRIVER_NAME     "r200"
+ #define R300_DRIVER_NAME     "r300"
++#define R600_DRIVER_NAME     "r600"
+ 
+ #define RADEON_VERSION_MAJOR PACKAGE_VERSION_MAJOR
+ #define RADEON_VERSION_MINOR PACKAGE_VERSION_MINOR

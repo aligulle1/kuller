@@ -1,0 +1,20 @@
+diff -ur pango-1.28.3.orig//pango/modules.c pango-1.28.3/pango/modules.c
+--- pango-1.28.3.orig//pango/modules.c	2010-02-09 14:06:28.000000000 +0200
++++ pango-1.28.3/pango/modules.c	2011-07-09 16:17:18.930829140 +0300
+@@ -528,9 +528,16 @@
+   dlloaded_modules = g_hash_table_new (g_str_hash, g_str_equal);
+ 
+   if (!file_str)
++#ifdef __x86_64
+     file_str = g_build_filename (pango_get_sysconf_subdirectory (),
+ 				 "pango.modules",
+ 				 NULL);
++#else
++    file_str = g_build_filename (pango_get_sysconf_subdirectory (),
++				 "32bit",
++				 "pango.modules",
++				 NULL);
++#endif
+ 
+   files = pango_split_file_list (file_str);
+ 

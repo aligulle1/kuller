@@ -1,0 +1,29 @@
+
+# Shell functions to cut down on useless shell instances.
+start() {
+  	if [ ! -f /var/kerberos/krb5kdc/principal ] ; then
+	    # Make an educated guess -- if they're using kldap somewhere,
+	    # then we don't know for sure that this is an error.
+  	    if ! grep -q 'db_library.*=.*kldap' /etc/krb5.conf ; then
+	        echo $"Error. Default principal database does not exist."
+	        exit 1
+	    fi
+	fi
+	daemon ${kadmind} ${KRB5REALM:+-r ${KRB5REALM}} -P $pidfile $KADMIND_ARGS
+}
+
+stop() {
+	echo -n $"Stopping $prog: "
+	killproc ${kadmind}
+	RETVAL=$?
+	echo
+	[ $RETVAL = 0 ] && rm -f /var/lock/subsys/kadmin
+}
+
+reload() {
+	echo -n $"Reopening $prog log file: "
+	killproc ${kadmind} -HUP
+	RETVAL=$?
+	echo
+}
+

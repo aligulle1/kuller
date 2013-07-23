@@ -1,0 +1,275 @@
+diff --git i/scripts/sync-abook.sh w/scripts/sync-abook.sh
+index 1fc22c3..d8293c6 100755
+--- i/scripts/sync-abook.sh
++++ w/scripts/sync-abook.sh
+@@ -64,11 +64,11 @@ fi
+ 
+ 
+ # check if DATAFILE exists
+-if [ ! -f $DATAFILE ]; then
+-    echo "Error: $DATAFILE does not exist"
++if [ ! -f "$DATAFILE" ]; then
++    echo "Error: '$DATAFILE' does not exist"
+     exit 1
+ fi
+ 
+ echo -n "Syncing abook to iPod... "
+-abook --convert --infile $DATAFILE --outformat gcrd | sed '/^$/d' | $RECODE > ${IPOD_MOUNT}/Contacts/abook.vcf
++abook --convert --infile "$DATAFILE" --outformat gcrd | sed '/^$/d' | $RECODE > "$IPOD_MOUNT/Contacts/abook.vcf"
+ echo "done!"
+diff --git i/scripts/sync-evocalendar.sh w/scripts/sync-evocalendar.sh
+index e73371c..8eb890c 100755
+--- i/scripts/sync-evocalendar.sh
++++ w/scripts/sync-evocalendar.sh
+@@ -96,24 +96,24 @@ else
+     RECODE="iconv -f UTF-8 -t $ENCODING"
+ fi
+ 
+-if [ $FILTER_SCRIPT ]; then
+-	FILTER=$FILTER_SCRIPT
++if [ -n "$FILTER_SCRIPT" ]; then
++	FILTER="$FILTER_SCRIPT"
+ else
+ 	FILTER="cat"
+ fi
+ 
+ # check if CALFILES exist
+ for i in $CALFILES; do
+-	if [ ! -f $CALFILE ]; then
+-	    echo "Error: $i does not exist"
++	if [ ! -f "$i" ]; then
++	    echo "Error: '$i' does not exist"
+ 	    exit 1
+ 	fi
+ done
+ 
+ # check if each TASKFILES exist
+ for j in $TASKFILES; do
+-	if [ ! -f $j ]; then
+-	    echo "Error: $TASKFILE does not exist"
++	if [ ! -f "$j" ]; then
++	    echo "Error: '$j' does not exist"
+ 	    exit 1
+ 	fi
+ done
+@@ -123,5 +123,5 @@ echo $TASKFILES
+ 
+ # remove all empty lines and recode if necessary
+ echo -n "Syncing iPod ... [Calendar] "
+-	cat $CALFILES $TASKFILES | grep -v '^[[:space:]]$\|^$' | $FILTER |  $RECODE > $IPOD_MOUNT/Calendars/evolution
++	cat $CALFILES $TASKFILES | grep -v '^[[:space:]]$\|^$' | $FILTER |  $RECODE > "$IPOD_MOUNT/Calendars/evolution"
+ echo "done!"
+diff --git i/scripts/sync-evolution.sh w/scripts/sync-evolution.sh
+index f1f81f7..4b06721 100755
+--- i/scripts/sync-evolution.sh
++++ w/scripts/sync-evolution.sh
+@@ -98,5 +98,5 @@ fi
+ # remove all empty lines and recode if necessary
+ echo -n "Syncing iPod ... [Contacts] "
+ # Redirect STDERR to avoid the "FIXME : wait for completion unimplemented" warning
+-evolution-addressbook-export 2>&1 | grep -v '^[[:space:]]$\|^$' | $RECODE | sed -e "s/PHOTO;ENCODING=b;TYPE=\"X-EVOLUTION-UNKNOWN\"/PHOTO;BASE64/g" > $IPOD_MOUNT/Contacts/evolution
++evolution-addressbook-export 2>&1 | grep -v '^[[:space:]]$\|^$' | $RECODE | sed -e "s/PHOTO;ENCODING=b;TYPE=\"X-EVOLUTION-UNKNOWN\"/PHOTO;BASE64/g" > "$IPOD_MOUNT/Contacts/evolution"
+ echo "done!"
+diff --git i/scripts/sync-kaddressbook.sh w/scripts/sync-kaddressbook.sh
+index e9f4d74..fec65d4 100755
+--- i/scripts/sync-kaddressbook.sh
++++ w/scripts/sync-kaddressbook.sh
+@@ -78,13 +78,13 @@ fi
+ 
+ 
+ # check if DATAFILE exists
+-if [ ! -f $DATAFILE ]; then
+-    echo "Error: $DATAFILE does not exist"
++if [ ! -f "$DATAFILE" ]; then
++    echo "Error: '$DATAFILE' does not exist"
+     exit 1
+ fi
+ 
+ 
+ # remove all empty lines and recode if necessary
+ echo -n "Syncing iPod ... [Contacts] "
+-cat $DATAFILE | grep -v '^[[:space:]]$\|^$' | $RECODE > $IPOD_MOUNT/Contacts/`basename $DATAFILE`
++cat "$DATAFILE" | grep -v '^[[:space:]]$\|^$' | $RECODE > "$IPOD_MOUNT/Contacts/`basename $DATAFILE`"
+ echo "done!"
+diff --git i/scripts/sync-knotes.sh w/scripts/sync-knotes.sh
+index 07ba914..d4af82c 100755
+--- i/scripts/sync-knotes.sh
++++ w/scripts/sync-knotes.sh
+@@ -41,15 +41,15 @@ else
+ fi
+ 
+ # check if iPod mountpoint exists
+-if [ ! -d $IPOD_MOUNT/Notes ]; then
++if [ ! -d "$IPOD_MOUNT/Notes" ]; then
+     echo "Error: Cannot find iPod at $IPOD_MOUNT"
+     exit 1
+ fi
+ 
+ echo -n "Syncing iPod ... [Notes] "
+ #Remove old notes
+-mkdir -p $IPOD_MOUNT/Notes
+-rm -rf $IPOD_MOUNT/Notes/*
++mkdir -p "$IPOD_MOUNT/Notes"
++rm -rf "$IPOD_MOUNT/Notes/"*
+ 
+ #Add new notes
+ INDICES=`dcop knotes KNotesIface notes| awk -F '->' '{print $1}'`
+diff --git i/scripts/sync-korganizer.sh w/scripts/sync-korganizer.sh
+index 0e880cb..c915319 100755
+--- i/scripts/sync-korganizer.sh
++++ w/scripts/sync-korganizer.sh
+@@ -78,13 +78,13 @@ fi
+ 
+ 
+ # check if DATAFILE exists
+-if [ ! -f $DATAFILE ]; then
+-    echo "Error: $DATAFILE does not exist"
++if [ ! -f "$DATAFILE" ]; then
++    echo "Error: '$DATAFILE' does not exist"
+     exit 1
+ fi
+ 
+ 
+ # remove all empty lines and recode if necessary
+ echo -n "Syncing iPod ... [Calendar] "
+-cat $DATAFILE | grep -v '^[[:space:]]$\|^$' | $RECODE > $IPOD_MOUNT/Calendars/`basename $DATAFILE`
++grep -v '^[[:space:]]$\|^$' "$DATAFILE" | $RECODE > "$IPOD_MOUNT/Calendars/`basename $DATAFILE`"
+ echo "done!"
+diff --git i/scripts/sync-notes.sh w/scripts/sync-notes.sh
+index 4e535ba..5658326 100755
+--- i/scripts/sync-notes.sh
++++ w/scripts/sync-notes.sh
+@@ -103,14 +103,14 @@ fi
+ 
+ 
+ # check if NOTESPATH exists
+-if [ ! -d $NOTESPATH ]; then
+-    echo "Error: folder $NOTESPATH does not exist"
++if [ ! -d "$NOTESPATH" ]; then
++    echo "Error: folder '$NOTESPATH' does not exist"
+     exit 1
+ fi
+ 
+ # check if iPod mountpoint exists
+-if [ ! -d $IPOD_MOUNT/Notes ]; then
+-    echo "Error: Cannot find iPod at $IPOD_MOUNT"
++if [ ! -d "$IPOD_MOUNT/Notes" ]; then
++    echo "Error: Cannot find iPod at '$IPOD_MOUNT'"
+     exit 1
+ fi
+ 
+@@ -119,9 +119,9 @@ fi
+ # Seeing all notes should be under 4K, easier to delete and recopy rather than checking all files sizes
+ 
+ echo -n "Syncing iPod ... [Notes] "
+-rm -rf $IPOD_MOUNT/Notes/*
+-rm -f $NOTESPATH/*~
+-cd $NOTESPATH
++rm -rf "$IPOD_MOUNT"/Notes/*
++rm -f "$NOTESPATH"/*~
++cd "$NOTESPATH"
+ 
+ I=0
+ 
+diff --git i/scripts/sync-thunderbird-nano.sh w/scripts/sync-thunderbird-nano.sh
+index 714fb28..7f6a008 100755
+--- i/scripts/sync-thunderbird-nano.sh
++++ w/scripts/sync-thunderbird-nano.sh
+@@ -73,17 +73,16 @@ done
+ 
+ 
+ echo "Exporting Contacts:"
+-SYNC="$(dirname $0)/sync-thunderbird.sh -i ${IPOD_MOUNT} -e ${ENCODING} -d ${THUNPATH} -n ${NAME}"
+-$SYNC
++$(dirname $0)/sync-thunderbird.sh -i "$IPOD_MOUNT" -e $ENCODING -d "$THUNPATH" -n "$NAME"
+ 
+ echo "Breaking apart VCF file into individual contacts"
+-for line in $(cat $IPOD_MOUNT/Contacts/${NAME}.vcf | sed "s/\ /[54321]/g")
++for line in $(cat "$IPOD_MOUNT/Contacts/${NAME}.vcf" | sed "s/\ /[54321]/g")
+ do
+ 	if [ "$FILE_FLAG" = 'END' ]; then
+ 		COUNT=$((COUNT+1));
+ 	fi
+ 
+-	echo $line | sed "s/\[54321\]/\ /g" >> $IPOD_MOUNT/Contacts/${NAME}$COUNT.vcf
++	echo $line | sed "s/\[54321\]/\ /g" >> "$IPOD_MOUNT/Contacts/${NAME}$COUNT.vcf"
+ 
+ 	if [ "$line" = 'END:VCARD' ]; then
+ 		echo "Finished Writing ${NAME}$COUNT.vcf"
+@@ -93,5 +92,5 @@ do
+ 	fi
+ done
+ 
+-echo "Removing ${NAME}.vcf"
+-rm $IPOD_MOUNT/Contacts/${NAME}.vcf
++echo "Removing $NAME.vcf"
++rm "$IPOD_MOUNT/Contacts/$NAME.vcf"
+diff --git i/scripts/sync-thunderbird.sh w/scripts/sync-thunderbird.sh
+index 25ea91c..0505195 100755
+--- i/scripts/sync-thunderbird.sh
++++ w/scripts/sync-thunderbird.sh
+@@ -83,5 +83,5 @@ MAB2VCARD=`dirname $0`/mab2vcard
+ 
+ # remove all empty lines and recode if necessary
+ echo -n "Syncing iPod ... [Contacts] "
+-$MAB2VCARD $THUNPATH | grep -v '^[[:space:]]$\|^$' | $RECODE > $IPOD_MOUNT/Contacts/${NAME}.vcf
++$MAB2VCARD "$THUNPATH" | grep -v '^[[:space:]]$\|^$' | $RECODE > "$IPOD_MOUNT/Contacts/$NAME.vcf"
+ echo "done!"
+diff --git i/scripts/sync-tomboy.sh w/scripts/sync-tomboy.sh
+index efb13f1..3e16ee6 100755
+--- i/scripts/sync-tomboy.sh
++++ w/scripts/sync-tomboy.sh
+@@ -107,14 +107,14 @@ fi
+ 
+ 
+ # check if NOTESPATH exists
+-if [ ! -d $NOTESPATH ]; then
+-    echo "Error: folder $NOTESPATH does not exist"
++if [ ! -d "$NOTESPATH" ]; then
++    echo "Error: folder '$NOTESPATH' does not exist"
+     exit 1
+ fi
+ 
+ # check if iPod mountpoint exists
+ if [ ! -d "$IPOD_MOUNT/Notes" ]; then
+-    echo "Error: Cannot find iPod at $IPOD_MOUNT"
++    echo "Error: Cannot find iPod at '$IPOD_MOUNT'"
+     exit 1
+ fi
+ 
+@@ -123,9 +123,9 @@ fi
+ # Seeing all notes should be under 4K, easier to delete and recopy rather than checking all files sizes
+ 
+ echo -n "Syncing iPod ... [Notes] "
+-rm -rf "$IPOD_MOUNT/Notes/*"
+-rm -f $NOTESPATH/*~
+-cd $NOTESPATH
++rm -rf "$IPOD_MOUNT"/Notes/*
++rm -f "$NOTESPATH"/*~
++cd "$NOTESPATH"
+ 
+ I=0
+ 
+@@ -136,7 +136,7 @@ ls *.note |
+ 	I=`expr $I + 1`
+ 
+ 	# Get the starting and ending lines for the data
+-	LIMITS=`cat $FILE | grep -n  note-content | cut -d ":" -f 1 | tr "\n" " "`
++	LIMITS=`cat "$FILE" | grep -n  note-content | cut -d ":" -f 1 | tr "\n" " "`
+ 	START=`echo $LIMITS | cut -d " " -f 1`
+ 	END=`echo $LIMITS | cut -d " " -f 2`
+ 
+diff --git i/scripts/sync-webcalendar.sh w/scripts/sync-webcalendar.sh
+index 7d85635..33a179d 100755
+--- i/scripts/sync-webcalendar.sh
++++ w/scripts/sync-webcalendar.sh
+@@ -58,6 +58,6 @@ while getopts i:d:c: option; do
+     esac
+ done
+ 
+-echo -n "Syncing Web Calendar \"${CALENDAR}\" to iPod... "
+-wget -q $WGET_OPTIONS -O ${IPOD_MOUNT}/Calendars/${CALENDAR}.ics $DATAFILE
++echo -n "Syncing Web Calendar '$CALENDAR' to iPod... "
++wget -q $WGET_OPTIONS -O "$IPOD_MOUNT/Calendars/$CALENDAR.ics" "$DATAFILE"
+ echo "done!"
+

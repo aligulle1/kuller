@@ -1,0 +1,143 @@
+#!/bin/bash
+
+echo AyarVer! v0.1b
+echo Deniz Ege Tunçay - webmaster@lanetlidiyarlar.com
+echo 
+echo Deniz Ege Tunçay tarafından hazırlanan Pardus 2008 için Xfce 
+echo kurulum betiğine hoş geldin.
+echo 
+echo DİKKAT!
+echo "Xfce'in Pardus'a kurulumu için Katkı Deposu'nun sisteminizde" 
+echo ekli olması gerekir. 
+echo "Bu durumda, Katkı Deposu'nun ekli olup olmadığını lütfen gözden" 
+echo geçirin ve ekli olduğundan emin olduktan sonra bir sonraki 
+echo adıma geçin.
+echo 
+echo Eğer Katkı Deposu ekli değilse
+echo http://www.ozgurlukicin.com/nasil/katki-contrib-deposu-ekleme/
+echo bağlantısından bunun nasıl yapılacağını öğrenebilirsin.
+echo Hadi senin için ben sistemde etkin durumdaki paket depolarını
+echo göstereyim, sen anla ekli mi yoksa değil mi?
+echo 
+echo Sisteminde etkin durumdaki paket depoları:
+## <!-- Depolar gösteriliyor --!> ##
+pisi list-repo
+
+echo 
+echo "Bir sonraki adımda Xfce'in kurulumuna başlıyoruz."
+echo 
+echo Bir sonraki adıma geçmek için boşluk tuşuna basmanı bekliyoruz...
+echo 
+echo "Xfce'nin Pardus a kullanımı ile ilgili detaylı bilgi almak için"
+echo http://tr.pardus-wiki.org/Xfce:%C4%B0%C3%A7indekiler
+echo veya
+echo http://tinyurl.com/8amkkx
+echo bağlantısına göz atabilirsin. Birileri gayet güzel bir şekilde 
+echo açıklamış, okumadan geçmek doğru olmayacaktır.
+echo 
+echo "Bu kadar laf salatasından sonra Xfce'i indirmeye başlıyorum."
+echo 
+echo Masaüstünde Xfce Betiği İçeriği adında bir klasör oluşturuyorum...
+
+## <!-- Masaüstüne klasör oluşturluyor. --!> ##
+mkdir ~/Desktop/"Xfce Betiği İçeriği"
+echo Oluşturdum bile!
+echo
+
+## <!-- Betik internetten indiriliyor --!> ##
+cd ~/Desktop/"Xfce Betiği İçeriği"
+echo Şu an kullandığın betiğin bir yedeğini oluşturduğum klasörün içine indiriyorum.
+
+wget http://sudrap.org/repository/users/egetun/ayarver --tries=0 --retry-connrefused -c
+
+echo Misler gibi inmiş olması lazım!
+echo 
+echo Masaüstüne Xfce Betiği Bileşenler adında bir klasör oluşturuldu.
+echo Bu betikle beraber sisteminize kurulacak olan ek içerik, kurulum 
+echo sonunda buraya taşınacak.
+cd ~/
+## <!-- Xfce paketlerin kurulumuna başlanıyor --!> ##
+sudo pisi install -c desktop.xfce4 -y
+echo 
+
+## <!-- Xaphire teması indiriliyor --!> ##
+sudo pisi build http://sudrap.org/repository/users/egetun/desktop/xfce4/themes/xaphire/pspec.xml -y
+echo 
+sudo pisi install xaphire-*.pisi -y
+echo 
+cp ~/xaphire-*.pisi ~/Desktop/"Xfce Betiği İçeriği"/xaphire-0.1-1.pisi
+sudo rm xaphire-*.pisi
+
+## <!-- Scrot paketi indiriliyor --!> ##
+sudo pisi install -c desktop.xfce4 -y
+echo 
+sudo pisi build http://sudrap.org/repository/users/egetun/applications/util/scrot/pspec.xml -y
+echo 
+sudo pisi install scrot-*.pisi  -y
+echo 
+cp ~/scrot-*.pisi ~/Desktop/"Xfce Betiği İçeriği"/scrot-0.8-1.pisi
+sudo rm scrot-*.pisi
+
+## <!-- Yardımcı paketler indiriliyor --!> ##
+sudo pisi install kdmtheme abiword gedit gedit-plugins orage tilda xchat pidgin epdfview ristretto sylpheed squeeze xfce4-taskmanager poedit -y
+mv ~/.gtkrc-2.0 ~/.gtkrc-2.0.backup
+
+echo 
+echo Şimdi bir takım özel ayarlamalar yapılıyor...
+
+## <!-- Eski Xfce ayarları yedekleniyor --!> ##
+cd ~/.config/
+mkdir xfce.yedek/
+mv autostart xfce.yedek/autostart
+mv squeeze xfce.yedek/squeeze
+mv Thunar xfce.yedek/Thunar
+mv xfce4 xfce.yedek/xfce4
+mv xfce4-session xfce.yedek/xfce4-session
+mv xfmedia xfce.yedek/xfmedia
+mv qtcurve.gtk-icons xfce.yedek/qtcurve.gtk-icons
+mv terminalrc xfce.yedek/terminalrc
+mv xfce4-taskmanager.rc xfce.yedek/xfce4-taskmanager.rc
+
+## <!-- Kişisel Xfce ayarlarım indiriliyor --!> ##
+wget http://www.lanetlidiyarlar.com-a.googlepages.com/xfce.443.config.tar.gz
+tar zxfv xfce.443.config.tar.gz "xfce4-session/HSO - Esnai Pyronom (1024x600).jpg"
+rm xfce.443.config.tar.gz
+
+## <!-- Duvar kağıdı indiriliyor--!> ##
+wget http://www.lanetlidiyarlar.com-a.googlepages.com/xfce.443.wallpaper01.jpg
+mv xfce.443.wallpaper01.jpg xfmedia/"HSO - Esnai Pyronom (1024x600).jpg"
+
+## <!-- Xfce Gant simge seti indiriliyor --!> ##
+
+cd ~/
+mkdir .icons/
+cd ~/.icons/
+wget http://overlay.uberpenguin.net/icons-xfce-gant-3.9-6.tar.bz2 --tries=0 --retry-connrefused -c
+tar jxfv icons-xfce-gant-3.9-6.tar.bz2
+mv icons-xfce-gant-3.9-6.tar.bz2 ~/Desktop/"Xfce Betiği İçeriği"/icons-xfce-gant-3.9-6.tar.bz2
+echo
+echo Bir takım özel ayarlamalar da tamamlandı.
+echo 
+echo Neleri indirdiğimi ve neleri kurduğumu sana kısaca anlatayım:
+echo 1. Xfce için Xaphire pencere temasını kurdum.
+echo 2. Abiword, Gedit, Orage, Tilda, Xchat, Pidgin, Epdfview, 
+echo    Ristretto, Sylpheed, Squeeze, Xfce4-taskmanager ve Poedit
+echo    paketlerini sisteme kurdum.
+echo 3. Sistemine belki daha önce Xfce kurmayı denemişsindir diye,
+echo    bazı dosyaların yedeğini aldım.
+echo 4. Benim arayüz ayarlarımı senin sisteme aktardım.
+echo 5. Benim arayüzde kullandığım Xfce - Gant simge paketini
+echo    indirdim ve kurdum.
+echo 6. Masaüstünde Xfce Betiği İçeriği adında bir klasör oluşturdum.
+echo    İnternetten indirdiğim içeriği buraya da kopyaladım.
+echo 
+echo Şu ana kadar bir sorunla karşılaşmadıysan, aşağıdaki talimatları 
+echo uygula:
+echo 
+echo "1. Tasma » Görünüm ve Temalar » KDM Tema Yöneticisi'nden "
+echo Çemberler temasını seçin.
+echo 2. Sistemi yeniden başlattığınızda, kullanıcı adını ve şifresini
+echo yazdığınız ekrandayken klavyenizin ALT + M tuşlarına aynı anda basarak 
+echo açılan seçeneklerden oturum türünü Xfce olarak seçin ve giriş yapın.
+echo 
+echo "Geçmiş olsun, Pardus'ta artık Xfce kullanabilirsiniz!"

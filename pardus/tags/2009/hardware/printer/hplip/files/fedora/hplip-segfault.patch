@@ -1,0 +1,19 @@
+diff -up hplip-2.8.12/prnt/hpijs/hpijs.cpp.segfault hplip-2.8.12/prnt/hpijs/hpijs.cpp
+--- hplip-2.8.12/prnt/hpijs/hpijs.cpp.segfault	2009-01-13 15:11:55.000000000 +0000
++++ hplip-2.8.12/prnt/hpijs/hpijs.cpp	2009-01-13 15:13:49.000000000 +0000
+@@ -231,8 +231,14 @@ int hpijs_set_cb (void *set_cb_data, Ijs
+ 		// call dbus here
+ 		const char    *user_name = " ";
+ 		const char    *title     = " ";
++		char *device_uri = getenv ("DEVICE_URI");
++		char *printer = getenv("PRINTER");
+ 		int     job_id = 0;
+-                SendDbusMessage (getenv ("DEVICE_URI"), getenv("PRINTER"),
++		if (!device_uri)
++		    device_uri = "";
++		if (!printer)
++		    printer = "";
++                SendDbusMessage (device_uri, printer,
+ 	     	                 EVENT_PRINT_FAILED_MISSING_PLUGIN,
+ 				 user_name, job_id, title);
+                 bug("unable to set device=%s, err=%d\n", svalue, r);

@@ -1,0 +1,40 @@
+--- katapult/plugins/catalogs/programcatalog/actionrunprogram.cpp	2006-11-04 21:11:08.000000000 +0200
++++ katapult/plugins/catalogs/programcatalog/actionrunprogram.cpp	2006-12-06 16:52:30.116005328 +0200
+@@ -21,8 +21,10 @@
+ #include <kglobal.h>
+ #include <kiconloader.h>
+ #include <krun.h>
+-#include <kurl.h>
++#include <kprocess.h>
++#include <kstandarddirs.h>
+ #include <klocale.h>
++#include <qregexp.h>
+
+ #include "program.h"
+ #include "katapultitem.h"
+@@ -54,7 +56,22 @@
+ 		const Program *program = (const Program *) item;
+ 		KService *service = program->service();
+ 		if(service != 0)
+-			KRun::run(*service, KURL::List());
+-		//TODO: report error running program
++                  {
++                    KProcess proc;
++                    QStringList args = QStringList::split(QRegExp("\\s{1}"),service->exec());
++                    QStringList::ConstIterator it = args.constBegin();
++
++                    proc << KStandardDirs::findExe(*it);
++                    ++it;
++
++                    while( it != args.constEnd() )
++                      {
++                        if ( !((*it).startsWith("%")) ) // Omit parameters
++                           proc << *it;
++                        ++it;
++                      }
++
++                    proc.start(KProcess::DontCare);
++                  }
+ 	}
+ }
+

@@ -1,0 +1,175 @@
+diff -Naur /var/pisi/kdebase-workspace-4.2.4-67/work/kdebase-workspace-4.2.4/kcontrol/dateandtime/CMakeLists.txt /tmp/dateandtime/CMakeLists.txt
+--- a/kcontrol/dateandtime/CMakeLists.txt	2008-05-15 21:37:15.000000000 +0300
++++ b/kcontrol/dateandtime/CMakeLists.txt	2009-07-01 04:20:06.153294347 +0300
+@@ -2,6 +2,8 @@
+ 
+ 
+ ########### next target ###############
++include_directories( ${POLKIT_INCLUDE_DIRS} ${POLKITDBUS_INCLUDE_DIRS}
++    ${DBUS_INCLUDE_DIRS} )
+ 
+ set(kcm_clock_PART_SRCS dtime.cpp tzone.cpp main.cpp )
+ 
+diff -Naur /var/pisi/kdebase-workspace-4.2.4-67/work/kdebase-workspace-4.2.4/kcontrol/dateandtime/dtime.cpp /tmp/dateandtime/dtime.cpp
+--- a/kcontrol/dateandtime/dtime.cpp	2009-05-28 22:21:16.000000000 +0300
++++ b/kcontrol/dateandtime/dtime.cpp	2009-07-01 04:20:12.907425519 +0300
+@@ -304,13 +304,73 @@
+   }
+   else {
+     // User time setting
++    // Use PolicyKit and COMAR to set the date and time
+     QDateTime dt(date,
+         QTime(hour->value(), minute->value(), second->value()));
+ 
+-    kDebug() << "Set date " << dt;
+ 
++    /*
+     helperargs << "date" << QString::number(dt.toTime_t())
+-                         << QString::number(::time(0));
++                         << QString::number(::time(0));*/
++
++    kDebug() << "Set date " << dt;
++
++    DBusError dbus_err;
++    dbus_error_init(&dbus_err);
++
++    DBusConnection *dbus_conn = dbus_bus_get_private(DBUS_BUS_SYSTEM, &dbus_err);
++    if (dbus_error_is_set(&dbus_err)) {
++        KMessageBox::error(this, i18n("Unable to connect D-Bus: %1.", dbus_err.message));
++        dbus_error_free(&dbus_err);
++        return;
++    }
++
++    DBusMessage *dbus_msg = dbus_message_new_method_call("tr.org.pardus.comar",
++                                                         "/package/util_linux",
++                                                         "tr.org.pardus.comar.Time.Clock",
++                                                         "setDate");
++
++    dbus_int32_t v_year = date.year();
++    dbus_int32_t v_month = date.month();
++    dbus_int32_t v_day = date.day();
++    dbus_int32_t v_hour = hour->value();
++    dbus_int32_t v_minute = minute->value();
++    dbus_int32_t v_second = second->value();
++    dbus_message_append_args(dbus_msg,
++                             DBUS_TYPE_INT32, &v_year,
++                             DBUS_TYPE_INT32, &v_month,
++                             DBUS_TYPE_INT32, &v_day,
++                             DBUS_TYPE_INT32, &v_hour,
++                             DBUS_TYPE_INT32, &v_minute,
++                             DBUS_TYPE_INT32, &v_second,
++                             DBUS_TYPE_INVALID);
++
++    DBusMessage *dbus_reply = dbus_connection_send_with_reply_and_block(dbus_conn, dbus_msg, 65535 * 1000, &dbus_err);
++    if (dbus_error_is_set(&dbus_err)) {
++        dbus_message_unref(dbus_msg);
++        dbus_error_free(&dbus_err);
++
++        if (this->obtain()) {
++            this->save(helperargs);
++        }
++        else {
++            KMessageBox::error(this, i18n("Unable to get authorization."));
++        }
++        return;
++    }
++
++    dbus_msg = dbus_message_new_method_call("tr.org.pardus.comar",
++                                            "/package/util_linux",
++                                            "tr.org.pardus.comar.Time.Clock",
++                                            "saveToHW");
++    dbus_connection_send_with_reply_and_block(dbus_conn, dbus_msg, 65535 * 1000, &dbus_err);
++
++    dbus_message_unref(dbus_reply);
++    dbus_message_unref(dbus_msg);
++    dbus_error_free(&dbus_err);
++    dbus_connection_close(dbus_conn);
++    dbus_connection_unref(dbus_conn);
++
+   }
+ 
+   // restart time
+@@ -342,6 +402,60 @@
+   kclock->setTime( time );
+ }
+ 
++/* Add PolicyKit support for Pardus */
++
++bool Dtime::obtain()
++{
++    DBusError dbus_err;
++    dbus_error_init(&dbus_err);
++
++    DBusConnection *dbus_conn = dbus_bus_get_private(DBUS_BUS_SESSION, &dbus_err);
++    if (dbus_error_is_set(&dbus_err)) {
++        //KMessageBox::error(this, i18n(QString("Unable to connect D-Bus: %1.").arg(dbus_err.message).latin1()));
++        KMessageBox::error(this, i18n("Unable to connect D-Bus: %1.", dbus_err.message));
++        dbus_error_free(&dbus_err);
++        return FALSE;
++    }
++
++    DBusMessage *dbus_msg = dbus_message_new_method_call("org.freedesktop.PolicyKit.AuthenticationAgent",
++                                                         "/",
++                                                         "org.freedesktop.PolicyKit.AuthenticationAgent",
++                                                         "ObtainAuthorization");
++
++    const char *v_action = "tr.org.pardus.comar.time.clock.set";
++    dbus_int32_t v_win = 0;
++    dbus_int32_t v_pid = getpid();
++
++    dbus_message_append_args(dbus_msg,
++                             DBUS_TYPE_STRING, &v_action,
++                             DBUS_TYPE_UINT32, &v_win,
++                             DBUS_TYPE_UINT32, &v_pid,
++                             DBUS_TYPE_INVALID);
++
++    DBusMessage *dbus_reply = dbus_connection_send_with_reply_and_block(dbus_conn, dbus_msg, 65535 * 1000, &dbus_err);
++    if (dbus_error_is_set(&dbus_err)) {
++        KMessageBox::error(this, i18n("Unable to change date: %1.", dbus_err.message));
++        dbus_message_unref(dbus_msg);
++        dbus_error_free(&dbus_err);
++        return FALSE;
++    }
++
++    dbus_bool_t v_grant = FALSE;
++    dbus_message_get_args(dbus_reply, &dbus_err,
++                          DBUS_TYPE_BOOLEAN, &v_grant,
++                          DBUS_TYPE_INVALID);
++
++    dbus_message_unref(dbus_reply);
++    dbus_message_unref(dbus_msg);
++    dbus_error_free(&dbus_err);
++    dbus_connection_close(dbus_conn);
++    dbus_connection_unref(dbus_conn);
++
++    return v_grant;
++}
++
++
++
+ QString Dtime::quickHelp() const
+ {
+   return i18n("<h1>Date & Time</h1> This control module can be used to set the system date and"
+diff -Naur /var/pisi/kdebase-workspace-4.2.4-67/work/kdebase-workspace-4.2.4/kcontrol/dateandtime/dtime.h /tmp/dateandtime/dtime.h
+--- a/kcontrol/dateandtime/dtime.h	2008-05-15 21:37:15.000000000 +0300
++++ b/kcontrol/dateandtime/dtime.h	2009-07-01 04:20:06.152295066 +0300
+@@ -36,6 +36,11 @@
+ #include <kdatepicker.h>
+ #include <knuminput.h>
+ 
++// For COMAR's PolicyKit support
++#include <polkit-grant/polkit-grant.h>
++#include <polkit-dbus/polkit-dbus.h>
++#include <dbus/dbus.h>
++
+ class Kclock;
+ 
+ class HMSTimeWidget : public KIntSpinBox
+@@ -56,6 +61,7 @@
+   void	save( QStringList& helperargs );
+   void processHelperErrors( int code );
+   void	load();
++  bool obtain();
+ 
+   QString quickHelp() const;
+ 

@@ -1,0 +1,76 @@
+diff -u -r src.orig/xgi_dri.c src/xgi_dri.c
+--- xf86-video-xgi-1.5.0/src.orig/xgi_dri.c	2007-08-28 05:43:37.656984250 +0200
++++ xf86-video-xgi-1.5.0/src/xgi_dri.c	2007-08-28 05:49:38.055507750 +0200
+@@ -280,7 +280,7 @@
+     pDRIInfo->ddxDriverMajorVersion = PACKAGE_VERSION_MAJOR;
+     pDRIInfo->ddxDriverMinorVersion = PACKAGE_VERSION_MINOR;
+     pDRIInfo->ddxDriverPatchVersion = PACKAGE_VERSION_PATCHLEVEL;
+-    pDRIInfo->frameBufferPhysicalAddress = pXGI->FbAddress;
++    pDRIInfo->frameBufferPhysicalAddress = (pointer) pXGI->FbAddress;
+     pDRIInfo->frameBufferSize = pXGI->FbMapSize;
+ 
+   /* ?? */
+diff -u -r src.orig/xgi_driver.c src/xgi_driver.c
+--- xf86-video-xgi-1.5.0/src.orig/xgi_driver.c	2007-08-28 05:43:36.352902750 +0200
++++ xf86-video-xgi-1.5.0/src/xgi_driver.c	2007-08-28 05:58:32.340898500 +0200
+@@ -2601,7 +2601,7 @@
+                                   (pXGI->PciInfo->ioBase[2] & 0xFFFC) 
+ #endif
+                                   );
+-    pXGI->xgi_HwDevExt.pjIOAddress = (XGIIOADDRESS) (pXGI->RelIO + 0x30);
++    pXGI->xgi_HwDevExt.pjIOAddress = (PUCHAR) (pXGI->RelIO + 0x30);
+     xf86DrvMsg(pScrn->scrnIndex, from, "Relocated IO registers at 0x%lX\n",
+                (unsigned long) pXGI->RelIO);
+ 
+diff -u -r src.orig/xgi_setup.c src/xgi_setup.c
+--- xf86-video-xgi-1.5.0/src.orig/xgi_setup.c	2007-08-28 05:43:35.844871000 +0200
++++ xf86-video-xgi-1.5.0/src/xgi_setup.c	2007-08-28 05:58:17.707984000 +0200
+@@ -317,7 +317,7 @@
+     PDEBUG(ErrorF("pXGI->FbBase = 0x%08lx\n",(ULONG)(pXGI->FbBase))) ;
+     PDEBUG(ErrorF("pHwDevInfo->pjVideoMemoryAddress = 0x%08lx\n",(ULONG)(pHwDevInfo->pjVideoMemoryAddress))) ;
+     pHwDevInfo->ulVideoMemorySize = pXGI->FbMapSize ;
+-    pHwDevInfo->pjIOAddress = pXGI->RelIO + 0x30 ;
++    pHwDevInfo->pjIOAddress = (PUCHAR) (pXGI->RelIO + 0x30) ;
+ 
+     switch (pXGI->Chipset) {
+     case PCI_CHIP_XGIXG40:
+--- xf86-video-xgi-1.5.0/src/xgi_accel.c.orig	2007-08-28 09:41:18.352222000 +0200
++++ xf86-video-xgi-1.5.0/src/xgi_accel.c	2007-08-28 09:45:34.852252250 +0200
+@@ -82,26 +82,10 @@
+ 
+ extern int FbDevExist;
+ 
+-#if X_BYTE_ORDER == X_BIG_ENDIAN
+-static CARD32 BE_SWAP32 (CARD32 val)
+-{
+-    if (CurrentColorDepth == 8)
+-	    return   ((((val) & 0x000000ff) << 24) | \
+-                  (((val) & 0x0000ff00) << 8) |  \
+-                  (((val) & 0x00ff0000) >> 8) |  \
+-                  (((val) & 0xff000000) >> 24));
+-    if (CurrentColorDepth == 24)
+-        return val;
+-    if (CurrentColorDepth == 16)
+-        return ((((val) & 0x0000ffff) << 16) | \
+-		         (((val) & 0xffff0000) >> 16));
+-}    
+-#else 
+ static CARD32 BE_SWAP32 (CARD32 val)
+ {
+ 	return val;
+ }
+-#endif
+ 
+ 
+ #ifdef DEBUG
+--- xf86-video-xgi-1.5.0/src/xgi_driver.c.orig	2008-01-19 20:28:22.000000000 +0000
++++ xf86-video-xgi-1.5.0/src/xgi_driver.c	2008-01-19 20:28:55.000000000 +0000
+@@ -2504,7 +2504,7 @@
+ 
+     FbDevExist = FALSE;
+     if (pXGI->Chipset != PCI_CHIP_XGIXG20) {
+-        if ((fd = open("/dev/fb", 'r')) != -1) {
++        if ((fd = open("/dev/fb", O_RDONLY)) != -1) {
+             PDEBUG(ErrorF("--- open /dev/fb....   \n"));
+             ioctl(fd, FBIOGET_FSCREENINFO, &fix);
+             if (fix.accel == FB_ACCEL_XGI_GLAMOUR) {

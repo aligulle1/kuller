@@ -1,0 +1,43 @@
+diff -ur Linux-PAM-0.99.6.3.orig/configure.in Linux-PAM-0.99.6.3/configure.in
+--- Linux-PAM-0.99.6.3.orig/configure.in	2007-03-28 18:06:31.763541000 +0300
++++ Linux-PAM-0.99.6.3/configure.in	2007-03-28 18:06:43.718717920 +0300
+@@ -315,15 +315,6 @@
+ AC_SUBST(LIBCRACK)
+ AM_CONDITIONAL([HAVE_LIBCRACK], [test ! -z "$LIBCRACK"])
+ 
+-dnl Look for Linux Auditing library - see documentation
+-AC_CHECK_HEADER([libaudit.h],
+-  [AC_CHECK_LIB(audit, audit_log_user_message, LIBAUDIT=-laudit, LIBAUDIT="")]
+-)
+-AC_SUBST(LIBAUDIT)
+-if test ! -z "$LIBAUDIT" -a "ac_cv_header_libaudit_h" != "no" ; then
+-    AC_DEFINE([HAVE_LIBAUDIT], 1, [Defined if audit support should be compiled in])
+-fi
+-
+ BACKUP_LIBS=$LIBS
+ AC_SEARCH_LIBS([crypt],[xcrypt crypt], LIBCRYPT="-l$ac_lib", LIBCRYPT="")
+ LIBS=$BACKUP_LIBS
+diff -ur Linux-PAM-0.99.6.3.orig/libpam/Makefile.am Linux-PAM-0.99.6.3/libpam/Makefile.am
+--- Linux-PAM-0.99.6.3.orig/libpam/Makefile.am	2006-08-01 11:40:16.000000000 +0300
++++ Linux-PAM-0.99.6.3/libpam/Makefile.am	2007-03-28 18:06:49.919771910 +0300
+@@ -20,7 +20,7 @@
+ noinst_HEADERS = pam_prelude.h pam_private.h pam_tokens.h \
+ 		pam_modutil_private.h pam_static_modules.h
+ 
+-libpam_la_LDFLAGS = -no-undefined -version-info 81:5:81 @LIBAUDIT@
++libpam_la_LDFLAGS = -no-undefined -version-info 81:5:81
+ if STATIC_MODULES
+   libpam_la_LDFLAGS += `ls ../modules/pam_*/*.lo` \
+ 	@LIBDB@ @LIBCRYPT@ @LIBNSL@ @LIBCRACK@ -lutil
+diff -ur Linux-PAM-0.99.6.3.orig/modules/pam_tally2/Makefile.am Linux-PAM-0.99.6.3/modules/pam_tally2/Makefile.am
+--- Linux-PAM-0.99.6.3.orig/modules/pam_tally2/Makefile.am	2007-03-28 18:06:31.825532000 +0300
++++ Linux-PAM-0.99.6.3/modules/pam_tally2/Makefile.am	2007-03-28 18:06:54.026145457 +0300
+@@ -12,7 +12,7 @@
+ noinst_HEADERS = tallylog.h
+ 
+ AM_CFLAGS = -I$(top_srcdir)/libpam/include -I$(top_srcdir)/libpamc/include
+-AM_LDFLAGS = -no-undefined -L$(top_builddir)/libpam -lpam $(LIBAUDIT)
++AM_LDFLAGS = -no-undefined -L$(top_builddir)/libpam -lpam
+ 
+ pam_tally2_la_LDFLAGS = -avoid-version -module
+ if HAVE_VERSIONING

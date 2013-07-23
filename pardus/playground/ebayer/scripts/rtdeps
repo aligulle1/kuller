@@ -1,0 +1,93 @@
+#!/usr/bin/env python
+
+# Take some directories or files and look for their runtime dependencies
+
+import sys, subprocess, os
+
+## {{{ http://code.activestate.com/recipes/134892/ (r2)
+class _Getch:
+    """Gets a single character from standard input.  Does not echo to the screen."""
+    def __init__(self):
+        try:
+            self.impl = _GetchWindows()
+        except ImportError:
+            self.impl = _GetchUnix()
+
+    def __call__(self): return self.impl()
+
+
+class _GetchUnix:
+    def __init__(self):
+        import tty, sys
+
+    def __call__(self):
+        import sys, tty, termios
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+        try:
+            tty.setraw(sys.stdin.fileno())
+            ch = sys.stdin.read(1)
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+        return ch
+
+
+class _GetchWindows:
+    def __init__(self):
+        import msvcrt
+
+    def __call__(self):
+        import msvcrt
+        return msvcrt.getch()
+
+
+getch = _Getch()
+## end of http://code.activestate.com/recipes/134892/ }}}
+
+if len(sys.argv) < 2:
+    print "rtdeps dirname1 [dirname2 ... dirnameN]"
+    exit(1)
+
+for dirname in sys.argv[1:]:
+    absdir = os.path.abspath(dirname)
+    if os.path.isdir(absdir):
+        for root, dirs, files in os.walk(absdir):
+            for onefile in files:
+                devnull = open("/dev/null")
+                p1 = subprocess.Popen(("/usr/bin/objdump", "-p", root + "/" + onefile), shell=False,
+                                      stdout=subprocess.PIPE, stderr=devnull)
+                sts = os.waitpid(p1.pid, 0)[1]
+                if sts == 0:
+                    print "Runtime deps of", root + "/" + onefile
+                    p2 = subprocess.Popen(("/bin/grep", "--color", "-i", "needed"), shell=False, stdin=p1.stdout)
+                    p2.communicate()
+                devnull.close()
+
+                print "Press y to see ldd -r -u output for", root + "/" + onefile, ":"
+                answer = getch()
+                if answer == "y":
+                    p1 = subprocess.Popen(("/usr/bin/ldd", "-r", "-u", root + "/" + onefile), shell=False,
+                                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                    p2 = subprocess.Popen(os.environ["PAGER"], stdin=p1.stdout)
+                    p2.communicate()
+
+                    
+    elif os.path.isfile(absdir):
+        devnull = open("/dev/null")
+        p1 = subprocess.Popen(("/usr/bin/objdump", "-p", absdir), shell=False,
+                              stdout=subprocess.PIPE, stderr=devnull)
+        sts = os.waitpid(p1.pid, 0)[1]
+        if sts == 0:
+            print "Runtime deps of", dirname
+            p2 = subprocess.Popen(("/bin/grep", "--color", "-i", "needed"), shell=False, stdin=p1.stdout)
+            p2.communicate()
+        devnull.close()
+
+        print "Press y to see ldd -r -u output for", absdir, ":"
+        answer = getch()
+        if answer == "y":
+            p1 = subprocess.Popen(("/usr/bin/ldd", "-r", "-u", absdir), shell=False,
+                                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            p2 = subprocess.Popen(os.environ["PAGER"], stdin=p1.stdout)
+            p2.communicate()
+

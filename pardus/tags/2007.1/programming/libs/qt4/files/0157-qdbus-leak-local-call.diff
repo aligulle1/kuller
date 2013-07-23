@@ -1,0 +1,19 @@
+qt-bugs@ issue: none
+Trolltech task ID: none
+applied: yes
+author: Thiago Macieira <thiago@kde.org>
+
+Fix memory leak when placing local calls.
+
+Index: tools/qdbus/src/qdbusintegrator.cpp
+===================================================================
+--- tools/qdbus/src/qdbusintegrator.cpp	(revisão 625240)
++++ tools/qdbus/src/qdbusintegrator.cpp	(cópia de trabalho)
+@@ -537,6 +537,7 @@
+     if (QDBusMessagePrivate::isLocal(msg)) {
+         //qDebug() << "QDBusConnectionPrivate::activateCall" << msg.d_ptr->msg;
+         sendCallDeliveryEvent(call);
++        delete call;
+     } else {
+         postCallDeliveryEvent(call);
+     }

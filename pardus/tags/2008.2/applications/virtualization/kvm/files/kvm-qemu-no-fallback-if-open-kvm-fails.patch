@@ -1,0 +1,14 @@
+Index: kvm-78/qemu/vl.c
+===================================================================
+--- kvm-78.orig/qemu/vl.c
++++ kvm-78/qemu/vl.c
+@@ -10057,7 +10057,8 @@ int main(int argc, char **argv)
+     if (kvm_enabled()) {
+ 	if (kvm_qemu_init() < 0) {
+ 	    extern int kvm_allowed;
+-	    fprintf(stderr, "Could not initialize KVM, will disable KVM support\n");
++	    fprintf(stderr, "Could not initialize KVM. Do you have kvm-amd or kvm-intel modprobe'd?\nIf you want to use CPU emulation, start with -no-kvm.\n");
++	    exit(1);
+ #ifdef NO_CPU_EMULATION
+ 	    fprintf(stderr, "Compiled with --disable-cpu-emulation, exiting.\n");
+ 	    exit(1);

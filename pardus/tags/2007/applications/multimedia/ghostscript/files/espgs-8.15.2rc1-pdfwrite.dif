@@ -1,0 +1,44 @@
+--- src/gdevpdfj.c
++++ src/gdevpdfj.c	2006-01-13 14:18:55.000000000 +0000
+@@ -346,6 +346,9 @@
+     pbw->dev = (gx_device_psdf *)pdev;
+     pbw->memory = pdev->pdf_memory;
+     pbw->target = NULL; /* We don't need target with cos_write_stream. */
++
++    return 0;	/* Code below seems to break drawings */
++
+     pdev->strm = pbw->strm;
+     code = psdf_begin_binary((gx_device_psdf *) pdev, pbw);
+     pdev->strm = save_strm;
+--- src/gdevpdfo.c
++++ src/gdevpdfo.c	2006-01-13 14:20:54.000000000 +0000
+@@ -1045,13 +1045,16 @@
+ 	const cos_value_t *v = cos_dict_find(pcd1, pcde0->key.data, pcde0->key.size);
+ 	int code;
+ 
++	if (cos_type(v->contents.object) != cos_type_dict)
++	    return false;	/* Should _never_ happen */
++
+ 	if (v == NULL)
+ 	    return false;
+ 	code = cos_value_equal(&pcde0->value, v, pdev);
+ 	if (code < 0)
+ 	    return code;
+ 	if (!code)
+-		    return false;
++	    return false;
+     }
+     return true;
+ }
+--- src/gdevpdfr.c
++++ src/gdevpdfr.c	2006-01-13 14:17:12.000000000 +0000
+@@ -309,7 +309,8 @@
+ 	stream_PSSD_state ss;
+ 	int status;
+ 
+-	s_PSSD_init((stream_state *)&ss);
++	s_PSSD_partially_init_inline(&ss);
++	ss.from_string = true;
+ 	r.ptr = p;		/* skip the '(' */
+ 	r.limit = end - 1;
+ 	w.limit = buf + sizeof(buf) - 1;

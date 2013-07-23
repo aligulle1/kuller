@@ -1,0 +1,104 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>calibre</Name>
+        <Homepage>http://calibre-ebook.com/</Homepage>
+        <Packager>
+            <Name>Serdar Dalgıç</Name>
+            <Email>serdar@pardus.org.tr</Email>
+        </Packager>
+        <License>GPLv2</License>
+        <Icon>calibre</Icon>
+        <IsA>app:gui</IsA>
+        <Summary>E-book converter and library management</Summary>
+        <Description>Calibre is meant to be a complete e-library solution. It includes library management, format conversion, news feeds to ebook conversion as well as e-book reader sync features. It also supports conversion to and from a dozen different ebook formats: MOBI, LIT, PRC, EPUB, ODT, HTML, CBR, CBZ, RTF, TXT, PDF, CHM and LRS.</Description>
+        <Archive sha1sum="d205894500fbba5f1f4f9f3fc1f44e3c94ab3d51" type="targz">mirrors://sourceforge/calibre/calibre-0.8.8.tar.gz</Archive>
+        <BuildDependencies>
+            <Dependency versionFrom="1.1.6">python-imaging</Dependency>
+            <Dependency versionFrom="4.7.0">qt-devel</Dependency>
+            <Dependency versionFrom="4.8.2">python-qt-devel</Dependency>
+            <Dependency versionFrom="0.1.11">python-mechanize</Dependency>
+            <Dependency versionFrom="6.5.9">imagemagick-devel</Dependency>
+            <Dependency versionFrom="1.0.2">xdg-utils</Dependency>
+            <Dependency versionFrom="2.2.1">python-lxml</Dependency>
+            <Dependency versionFrom="1.4.1">python-dateutil</Dependency>
+            <Dependency versionFrom="0.9.7_alpha3">python-cssutils</Dependency>
+            <Dependency versionFrom="3.0.5">python-beautifulsoup</Dependency>
+            <Dependency versionFrom="1.6.0">python-dns</Dependency> 
+            <Dependency versionFrom="0.12.0">poppler-qt-devel</Dependency> 
+            <Dependency versionFrom="0.8.2">podofo-devel</Dependency>
+            <Dependency versionFrom="0.2.8">libwmf-devel</Dependency>
+            <Dependency versionFrom="0.40">chmlib-devel</Dependency>
+            <Dependency versionFrom="4.4">icu4c-devel</Dependency>
+            <Dependency>python-cherrypy</Dependency>
+            <Dependency>pyPdf</Dependency>
+            <Dependency>python-routes</Dependency>
+            <Dependency>python-Genshi</Dependency>
+            <Dependency>jpeg-devel</Dependency>
+            <Dependency>fontconfig-devel</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <!-- Don't append calibre1 to the name of the manpages. No need to compress
+            either upstream won't fix: http://oldbugs.calibre-ebook.com/ticket/3770#comment:7 -->
+            <Patch level="1">calibre-manpages.patch</Patch>
+
+            <!-- Don't check for new upstream version (that's what packagers do) -->
+            <Patch level="1">calibre-no-update.patch</Patch>
+
+            <!-- Patch to fix crash on pdf export
+            (use the correct API for the external pyPdf library)
+            See https://bugzilla.redhat.com/show_bug.cgi?id=673604-->
+            <Patch level="1">calibre-0.7.38-pyPdf-fix.patch</Patch>
+
+            <!-- Workaround for sqlite Turkish character i->I conversion problem -->
+            <Patch level="1">fix-Turkish_I-i_problem.patch</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>calibre</Name>
+        <RuntimeDependencies>
+            <Dependency versionFrom="1.1.6">python-imaging</Dependency>
+            <Dependency versionFrom="4.7.0">qt</Dependency>
+            <Dependency versionFrom="4.8.2">python-qt</Dependency>
+            <Dependency versionFrom="0.1.11">python-mechanize</Dependency>
+            <Dependency versionFrom="6.5.9">imagemagick</Dependency>
+            <Dependency versionFrom="1.0.2">xdg-utils</Dependency>
+            <Dependency versionFrom="2.2.1">python-lxml</Dependency>
+            <Dependency versionFrom="1.4.1">python-dateutil</Dependency>
+            <Dependency versionFrom="0.9.7_alpha3">python-cssutils</Dependency>
+            <Dependency versionFrom="3.0.5">python-beautifulsoup</Dependency>
+            <Dependency versionFrom="1.6.0">python-dns</Dependency> 
+            <Dependency versionFrom="0.12.0">poppler-qt</Dependency> 
+            <Dependency versionFrom="0.12.0">poppler</Dependency> 
+            <Dependency versionFrom="0.8.2">podofo</Dependency>
+            <Dependency versionFrom="0.2.8">libwmf</Dependency>
+            <Dependency versionFrom="0.40">chmlib</Dependency>
+            <Dependency versionFrom="4.4">icu4c</Dependency>
+            <Dependency>liberation-fonts</Dependency>
+            <Dependency>fontconfig</Dependency>
+            <Dependency>python-cherrypy</Dependency>
+            <Dependency>pyPdf</Dependency>
+            <Dependency>python-routes</Dependency>
+            <Dependency>imagemagick</Dependency>
+            <Dependency>python-Genshi</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="data">/</Path>
+        </Files>
+        <AdditionalFiles>
+            <AdditionalFile owner="root" permission="0755" target="/usr/bin/calibre-mount-helper">calibre-mount-helper</AdditionalFile>
+        </AdditionalFiles>
+    </Package>
+
+    <History>
+        <Update release="1">
+            <Date>2011-07-07</Date>
+            <Version>0.8.8</Version>
+            <Comment>First release.</Comment>
+            <Name>Serdar Dalgıç</Name>
+            <Email>serdar@pardus.org.tr</Email>
+        </Update>
+    </History>
+</PISI>

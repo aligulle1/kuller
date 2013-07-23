@@ -1,0 +1,23 @@
+RETVAL=0
+prog="Kerberos 5 Propagation Server"
+kpropd=/usr/sbin/kpropd
+
+# Shell functions to cut down on useless shell instances.
+start() {
+  	[ -f /var/kerberos/krb5kdc/kpropd.acl ] || exit 6
+	echo
+	if test $RETVAL -ne 0 ; then
+	    if status -l kprop ${kpropd} > /dev/null ; then
+		RETVAL=0
+	    fi
+	fi
+	[ $RETVAL = 0 ] && touch /var/lock/subsys/kprop
+}
+
+stop() {
+	echo -n $"Stopping $prog: "
+	killproc ${kpropd}
+	RETVAL=$?
+	echo
+	[ $RETVAL = 0 ] && rm -f /var/lock/subsys/kprop
+}

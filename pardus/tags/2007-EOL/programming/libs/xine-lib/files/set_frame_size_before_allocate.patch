@@ -1,0 +1,44 @@
+diff -Nur xine-lib-1.1.10.1-old/src/input/input_v4l.c xine-lib-1.1.10.1/src/input/input_v4l.c
+--- xine-lib-1.1.10.1-old/src/input/input_v4l.c	2008-08-17 20:35:13.000000000 +0300
++++ xine-lib-1.1.10.1/src/input/input_v4l.c	2008-08-17 20:53:27.000000000 +0300
+@@ -848,10 +848,6 @@
+   _x_stream_info_set(this->stream, XINE_STREAM_INFO_HAS_AUDIO, 1);
+   _x_stream_info_set(this->stream, XINE_STREAM_INFO_HAS_VIDEO, 1);
+   
+-  /* Pre-allocate some frames for audio and video so it doesn't have to be 
+-   * done during capture */
+-  allocate_audio_frames(this);
+-  
+   /* Unmute audio off video capture device */
+   unmute_audio(this);
+   
+@@ -954,6 +950,13 @@
+     break;
+   }
+   
++  /* Strip the vbi / sync signal from the image by zooming in */ 
++  this->old_zoomx = xine_get_param(this->stream, XINE_PARAM_VO_ZOOM_X);
++  this->old_zoomy = xine_get_param(this->stream, XINE_PARAM_VO_ZOOM_Y);
++  
++  xine_set_param(this->stream, XINE_PARAM_VO_ZOOM_X, 103);
++  xine_set_param(this->stream, XINE_PARAM_VO_ZOOM_Y, 103);
++  
+   for (i = 0; i < NUM_FRAMES; i++) {
+     buf_element_t *frame;
+       
+@@ -968,12 +971,9 @@
+     store_vid_frame(frame);
+   }
+   
+-  /* Strip the vbi / sync signal from the image by zooming in */ 
+-  this->old_zoomx = xine_get_param(this->stream, XINE_PARAM_VO_ZOOM_X);
+-  this->old_zoomy = xine_get_param(this->stream, XINE_PARAM_VO_ZOOM_Y);
+-  
+-  xine_set_param(this->stream, XINE_PARAM_VO_ZOOM_X, 103);
+-  xine_set_param(this->stream, XINE_PARAM_VO_ZOOM_Y, 103);
++  /* Pre-allocate some frames for audio and video so it doesn't have to be 
++   * done during capture */
++  allocate_audio_frames(this);
+   
+   /* If we made it here, everything went ok */ 
+   this->audio_only = 0;

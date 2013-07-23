@@ -1,0 +1,612 @@
+diff -Nur alsa-utils-1.0.16.orig/configure.in alsa-utils-1.0.16/configure.in
+--- alsa-utils-1.0.16.orig/configure.in	2008-02-05 11:25:25.000000000 +0200
++++ alsa-utils-1.0.16/configure.in	2008-04-30 13:21:54.000000000 +0300
+@@ -103,6 +103,7 @@
+ 	  m4/Makefile po/Makefile.in \
+ 	  alsaconf/alsaconf alsaconf/Makefile \
+ 	  alsaconf/po/Makefile \
++	  salsa/Makefile \
+ 	  aplay/Makefile include/Makefile iecset/Makefile utils/Makefile \
+ 	  utils/alsa-utils.spec seq/Makefile seq/aconnect/Makefile \
+ 	  seq/aplaymidi/Makefile seq/aseqdump/Makefile seq/aseqnet/Makefile \
+diff -Nur alsa-utils-1.0.16.orig/Makefile.am alsa-utils-1.0.16/Makefile.am
+--- alsa-utils-1.0.16.orig/Makefile.am	2008-02-05 11:25:24.000000000 +0200
++++ alsa-utils-1.0.16/Makefile.am	2008-04-30 13:21:54.000000000 +0300
+@@ -4,7 +4,7 @@
+ else
+ ALSAMIXER_DIR=
+ endif
+-SUBDIRS= include alsactl alsaconf $(ALSAMIXER_DIR) amidi amixer aplay iecset seq speaker-test utils m4 po
++SUBDIRS= include alsactl alsaconf $(ALSAMIXER_DIR) amidi amixer aplay iecset seq speaker-test utils m4 po salsa
+ EXTRA_DIST= config.rpath  config.rpath mkinstalldirs ChangeLog INSTALL TODO README configure gitcompile depcomp
+ AUTOMAKE_OPTIONS=foreign
+ ACLOCAL_AMFLAGS = -I m4
+diff -Nur alsa-utils-1.0.16.orig/salsa/alsaunmute.c alsa-utils-1.0.16/salsa/alsaunmute.c
+--- alsa-utils-1.0.16.orig/salsa/alsaunmute.c	1970-01-01 02:00:00.000000000 +0200
++++ alsa-utils-1.0.16/salsa/alsaunmute.c	2008-04-30 13:21:54.000000000 +0300
+@@ -0,0 +1,407 @@
++/* Copyright 2005 Red Hat, Inc.
++ *
++ * Portions extraced from various ALSA code:
++ *  Copyright (c) by Abramo Bagnara <abramo@alsa-project.org>
++ *                   Jaroslav Kysela <perex@suse.cz>
++ *                   Takashi Iwai <tiwai@suse.de>
++ *                   Bernd Kaindl <bk@suse.de>
++ *                   Jan ONDREJ (SAL) <ondrejj@salstar.sk>
++ *
++ * This software may be freely redistributed under the terms of the GNU
++ * public license.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
++ *
++ */
++
++/*
++    TODO 
++    -> external unmute table
++*/
++
++#define  VERSION  "0.3"
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <ctype.h>
++
++#include <alsa/asoundlib.h>
++
++#define TRUE  (1==1)
++#define FALSE (1!=1)
++
++int verbose = 0;
++int help = 0;
++
++typedef struct _CHANNEL {
++
++  char name[100];
++  int play_volume;
++  int play_switch;
++  int rec_volume;
++  int rec_switch;
++  char driver[100];
++
++} CHANNEL;
++
++CHANNEL channels[] = {
++
++//   channel          pl vol  pl swt  rec vol  rec swt     driver
++
++  {"Master", 		75, 	1, 	0, 	0, 	""},
++  {"Front", 		75, 	1, 	0, 	0, 	""},
++  {"PCM", 		75, 	1, 	0, 	0, 	""},
++  {"PCM-2", 		75, 	1, 	0, 	0, 	""},
++  {"Synth", 		75, 	1, 	0, 	0, 	""},
++  {"CD", 		75, 	1, 	90, 	1, 	""},
++  {"Mono", 		75,	1,	0, 	0, 	""},
++  {"Master Mono", 	75,	1,	0, 	0, 	""},  
++  {"Speaker",	 	75,	1,	0, 	0, 	""},
++  
++  // mute mic
++  {"Mic", 		0, 	0, 	0, 	0, 	""},
++
++  // Trident/YMFPCI/emu10k1
++  {"Wave", 		100, 	1, 	0, 	0, 	""},
++  {"Music", 		100, 	1, 	0, 	0, 	""},
++  {"AC97", 		100, 	1, 	0, 	0, 	""},
++
++  // CS4237B chipset
++  {"Master Digital", 	75, 	1, 	0, 	0, 	""},
++
++  // Envy24 chips with analog outs
++  {"DAC", 		75, 	1, 	0, 	0, 	""},
++
++  // Powermacs
++  {"DRC Range", 	75, 	1, 	0, 	0, 	""},
++
++  // some notebooks use headphone instead of master
++  {"Headphone", 	75, 	1, 	0, 	0, 	""},
++  {"Playback", 		100, 	1, 	0, 	0, 	""},
++
++  // turn off digital switches
++  {"SB Live Analog/Digital Output Jack", 0, 0, 0, 0, 	""},
++  // removed - should by set by driver
++  // {"Audigy Analog/Digital Output Jack", 0, 0, 0, 0, 	""},
++
++  // Specific config for ca0106
++  {"Analog Front",	75, 	1, 	0, 	0, 	"snd-ca0106"},
++  {"Analog Rear",	75, 	1, 	0, 	0, 	"snd-ca0106"},
++  {"SPDIF Out",		 0, 	0, 	0, 	0, 	"snd-ca0106"},
++
++  // Specific config for snd-emu10k1
++  // Removed (#187807)
++  // {"Audigy Analog/Digital Output Jack",	0,1,0, 	0, 	"snd-emu10k1"},
++  {"IEC958 Optical Raw", 0,	0,	0, 	0, 	"snd-emu10k1"},
++  {"Tone", 		 0,	0,	0, 	0, 	"snd-emu10k1"},
++
++  // Specific config for AC97/HDA
++  {"External Amplifier", 1,	1,	0, 	0, 	"snd-intel8x0"},
++  {"iSpeaker",         	75,     1,      0,      0,      "snd-hda-intel"},
++  {"Internal Speaker", 	75,     1,      0,      0,      "snd-hda-intel"},
++
++  // Specific config for snd-ens1371
++  {"IEC958", 		0,	0,	0, 	0, 	"snd-ens1371"} 
++};
++
++char * strlwr(char *a)     
++{
++  char *ret = a;
++
++  while (*a != '\0') {
++    if (isupper (*a))
++      *a = tolower (*a);
++    a++;
++  }
++  return ret;
++}
++
++CHANNEL * channel_find(const char *p_name, const char *p_driver) {
++  int i;
++
++  for (i = 0; i < sizeof(channels) / sizeof(channels[0]); i++)
++    if (!strcmp(channels[i].driver, p_driver) && !strcmp(channels[i].name, p_name))
++      return (channels + i);
++
++  return (NULL);
++}
++
++int calc_volume(long min, long max, int percent)
++{
++  return ((int)(min + ((max - min) / 100.0f) * percent));
++}
++
++int unmute_card(int index, const char *p_driver)
++{
++  CHANNEL *p_chan;
++  long pmin, pmax;
++  long rmin, rmax;
++  int rc = 0;
++  char card[32];
++  char channel_name[500];
++  int c,vol;
++
++  snd_mixer_t *handle;
++  snd_mixer_selem_id_t *sid;
++  snd_mixer_elem_t *elem;
++  snd_mixer_selem_id_alloca(&sid);
++
++  if(verbose) {
++    fprintf(stderr,"Unmuting %s...\n",p_driver ? p_driver : "");
++  }
++
++  sprintf(card, "hw:%d", index);
++  if ((rc = snd_mixer_open(&handle, 0)) < 0) {
++    if(verbose) {
++      fprintf(stderr,"%s: error file %s, line %d...\n",__FUNCTION__,__FILE__,__LINE__);
++    }
++    return rc;
++  }
++  if ((rc = snd_mixer_attach(handle, card)) < 0) {
++    if(verbose) {
++      fprintf(stderr,"%s: error file %s, line %d...\n",__FUNCTION__,__FILE__,__LINE__);
++    }
++    goto out;
++  }
++  if ((rc = snd_mixer_selem_register(handle, NULL, NULL)) < 0) {
++    if(verbose) {
++      fprintf(stderr,"%s: error file %s, line %d...\n",__FUNCTION__,__FILE__,__LINE__);
++    }
++    goto out;
++  }
++  rc = snd_mixer_load(handle);
++  if (rc < 0) {
++    if(verbose) {
++      fprintf(stderr,"%s: error file %s, line %d...\n",__FUNCTION__,__FILE__,__LINE__);
++    }
++    goto out;
++  }
++
++  for (elem = snd_mixer_first_elem(handle); elem;
++       elem = snd_mixer_elem_next(elem)) {
++
++    snd_mixer_selem_get_id(elem, sid);
++    strncpy(channel_name,snd_mixer_selem_id_get_name(sid),500);    
++    channel_name[499] = '\0';
++    p_chan = channel_find(strlwr(channel_name),p_driver);
++    if (!p_chan)
++      continue;
++
++    for (c = 0; c < SND_MIXER_SCHN_LAST; c++) {
++
++      if (snd_mixer_selem_has_capture_channel(elem, c)) {
++        if (snd_mixer_selem_has_capture_switch(elem)) {
++          snd_mixer_selem_set_capture_switch(elem, c, p_chan->rec_switch);
++	  if(verbose) {
++             fprintf(stderr,"Cap. Switch %s(%d) to %d\n",p_chan->name,c,p_chan->rec_switch);
++          }
++	}
++        if (snd_mixer_selem_has_capture_volume(elem)) {
++          snd_mixer_selem_get_capture_volume_range(elem, &rmin, &rmax);
++	  vol = calc_volume(rmin, rmax,p_chan->rec_volume);
++          snd_mixer_selem_set_capture_volume(elem, c, vol);
++	  if(verbose) {
++             fprintf(stderr,"Cap. Volume %s(%d) to %d\n",p_chan->name,c,vol);
++          }	
++        }
++      }
++
++      if (snd_mixer_selem_has_playback_channel(elem, c)) {
++        if (snd_mixer_selem_has_playback_switch(elem)) {
++          snd_mixer_selem_set_playback_switch(elem, c, p_chan->play_switch);
++	  if(verbose) {
++             fprintf(stderr,"Play. Switch %s(%d) to %d\n",p_chan->name,c,p_chan->play_switch);
++          }
++	}
++        if (snd_mixer_selem_has_playback_volume(elem)) {
++          snd_mixer_selem_get_playback_volume_range(elem, &pmin, &pmax);
++	  vol = calc_volume(pmin, pmax,p_chan->play_volume);
++          snd_mixer_selem_set_playback_volume(elem, c, vol);
++	  if(verbose) {
++             fprintf(stderr,"Play. Volume %s(%d) to %d\n",p_chan->name,c,vol);
++          }	             
++        }
++      }
++    }
++  }
++  return(TRUE);
++
++out:
++  snd_mixer_close(handle);
++  return rc;
++}
++
++char * check_driver_name(char *p_name)
++{
++  char *p_tmp = strchr(p_name,'-');
++  if(p_tmp) {
++    *p_tmp = '_';
++  }    
++  return(p_name);
++}
++
++#define PROC_MODULES "/proc/asound/modules"
++
++static char  driver_name[100];
++
++const char * get_card_driver(int index)
++{
++  FILE *f = fopen(PROC_MODULES,"r");
++  char  tmp[100];
++  int   id;
++
++  if(!f)
++    return(NULL);
++
++  while(fgets(tmp,100,f)) {
++    sscanf(tmp," %d %s",&id,driver_name);
++    if(id == index) {
++      return(check_driver_name(driver_name));
++    }
++  }
++ 
++  return(NULL);
++}
++
++void set_volume(int volume)
++{
++  int i;
++
++  for (i = 0; i < sizeof(channels) / sizeof(channels[0]); i++) {
++    if (channels[i].play_volume > 1)
++        channels[i].play_volume = volume;
++  }
++}
++
++void check_data(void)
++{
++  int i;
++
++  for (i = 0; i < sizeof(channels) / sizeof(channels[0]); i++) {
++    strlwr(channels[i].name);
++    check_driver_name(channels[i].driver);
++  }
++}
++
++int get_card_device(const char *p_device)
++{
++  int err;
++  snd_ctl_t *handle;
++  snd_ctl_card_info_t *info;
++  int card = 0;
++
++  snd_ctl_card_info_alloca(&info);
++
++  if ((err = snd_ctl_open(&handle, "default", 0)) < 0) {
++    fprintf(stderr,"Open error: %s\n", snd_strerror(err));
++    return(0);
++  }
++  if ((err = snd_ctl_card_info(handle, info)) < 0) {
++    fprintf(stderr,"HW info error: %s\n", snd_strerror(err));
++    return(0);
++  }
++
++  card = snd_ctl_card_info_get_card(info);
++
++  snd_ctl_close(handle);
++
++  return(card);
++}
++
++void usage(void)
++{
++  printf("Alsa Unmute utility, Version %s, Copyright 2005 Red Hat, Inc.\n",VERSION);
++  printf("This software may be freely redistributed under the terms of the GNU\n");
++  printf("public license.\n\n");
++
++  printf("Usage: alsaunmute [options]\n\n");
++  printf("  [card_number]     - sound card number. If this parameter is not given,\n");
++  printf("                      the \"default\" sound device is unmuted.\n");
++  printf("  [-D device]       - unmute specified alsa device (like \"default\")\n");
++  printf("  [-v]              - verbose mode\n");
++  printf("  [-s volume]       - set this volume level instead of the default (75%%)\n");
++  printf("                      the volume is number from 0 to 100\n");
++  printf("  [-h]              - this help\n\n");
++  exit(0);
++}
++
++/* 
++   Unmute specified card  
++   alsaunmute 0 
++*/
++int main(int argc, char **argv)
++{
++  const char *p_driver;
++  char *p_device = "default";
++  int index = -1;
++  int volume = 75;
++  int param;
++  
++  for(param = 1; param < argc; param++) {  
++    if (argv[param][0] >= '0' && argv[param][0] <= '9') {
++      index = atoi(argv[param]);
++      continue;
++    }
++    if (!strcmp(argv[param],"-v")) {
++      verbose = TRUE;
++      continue;
++    }
++    if (!strcmp(argv[param],"-h") || !strcmp(argv[param],"--help")) {
++      help = TRUE;
++      continue;
++    }
++    if (param+1 < argc && !strcmp(argv[param],"-s")) {
++      param++;
++      volume = atoi(argv[param]);
++      continue;
++    }
++    if (param+1 < argc && !strcmp(argv[param],"-D")) {
++      param++;
++      p_device = argv[param];
++      continue;
++    }
++  }
++
++  if(help) {
++    usage();
++  }
++
++
++  if(index == -1) {
++    if(verbose) {
++       fprintf(stderr,"Unmuting ALSA device '%s'...\n",p_device);
++    }
++    index = get_card_device(p_device);
++  }
++  else {
++    if(verbose) {
++       fprintf(stderr,"Unmuting ALSA card %d...\n",index);
++    }  
++  }
++
++  p_driver = get_card_driver(index);  
++  if(!p_driver) {
++    fprintf(stderr,"Wrong card index %d...\n",index);
++    return(1);  
++  } 
++
++  if(verbose) {
++    fprintf(stderr,"Card %d Driver %s Volume %d%%...\n",index,p_driver,volume);
++  }
++
++  check_data();
++
++  // setting volume
++  set_volume(volume);
++
++  // default settings for all cards
++  unmute_card(index,"");
++
++  // specific setting for selected card_number  
++  unmute_card(index,p_driver);
++
++  return (0);
++}
+diff -Nur alsa-utils-1.0.16.orig/salsa/Makefile.am alsa-utils-1.0.16/salsa/Makefile.am
+--- alsa-utils-1.0.16.orig/salsa/Makefile.am	1970-01-01 02:00:00.000000000 +0200
++++ alsa-utils-1.0.16/salsa/Makefile.am	2008-04-30 13:21:54.000000000 +0300
+@@ -0,0 +1,4 @@
++INCLUDES = -I$(top_srcdir)/include
++
++bin_PROGRAMS = alsaunmute
++sbin_PROGRAMS = salsa
+diff -Nur alsa-utils-1.0.16.orig/salsa/salsa.c alsa-utils-1.0.16/salsa/salsa.c
+--- alsa-utils-1.0.16.orig/salsa/salsa.c	1970-01-01 02:00:00.000000000 +0200
++++ alsa-utils-1.0.16/salsa/salsa.c	2008-04-30 13:23:53.000000000 +0300
+@@ -0,0 +1,166 @@
++/* Copyright 2007 Red Hat, Inc.
++ *
++ * Portions extraced from various ALSA code:
++ *  Copyright (c) by Abramo Bagnara <abramo@alsa-project.org>
++ *                   Jaroslav Kysela <perex@suse.cz>
++ *
++ * This software may be freely redistributed under the terms of the GNU
++ * public license.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
++ *
++ */
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <time.h>
++
++#include <alsa/asoundlib.h>
++
++#define ALSA_CONFIG_PATH	"/etc/asound.state"
++#define ALL_CARDS         	(-1)
++
++
++int get_card_number()
++{
++  char *devname, *action;
++
++  action = getenv("ACTION");
++  if (!action || strcmp(action, "add"))
++    return -1;
++  devname = getenv("DEVNAME");
++  if (!devname)
++    return -1;
++  if (!strncmp(devname, "/dev/snd/controlC", 17))
++    return atoi(devname + 17);
++  if (!strncmp(devname, "/dev/snd/pcmC", 13))
++    return atoi(devname + 13);
++  return -1;
++}
++
++int has_config(int index)
++{
++  int rc = 0;
++  snd_config_t *config, *control;
++  snd_input_t *in;
++  snd_ctl_t *handle;
++  snd_ctl_card_info_t *info;
++  const char *id;
++  char path[32];  
++  
++  rc = snd_config_top(&config);
++  if (rc < 0)
++    goto out;
++  rc = snd_input_stdio_open(&in, ALSA_CONFIG_PATH, "r");
++  if (rc >= 0) {
++    rc = snd_config_load(config, in);
++    snd_input_close(in);
++    if (rc < 0)
++      goto out;
++  }
++  sprintf(path, "hw:%d", index);
++  rc = snd_ctl_open(&handle, path, 0);
++  if (rc < 0)
++    goto out;
++  snd_ctl_card_info_alloca(&info);
++  rc = snd_ctl_card_info(handle, info);
++  if (rc < 0)
++    goto out_close;
++  id = snd_ctl_card_info_get_id(info);
++  rc = snd_config_searchv(config, &control, "state", id, "control", 0);
++out_close:
++  snd_ctl_close(handle);
++out:
++  return !rc;
++
++}
++
++void load_volume_settings(int index)
++{
++  char *args[] = { "/usr/sbin/alsactl", "-f", ALSA_CONFIG_PATH, "restore", NULL, NULL };
++  char  num[10];
++
++  if(index != ALL_CARDS) {
++    snprintf(num, 10, "%d", index);
++    args[4] = num;
++  }
++  
++  execv(args[0], args);  
++}
++
++void save_volume_settings(int index)
++{
++  char *args[] = { "/usr/sbin/alsactl", "-f", ALSA_CONFIG_PATH, "store", NULL, NULL };
++  char  num[10];
++  
++  if(index != ALL_CARDS) {
++    snprintf(num, 10, "%d", index);
++    args[4] = num;    
++  }
++  
++  execv(args[0], args);
++}
++
++void frob_mixer(int index)
++{
++  char tmp[100];  
++  snprintf(tmp, 100, "%d", index);
++  tmp[99] = '\0';
++  execl("/usr/bin/alsaunmute","/usr/bin/alsaunmute", tmp, "-v", NULL);
++}
++
++void banner(void)
++{
++  printf("ALSA volume settings handler, Copyright 2007 Red Hat, Inc.\n");
++  printf("This software may be freely redistributed under\nthe terms of the GNU public license.\n\n");
++  
++  printf("Usage: salsa [options] [card number]\n\n");
++  printf(" Options:\n");
++  printf("    -l      - Load volume settings\n");
++  printf("    -s      - Save volume settings\n\n");
++  printf(" Card number:\n");
++  printf("    ##      - An affected card. If it isn't specified,\n");
++  printf("              configure all installed sound cards.\n\n");
++  
++  exit(0);   
++}
++
++int main(int argc, char **argv)
++{
++  int i;
++  
++  if(argc == 1) {
++    i = get_card_number();
++    if (i < 0) {
++      return 0;
++    }
++    if (has_config(i)) {
++      load_volume_settings(i);
++    }
++    else {
++      frob_mixer(i);
++    }
++  }
++  else if(argc >= 2) {
++    
++    int card_number = ALL_CARDS;
++    if(argc == 3) {
++      card_number = atoi(argv[2]);
++    }
++    
++    if(argv[1][1] == 'l') {
++      load_volume_settings(card_number);
++    }
++    else if(argv[1][1] == 's') {
++      save_volume_settings(card_number);
++    }
++    else {
++      banner();
++    }
++  }
++  
++  return(0);
++}

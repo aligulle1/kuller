@@ -1,0 +1,39 @@
+Make it possible to set dirty_ratio to 0, setting it to MAX_WRITEBACK_PAGES
+when the value is ultra low, and set background to 0 when that is the case.
+
+Signed-off-by: Con Kolivas <kernel@kolivas.org>
+
+Index: linux-2.6.18/mm/page-writeback.c
+===================================================================
+--- linux-2.6.18.orig/mm/page-writeback.c
++++ linux-2.6.18/mm/page-writeback.c
+@@ -110,9 +110,6 @@ static void background_writeout(unsigned
+  *
+  * We only allow 1/2 of the currently-unmapped memory to be dirtied.
+  *
+- * We don't permit the clamping level to fall below 5% - that is getting rather
+- * excessive.
+- *
+  * We make sure that the background writeout level is below the adjusted
+  * clamping level.
+  */
+@@ -146,15 +143,16 @@ get_dirty_limits(long *pbackground, long
+ 	if (dirty_ratio > unmapped_ratio / 2)
+ 		dirty_ratio = unmapped_ratio / 2;
+ 
+-	if (dirty_ratio < 5)
+-		dirty_ratio = 5;
+-
+ 	background_ratio = dirty_background_ratio;
+ 	if (background_ratio >= dirty_ratio)
+ 		background_ratio = dirty_ratio / 2;
+ 
+ 	background = (background_ratio * available_memory) / 100;
+ 	dirty = (dirty_ratio * available_memory) / 100;
++	if (dirty < MAX_WRITEBACK_PAGES) {
++		dirty = MAX_WRITEBACK_PAGES;
++		background = 0;
++	}
+ 	tsk = current;
+ 	if (tsk->flags & PF_LESS_THROTTLE || rt_task(tsk)) {
+ 		background += background / 4;

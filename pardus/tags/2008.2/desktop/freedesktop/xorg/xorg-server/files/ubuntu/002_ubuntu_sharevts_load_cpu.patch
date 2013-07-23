@@ -1,0 +1,27 @@
+diff -urNad xorg-server-1.0.2~/hw/xfree86/os-support/linux/lnx_init.c xorg-server-1.0.2/hw/xfree86/os-support/linux/lnx_init.c
+--- xorg-server-7.1.orig/xorg-server-1.4.2/hw/xfree86/os-support/linux/lnx_init.c	2006-04-10 14:47:04.000000000 +0200
++++ xorg-server-7.1.orig/xorg-server-1.4.2/hw/xfree86/os-support/linux/lnx_init.c	2006-04-10 14:48:01.000000000 +0200
+@@ -286,9 +286,7 @@
+ 	        FatalError("Unable to set screen info\n");
+ 	    close(fbfd);
+ #endif
+-        } else { /* ShareVTs */
+-            close(xf86Info.consoleFd);
+-        }
++	}
+ 	signal(SIGUSR2, xf86ReloadInputDevs);
+     } else { 	/* serverGeneration != 1 */
+         if (!ShareVTs && VTSwitch)
+@@ -317,7 +315,11 @@
+     int vtno = -1;
+ #endif
+ 
+-    if (ShareVTs) return;
++    if (ShareVTs)
++    {
++	    close(xf86Info.consoleFd);
++	    return;
++    }
+ 
+ #if defined(DO_OS_FONTRESTORE)
+     if (ioctl(xf86Info.consoleFd, VT_GETSTATE, &vts) < 0)

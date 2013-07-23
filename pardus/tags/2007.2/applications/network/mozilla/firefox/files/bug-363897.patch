@@ -1,0 +1,67 @@
+diff -u dom/src/base/nsJSEnvironment.cpp dom/src/base/nsJSEnvironment.cpp
+--- dom/src/base/nsJSEnvironment.cpp	2007-07-10 13:29:10.000000000 +0300
++++ dom/src/base/nsJSEnvironment.cpp	2007-07-10 02:03:49.000000000 +0300
+@@ -82,6 +82,7 @@
+ #include "nsIDOMGCParticipant.h"
+ #include "nsIDocument.h"
+ #include "nsIContent.h"
++#include "nsNetUtil.h"
+ 
+ // For locale aware string methods
+ #include "plstr.h"
+@@ -183,6 +184,7 @@
+ 
+     if (globalObject) {
+       nsAutoString fileName, msg;
++      NS_NAMED_LITERAL_STRING(xoriginMsg, "Script error.");
+ 
+       if (report) {
+         fileName.AssignWithConversion(report->filename);
+@@ -207,6 +209,7 @@
+        * new OOM instance -- this isn't pretty.
+        */
+       nsIDocShell *docShell = globalObject->GetDocShell();
++      nsCOMPtr<nsPIDOMWindow> win(do_QueryInterface(globalObject));
+       if (docShell &&
+           (!report ||
+            (report->errorNumber != JSMSG_OUT_OF_MEMORY &&
+@@ -219,8 +222,37 @@
+           nsScriptErrorEvent errorevent(PR_TRUE, NS_SCRIPT_ERROR);
+ 
+           errorevent.fileName = fileName.get();
+-          errorevent.errorMsg = msg.get();
+-          errorevent.lineNr = report ? report->lineno : 0;
++
++          nsCOMPtr<nsIScriptObjectPrincipal> sop(do_QueryInterface(win));
++          nsIPrincipal *p = sop->GetPrincipal();
++
++          PRBool sameOrigin = !(report && report->filename);
++
++          if (p && !sameOrigin) {
++              nsCOMPtr<nsIURI> errorURI;
++              NS_NewURI(getter_AddRefs(errorURI), report->filename);
++
++              nsCOMPtr<nsIURI> codebase;
++              p->GetURI(getter_AddRefs(codebase));
++
++              if (errorURI && codebase) {
++                // FIXME: Once error reports contain the origin of the
++                // error (principals) we should change this to do the
++                // security check based on the principals and not
++                // URIs. See bug 387476.
++                sameOrigin =
++                  NS_SUCCEEDED(sSecurityManager->
++                               CheckSameOriginURI(errorURI, codebase));
++              }
++            }
++
++            if (sameOrigin) {
++              errorevent.errorMsg = msg.get();
++              errorevent.lineNr = report ? report->lineno : 0;
++            } else {
++              errorevent.errorMsg = xoriginMsg.get();
++              errorevent.lineNr = 0;
++            }
+ 
+           // HandleDOMEvent() must be synchronous for the recursion block
+           // (errorDepth) to work.

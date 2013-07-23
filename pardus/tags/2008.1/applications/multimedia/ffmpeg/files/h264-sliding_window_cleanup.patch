@@ -1,0 +1,94 @@
+Index: libavcodec/h264.c
+===================================================================
+--- libavcodec/h264.c	(revision 14773)
++++ libavcodec/h264.c	(working copy)
+@@ -3220,7 +3220,9 @@
+ }
+ 
+ /**
+- * Executes the reference picture marking (memory management control operations).
++ * Executes the reference picture marking (memory management control 
++ * operations and sliding window).  mmco_count of 0 will simply perform
++ * sliding window ref picture marking
+  */
+ static int execute_ref_pic_marking(H264Context *h, MMCO *mmco, int mmco_count){
+     MpegEncContext * const s = &h->s;
+@@ -3228,8 +3230,7 @@
+     int current_ref_assigned=0;
+     Picture *pic;
+ 
+-    if((s->avctx->debug&FF_DEBUG_MMCO) && mmco_count==0)
+-        av_log(h->s.avctx, AV_LOG_DEBUG, "no mmco here\n");
++    assert(h->long_ref_count + h->short_ref_count <= h->sps.ref_frame_count);
+ 
+     for(i=0; i<mmco_count; i++){
+         int structure, frame_num;
+@@ -3315,6 +3316,10 @@
+             h->frame_num=
+             s->current_picture_ptr->frame_num= 0;
+             break;
++        case MMCO_END:
++            if((s->avctx->debug&FF_DEBUG_MMCO) && mmco_count==1)
++                av_log(h->s.avctx, AV_LOG_DEBUG, "no mmco here\n");
++            break;
+         default: assert(0);
+         }
+     }
+@@ -3351,10 +3356,14 @@
+ 
+     if (h->long_ref_count + h->short_ref_count > h->sps.ref_frame_count){
+ 
+-        /* We have too many reference frames, probably due to corrupted
+-         * stream. Need to discard one frame. Prevents overrun of the
+-         * short_ref and long_ref buffers.
++        /* We have too many reference frames; either due to sliding window or,
++         * if we processed MMCO ops, a corrupted/invalid stream. Need to
++         * discard one frame. 
++         * Also prevents overrun of the short_ref and long_ref buffers.
++         * One is always sufficient, since we added at most one picture this
++         * mmco processing cycle.
+          */
++        if (mmco_count)
+         av_log(h->s.avctx, AV_LOG_ERROR,
+                "number of reference frames exceeds max (probably "
+                "corrupt input), discarding one\n");
+@@ -3391,8 +3400,10 @@
+         }
+     }else{
+         if(get_bits1(gb)){ // adaptive_ref_pic_marking_mode_flag
+-            for(i= 0; i<MAX_MMCO_COUNT; i++) {
+-                MMCOOpcode opcode= get_ue_golomb(gb);
++            MMCOOpcode opcode;
++            i= 0;
++            do {
++                opcode= get_ue_golomb(gb);
+ 
+                 h->mmco[i].opcode= opcode;
+                 if(opcode==MMCO_SHORT2UNUSED || opcode==MMCO_SHORT2LONG){
+@@ -3415,25 +3426,8 @@
+                     av_log(h->s.avctx, AV_LOG_ERROR, "illegal memory management control operation %d\n", opcode);
+                     return -1;
+                 }
+-                if(opcode == MMCO_END)
+-                    break;
+-            }
++            } while (++i<MAX_MMCO_COUNT && opcode != MMCO_END);
+             h->mmco_index= i;
+-        }else{
+-            assert(h->long_ref_count + h->short_ref_count <= h->sps.ref_frame_count);
+-
+-            if(h->short_ref_count && h->long_ref_count + h->short_ref_count == h->sps.ref_frame_count &&
+-                    !(FIELD_PICTURE && !s->first_field && s->current_picture_ptr->reference)) {
+-                h->mmco[0].opcode= MMCO_SHORT2UNUSED;
+-                h->mmco[0].short_pic_num= h->short_ref[ h->short_ref_count - 1 ]->frame_num;
+-                h->mmco_index= 1;
+-                if (FIELD_PICTURE) {
+-                    h->mmco[0].short_pic_num *= 2;
+-                    h->mmco[1].opcode= MMCO_SHORT2UNUSED;
+-                    h->mmco[1].short_pic_num= h->mmco[0].short_pic_num + 1;
+-                    h->mmco_index= 2;
+-                }
+-            }
+         }
+     }
+ 

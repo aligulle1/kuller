@@ -1,0 +1,60 @@
+Index: linux-2.6.30/drivers/gpu/drm/drm_gem.c
+===================================================================
+--- linux-2.6.30.orig/drivers/gpu/drm/drm_gem.c
++++ linux-2.6.30/drivers/gpu/drm/drm_gem.c
+@@ -143,6 +143,9 @@ drm_gem_object_alloc(struct drm_device *
+ 		return NULL;
+ 	}
+ 
++	if (dev->gem_flags)
++		mapping_set_gfp_mask(obj->filp->f_mapping, dev->gem_flags);
++
+ 	kref_init(&obj->refcount);
+ 	kref_init(&obj->handlecount);
+ 	obj->size = size;
+Index: linux-2.6.30/drivers/gpu/drm/i915/i915_dma.c
+===================================================================
+--- linux-2.6.30.orig/drivers/gpu/drm/i915/i915_dma.c
++++ linux-2.6.30/drivers/gpu/drm/i915/i915_dma.c
+@@ -1145,12 +1145,12 @@ int i915_driver_load(struct drm_device *
+ 	}
+ 
+ #ifdef CONFIG_HIGHMEM64G
+-	/* don't enable GEM on PAE - needs agp + set_memory_* interface fixes */
+-	dev_priv->has_gem = 0;
+-#else
++	/* set default allocation flags */
++	dev->gem_flags = GFP_USER | GFP_DMA32;
++#endif
++
+ 	/* enable GEM by default */
+ 	dev_priv->has_gem = 1;
+-#endif
+ 
+ 	dev->driver->get_vblank_counter = i915_get_vblank_counter;
+ 	if (IS_GM45(dev))
+Index: linux-2.6.30/include/drm/drmP.h
+===================================================================
+--- linux-2.6.30.orig/include/drm/drmP.h
++++ linux-2.6.30/include/drm/drmP.h
+@@ -1043,6 +1043,7 @@ struct drm_device {
+ 	uint32_t gtt_total;
+ 	uint32_t invalidate_domains;    /* domains pending invalidation */
+ 	uint32_t flush_domains;         /* domains pending flush */
++	gfp_t gem_flags;		/* object allocation flags */
+ 	/*@} */
+ };
+ 
+Index: linux-2.6.30/mm/shmem.c
+===================================================================
+--- linux-2.6.30.orig/mm/shmem.c
++++ linux-2.6.30/mm/shmem.c
+@@ -1241,7 +1241,7 @@ repeat:
+ 		 * Try to preload while we can wait, to not make a habit of
+ 		 * draining atomic reserves; but don't latch on to this cpu.
+ 		 */
+-		error = radix_tree_preload(gfp & ~__GFP_HIGHMEM);
++		error = radix_tree_preload(gfp & ~(__GFP_HIGHMEM|__GFP_DMA32));
+ 		if (error)
+ 			goto failed;
+ 		radix_tree_preload_end();

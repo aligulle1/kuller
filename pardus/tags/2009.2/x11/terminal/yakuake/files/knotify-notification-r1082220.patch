@@ -1,0 +1,38 @@
+Index: yakuake-2.9.6/app/mainwindow.cpp
+===================================================================
+--- yakuake-2.9.6.orig/app/mainwindow.cpp
++++ yakuake-2.9.6/app/mainwindow.cpp
+@@ -36,7 +36,7 @@
+ #include <KHelpMenu>
+ #include <KMenu>
+ #include <KMessageBox>
+-#include <KPassivePopup>
++#include <KNotification>
+ #include <KShortcutsDialog>
+ #include <KStandardAction>
+ #include <KToggleFullScreenAction>
+@@ -968,19 +968,12 @@ void MainWindow::whatsThis()
+ void MainWindow::showStartupPopup()
+ {
+     KAction* action = static_cast<KAction*>(actionCollection()->action("toggle-window-state"));
+-    QString shortcut = action->globalShortcut().toString();
++    QString shortcut(action->globalShortcut().toString());
++    QString title(i18nc("@title:window", "<application>Yakuake</application> Notification"));
++    QString message(i18nc("@info", "Application successfully started.<nl/>" "Press <shortcut>%1</shortcut> to use it...", shortcut));
+ 
+-    KPassivePopup* popup = new KPassivePopup();
+-
+-    popup->setAutoDelete(true);
+-    popup->setTimeout(5000);
+-    popup->setView(popup->standardView(i18nc("@title:window", 
+-        "<application>Yakuake</application> Notification"), 
+-        i18nc("@info", "Application successfully started.<nl/>"
+-                       "Press <shortcut>%1</shortcut> to use it...", shortcut),
+-        KIconLoader::global()->loadIcon("yakuake", KIconLoader::Small)));
+-
+-    popup->show(getDesktopGeometry().topLeft());
++    KNotification::event("startup", title, message,
++        KIconLoader::global()->loadIcon("yakuake", KIconLoader::Desktop));
+ }
+ 
+ void MainWindow::showFirstRunDialog()

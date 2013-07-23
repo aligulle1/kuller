@@ -1,0 +1,25 @@
+Index: dhcpcd-3.2.3/dhcp.c
+===================================================================
+--- dhcpcd-3.2.3.orig/dhcp.c
++++ dhcpcd-3.2.3/dhcp.c
+@@ -668,7 +668,7 @@ parse_start:
+ 
+ 		length = *p++;
+ 
+-		if (option != DHCP_PAD && length == 0) {
++		if ((option != DHCP_PAD) && (option != DHCP_VENDOR) && (length == 0)) {
+ 			logger (LOG_ERR, "option %d has zero length", option);
+ 			retval = -1;
+ 			goto eexit;
+Index: dhcpcd-3.2.3/dhcp.h
+===================================================================
+--- dhcpcd-3.2.3.orig/dhcp.h
++++ dhcpcd-3.2.3/dhcp.h
+@@ -86,6 +86,7 @@ enum DHCP_OPTIONS
+ 	DHCP_NISDOMAIN              = 40,
+ 	DHCP_NISSERVER              = 41,
+ 	DHCP_NTPSERVER              = 42,
++	DHCP_VENDOR                 = 43,
+ 	DHCP_ADDRESS                = 50,
+ 	DHCP_LEASETIME              = 51,
+ 	DHCP_OPTIONSOVERLOADED      = 52,

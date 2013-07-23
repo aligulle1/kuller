@@ -1,0 +1,108 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>tigervnc</Name>
+        <Homepage>http://www.tigervnc.org</Homepage>
+        <Packager>
+            <Name>Metin Akdere</Name>
+            <Email>metin@pardus.org.tr</Email>
+        </Packager>
+        <License>GPLv2</License>
+        <IsA>app:console</IsA>
+        <IsA>app:gui</IsA>
+        <Summary>Free remote control software package</Summary>
+        <Description>With TigerVNC, you can see the desktop of a remote machine and control it with your local mouse and keyboard, just like you would do it sitting in the front of that computer.</Description>
+        <Archive sha1sum="9fbfb1680bf118ad9d5033159504552c779629ad" type="targz">mirrors://sourceforge/project/tigervnc/tigervnc/1.0.90%20%281.1beta1%29/tigervnc-1.0.90.tar.gz</Archive>
+        <Archive sha1sum="03be24d6906f3ed3237057a5a7df2b02723c9749" type="tarbz2">mirrors://xorg/individual/xserver/xorg-server-1.9.5.tar.bz2</Archive>
+        <BuildDependencies>
+            <Dependency>gnutls-devel</Dependency>
+            <Dependency>jpeg-devel</Dependency>
+            <Dependency>libXaw-devel</Dependency>
+            <Dependency>libXext-devel</Dependency>
+            <Dependency>libXfont-devel</Dependency>
+            <Dependency>libxkbfile-devel</Dependency>
+            <Dependency>libXmu-devel</Dependency>
+            <Dependency>libXt-devel</Dependency>
+            <Dependency>libXtst-devel</Dependency>
+            <Dependency>sun-jdk</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <Patch>0001-Add-lcrypto-for-SHA1-functions.patch</Patch>
+            <Patch>tigervnc11-gethomedir.patch</Patch>
+            <Patch>tigervnc11-glx.patch</Patch>
+            <Patch>tigervnc11-ldnow.patch</Patch>
+            <Patch>tigervnc-cookie.patch</Patch>
+            <Patch>tigervnc-viewer-reparent.patch</Patch>
+            <Patch>xserver110.patch</Patch>
+            <Patch>pardus-xstartup.diff</Patch>
+        </Patches>
+    </Source>
+    <Package>
+        <Name>tigervnc-server</Name>
+        <Summary>Server for the VNC remote display system</Summary>
+        <RuntimeDependencies>
+            <Dependency>gnutls</Dependency>
+            <Dependency>jpeg</Dependency>
+            <Dependency>libgcrypt</Dependency>
+            <Dependency>libXfont</Dependency>
+            <Dependency>libXtst</Dependency>
+            <Dependency>pixman</Dependency>
+        </RuntimeDependencies>
+       <Files>
+            <Path fileType="config">/etc</Path>
+            <Path fileType="executable">/usr/bin/vncserver</Path>
+            <Path fileType="executable">/usr/bin/vncpasswd</Path>
+            <Path fileType="executable">/usr/bin/vncconfig</Path>
+            <Path fileType="executable">/usr/bin/x0vncserver</Path>
+            <Path fileType="executable">/usr/bin/Xvnc</Path>
+            <Path fileType="library">/usr/lib</Path>
+            <Path fileType="man">/usr/share/man</Path>
+            <Path fileType="doc">/usr/share/doc</Path>
+        </Files>
+     </Package>
+
+    <Package>
+        <Name>tigervnc-viewer</Name>
+        <Summary>Viewer for the VNC remote display system</Summary>
+        <RuntimeDependencies>
+            <Dependency>gnutls</Dependency>
+            <Dependency>jpeg</Dependency>
+            <Dependency release="current">tigervnc-server</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="executable">/usr/bin/vncviewer</Path>
+            <Path fileType="man">/usr/share/man/man1/vncviewer.1</Path>
+            <Path fileType="data">/usr/share/applications</Path>
+            <Path fileType="data">/usr/share/icons</Path>
+        </Files>
+         <AdditionalFiles>
+             <AdditionalFile owner="root" permission="0644" target="/usr/share/applications/vncviewer.desktop">vncviewer.desktop</AdditionalFile>
+        </AdditionalFiles>
+   </Package>
+
+    <Package>
+        <Name>tigervnc-java</Name>
+        <Summary>Java viewer for the VNC remote display system</Summary>
+        <RuntimeDependencies>
+            <Dependency>jpeg</Dependency>
+            <Dependency>sun-jre</Dependency>
+            <Dependency release="current">tigervnc-server</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="library">/usr/share/vnc/*.jar</Path>
+            <Path fileType="data">/usr/share/vnc/classes</Path>
+        </Files>
+    </Package>
+
+    <History>
+        <Update release="1">
+            <Date>2011-04-01</Date>
+            <Version>1.0.90</Version>
+            <Comment>First release.</Comment>
+            <Name>Metin Akdere</Name>
+            <Email>metin@pardus.org.tr</Email>
+        </Update>
+    </History>
+</PISI>
+

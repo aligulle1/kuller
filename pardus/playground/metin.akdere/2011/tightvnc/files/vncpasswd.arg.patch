@@ -1,0 +1,113 @@
+--- vnc_unixsrc.orig/Imakefile
++++ vnc_unixsrc/Imakefile
+@@ -1,7 +1,7 @@
+ #define IHaveSubdirs
+ #define PassCDebugFlags
+ 
+-SUBDIRS = libvncauth vncviewer vncpasswd vncconnect
++SUBDIRS = libvncauth vncviewer vncpasswd vncconnect vncpasswd.arg
+ 
+ World:
+ 	make Makefiles
+--- vnc_unixsrc.orig/vncinstall
++++ vnc_unixsrc/vncinstall
+@@ -39,7 +39,7 @@
+ fi
+ 
+ for f in Xvnc/programs/Xserver/Xvnc vncviewer/vncviewer \
+-	 vncpasswd/vncpasswd vncconnect/vncconnect vncserver; do
++	 vncpasswd/vncpasswd vncpasswd.arg/vncpasswd.arg vncconnect/vncconnect vncserver; do
+ 
+   # Installing binaries
+   if cmp -s $f $bin_dst/`basename $f`; then
+--- vnc_unixsrc.orig/vncpasswd.arg/Imakefile
++++ vnc_unixsrc/vncpasswd.arg/Imakefile
+@@ -0,0 +1,15 @@
++
++#ifdef SunArchitecture
++CC = gcc
++CCOPTIONS =
++CDEBUGFLAGS = -O2
++#endif
++
++SRCS = vncpasswd.arg.c
++INCLUDES = -I../include
++VNCAUTH_LIB = ../libvncauth/libvncauth.a
++
++all:: vncpasswd.arg
++
++NormalProgramTarget(vncpasswd.arg,vncpasswd.arg.o,$(VNCAUTH_LIB),$(VNCAUTH_LIB),)
++DependTarget()
+--- vnc_unixsrc.orig/vncpasswd.arg/vncpasswd.arg.c
++++ vnc_unixsrc/vncpasswd.arg/vncpasswd.arg.c
+@@ -0,0 +1,70 @@
++/*
++ *  Copyright (C) 1999 AT&T Laboratories Cambridge.  All Rights Reserved.
++ *
++ *  This is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License as published by
++ *  the Free Software Foundation; either version 2 of the License, or
++ *  (at your option) any later version.
++ *
++ *  This software is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  GNU General Public License for more details.
++ *
++ *  You should have received a copy of the GNU General Public License
++ *  along with this software; if not, write to the Free Software
++ *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307,
++ *  USA.
++ */
++
++/*
++ *  vncpasswd:  A standalone program which gets and verifies a password, 
++ *              encrypts it, and stores it to a file.  Always ignore anything
++ *              after 8 characters, since this is what Solaris getpass() does
++ *              anyway.
++ */
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <unistd.h>
++#include "vncauth.h"
++
++static void usage(char *argv[]) {
++  fprintf(stderr,"Usage: %s file password\n",argv[0]);
++  exit(1);
++}
++
++int main(int argc, char *argv[]) {
++  char *passwd;
++  char *passwdFile;
++  int i,len;
++
++  if (argc == 3) {
++      passwdFile = argv[1];
++      passwd = argv[2];
++  } else {
++      usage(argv);
++  }
++
++  if (!passwd) {
++    fprintf(stderr,"Can't get password\n");
++    exit(1);
++  }   
++  if (strlen(passwd) < 6) {
++    fprintf(stderr,"Password too short\n");
++    exit(1);
++  }   
++  if (strlen(passwd) > 8) {
++    passwd[8] = '\0';
++  }
++
++  if (vncEncryptAndStorePasswd(passwd, passwdFile) != 0) {
++    fprintf(stderr,"Cannot write password file %s\n",passwdFile);
++    exit(1);
++  }
++  len = strlen(passwd);
++  for (i = 0; i < len; i++)
++    passwd[i] = '\0';
++  return(0);
++}

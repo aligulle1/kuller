@@ -1,0 +1,37 @@
+From bd86067c319685089930895cd12567b2fa6ef4c6 Mon Sep 17 00:00:00 2001
+From: Mark Anderson <linuxman@prodigy.net>
+Date: Tue, 19 Aug 2008 08:32:33 -0600
+Subject: [PATCH] mesa: fix float blend bug
+
+---
+ src/mesa/swrast/s_blend.c |    7 ++++---
+ 1 files changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/src/mesa/swrast/s_blend.c b/src/mesa/swrast/s_blend.c
+index 82c5e84..1293816 100644
+--- Mesa-7.0.4/src/mesa/swrast/s_blend.c
++++ Mesa-7.0.4/src/mesa/swrast/s_blend.c
+@@ -1,8 +1,8 @@
+ /*
+  * Mesa 3-D graphics library
+- * Version:  6.5.2
++ * Version:  7.0.4
+  *
+- * Copyright (C) 1999-2006  Brian Paul   All Rights Reserved.
++ * Copyright (C) 1999-2008  Brian Paul   All Rights Reserved.
+  *
+  * Permission is hereby granted, free of charge, to any person obtaining a
+  * copy of this software and associated documentation files (the "Software"),
+@@ -880,7 +880,8 @@ blend_general(GLcontext *ctx, GLuint n, const GLubyte mask[],
+       }
+    }
+    else {
+-      blend_general_float(ctx, n, mask, rgbaF, destF, chanType);
++      blend_general_float(ctx, n, mask, (GLfloat (*)[4]) src,
++                          (GLfloat (*)[4]) dst, chanType);
+    }
+ }
+ 
+-- 
+1.5.6.5
+

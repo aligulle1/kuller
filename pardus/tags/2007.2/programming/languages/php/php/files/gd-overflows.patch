@@ -1,0 +1,98 @@
+--- ext/gd/libgd/gd.c	2007/04/14 17:33:15	1.90.2.1.2.11
++++ ext/gd/libgd/gd.c	2007/06/06 09:45:43	1.90.2.1.2.12
+@@ -120,6 +120,15 @@
+ {
+ 	int i;
+ 	gdImagePtr im;
++
++	if (overflow2(sx, sy)) {
++		return NULL;
++	}
++
++	if (overflow2(sizeof(unsigned char *), sy)) {
++		return NULL;
++	}
++
+ 	im = (gdImage *) gdMalloc(sizeof(gdImage));
+ 	memset(im, 0, sizeof(gdImage));
+ 	/* Row-major ever since gd 1.3 */
+@@ -162,6 +171,19 @@
+ {
+ 	int i;
+ 	gdImagePtr im;
++
++	if (overflow2(sx, sy)) {
++		return NULL;
++	}
++
++	if (overflow2(sizeof(unsigned char *), sy)) {
++		return NULL;
++	}
++	
++	if (overflow2(sizeof(int), sx)) {
++		return NULL;
++	}
++
+ 	im = (gdImage *) gdMalloc(sizeof(gdImage));
+ 	memset(im, 0, sizeof(gdImage));
+ 	im->tpixels = (int **) gdMalloc(sizeof(int *) * sy);
+@@ -2404,6 +2426,14 @@
+ 	int *stx, *sty;
+ 	/* We only need to use floating point to determine the correct stretch vector for one line's worth. */
+ 	double accum;
++	
++	if (overflow2(sizeof(int), srcW)) {
++		return;
++	}
++	if (overflow2(sizeof(int), srcH)) {
++		return;
++	}
++
+ 	stx = (int *) gdMalloc (sizeof (int) * srcW);
+ 	sty = (int *) gdMalloc (sizeof (int) * srcH);
+ 	accum = 0;
+@@ -3195,6 +3225,10 @@
+ 		return;
+ 	}
+ 
++	if (overflow2(sizeof(int), n)) {
++		return;
++	}
++
+ 	if (c == gdAntiAliased) {
+ 		fill_color = im->AA_color;
+ 	} else {
+@@ -3208,6 +3242,9 @@
+ 	if (im->polyAllocated < n) {
+ 		while (im->polyAllocated < n) {
+ 			im->polyAllocated *= 2;
++		}
++		if (overflow2(sizeof(int), im->polyAllocated)) {
++			return;
+ 		}
+ 		im->polyInts = (int *) gdRealloc(im->polyInts, sizeof(int) * im->polyAllocated);
+ 	}
+--- ext/gd/gd.c	2007/06/03 17:46:18	1.312.2.20.2.28
++++ ext/gd/gd.c	2007/06/06 09:45:43	1.312.2.20.2.29
+@@ -1740,6 +1740,10 @@
+ 
+ 	im = gdImageCreateTrueColor(Z_LVAL_PP(x_size), Z_LVAL_PP(y_size));
+ 
++	if (!im) {
++		RETURN_FALSE;
++	}
++
+ 	ZEND_REGISTER_RESOURCE(return_value, im, le_gd);
+ }
+ /* }}} */
+@@ -2349,6 +2353,10 @@
+ 	}
+ 
+ 	im = gdImageCreate(Z_LVAL_PP(x_size), Z_LVAL_PP(y_size));
++
++	if (!im) {
++		RETURN_FALSE;
++	}
+ 
+ 	ZEND_REGISTER_RESOURCE(return_value, im, le_gd);
+ }

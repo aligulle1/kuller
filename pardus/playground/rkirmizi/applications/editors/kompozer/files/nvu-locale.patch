@@ -1,0 +1,36 @@
+--- composer/app/mozilla.in.origi	2005-01-17 00:02:24.474910914 +0100
++++ composer/app/mozilla.in	2005-01-17 00:06:46.600902355 +0100
+@@ -113,8 +113,31 @@
+ 
+ export MRE_HOME
+ eval "set -- $moreargs"
++
++## Autodetect language
++##
++if [ "$HOME" -a "$SET_LANG" != "0" -a -r "$moz_libdir/chrome/installed-chrome.txt" ]; then
++  for LANG in `echo $LANGUAGE:$LC_ALL:$LC_MESSAGES:$LANG | tr ':' ' '`
++  do
++	unset MOZ_LANG
++	MOZ_LANG_PART1=`echo $LANG | cut -f 1 --delimiter "_"`
++	MOZ_LANG_PART2=`echo $LANG | cut -f 2 --delimiter "_" | cut -f 1 --delimiter "." | cut -f 1 --delimiter "@"`
++	if [ "$MOZ_LANG_PART2" -a -r "$moz_libdir/chrome/$MOZ_LANG_PART1-$MOZ_LANG_PART2.jar" ]; then
++		MOZ_LANG="-contentLocale $MOZ_LANG_PART2 -UILocale $MOZ_LANG_PART1-$MOZ_LANG_PART2"
++	else
++	# Default locale not found. Trying with language code as country code
++	# i.e. : for fr_CA -> fr_FR, etc.
++		MOZ_LANG_PART2=`echo $MOZ_LANG_PART1 | tr a-z A-Z `;
++		if [ "$MOZ_LANG_PART2" -a -r "$moz_libdir/chrome/$MOZ_LANG_PART1-$MOZ_LANG_PART2.jar" ]; then
++			MOZ_LANG="-contentLocale $MOZ_LANG_PART2 -UILocale $MOZ_LANG_PART1-$MOZ_LANG_PART2"
++		fi
++	fi
++	if [ -n "$MOZ_LANG" ] ; then break ; fi
++  done
++fi
++
+ if [ $debugging = 1 ]
+ then
+-  echo $dist_bin/run-mozilla.sh $script_args $dist_bin/$MOZILLA_BIN "$@"
++  echo $dist_bin/run-mozilla.sh $script_args $dist_bin/$MOZILLA_BIN  $MOZ_LANG "$@"
+ fi
+-exec "$dist_bin/run-mozilla.sh" $script_args "$dist_bin/$MOZILLA_BIN" "$@"
++exec "$dist_bin/run-mozilla.sh" $script_args "$dist_bin/$MOZILLA_BIN"  $MOZ_LANG "$@"

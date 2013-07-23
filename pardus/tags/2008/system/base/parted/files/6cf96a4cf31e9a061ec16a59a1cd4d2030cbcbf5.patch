@@ -1,0 +1,460 @@
+diff --git a/doc/C/parted.8 b/doc/C/parted.8
+index 7040402..fdf3d04 100644
+--- a/doc/C/parted.8
++++ b/doc/C/parted.8
+@@ -124,6 +124,18 @@ and a human-friendly form for output).
+ .B version
+ Display version information and a copyright message.
+ .RE
++.SH KNOWN ISSUES
++ext3 filesystem resizing does not currently work, please use
++.BR resize2fs (8)
++instead.
++
++Resizing partitions with an ext3 filesystem will not generally work because
++of the above issue.  Use
++.BR resize2fs (8)
++to resize the filesystem and resize the partition manually using
++.BR fdisk (8)
++or a similar tool.  For LVM situations, you will need to use the LVM commands
++to resize the LVM elements.
+ .SH REPORTING BUGS
+ Report bugs to <bug-parted@gnu.org>
+ .SH SEE ALSO
+diff --git a/include/parted/constraint.h b/include/parted/constraint.h
+index 7a39602..6496926 100644
+--- a/include/parted/constraint.h
++++ b/include/parted/constraint.h
+@@ -22,6 +22,7 @@
+ typedef struct _PedConstraint	PedConstraint;
+ 
+ #include <parted/device.h>
++#include <parted/geom.h>
+ #include <parted/natmath.h>
+ 
+ struct _PedConstraint {
+diff --git a/include/parted/device.h b/include/parted/device.h
+index cf32dba..e669688 100644
+--- a/include/parted/device.h
++++ b/include/parted/device.h
+@@ -26,6 +26,7 @@
+ #ifndef PED_DEVICE_H_INCLUDED
+ #define PED_DEVICE_H_INCLUDED
+ 
++#include <parted/constraint.h>
+ #include <parted/timer.h>
+ 
+ /** We can address 2^63 sectors */
+@@ -45,9 +46,7 @@ typedef enum {
+         PED_DEVICE_DASD         = 9,
+         PED_DEVICE_VIODASD      = 10,
+         PED_DEVICE_SX8          = 11,
+-#ifdef ENABLE_DEVICE_MAPPER
+         PED_DEVICE_DM           = 12,
+-#endif
+         PED_DEVICE_XVD          = 13
+ } PedDeviceType;
+ 
+diff --git a/include/parted/natmath.h b/include/parted/natmath.h
+index 32a6e28..e387833 100644
+--- a/include/parted/natmath.h
++++ b/include/parted/natmath.h
+@@ -30,6 +30,7 @@
+ typedef struct _PedAlignment	PedAlignment;
+ 
+ #include <parted/disk.h>
++#include <parted/device.h>
+ 
+ #define PED_MIN(a, b)	( ((a)<(b)) ? (a) : (b) )
+ #define PED_MAX(a, b)	( ((a)>(b)) ? (a) : (b) )
+diff --git a/libparted/cs/natmath.c b/libparted/cs/natmath.c
+index b8b4a95..fd376cd 100644
+--- a/libparted/cs/natmath.c
++++ b/libparted/cs/natmath.c
+@@ -74,16 +74,16 @@ ped_round_down_to (PedSector sector, PedSector grain_size)
+ 	return sector - abs_mod (sector, grain_size);
+ }
+ 
+-inline PedSector
++PedSector
+ ped_div_round_up (PedSector numerator, PedSector divisor)
+ {
+-                return (numerator + divisor - 1) / divisor;
++	return (numerator + divisor - 1) / divisor;
+ }
+ 
+-inline PedSector
++PedSector
+ ped_div_round_to_nearest (PedSector numerator, PedSector divisor)
+ {
+-                return (numerator + divisor/2) / divisor;
++	return (numerator + divisor/2) / divisor;
+ }
+ 
+ /* Rounds a number up to the closest number that is a multiple of
+diff --git a/libparted/disk.c b/libparted/disk.c
+index 1582f26..52095d0 100644
+--- a/libparted/disk.c
++++ b/libparted/disk.c
+@@ -224,23 +224,24 @@ static int
+ _add_duplicate_part (PedDisk* disk, PedPartition* old_part)
+ {
+ 	PedPartition*	new_part;
+-	PedConstraint*	constraint_exact;
++	int ret;
+ 
+ 	new_part = disk->type->ops->partition_duplicate (old_part);
+ 	if (!new_part)
+ 		goto error;
+ 	new_part->disk = disk;
+ 
+-	constraint_exact = ped_constraint_exact (&new_part->geom);
+-	if (!constraint_exact)
++	_disk_push_update_mode (disk);
++	ret = _disk_raw_add (disk, new_part);
++	_disk_pop_update_mode (disk);
++	if (!ret)
+ 		goto error_destroy_new_part;
+-	if (!ped_disk_add_partition (disk, new_part, constraint_exact))
+-       		goto error_destroy_constraint_exact;
+-	ped_constraint_destroy (constraint_exact);
++#ifdef DEBUG
++	if (!_disk_check_sanity (disk))
++		goto error_destroy_new_part;
++#endif
+ 	return 1;
+ 
+-error_destroy_constraint_exact:
+-	ped_constraint_destroy (constraint_exact);
+ error_destroy_new_part:
+ 	ped_partition_destroy (new_part);
+ error:
+diff --git a/libparted/fs/ext2/ext2.c b/libparted/fs/ext2/ext2.c
+index 618fca9..79fc6f6 100644
+--- a/libparted/fs/ext2/ext2.c
++++ b/libparted/fs/ext2/ext2.c
+@@ -727,7 +727,10 @@ struct ext2_fs *ext2_open(struct ext2_dev_handle *handle, int state)
+ 			    EXT2_FEATURE_RO_COMPAT_LARGE_FILE)))
+ 	{
+ 		ped_exception_throw (PED_EXCEPTION_ERROR, PED_EXCEPTION_CANCEL,
+-		     _("File system has an incompatible feature enabled."));
++		     _("File system has an incompatible feature enabled.  "
++		       "Compatible features are has_journal, dir_index, "
++		       "filetype, sparse_super and large_file.  "
++		       "Use tune2fs or debugfs to remove features."));
+ 		goto error_free_fs;
+ 	}
+ 
+diff --git a/libparted/labels/bsd.c b/libparted/labels/bsd.c
+index f25353b..ee9aba0 100644
+--- a/libparted/labels/bsd.c
++++ b/libparted/labels/bsd.c
+@@ -108,6 +108,9 @@ typedef struct {
+ 
+ typedef struct {
+ 	uint8_t		type;
++	int			boot;
++	int			raid;
++	int			lvm;
+ } BSDPartitionData;
+ 
+ static PedDiskType bsd_disk_type;
+@@ -394,6 +397,9 @@ bsd_partition_new (const PedDisk* disk, PedPartitionType part_type,
+ 		if (!bsd_data)
+ 			goto error_free_part;
+ 		bsd_data->type = 0;
++		bsd_data->boot = 0;
++		bsd_data->raid = 0;
++		bsd_data->lvm  = 0;
+ 	} else {
+ 		part->disk_specific = NULL;
+ 	}
+@@ -423,6 +429,9 @@ bsd_partition_duplicate (const PedPartition* part)
+ 	old_bsd_data = (BSDPartitionData*) part->disk_specific;
+ 	new_bsd_data = (BSDPartitionData*) new_part->disk_specific;
+ 	new_bsd_data->type = old_bsd_data->type;
++	new_bsd_data->boot = old_bsd_data->boot;
++	new_bsd_data->raid = old_bsd_data->raid;
++	new_bsd_data->lvm = old_bsd_data->lvm;
+ 	return new_part;
+ }
+ 
+@@ -456,14 +465,60 @@ bsd_partition_set_system (PedPartition* part, const PedFileSystemType* fs_type)
+ static int
+ bsd_partition_set_flag (PedPartition* part, PedPartitionFlag flag, int state)
+ {
+-	/* no flags for bsd */
++	PedDisk*			disk;
++//	PedPartition*		walk; // since -Werror, this unused variable would break build
++	BSDPartitionData*	bsd_data;
++
++	PED_ASSERT (part != NULL, return 0);
++	PED_ASSERT (part->disk_specific != NULL, return 0);
++	PED_ASSERT (part->disk != NULL, return 0);
++
++	bsd_data = part->disk_specific;
++	disk = part->disk;
++
++	switch (flag) {
++		case PED_PARTITION_BOOT:
++			bsd_data->boot = state;
++			return 1;
++		case PED_PARTITION_RAID:
++			if (state) {
++				bsd_data->lvm = 0;
++			}
++			bsd_data->raid = state;
++			return 1;
++		case PED_PARTITION_LVM:
++			if (state) {
++				bsd_data->raid = 0;
++			}
++			bsd_data->lvm = state;
++		default:
++			;
++	}
+ 	return 0;
+ }
+ 
+ static int
+ bsd_partition_get_flag (const PedPartition* part, PedPartitionFlag flag)
+ {
+-	/* no flags for bsd */
++	BSDPartitionData*		bsd_data;
++
++	PED_ASSERT (part != NULL, return 0);
++	PED_ASSERT (part->disk_specific != NULL, return 0);
++
++	bsd_data = part->disk_specific;
++	switch (flag) {
++		case PED_PARTITION_BOOT:
++			return bsd_data->boot;
++
++		case PED_PARTITION_RAID:
++			return bsd_data->raid;
++
++		case PED_PARTITION_LVM:
++			return bsd_data->lvm;
++
++		default:
++			;
++	}
+ 	return 0;
+ }
+ 
+@@ -471,7 +526,14 @@ static int
+ bsd_partition_is_flag_available (const PedPartition* part,
+ 				 PedPartitionFlag flag)
+ {
+-	/* no flags for bsd */
++	switch (flag) {
++		case PED_PARTITION_BOOT:
++		case PED_PARTITION_RAID:
++		case PED_PARTITION_LVM:
++			return 1;
++		default:
++			;
++	}
+ 	return 0;
+ }
+ 
+diff --git a/libparted/tests/Makefile.am b/libparted/tests/Makefile.am
+index 12ad29f..d526207 100644
+--- a/libparted/tests/Makefile.am
++++ b/libparted/tests/Makefile.am
+@@ -3,13 +3,17 @@
+ #
+ # This file may be modified and/or distributed without restriction.
+ 
+-TESTS = t1000-label.sh
++TESTS = t1000-label.sh t2000-disk.sh
+ EXTRA_DIST = $(TESTS)
+-bin_PROGRAMS     = label
++bin_PROGRAMS     = label disk
+ label_CFLAGS    = $(CHECK_CFLAGS) -I$(top_srcdir)/include
+ label_LDADD     = $(CHECK_LIBS) $(top_builddir)/libparted/libparted.la
+ label_SOURCES   = common.h common.c label.c
+ 
++disk_CFLAGS    = $(CHECK_CFLAGS) -I$(top_srcdir)/include
++disk_LDADD     = $(CHECK_LIBS) $(top_builddir)/libparted/libparted.la
++disk_SOURCES   = common.h common.c disk.c
++
+ MAINTAINERCLEANFILES = Makefile.in
+ 
+ CLEANFILES = init.sh
+diff --git a/libparted/tests/disk.c b/libparted/tests/disk.c
+new file mode 100644
+index 0000000..295ec05
+--- /dev/null
++++ b/libparted/tests/disk.c
+@@ -0,0 +1,111 @@
++#include <config.h>
++#include <unistd.h>
++
++#include <check.h>
++
++#include <parted/parted.h>
++
++#include "common.h"
++
++static char* temporary_disk;
++
++static void
++create_disk (void)
++{
++        temporary_disk = _create_disk (20);
++        fail_if (temporary_disk == NULL, "Failed to create temporary disk");
++}
++
++static void
++destroy_disk (void)
++{
++        unlink (temporary_disk);
++        free (temporary_disk);
++}
++
++/* TEST: Create a disklabel on a simple disk image */
++START_TEST (test_duplicate)
++{
++        PedDevice* dev = ped_device_get (temporary_disk);
++        if (dev == NULL)
++                return;
++
++        PedDiskType* type;
++        PedDisk* disk;
++        PedDisk* disk_dup;
++        PedPartition *part;
++        PedPartition *part_dup;
++        PedConstraint *constraint;
++
++        int part_num[] = {1, 5, 6, 0};
++
++        disk = _create_disk_label (dev, ped_disk_type_get ("msdos"));
++
++        constraint = ped_constraint_any (dev);
++
++        /* Primary partition from 16,4kB to 15MB */
++        part = ped_partition_new (disk, PED_PARTITION_EXTENDED,
++                                  NULL,
++                                  32, 29311);
++        ped_disk_add_partition (disk, part, constraint);
++
++        /* Logical partition from 10MB to 15MB */
++        part = ped_partition_new (disk, PED_PARTITION_LOGICAL,
++                                  ped_file_system_type_get ("ext2"),
++                                  19584, 29311);
++        ped_disk_add_partition (disk, part, constraint);
++
++        /* Logical partition from 16,4kB to 4981kB */
++        part = ped_partition_new (disk, PED_PARTITION_LOGICAL,
++                                  ped_file_system_type_get ("ext2"),
++                                  32, 9727);
++        ped_disk_add_partition (disk, part, constraint);
++
++        ped_disk_commit (disk);
++
++        ped_constraint_destroy (constraint);
++
++        disk_dup = ped_disk_duplicate (disk);
++
++        /* Checks if both partitions match */
++        for (int *i = part_num; *i != 0; i++) {
++                part = ped_disk_get_partition (disk, *i);
++                part_dup = ped_disk_get_partition (disk_dup, *i);
++
++                fail_if (part->geom.start != part_dup->geom.start ||
++                         part->geom.end != part_dup->geom.end,
++                         "Duplicated partition %d doesn't match. "
++                         "Details are start: %d/%d end: %d/%d\n",
++                         *i, part->geom.start, part_dup->geom.start,
++                         part->geom.end, part_dup->geom.end);
++        }
++
++        ped_disk_destroy (disk);
++        ped_device_destroy (dev);
++}
++END_TEST
++
++int
++main (void)
++{
++        int number_failed;
++        Suite* suite = suite_create ("Disk");
++        TCase* tcase_duplicate = tcase_create ("Duplicate");
++
++        /* Fail when an exception is raised */
++        ped_exception_set_handler (_test_exception_handler);
++
++        tcase_add_checked_fixture (tcase_duplicate, create_disk, destroy_disk);
++        tcase_add_test (tcase_duplicate, test_duplicate);
++        /* Disable timeout for this test */
++        tcase_set_timeout (tcase_duplicate, 0);
++        suite_add_tcase (suite, tcase_duplicate);
++
++        SRunner* srunner = srunner_create (suite);
++        srunner_run_all (srunner, CK_VERBOSE);
++
++        number_failed = srunner_ntests_failed (srunner);
++        srunner_free (srunner);
++
++        return (number_failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
++}
+diff --git a/libparted/tests/t2000-disk.sh b/libparted/tests/t2000-disk.sh
+new file mode 100755
+index 0000000..7a85b98
+--- /dev/null
++++ b/libparted/tests/t2000-disk.sh
+@@ -0,0 +1,27 @@
++#!/bin/sh
++
++# Copyright (C) 2007 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++test_description='run the disk unit tests in a directory supporting O_DIRECT'
++# This wrapper around the ./label binary is used to find a directory
++# in which one can open a file with the O_DIRECT flag.
++
++. ./init.sh
++
++test_expect_success \
++    'run the actual tests' 'disk'
++
++test_done
+diff --git a/parted/parted.c b/parted/parted.c
+index 6a606ae..738151b 100644
+--- a/parted/parted.c
++++ b/parted/parted.c
+@@ -1226,7 +1226,7 @@ partition_print (PedPartition* part)
+         putchar ('\n');
+ 
+         flags = partition_print_flags (part);
+-     
++
+         printf (_("Minor: %d\n"), part->num);
+         printf (_("Flags: %s\n"), flags);
+         printf (_("File System: %s\n"), fs->type->name);
+@@ -1264,9 +1264,10 @@ do_print (PedDevice** dev)
+         int             has_free_arg = 0;
+         int             has_list_arg = 0;
+         int             has_num_arg = 0;
+-        char*           transport[13] = {"unknown", "scsi", "ide", "dac960",
++        char*           transport[14] = {"unknown", "scsi", "ide", "dac960",
+                                          "cpqarray", "file", "ataraid", "i2o",
+-                                         "ubd", "dasd", "viodasd", "sx8", "dm"};
++                                         "ubd", "dasd", "viodasd", "sx8", "dm",
++                                         "xvd"};
+         char*           peek_word;
+         char*           start;
+         char*           end;

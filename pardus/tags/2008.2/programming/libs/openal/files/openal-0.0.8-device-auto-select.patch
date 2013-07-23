@@ -1,0 +1,53 @@
+# HG changeset patch
+# User tiwai
+# Date 1183026187 -7200
+# Node ID 3fe389df1d6c3f950a668a27852320dbe9e1d8c3
+# Parent  ccda65649e9791066e706f1c516c1e8daa921b70
+Select ALSA device appropriately according to the given speaker-num config.
+
+diff -r ccda65649e97 -r 3fe389df1d6c src/backends/alc_backend_alsa.c
+--- a/src/backends/alc_backend_alsa.c	Tue Jun 26 13:53:52 2007 +0200
++++ b/src/backends/alc_backend_alsa.c	Thu Jun 28 12:23:07 2007 +0200
+@@ -120,6 +120,7 @@ static void get_out_device_name(char *re
+ static void get_out_device_name(char *retref, size_t retsize)
+ {
+ 	Rcvar rcv;
++	const char *defdev;
+ 
+ 	assert(retref);
+ 
+@@ -135,7 +136,33 @@ static void get_out_device_name(char *re
+ 		}
+ 	}
+ 
+-	strncpy(retref, DEFAULT_DEVICE, retsize);
++	defdev = DEFAULT_DEVICE;
++	rcv = rc_lookup("speaker-num");
++	if (rcv && rc_type(rcv) == ALRC_INTEGER) {
++		ALint s = rc_toint(rcv );
++		switch (s) {
++		case 2:
++			defdev = "default";
++			break;
++		case 4:
++			defdev = "plug:surround40";
++			break;
++		case 5:
++			defdev = "plug:surround50";
++			break;
++		case 6:
++			defdev = "plug:surround51";
++			break;
++		case 7:
++			defdev = "plug:surround70";
++			break;
++		case 8:
++			defdev = "plug:surround71";
++			break;
++		}
++	}
++	
++	strncpy(retref, defdev, retsize);
+ 	retref[retsize - 1] = '\0';
+ }
+ 

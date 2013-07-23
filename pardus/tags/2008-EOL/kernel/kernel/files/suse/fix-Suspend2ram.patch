@@ -1,0 +1,108 @@
+From: Tejun Heo <teheo@novell.com>
+Subject: fix resume on s2ram for 2.6.25.18
+Patch-mainline: no
+References: bnc#439461
+
+Adapted revert of
+commit ffa4da2a25bb4ac08f710ac99827baf48a8f8d57
+fixes resume from suspend to ram on various machines.
+
+Signed-off-by: Tejun Heo <teheo@novell.com>
+Signed-off-by: Frank Seidel <fseidel@suse.de>
+
+---
+ kernel/time/tick-broadcast.c |   57 ++++++++++++++++++-------------------------
+ 1 file changed, 25 insertions(+), 32 deletions(-)
+
+Index: linux-2.6.25-SL110_BRANCH/kernel/time/tick-broadcast.c
+===================================================================
+--- linux-2.6.25-SL110_BRANCH.orig/kernel/time/tick-broadcast.c
++++ linux-2.6.25-SL110_BRANCH/kernel/time/tick-broadcast.c
+@@ -209,7 +209,7 @@ static void tick_do_broadcast_on_off(voi
+ 	struct clock_event_device *bc, *dev;
+ 	struct tick_device *td;
+ 	unsigned long flags, *reason = why;
+-	int cpu, bc_stopped;
++	int cpu;
+ 
+ 	spin_lock_irqsave(&tick_broadcast_lock, flags);
+ 
+@@ -227,8 +227,6 @@ static void tick_do_broadcast_on_off(voi
+ 	if (!tick_device_is_functional(dev))
+ 		goto out;
+ 
+-	bc_stopped = cpus_empty(tick_broadcast_mask);
+-
+ 	switch (*reason) {
+ 	case CLOCK_EVT_NOTIFY_BROADCAST_ON:
+ 	case CLOCK_EVT_NOTIFY_BROADCAST_FORCE:
+@@ -250,10 +248,9 @@ static void tick_do_broadcast_on_off(voi
+ 		break;
+ 	}
+ 
+-	if (cpus_empty(tick_broadcast_mask)) {
+-		if (!bc_stopped)
+-			clockevents_set_mode(bc, CLOCK_EVT_MODE_SHUTDOWN);
+-	} else if (bc_stopped) {
++	if (cpus_empty(tick_broadcast_mask))
++		clockevents_set_mode(bc, CLOCK_EVT_MODE_SHUTDOWN);
++	else {
+ 		if (tick_broadcast_device.mode == TICKDEV_MODE_PERIODIC)
+ 			tick_broadcast_start_periodic(bc);
+ 		else
+@@ -508,34 +505,30 @@ static void tick_broadcast_init_next_eve
+ void tick_broadcast_setup_oneshot(struct clock_event_device *bc)
+ {
+ 	/* Set it up only once ! */
+-	if (bc->event_handler != tick_handle_oneshot_broadcast) {
+-		int was_periodic = bc->mode == CLOCK_EVT_MODE_PERIODIC;
+-		int cpu = smp_processor_id();
+-		cpumask_t mask;
++	int was_periodic = bc->mode == CLOCK_EVT_MODE_PERIODIC;
++	int cpu = smp_processor_id();
++	cpumask_t mask;
+ 
+-		bc->event_handler = tick_handle_oneshot_broadcast;
+-		clockevents_set_mode(bc, CLOCK_EVT_MODE_ONESHOT);
++	bc->event_handler = tick_handle_oneshot_broadcast;
++	clockevents_set_mode(bc, CLOCK_EVT_MODE_ONESHOT);
+ 
+-		/* Take the do_timer update */
+-		tick_do_timer_cpu = cpu;
++	/* Take the do_timer update */
++	tick_do_timer_cpu = cpu;
+ 
+-		/*
+-		 * We must be careful here. There might be other CPUs
+-		 * waiting for periodic broadcast. We need to set the
+-		 * oneshot_mask bits for those and program the
+-		 * broadcast device to fire.
+-		 */
+-		mask = tick_broadcast_mask;
+-		cpu_clear(cpu, mask);
+-		cpus_or(tick_broadcast_oneshot_mask,
+-			tick_broadcast_oneshot_mask, mask);
+-
+-		if (was_periodic && !cpus_empty(mask)) {
+-			tick_broadcast_init_next_event(&mask, tick_next_period);
+-			tick_broadcast_set_event(tick_next_period, 1);
+-		} else
+-			bc->next_event.tv64 = KTIME_MAX;
+-	}
++	/*
++	 * We must be careful here. There might be other CPUs waiting
++	 * for periodic broadcast. We need to set the oneshot_mask
++	 * bits for those and program the broadcast device to fire.
++	 */
++	mask = tick_broadcast_mask;
++	cpu_clear(cpu, mask);
++	cpus_or(tick_broadcast_oneshot_mask, tick_broadcast_oneshot_mask, mask);
++
++	if (was_periodic && !cpus_empty(mask)) {
++		tick_broadcast_init_next_event(&mask, tick_next_period);
++		tick_broadcast_set_event(tick_next_period, 1);
++	} else
++		bc->next_event.tv64 = KTIME_MAX;
+ }
+ 
+ /*

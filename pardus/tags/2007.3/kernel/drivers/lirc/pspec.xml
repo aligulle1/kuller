@@ -1,0 +1,165 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>lirc</Name>
+        <Homepage>http://www.lirc.org</Homepage>
+        <Packager>
+            <Name>Onur Küçük</Name>
+            <Email>onur@pardus.org.tr</Email>
+        </Packager>
+        <License>GPL-2</License>
+        <IsA>app:console</IsA>
+        <IsA>service</IsA>
+        <Summary>Linux Infrared Remote Control system</Summary>
+        <Description>LIRC is a package that allows you to decode and send infra-red signals of many (but not all) commonly used remote controls.</Description>
+        <Archive sha1sum="14579ccd570b73e1ccce9d1ad4c1031c246f07d7" type="tarbz2">http://lirc.sourceforge.net/software/snapshots/lirc-0.8.2pre3.tar.bz2</Archive>
+        <BuildDependencies>
+            <Dependency release="86">kernel-source</Dependency>
+            <Dependency versionFrom="1.0.14">alsa-lib</Dependency>
+            <Dependency versionFrom="18.1">portaudio</Dependency>
+            <Dependency>xorg-server</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <Patch level="1">noparallel.patch</Patch>
+            <Patch level="1">lirc-0.8.1-imon_pad2keys.patch</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>lirc-drivers</Name>
+        <Files>
+            <Path fileType="library" permanent="true">/lib/modules</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>lirc</Name>
+        <PartOf>applications.hardware</PartOf>
+        <RuntimeDependencies>
+            <Dependency release="86">kernel</Dependency>
+            <Dependency versionFrom="1.0.14">alsa-lib</Dependency>
+            <Dependency versionFrom="18.1">portaudio</Dependency>
+            <Dependency>xorg-server</Dependency>
+            <Dependency versionFrom="0.8.2_pre3">lirc-drivers</Dependency>
+            <Dependency releaseFrom="17">comar-api</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="config">/etc</Path>
+            <Path fileType="executable">/usr/bin</Path>
+            <Path fileType="header">/usr/include</Path>
+            <Path fileType="library">/usr/lib</Path>
+            <Path fileType="executable">/usr/sbin</Path>
+            <Path fileType="doc">/usr/share/doc</Path>
+            <Path fileType="man">/usr/share/man</Path>
+        </Files>
+        <AdditionalFiles>
+            <AdditionalFile owner="root" permission="0644" target="/etc/conf.d/lirc">lirc.conf.d</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/etc/udev/rules.d/10-lirc.rules">10-lirc.rules</AdditionalFile>
+        </AdditionalFiles>
+        <Provides>
+            <COMAR script="service.py">System.Service</COMAR>
+        </Provides>
+    </Package>
+
+    <History>
+        <Update release="14">
+            <Date>2007-06-07</Date>
+            <Version>0.8.2_pre3</Version>
+            <Comment>Version bump especially for smp compatibility</Comment>
+            <Name>Onur Küçük</Name>
+            <Email>onur@pardus.org.tr</Email>
+        </Update>
+        <Update release="13">
+            <Date>2007-05-23</Date>
+            <Version>0.8.0</Version>
+            <Comment>Updated Service script.</Comment>
+            <Name>Bahadır Kandemir</Name>
+            <Email>bahadir@pardus.org.tr</Email>
+        </Update>
+        <Update release="12" type="bug">
+            <Date>2007-03-05</Date>
+            <Version>0.8.0</Version>
+            <Comment>Fixed config file for service script, bug #5142</Comment>
+            <Name>Onur Küçük</Name>
+            <Email>onur@pardus.org.tr</Email>
+        </Update>
+        <Update release="11">
+            <Date>2006-11-20</Date>
+            <Version>0.8.0</Version>
+            <Comment>Service script localized</Comment>
+            <Name>Onur Küçük</Name>
+            <Email>onur@pardus.org.tr</Email>
+        </Update>
+        <Update release="10">
+            <Date>2006-10-09</Date>
+            <Version>0.8.0</Version>
+            <Comment>Service script updated.</Comment>
+            <Name>Bahadır Kandemir</Name>
+            <Email>bahadir@pardus.org.tr</Email>
+        </Update>
+        <Update release="9">
+            <Date>2006-09-27</Date>
+            <Version>0.8.0</Version>
+            <Comment>Split the kernel.drivers part</Comment>
+            <Name>Onur Küçük</Name>
+            <Email>onur@pardus.org.tr</Email>
+        </Update>
+        <Update release="8">
+            <Date>2006-09-15</Date>
+            <Version>0.8.0</Version>
+            <Comment>Fix smp + new kernel build, some bttv cards, udev, i2c</Comment>
+            <Name>Onur Küçük</Name>
+            <Email>onur@pardus.org.tr</Email>
+        </Update>
+        <Update release="7">
+            <Date>2006-08-03</Date>
+            <Version>0.8.0</Version>
+            <Comment>Add portaudio dependency</Comment>
+            <Name>Onur Küçük</Name>
+            <Email>onur@pardus.org.tr</Email>
+        </Update>
+        <Update release="6">
+            <Date>2006-05-07</Date>
+            <Version>0.8.0</Version>
+            <Comment>Mudur script + add example configs</Comment>
+            <Name>Onur Küçük</Name>
+            <Email>onur@pardus.org.tr</Email>
+        </Update>
+        <Update release="5">
+            <Date>2006-04-21</Date>
+            <Version>0.8.0</Version>
+            <Comment>Fix 2.6.16 kernel compilation, fix autoconf stuff, install udev.rules</Comment>
+            <Name>Onur Küçük</Name>
+            <Email>onur@pardus.org.tr</Email>
+        </Update>
+        <Update release="4">
+            <Date>2006-01-22</Date>
+            <Version>0.8.0</Version>
+            <Comment>New stable release</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="3">
+            <Date>2005-12-28</Date>
+            <Version>0.8.0_pre3</Version>
+            <Comment>Version bump</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="2">
+            <Date>2005-12-23</Date>
+            <Version>0.8.0_pre1</Version>
+            <Comment>Version bump and build all drivers</Comment>
+            <Name>Onur Küçük</Name>
+            <Email>onur@pardus.org.tr</Email>
+        </Update>
+        <Update release="1">
+            <Date>2005-12-12</Date>
+            <Version>0.7.2</Version>
+            <Comment>First release.</Comment>
+            <Name>Onur Küçük</Name>
+            <Email>onur@pardus.org.tr</Email>
+        </Update>
+    </History>
+</PISI>

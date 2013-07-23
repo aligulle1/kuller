@@ -1,0 +1,43 @@
+--- ntp-stable-4.2.0a-20040616/ntpd/ntpd.c.groups	2004-02-25 06:58:13.000000000 +0100
++++ ntp-stable-4.2.0a-20040616/ntpd/ntpd.c	2004-08-17 13:24:54.597319063 +0200
+@@ -862,10 +862,18 @@
+ 				sw_uid = (uid_t)strtoul(user, &endp, 0);
+ 				if (*endp != '\0') 
+ 					goto getuser;
++
++                                if ((pw = getpwuid(sw_uid)) != NULL) {
++                                        user = strdup(pw->pw_name);
++                                } else {
++					user = (char *)-1;
++                                }
++
+ 			} else {
+ getuser:	
+ 				if ((pw = getpwnam(user)) != NULL) {
+ 					sw_uid = pw->pw_uid;
++					sw_gid = pw->pw_gid;
+ 				} else {
+ 					errno = 0;
+ 					msyslog(LOG_ERR, "Cannot find user `%s'", user);
+@@ -901,6 +909,13 @@
+ 				exit (-1);
+ 			}
+ 		}
++
++		if (user && (user != (char *)-1) && initgroups(user, sw_gid)) {
++                        msyslog(LOG_ERR, "Cannot initgroups() to user `%s': %m", user);
++                        exit (-1);
++                }
++	
++
+ 		if (group && setgid(sw_gid)) {
+ 			msyslog(LOG_ERR, "Cannot setgid() to group `%s': %m", group);
+ 			exit (-1);
+@@ -917,7 +932,6 @@
+ 			msyslog(LOG_ERR, "Cannot seteuid() to user `%s': %m", user);
+ 			exit (-1);
+ 		}
+-	
+ #ifdef HAVE_LINUX_CAPABILITIES
+ 		do {
+ 			/*  We may be running under non-root uid now, but we still hold full root privileges!

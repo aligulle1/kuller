@@ -1,0 +1,42 @@
+From: ak@suse.de
+Subject: Disable APIC error printing
+References: 156576
+Patch-mainline: not planned
+
+ATI chipsets currently do this all the time. It's probably
+mostly harmless
+
+We keep it enabled in mainline to make sure the (hardware?) bug
+is tracked down, but don't bother in the distribution kernels
+with it.
+
+Index: linux-2.6.18/arch/i386/kernel/apic.c
+===================================================================
+--- linux-2.6.18.orig/arch/i386/kernel/apic.c
++++ linux-2.6.18/arch/i386/kernel/apic.c
+@@ -1321,8 +1321,10 @@ fastcall void smp_error_interrupt(struct
+ 	   6: Received illegal vector
+ 	   7: Illegal register address
+ 	*/
++#if 0
+ 	printk (KERN_DEBUG "APIC error on CPU%d: %02lx(%02lx)\n",
+ 	        smp_processor_id(), v , v1);
++#endif
+ 	irq_exit();
+ }
+ 
+Index: linux-2.6.18/arch/x86_64/kernel/apic.c
+===================================================================
+--- linux-2.6.18.orig/arch/x86_64/kernel/apic.c
++++ linux-2.6.18/arch/x86_64/kernel/apic.c
+@@ -1098,8 +1098,10 @@ asmlinkage void smp_error_interrupt(void
+ 	   6: Received illegal vector
+ 	   7: Illegal register address
+ 	*/
++#if 0
+ 	printk (KERN_DEBUG "APIC error on CPU%d: %02x(%02x)\n",
+ 	        smp_processor_id(), v , v1);
++#endif
+ 	irq_exit();
+ }
+ 

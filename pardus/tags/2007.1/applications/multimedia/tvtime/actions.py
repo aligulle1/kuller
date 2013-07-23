@@ -1,0 +1,28 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*- 
+#
+# Copyright 2005 TUBITAK/UEKAE
+# Licensed under the GNU General Public License, version 2.
+# See the file http://www.gnu.org/copyleft/gpl.txt.
+
+from pisi.actionsapi import autotools
+from pisi.actionsapi import pisitools
+from pisi.actionsapi import shelltools
+from pisi.actionsapi import get
+
+def setup():
+    autotools.configure("--enable-nls")
+
+def build():
+    autotools.make()
+    shelltools.cd("po")
+    autotools.make("update-po")
+
+def install():
+    autotools.rawInstall('DESTDIR="%s"' % get.installDIR())
+
+    pisitools.dohtml("docs/html")
+    pisitools.dodoc("ChangeLog", "AUTHORS", "NEWS", "README")
+
+    # We will use our desktop file
+    pisitools.remove("/usr/share/applications/net-tvtime.desktop")

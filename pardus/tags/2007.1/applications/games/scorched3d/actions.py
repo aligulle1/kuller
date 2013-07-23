@@ -1,0 +1,31 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+#
+# Copyright 2007 TUBITAK/UEKAE
+# Licensed under the GNU General Public License, version 2.
+# See the file http://www.gnu.org/copyleft/gpl.txt.
+
+from pisi.actionsapi import autotools
+from pisi.actionsapi import pisitools
+from pisi.actionsapi import shelltools
+from pisi.actionsapi import get
+
+WorkDir = "scorched"
+
+def setup():
+    # too lazy to autoconfigure"
+    pisitools.dosed("configure", "WX_CONFIG_WITH_ARGS --static --libs", "WX_CONFIG_WITH_ARGS --libs")
+
+    autotools.configure("--disable-dependency-tracking \
+                         --datadir=/usr/share/scorched3d \
+                         --with-docdir=/%s/%s \
+                         --with-wx-config=/usr/bin/wx-config"
+                         % (get.docDIR(), get.srcTAG()))
+
+def build():
+    autotools.make()
+
+def install():
+    autotools.rawInstall("DESTDIR=%s" % get.installDIR())
+    pisitools.dodoc("AUTHORS", "COMPILING", "COPYING", "README", "TODO")
+

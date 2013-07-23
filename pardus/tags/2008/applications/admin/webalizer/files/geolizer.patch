@@ -1,0 +1,2786 @@
+diff -adNruX nodiff webalizer-orig/Makefile.MinGW webalizer-2.01-10/Makefile.MinGW
+--- webalizer-orig/Makefile.MinGW	1969-12-31 21:00:00.000000000 -0300
++++ webalizer-2.01-10/Makefile.MinGW	2004-02-15 13:29:27.000000000 -0300
+@@ -0,0 +1,99 @@
++#
++# Makefile for webalizer - a web server logfile analysis thingie
++#
++# (c)1997-2000 by Bradford L. Barrett (brad@mrunix.net)
++# Distributed under the GNU GPL. See "README" and "Copyright"
++# files supplied with this distribution for more information.
++#
++# Modified by Stanislaw Pusep (stanis@linuxmail.org) to work with MinGW/MSYS
++# To build this, first compile all dependencies, check LDFLAGS and then:
++#
++# make distclean
++# make all
++
++#BINDIR	= ${exec_prefix}/bin
++#MANDIR	= ${prefix}/man/man1
++CC	= gcc
++CP	= cp -fp
++#CP	= copy /Y
++RM	= rm -f
++#RM	= del
++
++CFLAGS	= -Wall -Os -IWin32 -I../zlib-1.2.1
++LIBS	= -lgd -lpng -lz -lm -liberty
++LDFLAGS	= -L../gd-2.0.22/.libs -L../libpng-1.2.5 -L../zlib-1.2.1
++DEFS	= -DWIN32 -DHAVE_GETOPT_H=1 -DHAVE_MATH_H=1
++
++# where are the GD header files?
++GDLIB	=../gd-2.0.22
++
++# Uncomment this if compiling with GeoIP support:
++#CFLAGS	+= -I../GeoIP-1.3.1/libGeoIP
++#LIBS	+= -lGeoIP -lwsock32
++#LDFLAGS	+= -L../GeoIP-1.3.1/libGeoIP/.libs
++#DEFS	+= -DUSE_GEOIP=1
++
++# Shouldn't have to touch below here!
++
++all: webalizer.exe
++
++webalizer.exe:	webalizer.o webalizer.h hashtab.o hashtab.h  \
++		linklist.o linklist.h preserve.o preserve.h  \
++                dns_resolv.o dns_resolv.h parser.o parser.h  \
++                output.o output.h graphs.o graphs.h lang.h   \
++		webalizer_lang.h win_port.o
++	$(CC) ${LDFLAGS} -o webalizer.exe webalizer.o hashtab.o linklist.o preserve.o parser.o output.o dns_resolv.o graphs.o win_port.o ${LIBS}
++	strip webalizer.exe
++
++webalizer.o:	webalizer.c webalizer.h parser.h output.h preserve.h \
++		graphs.h dns_resolv.h webalizer_lang.h
++	$(CC) ${CFLAGS} ${DEFS} -c webalizer.c
++
++parser.o:	parser.c parser.h webalizer.h lang.h
++	$(CC) ${CFLAGS} ${DEFS} -c parser.c
++
++hashtab.o:	hashtab.c hashtab.h dns_resolv.h webalizer.h lang.h
++	$(CC) ${CFLAGS} ${DEFS} -c hashtab.c
++
++linklist.o:	linklist.c linklist.h webalizer.h lang.h
++	$(CC) ${CFLAGS} ${DEFS} -c linklist.c
++
++output.o:	output.c output.h webalizer.h preserve.h \
++		hashtab.h graphs.h lang.h
++	$(CC) ${CFLAGS} ${DEFS} -c output.c
++
++preserve.o:	preserve.c preserve.h webalizer.h parser.h   \
++		hashtab.h graphs.h lang.h
++	$(CC) ${CFLAGS} ${DEFS} -c preserve.c
++
++dns_resolv.o:	dns_resolv.c dns_resolv.h lang.h webalizer.h
++	$(CC) ${CFLAGS} ${DEFS} -c dns_resolv.c
++
++graphs.o:	graphs.c graphs.h webalizer.h lang.h
++	$(CC) ${CFLAGS} ${DEFS} -I${GDLIB} -c graphs.c
++
++win_port.o:	Win32/sys/times.h Win32/sys/utsname.h
++	$(CC) ${CFLAGS} ${DEFS} -c win_port.c
++
++clean:
++	$(RM) webalizer.exe *.o usage*.png daily*.png hourly*.png ctry*.png
++	$(RM) *.html *.hist *.current core *.gif
++
++distclean: clean
++	$(RM) webalizer.conf *.tar *.tgz *.Z *.tar.gz
++	$(RM) webalizer_lang.h config.cache config.log config.status
++
++install: all
++	@echo can't install: sorry this is win32 makefile!
++#	$(CP) webalizer.1   ${MANDIR}/webalizer.1
++#	$(CP) webalizer.exe ${BINDIR}/webalizer.exe
++#	$(CP) sample.conf   /etc/webalizer.conf.sample
++
++uninstall:
++	@echo can't uninstall: sorry this is win32 makefile!
++#	$(RM) ${MANDIR}/webalizer.1
++#	$(RM) ${BINDIR}/webalizer.exe
++#	$(RM) /etc/webalizer.conf.sample
++
++webalizer_lang.h:
++	$(CP) lang/webalizer_lang.english webalizer_lang.h
+diff -adNruX nodiff webalizer-orig/Makefile.in webalizer-2.01-10/Makefile.in
+--- webalizer-orig/Makefile.in	2000-10-17 02:15:53.000000000 -0200
++++ webalizer-2.01-10/Makefile.in	2002-08-22 18:05:13.000000000 -0300
+@@ -44,6 +44,7 @@
+                 output.o output.h graphs.o graphs.h lang.h   \
+ 		webalizer_lang.h
+ 	$(CC) ${LDFLAGS} -o webalizer webalizer.o hashtab.o linklist.o preserve.o parser.o output.o dns_resolv.o graphs.o ${LIBS}
++	strip webalizer
+ 	rm -f webazolver
+ 	@LN_S@ webalizer webazolver
+ 
+diff -adNruX nodiff webalizer-orig/Makefile.std webalizer-2.01-10/Makefile.std
+--- webalizer-orig/Makefile.std	2000-10-17 02:15:53.000000000 -0200
++++ webalizer-2.01-10/Makefile.std	2002-08-22 18:04:04.000000000 -0300
+@@ -41,6 +41,10 @@
+ # Some might need this instead (Solaris?!?)
+ #LIBS   = -lgd -lpng -lz -lm -ldb -lnsl -lsocket
+ 
++# Now, if you want to use GeoIP feature... Uncoment this:
++#DEFS   = -DUSE_GEOIP -DETCDIR=\"${ETCDIR}\"
++#LIBS   = -lgd -lpng -lz -lm -lGeoIP
++
+ # If your GD lib was compiled with X/truetype, use this
+ # or some variation of it:
+ 
+@@ -56,6 +60,7 @@
+                 output.o output.h graphs.o graphs.h lang.h   \
+ 		webalizer_lang.h
+ 	$(CC) ${LDFLAGS} -o webalizer webalizer.o hashtab.o linklist.o preserve.o parser.o output.o dns_resolv.o graphs.o ${LIBS}
++	strip webalizer
+ 
+ webalizer.o:	webalizer.c webalizer.h parser.h output.h preserve.h \
+ 		graphs.h dns_resolv.h webalizer_lang.h
+diff -adNruX nodiff webalizer-orig/README.Win32 webalizer-2.01-10/README.Win32
+--- webalizer-orig/README.Win32	1969-12-31 21:00:00.000000000 -0300
++++ webalizer-2.01-10/README.Win32	2004-02-16 15:36:00.000000000 -0300
+@@ -0,0 +1,24 @@
++Info about compiling Webalizer on Win32 platform under MinGW
++============================================================
++
++by Stanislaw Pusep (stanis@linuxmail.org)
++
++
++Wow, since last time I compiled this thingie on MinGW things evolved a lot :)
++Now there's MSYS (http://www.mingw.org/msys.shtml) that closely simulates
++Bash & RXVT so one could simply "./configure; make; make install" on Win32.
++That was exactly what I did to compile zlib, libpng & gd dependencies.
++libGeoIP didn't compiled that fine; I needed to patch the source and I hope
++that libGeoIP 1.3.2 and future releases will have my Win32/MinGW patch
++integrated.
++It's perfectly possible to run configure script for patched webalizer itself
++but I don't thing it's a good idea. If you really wish to do that just set
++appropriate CFLAGS & LDFLAGS. They're almost the same as those set by
++Makefile.MinGW; so why not just "make -f Makefile.MinGW"?!
++So, copy Makefile.MinGW to Makefile, edit it, set proper dependency pathes
++and uncomment GeoIP enabling lines if you got it working :)
++Then simply "make distclean" and "make all". Note that "make distclean" is
++necessary to set proper language header as Win32 doesn't supports symlinks.
++
++
++Have a fun!!!
+diff -adNruX nodiff webalizer-orig/Win32/sys/times.h webalizer-2.01-10/Win32/sys/times.h
+--- webalizer-orig/Win32/sys/times.h	1969-12-31 21:00:00.000000000 -0300
++++ webalizer-2.01-10/Win32/sys/times.h	2002-08-19 15:44:39.000000000 -0300
+@@ -0,0 +1,15 @@
++#ifndef __SYS_TIMES_H
++#define __SYS_TIMES_H
++
++#include <windows.h>
++
++struct tms {
++	clock_t tms_utime;
++	clock_t tms_cstime;
++	clock_t tms_cutime;
++	clock_t tms_stime;
++};
++
++clock_t	times(struct tms *buffer);
++
++#endif
+diff -adNruX nodiff webalizer-orig/Win32/sys/utsname.h webalizer-2.01-10/Win32/sys/utsname.h
+--- webalizer-orig/Win32/sys/utsname.h	1969-12-31 21:00:00.000000000 -0300
++++ webalizer-2.01-10/Win32/sys/utsname.h	2002-08-19 15:44:39.000000000 -0300
+@@ -0,0 +1,14 @@
++#ifndef __SYS_UTSNAME_H
++#define __SYS_UTSNAME_H
++
++#include <windows.h>
++
++struct utsname {
++	char nodename[MAX_COMPUTERNAME_LENGTH + 1];
++	char release[32];
++	char sysname[16];
++};
++
++int	uname(struct utsname *name);
++
++#endif
+diff -adNruX nodiff webalizer-orig/configure webalizer-2.01-10/configure
+--- webalizer-orig/configure	2000-10-06 04:51:48.000000000 -0300
++++ webalizer-2.01-10/configure	2002-08-25 10:20:44.000000000 -0300
+@@ -34,8 +34,14 @@
+ ac_help="$ac_help
+ --with-dblib=DIR          Alternate location for db library"
+ ac_help="$ac_help
++--with-geoip-inc=DIR      Alternate location for GeoIP headers"
++ac_help="$ac_help
++--with-geoip-lib=DIR      Alternate location for GeoIP library"
++ac_help="$ac_help
+ --enable-dns              Enable DNS lookup code"
+ ac_help="$ac_help
++--enable-geoip            Enable GeoIP country lookup"
++ac_help="$ac_help
+ --with-language=language  Use 'language' (default is english)"
+ 
+ # Initialize some variables set by options.
+@@ -557,7 +563,7 @@
+ # Extract the first word of "gcc", so it can be a program name with args.
+ set dummy gcc; ac_word=$2
+ echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
+-echo "configure:561: checking for $ac_word" >&5
++echo "configure:567: checking for $ac_word" >&5
+ if eval "test \"`echo '$''{'ac_cv_prog_CC'+set}'`\" = set"; then
+   echo $ac_n "(cached) $ac_c" 1>&6
+ else
+@@ -587,7 +593,7 @@
+   # Extract the first word of "cc", so it can be a program name with args.
+ set dummy cc; ac_word=$2
+ echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
+-echo "configure:591: checking for $ac_word" >&5
++echo "configure:597: checking for $ac_word" >&5
+ if eval "test \"`echo '$''{'ac_cv_prog_CC'+set}'`\" = set"; then
+   echo $ac_n "(cached) $ac_c" 1>&6
+ else
+@@ -638,7 +644,7 @@
+       # Extract the first word of "cl", so it can be a program name with args.
+ set dummy cl; ac_word=$2
+ echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
+-echo "configure:642: checking for $ac_word" >&5
++echo "configure:648: checking for $ac_word" >&5
+ if eval "test \"`echo '$''{'ac_cv_prog_CC'+set}'`\" = set"; then
+   echo $ac_n "(cached) $ac_c" 1>&6
+ else
+@@ -670,7 +676,7 @@
+ fi
+ 
+ echo $ac_n "checking whether the C compiler ($CC $CFLAGS $LDFLAGS) works""... $ac_c" 1>&6
+-echo "configure:674: checking whether the C compiler ($CC $CFLAGS $LDFLAGS) works" >&5
++echo "configure:680: checking whether the C compiler ($CC $CFLAGS $LDFLAGS) works" >&5
+ 
+ ac_ext=c
+ # CFLAGS is not in ac_cpp because -g, -O, etc. are not valid cpp options.
+@@ -681,12 +687,12 @@
+ 
+ cat > conftest.$ac_ext << EOF
+ 
+-#line 685 "configure"
++#line 691 "configure"
+ #include "confdefs.h"
+ 
+ main(){return(0);}
+ EOF
+-if { (eval echo configure:690: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext}; then
++if { (eval echo configure:696: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext}; then
+   ac_cv_prog_cc_works=yes
+   # If we can't run a trivial program, we are probably using a cross compiler.
+   if (./conftest; exit) 2>/dev/null; then
+@@ -712,12 +718,12 @@
+   { echo "configure: error: installation or configuration problem: C compiler cannot create executables." 1>&2; exit 1; }
+ fi
+ echo $ac_n "checking whether the C compiler ($CC $CFLAGS $LDFLAGS) is a cross-compiler""... $ac_c" 1>&6
+-echo "configure:716: checking whether the C compiler ($CC $CFLAGS $LDFLAGS) is a cross-compiler" >&5
++echo "configure:722: checking whether the C compiler ($CC $CFLAGS $LDFLAGS) is a cross-compiler" >&5
+ echo "$ac_t""$ac_cv_prog_cc_cross" 1>&6
+ cross_compiling=$ac_cv_prog_cc_cross
+ 
+ echo $ac_n "checking whether we are using GNU C""... $ac_c" 1>&6
+-echo "configure:721: checking whether we are using GNU C" >&5
++echo "configure:727: checking whether we are using GNU C" >&5
+ if eval "test \"`echo '$''{'ac_cv_prog_gcc'+set}'`\" = set"; then
+   echo $ac_n "(cached) $ac_c" 1>&6
+ else
+@@ -726,7 +732,7 @@
+   yes;
+ #endif
+ EOF
+-if { ac_try='${CC-cc} -E conftest.c'; { (eval echo configure:730: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }; } | egrep yes >/dev/null 2>&1; then
++if { ac_try='${CC-cc} -E conftest.c'; { (eval echo configure:736: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }; } | egrep yes >/dev/null 2>&1; then
+   ac_cv_prog_gcc=yes
+ else
+   ac_cv_prog_gcc=no
+@@ -745,7 +751,7 @@
+ ac_save_CFLAGS="$CFLAGS"
+ CFLAGS=
+ echo $ac_n "checking whether ${CC-cc} accepts -g""... $ac_c" 1>&6
+-echo "configure:749: checking whether ${CC-cc} accepts -g" >&5
++echo "configure:755: checking whether ${CC-cc} accepts -g" >&5
+ if eval "test \"`echo '$''{'ac_cv_prog_cc_g'+set}'`\" = set"; then
+   echo $ac_n "(cached) $ac_c" 1>&6
+ else
+@@ -777,7 +783,7 @@
+ fi
+ 
+ echo $ac_n "checking whether ln -s works""... $ac_c" 1>&6
+-echo "configure:781: checking whether ln -s works" >&5
++echo "configure:787: checking whether ln -s works" >&5
+ if eval "test \"`echo '$''{'ac_cv_prog_LN_S'+set}'`\" = set"; then
+   echo $ac_n "(cached) $ac_c" 1>&6
+ else
+@@ -828,7 +834,7 @@
+ # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
+ # ./install, which can be erroneously created by make from ./install.sh.
+ echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
+-echo "configure:832: checking for a BSD compatible install" >&5
++echo "configure:838: checking for a BSD compatible install" >&5
+ if test -z "$INSTALL"; then
+ if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
+   echo $ac_n "(cached) $ac_c" 1>&6
+@@ -881,7 +887,7 @@
+ test -z "$INSTALL_DATA" && INSTALL_DATA='${INSTALL} -m 644'
+ 
+ echo $ac_n "checking how to run the C preprocessor""... $ac_c" 1>&6
+-echo "configure:885: checking how to run the C preprocessor" >&5
++echo "configure:891: checking how to run the C preprocessor" >&5
+ # On Suns, sometimes $CPP names a directory.
+ if test -n "$CPP" && test -d "$CPP"; then
+   CPP=
+@@ -896,13 +902,13 @@
+   # On the NeXT, cc -E runs the code through the compiler's parser,
+   # not just through cpp.
+   cat > conftest.$ac_ext <<EOF
+-#line 900 "configure"
++#line 906 "configure"
+ #include "confdefs.h"
+ #include <assert.h>
+ Syntax Error
+ EOF
+ ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
+-{ (eval echo configure:906: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
++{ (eval echo configure:912: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+ ac_err=`grep -v '^ *+' conftest.out | grep -v "^conftest.${ac_ext}\$"`
+ if test -z "$ac_err"; then
+   :
+@@ -913,13 +919,13 @@
+   rm -rf conftest*
+   CPP="${CC-cc} -E -traditional-cpp"
+   cat > conftest.$ac_ext <<EOF
+-#line 917 "configure"
++#line 923 "configure"
+ #include "confdefs.h"
+ #include <assert.h>
+ Syntax Error
+ EOF
+ ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
+-{ (eval echo configure:923: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
++{ (eval echo configure:929: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+ ac_err=`grep -v '^ *+' conftest.out | grep -v "^conftest.${ac_ext}\$"`
+ if test -z "$ac_err"; then
+   :
+@@ -930,13 +936,13 @@
+   rm -rf conftest*
+   CPP="${CC-cc} -nologo -E"
+   cat > conftest.$ac_ext <<EOF
+-#line 934 "configure"
++#line 940 "configure"
+ #include "confdefs.h"
+ #include <assert.h>
+ Syntax Error
+ EOF
+ ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
+-{ (eval echo configure:940: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
++{ (eval echo configure:946: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+ ac_err=`grep -v '^ *+' conftest.out | grep -v "^conftest.${ac_ext}\$"`
+ if test -z "$ac_err"; then
+   :
+@@ -961,14 +967,14 @@
+ echo "$ac_t""$CPP" 1>&6
+ 
+ echo $ac_n "checking whether char is unsigned""... $ac_c" 1>&6
+-echo "configure:965: checking whether char is unsigned" >&5
++echo "configure:971: checking whether char is unsigned" >&5
+ if eval "test \"`echo '$''{'ac_cv_c_char_unsigned'+set}'`\" = set"; then
+   echo $ac_n "(cached) $ac_c" 1>&6
+ else
+   if test "$GCC" = yes; then
+   # GCC predefines this symbol on systems where it applies.
+ cat > conftest.$ac_ext <<EOF
+-#line 972 "configure"
++#line 978 "configure"
+ #include "confdefs.h"
+ #ifdef __CHAR_UNSIGNED__
+   yes
+@@ -990,7 +996,7 @@
+     { echo "configure: error: can not run test program while cross compiling" 1>&2; exit 1; }
+ else
+   cat > conftest.$ac_ext <<EOF
+-#line 994 "configure"
++#line 1000 "configure"
+ #include "confdefs.h"
+ /* volatile prevents gcc2 from optimizing the test away on sparcs.  */
+ #if !defined(__STDC__) || __STDC__ != 1
+@@ -1000,7 +1006,7 @@
+   volatile char c = 255; exit(c < 0);
+ }
+ EOF
+-if { (eval echo configure:1004: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext} && (./conftest; exit) 2>/dev/null
++if { (eval echo configure:1010: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext} && (./conftest; exit) 2>/dev/null
+ then
+   ac_cv_c_char_unsigned=yes
+ else
+@@ -1123,6 +1129,20 @@
+ fi
+ 
+ 
++# Check whether --with-geoip-inc or --without-geoip-inc was given.
++if test "${with_geoip_inc+set}" = set; then
++  withval="$with_geoip_inc"
++  EXTRA_GEOIPINC="${withval}"
++fi
++
++
++# Check whether --with-geoip-lib or --without-geoip-lib was given.
++if test "${with_geoip_lib+set}" = set; then
++  withval="$with_geoip_lib"
++  EXTRA_GEOIPLIB="${withval}"
++fi
++
++
+ # Check whether --enable-dns or --disable-dns was given.
+ if test "${enable_dns+set}" = set; then
+   enableval="$enable_dns"
+@@ -1130,17 +1150,24 @@
+ fi
+ 
+ 
++# Check whether --enable-geoip or --disable-geoip was given.
++if test "${enable_geoip+set}" = set; then
++  enableval="$enable_geoip"
++  USE_GEOIP="yes"
++fi
++
++
+ if test "$USE_DNS" = "yes"; then
+   if test "$HAVE_DB" = ""; then
+     for ac_func in dbopen
+ do
+ echo $ac_n "checking for $ac_func""... $ac_c" 1>&6
+-echo "configure:1139: checking for $ac_func" >&5
++echo "configure:1166: checking for $ac_func" >&5
+ if eval "test \"`echo '$''{'ac_cv_func_$ac_func'+set}'`\" = set"; then
+   echo $ac_n "(cached) $ac_c" 1>&6
+ else
+   cat > conftest.$ac_ext <<EOF
+-#line 1144 "configure"
++#line 1171 "configure"
+ #include "confdefs.h"
+ /* System header to define __stub macros and hopefully few prototypes,
+     which can conflict with char $ac_func(); below.  */
+@@ -1163,7 +1190,7 @@
+ 
+ ; return 0; }
+ EOF
+-if { (eval echo configure:1167: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext}; then
++if { (eval echo configure:1194: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext}; then
+   rm -rf conftest*
+   eval "ac_cv_func_$ac_func=yes"
+ else
+@@ -1190,14 +1217,14 @@
+     if test $ac_cv_func_dbopen = no; then
+       
+ echo $ac_n "checking for library containing dbopen""... $ac_c" 1>&6
+-echo "configure:1194: checking for library containing dbopen" >&5
++echo "configure:1221: checking for library containing dbopen" >&5
+ if eval "test \"`echo '$''{'ac_cv_search_dbopen'+set}'`\" = set"; then
+   echo $ac_n "(cached) $ac_c" 1>&6
+ else
+   ac_func_search_save_LIBS="$LIBS"
+ ac_cv_search_dbopen="no"
+ cat > conftest.$ac_ext <<EOF
+-#line 1201 "configure"
++#line 1228 "configure"
+ #include "confdefs.h"
+ /* Override any gcc2 internal prototype to avoid an error.  */
+ /* We use char because int might match the return type of a gcc2
+@@ -1208,7 +1235,7 @@
+ dbopen()
+ ; return 0; }
+ EOF
+-if { (eval echo configure:1212: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext}; then
++if { (eval echo configure:1239: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext}; then
+   rm -rf conftest*
+   ac_cv_search_dbopen="none required"
+ else
+@@ -1219,7 +1246,7 @@
+ test "$ac_cv_search_dbopen" = "no" && for i in db db1; do
+ LIBS="-l$i  $ac_func_search_save_LIBS"
+ cat > conftest.$ac_ext <<EOF
+-#line 1223 "configure"
++#line 1250 "configure"
+ #include "confdefs.h"
+ /* Override any gcc2 internal prototype to avoid an error.  */
+ /* We use char because int might match the return type of a gcc2
+@@ -1230,7 +1257,7 @@
+ dbopen()
+ ; return 0; }
+ EOF
+-if { (eval echo configure:1234: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext}; then
++if { (eval echo configure:1261: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext}; then
+   rm -rf conftest*
+   ac_cv_search_dbopen="-l$i"
+ break
+@@ -1265,17 +1292,17 @@
+ do
+ ac_safe=`echo "$ac_hdr" | sed 'y%./+-%__p_%'`
+ echo $ac_n "checking for $ac_hdr""... $ac_c" 1>&6
+-echo "configure:1269: checking for $ac_hdr" >&5
++echo "configure:1296: checking for $ac_hdr" >&5
+ if eval "test \"`echo '$''{'ac_cv_header_$ac_safe'+set}'`\" = set"; then
+   echo $ac_n "(cached) $ac_c" 1>&6
+ else
+   cat > conftest.$ac_ext <<EOF
+-#line 1274 "configure"
++#line 1301 "configure"
+ #include "confdefs.h"
+ #include <$ac_hdr>
+ EOF
+ ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
+-{ (eval echo configure:1279: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
++{ (eval echo configure:1306: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+ ac_err=`grep -v '^ *+' conftest.out | grep -v "^conftest.${ac_ext}\$"`
+ if test -z "$ac_err"; then
+   rm -rf conftest*
+@@ -1305,17 +1332,17 @@
+ do
+ ac_safe=`echo "$ac_hdr" | sed 'y%./+-%__p_%'`
+ echo $ac_n "checking for $ac_hdr""... $ac_c" 1>&6
+-echo "configure:1309: checking for $ac_hdr" >&5
++echo "configure:1336: checking for $ac_hdr" >&5
+ if eval "test \"`echo '$''{'ac_cv_header_$ac_safe'+set}'`\" = set"; then
+   echo $ac_n "(cached) $ac_c" 1>&6
+ else
+   cat > conftest.$ac_ext <<EOF
+-#line 1314 "configure"
++#line 1341 "configure"
+ #include "confdefs.h"
+ #include <$ac_hdr>
+ EOF
+ ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
+-{ (eval echo configure:1319: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
++{ (eval echo configure:1346: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+ ac_err=`grep -v '^ *+' conftest.out | grep -v "^conftest.${ac_ext}\$"`
+ if test -z "$ac_err"; then
+   rm -rf conftest*
+@@ -1345,12 +1372,12 @@
+     for ac_func in socket
+ do
+ echo $ac_n "checking for $ac_func""... $ac_c" 1>&6
+-echo "configure:1349: checking for $ac_func" >&5
++echo "configure:1376: checking for $ac_func" >&5
+ if eval "test \"`echo '$''{'ac_cv_func_$ac_func'+set}'`\" = set"; then
+   echo $ac_n "(cached) $ac_c" 1>&6
+ else
+   cat > conftest.$ac_ext <<EOF
+-#line 1354 "configure"
++#line 1381 "configure"
+ #include "confdefs.h"
+ /* System header to define __stub macros and hopefully few prototypes,
+     which can conflict with char $ac_func(); below.  */
+@@ -1373,7 +1400,7 @@
+ 
+ ; return 0; }
+ EOF
+-if { (eval echo configure:1377: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext}; then
++if { (eval echo configure:1404: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext}; then
+   rm -rf conftest*
+   eval "ac_cv_func_$ac_func=yes"
+ else
+@@ -1399,7 +1426,7 @@
+ 
+   if test $ac_cv_func_socket = no; then
+     echo $ac_n "checking for main in -lsocket""... $ac_c" 1>&6
+-echo "configure:1403: checking for main in -lsocket" >&5
++echo "configure:1430: checking for main in -lsocket" >&5
+ ac_lib_var=`echo socket'_'main | sed 'y%./+-%__p_%'`
+ if eval "test \"`echo '$''{'ac_cv_lib_$ac_lib_var'+set}'`\" = set"; then
+   echo $ac_n "(cached) $ac_c" 1>&6
+@@ -1407,14 +1434,14 @@
+   ac_save_LIBS="$LIBS"
+ LIBS="-lsocket  $LIBS"
+ cat > conftest.$ac_ext <<EOF
+-#line 1411 "configure"
++#line 1438 "configure"
+ #include "confdefs.h"
+ 
+ int main() {
+ main()
+ ; return 0; }
+ EOF
+-if { (eval echo configure:1418: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext}; then
++if { (eval echo configure:1445: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext}; then
+   rm -rf conftest*
+   eval "ac_cv_lib_$ac_lib_var=yes"
+ else
+@@ -1439,17 +1466,17 @@
+ do
+ ac_safe=`echo "$ac_hdr" | sed 'y%./+-%__p_%'`
+ echo $ac_n "checking for $ac_hdr""... $ac_c" 1>&6
+-echo "configure:1443: checking for $ac_hdr" >&5
++echo "configure:1470: checking for $ac_hdr" >&5
+ if eval "test \"`echo '$''{'ac_cv_header_$ac_safe'+set}'`\" = set"; then
+   echo $ac_n "(cached) $ac_c" 1>&6
+ else
+   cat > conftest.$ac_ext <<EOF
+-#line 1448 "configure"
++#line 1475 "configure"
+ #include "confdefs.h"
+ #include <$ac_hdr>
+ EOF
+ ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
+-{ (eval echo configure:1453: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
++{ (eval echo configure:1480: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+ ac_err=`grep -v '^ *+' conftest.out | grep -v "^conftest.${ac_ext}\$"`
+ if test -z "$ac_err"; then
+   rm -rf conftest*
+@@ -1476,7 +1503,7 @@
+ done
+ 
+   echo $ac_n "checking for main in -lnsl""... $ac_c" 1>&6
+-echo "configure:1480: checking for main in -lnsl" >&5
++echo "configure:1507: checking for main in -lnsl" >&5
+ ac_lib_var=`echo nsl'_'main | sed 'y%./+-%__p_%'`
+ if eval "test \"`echo '$''{'ac_cv_lib_$ac_lib_var'+set}'`\" = set"; then
+   echo $ac_n "(cached) $ac_c" 1>&6
+@@ -1484,14 +1511,14 @@
+   ac_save_LIBS="$LIBS"
+ LIBS="-lnsl  $LIBS"
+ cat > conftest.$ac_ext <<EOF
+-#line 1488 "configure"
++#line 1515 "configure"
+ #include "confdefs.h"
+ 
+ int main() {
+ main()
+ ; return 0; }
+ EOF
+-if { (eval echo configure:1495: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext}; then
++if { (eval echo configure:1522: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext}; then
+   rm -rf conftest*
+   eval "ac_cv_lib_$ac_lib_var=yes"
+ else
+@@ -1514,7 +1541,7 @@
+ fi
+ 
+ echo $ac_n "checking for main in -l44bsd""... $ac_c" 1>&6
+-echo "configure:1518: checking for main in -l44bsd" >&5
++echo "configure:1545: checking for main in -l44bsd" >&5
+ ac_lib_var=`echo 44bsd'_'main | sed 'y%./+-%__p_%'`
+ if eval "test \"`echo '$''{'ac_cv_lib_$ac_lib_var'+set}'`\" = set"; then
+   echo $ac_n "(cached) $ac_c" 1>&6
+@@ -1522,14 +1549,14 @@
+   ac_save_LIBS="$LIBS"
+ LIBS="-l44bsd  $LIBS"
+ cat > conftest.$ac_ext <<EOF
+-#line 1526 "configure"
++#line 1553 "configure"
+ #include "confdefs.h"
+ 
+ int main() {
+ main()
+ ; return 0; }
+ EOF
+-if { (eval echo configure:1533: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext}; then
++if { (eval echo configure:1560: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext}; then
+   rm -rf conftest*
+   eval "ac_cv_lib_$ac_lib_var=yes"
+ else
+@@ -1551,7 +1578,7 @@
+ 
+ 
+ echo $ac_n "checking for main in -lm""... $ac_c" 1>&6
+-echo "configure:1555: checking for main in -lm" >&5
++echo "configure:1582: checking for main in -lm" >&5
+ ac_lib_var=`echo m'_'main | sed 'y%./+-%__p_%'`
+ if eval "test \"`echo '$''{'ac_cv_lib_$ac_lib_var'+set}'`\" = set"; then
+   echo $ac_n "(cached) $ac_c" 1>&6
+@@ -1559,14 +1586,14 @@
+   ac_save_LIBS="$LIBS"
+ LIBS="-lm  $LIBS"
+ cat > conftest.$ac_ext <<EOF
+-#line 1563 "configure"
++#line 1590 "configure"
+ #include "confdefs.h"
+ 
+ int main() {
+ main()
+ ; return 0; }
+ EOF
+-if { (eval echo configure:1570: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext}; then
++if { (eval echo configure:1597: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext}; then
+   rm -rf conftest*
+   eval "ac_cv_lib_$ac_lib_var=yes"
+ else
+@@ -1588,7 +1615,7 @@
+ 
+ 
+ echo $ac_n "checking for main in -lz""... $ac_c" 1>&6
+-echo "configure:1592: checking for main in -lz" >&5
++echo "configure:1619: checking for main in -lz" >&5
+ ac_lib_var=`echo z'_'main | sed 'y%./+-%__p_%'`
+ if eval "test \"`echo '$''{'ac_cv_lib_$ac_lib_var'+set}'`\" = set"; then
+   echo $ac_n "(cached) $ac_c" 1>&6
+@@ -1596,14 +1623,14 @@
+   ac_save_LIBS="$LIBS"
+ LIBS="-lz  $LIBS"
+ cat > conftest.$ac_ext <<EOF
+-#line 1600 "configure"
++#line 1627 "configure"
+ #include "confdefs.h"
+ 
+ int main() {
+ main()
+ ; return 0; }
+ EOF
+-if { (eval echo configure:1607: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext}; then
++if { (eval echo configure:1634: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext}; then
+   rm -rf conftest*
+   eval "ac_cv_lib_$ac_lib_var=yes"
+ else
+@@ -1628,7 +1655,7 @@
+   { echo "configure: error: z library not found... please install zlib." 1>&2; exit 1; }
+ else
+  echo $ac_n "checking for gzrewind in -lz""... $ac_c" 1>&6
+-echo "configure:1632: checking for gzrewind in -lz" >&5
++echo "configure:1659: checking for gzrewind in -lz" >&5
+ ac_lib_var=`echo z'_'gzrewind | sed 'y%./+-%__p_%'`
+ if eval "test \"`echo '$''{'ac_cv_lib_$ac_lib_var'+set}'`\" = set"; then
+   echo $ac_n "(cached) $ac_c" 1>&6
+@@ -1636,7 +1663,7 @@
+   ac_save_LIBS="$LIBS"
+ LIBS="-lz  $LIBS"
+ cat > conftest.$ac_ext <<EOF
+-#line 1640 "configure"
++#line 1667 "configure"
+ #include "confdefs.h"
+ /* Override any gcc2 internal prototype to avoid an error.  */
+ /* We use char because int might match the return type of a gcc2
+@@ -1647,7 +1674,7 @@
+ gzrewind()
+ ; return 0; }
+ EOF
+-if { (eval echo configure:1651: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext}; then
++if { (eval echo configure:1678: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext}; then
+   rm -rf conftest*
+   eval "ac_cv_lib_$ac_lib_var=yes"
+ else
+@@ -1674,7 +1701,7 @@
+ fi
+ 
+ echo $ac_n "checking for main in -lpng""... $ac_c" 1>&6
+-echo "configure:1678: checking for main in -lpng" >&5
++echo "configure:1705: checking for main in -lpng" >&5
+ ac_lib_var=`echo png'_'main | sed 'y%./+-%__p_%'`
+ if eval "test \"`echo '$''{'ac_cv_lib_$ac_lib_var'+set}'`\" = set"; then
+   echo $ac_n "(cached) $ac_c" 1>&6
+@@ -1682,14 +1709,14 @@
+   ac_save_LIBS="$LIBS"
+ LIBS="-lpng  $LIBS"
+ cat > conftest.$ac_ext <<EOF
+-#line 1686 "configure"
++#line 1713 "configure"
+ #include "confdefs.h"
+ 
+ int main() {
+ main()
+ ; return 0; }
+ EOF
+-if { (eval echo configure:1693: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext}; then
++if { (eval echo configure:1720: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext}; then
+   rm -rf conftest*
+   eval "ac_cv_lib_$ac_lib_var=yes"
+ else
+@@ -1717,7 +1744,7 @@
+ if test "$EXTRA_GD" = ""; then
+   if test "$EXTRA_GDLIB" = ""; then
+    echo $ac_n "checking for gdImagePng in -lgd""... $ac_c" 1>&6
+-echo "configure:1721: checking for gdImagePng in -lgd" >&5
++echo "configure:1748: checking for gdImagePng in -lgd" >&5
+ ac_lib_var=`echo gd'_'gdImagePng | sed 'y%./+-%__p_%'`
+ if eval "test \"`echo '$''{'ac_cv_lib_$ac_lib_var'+set}'`\" = set"; then
+   echo $ac_n "(cached) $ac_c" 1>&6
+@@ -1725,7 +1752,7 @@
+   ac_save_LIBS="$LIBS"
+ LIBS="-lgd  $LIBS"
+ cat > conftest.$ac_ext <<EOF
+-#line 1729 "configure"
++#line 1756 "configure"
+ #include "confdefs.h"
+ /* Override any gcc2 internal prototype to avoid an error.  */
+ /* We use char because int might match the return type of a gcc2
+@@ -1736,7 +1763,7 @@
+ gdImagePng()
+ ; return 0; }
+ EOF
+-if { (eval echo configure:1740: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext}; then
++if { (eval echo configure:1767: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext}; then
+   rm -rf conftest*
+   eval "ac_cv_lib_$ac_lib_var=yes"
+ else
+@@ -1763,7 +1790,7 @@
+ if test "$HAVE_LIBGD" = ""; then
+  
+ echo $ac_n "checking for libgd.a""... $ac_c" 1>&6
+-echo "configure:1767: checking for libgd.a" >&5
++echo "configure:1794: checking for libgd.a" >&5
+ if eval "test \"`echo '$''{'ac_cv_GDLOC'+set}'`\" = set"; then
+   echo $ac_n "(cached) $ac_c" 1>&6
+ else
+@@ -1791,7 +1818,7 @@
+  if test "$GDLOC" = ""; then
+    
+ echo $ac_n "checking for libgd.so""... $ac_c" 1>&6
+-echo "configure:1795: checking for libgd.so" >&5
++echo "configure:1822: checking for libgd.so" >&5
+ if eval "test \"`echo '$''{'ac_cv_GDLOC'+set}'`\" = set"; then
+   echo $ac_n "(cached) $ac_c" 1>&6
+ else
+@@ -1827,7 +1854,7 @@
+ 
+ 
+ echo $ac_n "checking for gd.h""... $ac_c" 1>&6
+-echo "configure:1831: checking for gd.h" >&5
++echo "configure:1858: checking for gd.h" >&5
+ if eval "test \"`echo '$''{'ac_cv_GDLIB'+set}'`\" = set"; then
+   echo $ac_n "(cached) $ac_c" 1>&6
+ else
+@@ -1856,21 +1883,136 @@
+  { echo "configure: error: gd headers not found... please install gd." 1>&2; exit 1; }
+ fi
+ 
++if test "$USE_GEOIP" = "yes"; then
++  
++echo $ac_n "checking for GeoIP.h""... $ac_c" 1>&6
++echo "configure:1890: checking for GeoIP.h" >&5
++if eval "test \"`echo '$''{'ac_cv_GEOIPINC'+set}'`\" = set"; then
++  echo $ac_n "(cached) $ac_c" 1>&6
++else
++  ac_cv_GEOIPINC=""
++fi
++
++INPATH=$ac_cv_GEOIPINC
++if test "$INPATH" = ""; then
++ for i in ${PREFIX}/include /usr/local/include /usr/include /include ${prefix}/include ./ ${EXTRA_GEOIPINC}; do
++   if test -f "$i/GeoIP.h"; then
++   INPATH=$i
++   fi
++ done
++fi
++
++if test "$INPATH" = ""; then
++echo "$ac_t""no" 1>&6
++GEOIPINC=""
++else
++echo "$ac_t""$INPATH" 1>&6
++GEOIPINC=$INPATH
++fi
++ac_cv_GEOIPINC=$GEOIPINC
++
++ if test "$GEOIPINC" = ""; then
++  { echo "configure: error: GeoIP headers not found... please install GeoIP." 1>&2; exit 1; }
++ else
++  CFLAGS="-I${GEOIPINC} ${CFLAGS}"
++ fi
++
++  
++echo $ac_n "checking for libGeoIP.so""... $ac_c" 1>&6
++echo "configure:1923: checking for libGeoIP.so" >&5
++if eval "test \"`echo '$''{'ac_cv_GEOIPLIB'+set}'`\" = set"; then
++  echo $ac_n "(cached) $ac_c" 1>&6
++else
++  ac_cv_GEOIPLIB=""
++fi
++
++INPATH=$ac_cv_GEOIPLIB
++if test "$INPATH" = ""; then
++ for i in ${PREFIX}/lib /usr/local/lib /usr/lib /lib ${prefix}/lib ./ ${EXTRA_GEOIPLIB}; do
++   if test -f "$i/libGeoIP.so"; then
++   INPATH=$i
++   fi
++ done
++fi
++
++if test "$INPATH" = ""; then
++echo "$ac_t""no" 1>&6
++GEOIPLIB=""
++else
++echo "$ac_t""$INPATH" 1>&6
++GEOIPLIB=$INPATH
++fi
++ac_cv_GEOIPLIB=$GEOIPLIB
++
++ if test "$GEOIPLIB" = ""; then
++  { echo "configure: error: GeoIP library not found... please install GeoIP." 1>&2; exit 1; }
++ else
++  LDFLAGS="-L${GEOIPLIB} ${LDFLAGS}"
++ fi
++
++ echo $ac_n "checking for GeoIP_new in -lGeoIP""... $ac_c" 1>&6
++echo "configure:1955: checking for GeoIP_new in -lGeoIP" >&5
++ac_lib_var=`echo GeoIP'_'GeoIP_new | sed 'y%./+-%__p_%'`
++if eval "test \"`echo '$''{'ac_cv_lib_$ac_lib_var'+set}'`\" = set"; then
++  echo $ac_n "(cached) $ac_c" 1>&6
++else
++  ac_save_LIBS="$LIBS"
++LIBS="-lGeoIP  $LIBS"
++cat > conftest.$ac_ext <<EOF
++#line 1963 "configure"
++#include "confdefs.h"
++/* Override any gcc2 internal prototype to avoid an error.  */
++/* We use char because int might match the return type of a gcc2
++    builtin and then its argument prototype would still apply.  */
++char GeoIP_new();
++
++int main() {
++GeoIP_new()
++; return 0; }
++EOF
++if { (eval echo configure:1974: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext}; then
++  rm -rf conftest*
++  eval "ac_cv_lib_$ac_lib_var=yes"
++else
++  echo "configure: failed program was:" >&5
++  cat conftest.$ac_ext >&5
++  rm -rf conftest*
++  eval "ac_cv_lib_$ac_lib_var=no"
++fi
++rm -f conftest*
++LIBS="$ac_save_LIBS"
++
++fi
++if eval "test \"`echo '$ac_cv_lib_'$ac_lib_var`\" = yes"; then
++  echo "$ac_t""yes" 1>&6
++  LIBS="-lGeoIP ${LIBS}"
++else
++  echo "$ac_t""no" 1>&6
++LIBGEOIP="no"
++fi
++
++  if test "$LIBGEOIP" = "no"; then
++   { echo "configure: error: GeoIP library not functional... please install GeoIP." 1>&2; exit 1; }
++  else
++   OPTS="-DUSE_GEOIP ${OPTS}"
++  fi
++fi
++
+ for ac_hdr in getopt.h
+ do
+ ac_safe=`echo "$ac_hdr" | sed 'y%./+-%__p_%'`
+ echo $ac_n "checking for $ac_hdr""... $ac_c" 1>&6
+-echo "configure:1864: checking for $ac_hdr" >&5
++echo "configure:2006: checking for $ac_hdr" >&5
+ if eval "test \"`echo '$''{'ac_cv_header_$ac_safe'+set}'`\" = set"; then
+   echo $ac_n "(cached) $ac_c" 1>&6
+ else
+   cat > conftest.$ac_ext <<EOF
+-#line 1869 "configure"
++#line 2011 "configure"
+ #include "confdefs.h"
+ #include <$ac_hdr>
+ EOF
+ ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
+-{ (eval echo configure:1874: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
++{ (eval echo configure:2016: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+ ac_err=`grep -v '^ *+' conftest.out | grep -v "^conftest.${ac_ext}\$"`
+ if test -z "$ac_err"; then
+   rm -rf conftest*
+@@ -1901,17 +2043,17 @@
+ do
+ ac_safe=`echo "$ac_hdr" | sed 'y%./+-%__p_%'`
+ echo $ac_n "checking for $ac_hdr""... $ac_c" 1>&6
+-echo "configure:1905: checking for $ac_hdr" >&5
++echo "configure:2047: checking for $ac_hdr" >&5
+ if eval "test \"`echo '$''{'ac_cv_header_$ac_safe'+set}'`\" = set"; then
+   echo $ac_n "(cached) $ac_c" 1>&6
+ else
+   cat > conftest.$ac_ext <<EOF
+-#line 1910 "configure"
++#line 2052 "configure"
+ #include "confdefs.h"
+ #include <$ac_hdr>
+ EOF
+ ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
+-{ (eval echo configure:1915: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
++{ (eval echo configure:2057: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+ ac_err=`grep -v '^ *+' conftest.out | grep -v "^conftest.${ac_ext}\$"`
+ if test -z "$ac_err"; then
+   rm -rf conftest*
+@@ -1940,7 +2082,7 @@
+ fi
+ 
+ echo $ac_n "checking default config dir""... $ac_c" 1>&6
+-echo "configure:1944: checking default config dir" >&5
++echo "configure:2086: checking default config dir" >&5
+ if test "$CACHE_ETC" = "yes"; then
+  if eval "test \"`echo '$''{'ac_cv_etcdir'+set}'`\" = set"; then
+   echo $ac_n "(cached) $ac_c" 1>&6
+@@ -1965,7 +2107,7 @@
+ 
+ if test "$WEBALIZER_LANG" = "no"; then WEBALIZER_LANG=english; fi
+ echo $ac_n "checking for language file""... $ac_c" 1>&6
+-echo "configure:1969: checking for language file" >&5
++echo "configure:2111: checking for language file" >&5
+ if test "$LANG_CACHE" = "yes"; then
+ if eval "test \"`echo '$''{'ac_cv_language'+set}'`\" = set"; then
+   echo $ac_n "(cached) $ac_c" 1>&6
+@@ -2147,6 +2289,8 @@
+ s%@CPP@%$CPP%g
+ s%@GDLOC@%$GDLOC%g
+ s%@GDLIB@%$GDLIB%g
++s%@GEOIPINC@%$GEOIPINC%g
++s%@GEOIPLIB@%$GEOIPLIB%g
+ s%@ETCDIR@%$ETCDIR%g
+ 
+ CEOF
+diff -adNruX nodiff webalizer-orig/configure.in webalizer-2.01-10/configure.in
+--- webalizer-orig/configure.in	2000-10-06 04:51:49.000000000 -0300
++++ webalizer-2.01-10/configure.in	2002-08-25 10:20:35.000000000 -0300
+@@ -62,10 +62,20 @@
+ AC_ARG_WITH(dblib,--with-dblib=DIR          Alternate location for db library,
+ LDFLAGS="-L${withval} ${LDFLAGS}"; HAVE_DB="yes", HAVE_DB="")
+ 
++AC_ARG_WITH(geoip-inc,--with-geoip-inc=DIR      Alternate location for GeoIP headers,
++EXTRA_GEOIPINC="${withval}")
++
++AC_ARG_WITH(geoip-lib,--with-geoip-lib=DIR      Alternate location for GeoIP library,
++EXTRA_GEOIPLIB="${withval}")
++
+ dnl enable-dns forces use of DNS code
+ AC_ARG_ENABLE(dns,--enable-dns              Enable DNS lookup code,
+ USE_DNS="yes")
+ 
++dnl enable-geoip forces use of GeoIP library
++AC_ARG_ENABLE(geoip,--enable-geoip            Enable GeoIP country lookup,
++USE_GEOIP="yes")
++
+ dnl DNS library check
+ if test "$USE_DNS" = "yes"; then
+   if test "$HAVE_DB" = ""; then
+@@ -146,6 +156,32 @@
+  AC_MSG_ERROR(gd headers not found... please install gd.)
+ fi
+ 
++dnl Check GeoIP if user wants it
++if test "$USE_GEOIP" = "yes"; then
++ dnl Check for GeoIP headers
++ AC_FIND_PATH(GEOIPINC,GeoIP.h,"", ${PREFIX}/include /usr/local/include /usr/include /include ${prefix}/include ./ ${EXTRA_GEOIPINC})
++ if test "$GEOIPINC" = ""; then
++  AC_MSG_ERROR(GeoIP headers not found... please install GeoIP.)
++ else
++  CFLAGS="-I${GEOIPINC} ${CFLAGS}"
++ fi
++
++ dnl Check for GeoIP library
++ AC_FIND_PATH(GEOIPLIB,libGeoIP.so,"", ${PREFIX}/lib /usr/local/lib /usr/lib /lib ${prefix}/lib ./ ${EXTRA_GEOIPLIB})
++ if test "$GEOIPLIB" = ""; then
++  AC_MSG_ERROR(GeoIP library not found... please install GeoIP.)
++ else
++  LDFLAGS="-L${GEOIPLIB} ${LDFLAGS}"
++ fi
++
++ AC_CHECK_LIB(GeoIP, GeoIP_new, LIBS="-lGeoIP ${LIBS}", LIBGEOIP="no")
++  if test "$LIBGEOIP" = "no"; then
++   AC_MSG_ERROR(GeoIP library not functional... please install GeoIP.)
++  else
++   OPTS="-DUSE_GEOIP ${OPTS}"
++  fi
++fi
++
+ dnl additonal platform specific checks
+ AC_CHECK_HEADERS(getopt.h)
+ if test "$HAVE_LIBM" = "1"; then
+diff -adNruX nodiff webalizer-orig/country-codes.txt webalizer-2.01-10/country-codes.txt
+--- webalizer-orig/country-codes.txt	2000-09-29 00:49:25.000000000 -0300
++++ webalizer-2.01-10/country-codes.txt	2002-08-19 15:50:24.000000000 -0300
+@@ -7,6 +7,7 @@
+ AM   Armenia
+ AN   Netherlands Antilles
+ AO   Angola
++AP   Asia/Pacific Region
+ AQ   Antarctica
+ AR   Argentina
+ AS   American Samoa
+@@ -35,6 +36,7 @@
+ BZ   Belize
+ CA   Canada
+ CC   Cocos (Keeling) Islands
++CD   Congo
+ CF   Central African Republic
+ CG   Congo
+ CH   Switzerland
+@@ -64,6 +66,7 @@
+ ER   Eritrea
+ ES   Spain
+ ET   Ethiopia
++EU   Europe
+ FI   Finland
+ FJ   Fiji
+ FK   Falkland Islands (Malvinas)
+@@ -174,6 +177,7 @@
+ PM   St. Pierre and Miquelon
+ PN   Pitcairn
+ PR   Puerto Rico
++PS   Palestinian Territory
+ PT   Portugal
+ PW   Palau
+ PY   Paraguay
+@@ -183,7 +187,7 @@
+ RU   Russian Federation
+ RW   Rwanda
+ SA   Saudi Arabia
+-Sb   Solomon Islands
++SB   Solomon Islands
+ SC   Seychelles
+ SD   Sudan
+ SE   Sweden
+@@ -230,7 +234,7 @@
+ VE   Venezuela
+ VG   Virgin Islands (British)
+ VI   Virgin Islands (U.S.)
+-VN   Viet Nam
++VN   Vietnam
+ VU   Vanuatu
+ WF   Wallis and Futuna Islands
+ WS   Samoa
+@@ -241,12 +245,14 @@
+ ZM   Zambia
+ ZR   Zaire
+ ZW   Zimbabwe
+-COM   US Commercial
+-EDU   US Educational
+-GOV   US Government
+-INT   International
+-MIL   US Military
+-NET   Network
+-ORG   Non-Profit Organization
+-ARPA   Old style Arpanet
+-NATO   Nato field
++COM  US Commercial
++EDU  US Educational
++GOV  US Government
++INT  International (int)
++MIL  US Military
++NET  Network
++ORG  Non-Profit Organization
++ARPA Old style Arpanet (arpa)
++NATO Nato field (nato)
++A1   Anonymous Proxy
++A2   Satellite Provider
+diff -adNruX nodiff webalizer-orig/lang/webalizer_lang.english webalizer-2.01-10/lang/webalizer_lang.english
+--- webalizer-orig/lang/webalizer_lang.english	2000-10-06 02:27:48.000000000 -0300
++++ webalizer-2.01-10/lang/webalizer_lang.english	2005-05-20 14:38:07.000000000 -0300
+@@ -154,6 +154,8 @@
+          "-X        = Hide individual sites"               ,
+          "-D name   = Use DNS Cache file 'name'"           ,
+          "-N num    = Number of DNS processes (0=disable)" ,
++         "-w        = Disable GeoIP feature"               ,
++         "-W file   = Use specific GeoIP database 'file'"  ,
+          NULL};
+ 
+ /***********************************************************************/
+@@ -334,6 +336,8 @@
+ { IDX_3C('o','r','g'),    "Non-Profit Organization",          0,0,0 },
+ { IDX_4C('a','r','p','a'),"Old style Arpanet (arpa)",         0,0,0 },
+ { IDX_4C('n','a','t','o'),"Nato field (nato)",                0,0,0 },
++{ IDX_2C('a','1'),        "Anonymous Proxy",                  0,0,0 },
++{ IDX_2C('a','2'),        "Satellite Provider",               0,0,0 },
+ { IDX_2C('a','d'),        "Andorra",                          0,0,0 },
+ { IDX_2C('a','e'),        "United Arab Emirates",             0,0,0 },
+ { IDX_2C('a','f'),        "Afghanistan",                      0,0,0 },
+@@ -343,6 +347,7 @@
+ { IDX_2C('a','m'),        "Armenia",                          0,0,0 },
+ { IDX_2C('a','n'),        "Netherlands Antilles",             0,0,0 },
+ { IDX_2C('a','o'),        "Angola",                           0,0,0 },
++{ IDX_2C('a','p'),        "Asia/Pacific Region",              0,0,0 },
+ { IDX_2C('a','q'),        "Antarctica",                       0,0,0 },
+ { IDX_2C('a','r'),        "Argentina",                        0,0,0 },
+ { IDX_2C('a','s'),        "American Samoa",                   0,0,0 },
+@@ -371,6 +376,7 @@
+ { IDX_2C('b','z'),        "Belize",                           0,0,0 },
+ { IDX_2C('c','a'),        "Canada",                           0,0,0 },
+ { IDX_2C('c','c'),        "Cocos (Keeling) Islands",          0,0,0 },
++{ IDX_2C('c','d'),        "Congo",                            0,0,0 },
+ { IDX_2C('c','f'),        "Central African Republic",         0,0,0 },
+ { IDX_2C('c','g'),        "Congo",                            0,0,0 },
+ { IDX_2C('c','h'),        "Switzerland",                      0,0,0 },
+@@ -400,6 +406,7 @@
+ { IDX_2C('e','r'),        "Eritrea",                          0,0,0 },
+ { IDX_2C('e','s'),        "Spain",                            0,0,0 },
+ { IDX_2C('e','t'),        "Ethiopia",                         0,0,0 },
++{ IDX_2C('e','u'),        "Europe",                           0,0,0 },
+ { IDX_2C('f','i'),        "Finland",                          0,0,0 },
+ { IDX_2C('f','j'),        "Fiji",                             0,0,0 },
+ { IDX_2C('f','k'),        "Falkland Islands (Malvinas)",      0,0,0 },
+@@ -510,6 +517,7 @@
+ { IDX_2C('p','m'),        "St. Pierre and Miquelon",          0,0,0 },
+ { IDX_2C('p','n'),        "Pitcairn",                         0,0,0 },
+ { IDX_2C('p','r'),        "Puerto Rico",                      0,0,0 },
++{ IDX_2C('p','s'),        "Palestinian Territory",            0,0,0 },
+ { IDX_2C('p','t'),        "Portugal",                         0,0,0 },
+ { IDX_2C('p','w'),        "Palau",                            0,0,0 },
+ { IDX_2C('p','y'),        "Paraguay",                         0,0,0 },
+@@ -519,7 +527,7 @@
+ { IDX_2C('r','u'),        "Russian Federation",               0,0,0 },
+ { IDX_2C('r','w'),        "Rwanda",                           0,0,0 },
+ { IDX_2C('s','a'),        "Saudi Arabia",                     0,0,0 },
+-{ IDX_2C('s','B'),        "Solomon Islands",                  0,0,0 },
++{ IDX_2C('s','b'),        "Solomon Islands",                  0,0,0 },
+ { IDX_2C('s','c'),        "Seychelles",                       0,0,0 },
+ { IDX_2C('s','d'),        "Sudan",                            0,0,0 },
+ { IDX_2C('s','e'),        "Sweden",                           0,0,0 },
+@@ -566,7 +574,7 @@
+ { IDX_2C('v','e'),        "Venezuela",                        0,0,0 },
+ { IDX_2C('v','g'),        "Virgin Islands (British)",         0,0,0 },
+ { IDX_2C('v','i'),        "Virgin Islands (U.S.)",            0,0,0 },
+-{ IDX_2C('v','n'),        "Viet Nam",                         0,0,0 },
++{ IDX_2C('v','n'),        "Vietnam",                          0,0,0 },
+ { IDX_2C('v','u'),        "Vanuatu",                          0,0,0 },
+ { IDX_2C('w','f'),        "Wallis and Futuna Islands",        0,0,0 },
+ { IDX_2C('w','s'),        "Samoa",                            0,0,0 },
+diff -adNruX nodiff webalizer-orig/linklist.c webalizer-2.01-10/linklist.c
+--- webalizer-orig/linklist.c	2001-06-15 05:34:24.000000000 -0300
++++ webalizer-2.01-10/linklist.c	2005-05-20 15:09:01.000000000 -0300
+@@ -190,12 +190,12 @@
+ int add_glist(char *str, GLISTPTR *list)
+ {
+    GLISTPTR newptr,cptr,pptr;
+-   char temp_buf[80];
++   char temp_buf[256];
+    char *name=temp_buf;
+ 
+    /* make local copy of string */
+-   strncpy(temp_buf,str,79);
+-   temp_buf[79]=0;
++   strncpy(temp_buf,str,255);
++   temp_buf[255]=0;
+ 
+    while (!isspace((int)*name)&&*name!=0) name++;
+    if (*name==0) name=temp_buf;
+diff -adNruX nodiff webalizer-orig/output.c webalizer-2.01-10/output.c
+--- webalizer-orig/output.c	2001-06-15 05:34:24.000000000 -0300
++++ webalizer-2.01-10/output.c	2005-05-20 14:51:00.000000000 -0300
+@@ -59,6 +59,13 @@
+ #define CLK_TCK _SC_CLK_TCK
+ #endif
+ 
++/* GeoIP stuff */
++#ifdef USE_GEOIP
++#include <GeoIP.h>
++extern GeoIP *gi;
++#define GEOIP_OK(r) ((r!=NULL)&&(r[0]!='-')&&(r[1]!='-'))
++#endif	/* USE_GEOIP */
++
+ #include "webalizer.h"                        /* main header              */
+ #include "lang.h"
+ #include "hashtab.h"
+@@ -100,6 +107,8 @@
+ int     qs_ident_cmph(const void*, const void*);    /* compare by hits     */
+ int     qs_ident_cmpk(const void*, const void*);    /* compare by kbytes   */
+ 
++const char *hr_size(unsigned long long int size);   /* human readable size */
++
+ int     all_sites_page(u_long, u_long);             /* output site page    */
+ int     all_urls_page(u_long, u_long);              /* output urls page    */
+ int     all_refs_page(u_long, u_long);              /* output refs page    */
+@@ -140,6 +149,10 @@
+ 
+ FILE     *out_fp;
+ 
++/* human readable size warp buffer */
++char warpbuf[32][32];
++int wb_index = -1;
++
+ /*********************************************/
+ /* WRITE_HTML_HEAD - output top of HTML page */
+ /*********************************************/
+@@ -207,7 +220,12 @@
+    }
+    fprintf(out_fp,"<H2>%s %s</H2>\n",msg_title, hname);
+    fprintf(out_fp,"<SMALL><STRONG>\n%s: %s<BR>\n",msg_hhdr_sp,period);
+-   fprintf(out_fp,"%s %s<BR>\n</STRONG></SMALL>\n",msg_hhdr_gt,cur_time());
++   fprintf(out_fp,"%s %s<BR>\n",msg_hhdr_gt,cur_time());
++#ifdef USE_GEOIP
++   if (use_geoip)
++      fprintf(out_fp,"%s<BR>\n", gi_db_info);
++#endif	/* USE_GEOIP */
++   fprintf(out_fp, "</STRONG></SMALL>\n");
+    lptr=html_post;
+    while (lptr!=NULL)
+    {
+@@ -234,6 +252,12 @@
+    fprintf(out_fp,"<SMALL>Generated by\n");
+    fprintf(out_fp,"<A HREF=\"http://www.mrunix.net/webalizer/\">");
+    fprintf(out_fp,"<STRONG>Webalizer Version %s</STRONG></A>\n",version);
++#ifdef USE_GEOIP
++   if (use_geoip)
++      fprintf(out_fp,"(with " \
++                     "<A HREF=\"http://sysd.org/proj/log.php#glzr\">" \
++                     "<STRONG>Geolizer</STRONG></A> patch)\n");
++#endif	/* USE_GEOIP */
+    fprintf(out_fp,"</SMALL>\n</TD>\n");
+    lptr=html_tail;
+    if (lptr)
+@@ -544,8 +568,8 @@
+       "</FONT></TD></TR>\n",msg_h_total, msg_h_visits, t_visit);
+    /* Total XFer */
+    fprintf(out_fp,"<TR><TD WIDTH=380><FONT SIZE=\"-1\">%s</FONT></TD>\n"     \
+-      "<TD ALIGN=right COLSPAN=2><FONT SIZE=\"-1\"><B>%.0f</B>"              \
+-      "</FONT></TD></TR>\n",msg_mtot_tx,t_xfer/1024);
++      "<TD ALIGN=right COLSPAN=2><FONT SIZE=\"-1\"><B>%s</B>"                \
++      "</FONT></TD></TR>\n",msg_mtot_tx,hr_size(t_xfer));
+    fprintf(out_fp,"<TR><TH HEIGHT=4></TH></TR>\n");
+    /**********************************************/
+    /* Unique Sites */
+@@ -620,10 +644,10 @@
+    /* Max/Avg KBytes per Day */
+    fprintf(out_fp,"<TR>"                                                     \
+       "<TD><FONT SIZE=\"-1\">%s</FONT></TD>\n"                               \
+-      "<TD ALIGN=right WIDTH=65><FONT SIZE=\"-1\"><B>%.0f</B></FONT></TD>\n" \
+-      "<TD WIDTH=65 ALIGN=right><FONT SIZE=-1><B>%.0f</B>"                   \
++      "<TD ALIGN=right WIDTH=65><FONT SIZE=\"-1\"><B>%s</B></FONT></TD>\n"   \
++      "<TD WIDTH=65 ALIGN=right><FONT SIZE=-1><B>%s</B>"                     \
+       "</FONT></TD></TR>\n",msg_mtot_mkd,
+-      (t_xfer/1024)/days_in_month,max_xfer/1024);
++      hr_size(t_xfer/days_in_month),hr_size(max_xfer));
+    fprintf(out_fp,"<TR><TH HEIGHT=4></TH></TR>\n");
+    /**********************************************/
+    /* response code totals */
+@@ -713,9 +737,9 @@
+               "<TD ALIGN=right><FONT SIZE=\"-2\">%3.02f%%</FONT></TD>\n",
+               tm_site[i],PCENT(tm_site[i],t_site));
+       fprintf(out_fp,"<TD ALIGN=right>"                                      \
+-              "<FONT SIZE=\"-1\"><B>%.0f</B></FONT></TD>\n"                  \
++              "<FONT SIZE=\"-1\"><B>%s</B></FONT></TD>\n"                    \
+               "<TD ALIGN=right><FONT SIZE=\"-2\">%3.02f%%</FONT></TD></TR>\n",
+-              tm_xfer[i]/1024,PCENT(tm_xfer[i],t_xfer));
++              hr_size(tm_xfer[i]),PCENT(tm_xfer[i],t_xfer));
+    }
+    fprintf(out_fp,"<TR><TH HEIGHT=4></TH></TR>\n");
+    fprintf(out_fp,"</TABLE>\n");
+@@ -801,10 +825,10 @@
+          th_page[i]/days_in_month,th_page[i],
+          PCENT(th_page[i],t_page));
+       fprintf(out_fp,
+-         "<TD ALIGN=right><FONT SIZE=\"-1\"><B>%.0f</B></FONT></TD>\n" \
+-         "<TD ALIGN=right><FONT SIZE=\"-1\"><B>%.0f</B></FONT></TD>\n" \
++         "<TD ALIGN=right><FONT SIZE=\"-1\"><B>%s</B></FONT></TD>\n" \
++         "<TD ALIGN=right><FONT SIZE=\"-1\"><B>%s</B></FONT></TD>\n" \
+          "<TD ALIGN=right><FONT SIZE=\"-2\">%3.02f%%</FONT></TD></TR>\n",
+-         (th_xfer[i]/days_in_month)/1024,th_xfer[i]/1024,
++         hr_size(th_xfer[i]/days_in_month),hr_size(th_xfer[i]),
+          PCENT(th_xfer[i],t_xfer));
+       avg_file += th_file[i]/days_in_month;
+       avg_xfer+= (th_xfer[i]/days_in_month)/1024;
+@@ -822,6 +846,12 @@
+    u_long cnt=0, h_reg=0, h_grp=0, h_hid=0, tot_num;
+    int i;
+    HNODEPTR hptr, *pointer;
++#ifdef USE_GEOIP
++   int cols=use_geoip?11:10;
++   const char *result;
++#else
++   int cols=10;
++#endif	/* USE_GEOIP */
+ 
+    cnt=a_ctr; pointer=h_array;
+    while(cnt--)
+@@ -845,13 +875,13 @@
+ 
+    fprintf(out_fp,"<TABLE WIDTH=510 BORDER=2 CELLSPACING=1 CELLPADDING=1>\n");
+    fprintf(out_fp,"<TR><TH HEIGHT=4></TH></TR>\n");
+-   if (flag) fprintf(out_fp,"<TR><TH BGCOLOR=\"%s\" ALIGN=CENTER COLSPAN=10>" \
++   if (flag) fprintf(out_fp,"<TR><TH BGCOLOR=\"%s\" ALIGN=CENTER COLSPAN=%d>" \
+            "%s %lu %s %lu %s %s %s</TH></TR>\n",
+-           GREY, msg_top_top,tot_num,msg_top_of,
++           GREY, cols, msg_top_top,tot_num,msg_top_of,
+            t_site,msg_top_s,msg_h_by,msg_h_xfer);
+-   else      fprintf(out_fp,"<TR><TH BGCOLOR=\"%s\" ALIGN=CENTER COLSPAN=10>" \
++   else      fprintf(out_fp,"<TR><TH BGCOLOR=\"%s\" ALIGN=CENTER COLSPAN=%d>" \
+            "%s %lu %s %lu %s</TH></TR>\n",
+-           GREY,msg_top_top, tot_num, msg_top_of, t_site, msg_top_s);
++           GREY, cols, msg_top_top, tot_num, msg_top_of, t_site, msg_top_s);
+    fprintf(out_fp,"<TR><TH HEIGHT=4></TH></TR>\n");
+    fprintf(out_fp,"<TR><TH BGCOLOR=\"%s\" ALIGN=center>"                    \
+           "<FONT SIZE=\"-1\">#</FONT></TH>\n",GREY);
+@@ -864,7 +894,13 @@
+    fprintf(out_fp,"<TH BGCOLOR=\"%s\" ALIGN=center COLSPAN=2>"              \
+           "<FONT SIZE=\"-1\">%s</FONT></TH>\n",YELLOW,msg_h_visits);
+    fprintf(out_fp,"<TH BGCOLOR=\"%s\" ALIGN=center>"                        \
+-          "<FONT SIZE=\"-1\">%s</FONT></TH></TR>\n",CYAN,msg_h_hname);
++          "<FONT SIZE=\"-1\">%s</FONT></TH>\n",CYAN,msg_h_hname);
++#ifdef USE_GEOIP
++   if (use_geoip)
++      fprintf(out_fp,"<TH BGCOLOR=\"%s\" ALIGN=center>"                     \
++             "<FONT SIZE=\"-1\">Country</FONT></TH>\n",ORANGE);
++#endif	/* USE_GEOIP */
++   fprintf(out_fp,"</TR>\n");
+    fprintf(out_fp,"<TR><TH HEIGHT=4></TH></TR>\n");
+ 
+    pointer=h_array; i=0;
+@@ -884,22 +920,37 @@
+               "<TD ALIGN=right><FONT SIZE=\"-2\">%3.02f%%</FONT></TD>\n"    \
+               "<TD ALIGN=right><FONT SIZE=\"-1\"><B>%lu</B></FONT></TD>\n"  \
+               "<TD ALIGN=right><FONT SIZE=\"-2\">%3.02f%%</FONT></TD>\n"    \
+-              "<TD ALIGN=right><FONT SIZE=\"-1\"><B>%.0f</B></FONT></TD>\n" \
++              "<TD ALIGN=right><FONT SIZE=\"-1\"><B>%s</B></FONT></TD>\n" \
+               "<TD ALIGN=right><FONT SIZE=\"-2\">%3.02f%%</FONT></TD>\n"    \
+               "<TD ALIGN=right><FONT SIZE=\"-1\"><B>%lu</B></FONT></TD>\n"  \
+               "<TD ALIGN=right><FONT SIZE=\"-2\">%3.02f%%</FONT></TD>\n"    \
+               "<TD ALIGN=left NOWRAP><FONT SIZE=\"-1\">",
+               i+1,hptr->count,
+               (t_hit==0)?0:((float)hptr->count/t_hit)*100.0,hptr->files,
+-              (t_file==0)?0:((float)hptr->files/t_file)*100.0,hptr->xfer/1024,
++              (t_file==0)?0:((float)hptr->files/t_file)*100.0,hr_size(hptr->xfer),
+               (t_xfer==0)?0:((float)hptr->xfer/t_xfer)*100.0,hptr->visit,
+               (t_visit==0)?0:((float)hptr->visit/t_visit)*100.0);
+ 
+          if ((hptr->flag==OBJ_GRP)&&hlite_groups)
+              fprintf(out_fp,"<STRONG>%s</STRONG></FONT></TD></TR>\n",
+                hptr->string);
++#ifdef USE_GEOIP
++         else
++         {
++            fprintf(out_fp,"%s</FONT></TD>", hptr->string);
++            if (use_geoip)
++            {
++               result=GeoIP_country_name_by_name(gi, hptr->string);
++               fprintf(out_fp,"\n<TD ALIGN=left NOWRAP><FONT SIZE=\"-1\">%s" \
++                              "</FONT></TD></TR>\n", GEOIP_OK(result)?result:"<I>Unknown</I>");
++            }
++            else
++               fprintf(out_fp,"</TR>\n");
++         }
++#else
+          else fprintf(out_fp,"%s</FONT></TD></TR>\n",
+                hptr->string);
++#endif	/* USE_GEOIP */
+          tot_num--;
+          i++;
+       }
+@@ -913,7 +964,7 @@
+          if (all_sites_page(h_reg, h_grp))
+          {
+             fprintf(out_fp,"<TR BGCOLOR=\"%s\">",GRPCOLOR);
+-            fprintf(out_fp,"<TD COLSPAN=10 ALIGN=\"center\">\n");
++            fprintf(out_fp,"<TD COLSPAN=%d ALIGN=\"center\">\n", cols);
+             fprintf(out_fp,"<FONT SIZE=\"-1\">");
+             fprintf(out_fp,"<A HREF=\"./site_%04d%02d.%s\">",
+                     cur_year,cur_month,html_ext);
+@@ -936,6 +987,9 @@
+    char     site_fname[256], buffer[256];
+    FILE     *out_fp;
+    int      i=(h_grp)?1:0;
++#ifdef USE_GEOIP
++   const char *result;
++#endif	/* USE_GEOIP */
+ 
+    /* generate file name */
+    sprintf(site_fname,"site_%04d%02d.%s",cur_year,cur_month,html_ext);
+@@ -948,10 +1002,27 @@
+ 
+    fprintf(out_fp,"<FONT SIZE=\"-1\"></CENTER><PRE>\n");
+ 
+-   fprintf(out_fp," %12s      %12s      %12s      %12s      %s\n",
++#ifdef USE_GEOIP
++   if (use_geoip)
++   {
++      fprintf(out_fp," %12s      %12s         %12s      %12s      %s              Country\n",
++              msg_h_hits, msg_h_files, msg_h_xfer, msg_h_visits, msg_h_hname);
++      fprintf(out_fp,"----------------  ----------------  -------------------  " \
++                     "----------------  --------------------  -------------------------\n\n");
++   }
++   else
++   {
++      fprintf(out_fp," %12s      %12s         %12s      %12s      %s\n",
++              msg_h_hits, msg_h_files, msg_h_xfer, msg_h_visits, msg_h_hname);
++      fprintf(out_fp,"----------------  ----------------  -------------------  " \
++                     "----------------  --------------------\n\n");
++   }
++#else
++   fprintf(out_fp," %12s      %12s         %12s      %12s      %s\n",
+            msg_h_hits, msg_h_files, msg_h_xfer, msg_h_visits, msg_h_hname);
+-   fprintf(out_fp,"----------------  ----------------  ----------------  " \
++   fprintf(out_fp,"----------------  ----------------  -------------------  " \
+                   "----------------  --------------------\n\n");
++#endif	/* USE_GEOIP */
+ 
+    /* Do groups first (if any) */
+    pointer=h_array;
+@@ -961,10 +1032,10 @@
+       if (hptr->flag == OBJ_GRP)
+       {
+          fprintf(out_fp,
+-         "%-8lu %6.02f%%  %8lu %6.02f%%  %8.0f %6.02f%%  %8lu %6.02f%%  %s\n",
++         "%-8lu %6.02f%%  %8lu %6.02f%%  %16s %6.02f%%  %8lu %6.02f%%  %s\n",
+             hptr->count,
+             (t_hit==0)?0:((float)hptr->count/t_hit)*100.0,hptr->files,
+-            (t_file==0)?0:((float)hptr->files/t_file)*100.0,hptr->xfer/1024,
++            (t_file==0)?0:((float)hptr->files/t_file)*100.0,hr_size(hptr->xfer),
+             (t_xfer==0)?0:((float)hptr->xfer/t_xfer)*100.0,hptr->visit,
+             (t_visit==0)?0:((float)hptr->visit/t_visit)*100.0,
+             hptr->string);
+@@ -981,6 +1052,31 @@
+       hptr=*pointer++;
+       if (hptr->flag == OBJ_REG)
+       {
++#ifdef USE_GEOIP
++         if (use_geoip)
++         {
++            result=GeoIP_country_name_by_addr(gi, hptr->string);
++            fprintf(out_fp,
++            "%-8lu %6.02f%%  %8lu %6.02f%%  %16s %6.02f%%  %8lu %6.02f%%  %-20s  %s\n",
++               hptr->count,
++               (t_hit==0)?0:((float)hptr->count/t_hit)*100.0,hptr->files,
++               (t_file==0)?0:((float)hptr->files/t_file)*100.0,hr_size(hptr->xfer),
++               (t_xfer==0)?0:((float)hptr->xfer/t_xfer)*100.0,hptr->visit,
++               (t_visit==0)?0:((float)hptr->visit/t_visit)*100.0,
++               hptr->string, GEOIP_OK(result)?result:"Unknown");
++         }
++         else
++         {
++            fprintf(out_fp,
++            "%-8lu %6.02f%%  %8lu %6.02f%%  %8.0f %6.02f%%  %8lu %6.02f%%  %s\n",
++               hptr->count,
++               (t_hit==0)?0:((float)hptr->count/t_hit)*100.0,hptr->files,
++               (t_file==0)?0:((float)hptr->files/t_file)*100.0,hptr->xfer/1024,
++               (t_xfer==0)?0:((float)hptr->xfer/t_xfer)*100.0,hptr->visit,
++               (t_visit==0)?0:((float)hptr->visit/t_visit)*100.0,
++               hptr->string);
++         }
++#else
+          fprintf(out_fp,
+          "%-8lu %6.02f%%  %8lu %6.02f%%  %8.0f %6.02f%%  %8lu %6.02f%%  %s\n",
+             hptr->count,
+@@ -989,6 +1085,7 @@
+             (t_xfer==0)?0:((float)hptr->xfer/t_xfer)*100.0,hptr->visit,
+             (t_visit==0)?0:((float)hptr->visit/t_visit)*100.0,
+             hptr->string);
++#endif	/* USE_GEOIP */
+          h_reg--;
+       }
+    }
+@@ -1066,12 +1163,12 @@
+             "<TD ALIGN=center><FONT SIZE=\"-1\"><B>%d</B></FONT></TD>\n" \
+             "<TD ALIGN=right><FONT SIZE=\"-1\"><B>%lu</B></FONT></TD>\n" \
+             "<TD ALIGN=right><FONT SIZE=\"-2\">%3.02f%%</FONT></TD>\n"   \
+-            "<TD ALIGN=right><FONT SIZE=\"-1\"><B>%.0f</B></FONT></TD>\n"\
++            "<TD ALIGN=right><FONT SIZE=\"-1\"><B>%s</B></FONT></TD>\n"\
+             "<TD ALIGN=right><FONT SIZE=\"-2\">%3.02f%%</FONT></TD>\n"   \
+             "<TD ALIGN=left NOWRAP><FONT SIZE=\"-1\">",
+             i+1,uptr->count,
+             (t_hit==0)?0:((float)uptr->count/t_hit)*100.0,
+-            uptr->xfer/1024,
++            hr_size(uptr->xfer),
+             (t_xfer==0)?0:((float)uptr->xfer/t_xfer)*100.0);
+ 
+          if (uptr->flag==OBJ_GRP)
+@@ -1153,9 +1250,9 @@
+ 
+    fprintf(out_fp,"<FONT SIZE=\"-1\"></CENTER><PRE>\n");
+ 
+-   fprintf(out_fp," %12s      %12s      %s\n",
++   fprintf(out_fp," %12s         %12s      %s\n",
+            msg_h_hits,msg_h_xfer,msg_h_url);
+-   fprintf(out_fp,"----------------  ----------------  " \
++   fprintf(out_fp,"----------------  -------------------  " \
+                   "--------------------\n\n");
+ 
+    /* do groups first (if any) */
+@@ -1165,10 +1262,10 @@
+       uptr=*pointer++;
+       if (uptr->flag == OBJ_GRP)
+       {
+-         fprintf(out_fp,"%-8lu %6.02f%%  %8.0f %6.02f%%  %s\n",
++         fprintf(out_fp,"%-8lu %6.02f%%  %16s %6.02f%%  %s\n",
+             uptr->count,
+             (t_hit==0)?0:((float)uptr->count/t_hit)*100.0,
+-            uptr->xfer/1024,
++            hr_size(uptr->xfer),
+             (t_xfer==0)?0:((float)uptr->xfer/t_xfer)*100.0,
+             uptr->string);
+          u_grp--;
+@@ -1184,10 +1281,10 @@
+       uptr=*pointer++;
+       if (uptr->flag == OBJ_REG)
+       {
+-         fprintf(out_fp,"%-8lu %6.02f%%  %8.0f %6.02f%%  %s\n",
++         fprintf(out_fp,"%-8lu %6.02f%%  %16s %6.02f%%  %s\n",
+             uptr->count,
+             (t_hit==0)?0:((float)uptr->count/t_hit)*100.0,
+-            uptr->xfer/1024,
++            hr_size(uptr->xfer),
+             (t_xfer==0)?0:((float)uptr->xfer/t_xfer)*100.0,
+             uptr->string);
+          u_reg--;
+@@ -1794,14 +1891,14 @@
+               "<TD ALIGN=right><FONT SIZE=\"-2\">%3.02f%%</FONT></TD>\n"    \
+               "<TD ALIGN=right><FONT SIZE=\"-1\"><B>%lu</B></FONT></TD>\n"  \
+               "<TD ALIGN=right><FONT SIZE=\"-2\">%3.02f%%</FONT></TD>\n"    \
+-              "<TD ALIGN=right><FONT SIZE=\"-1\"><B>%.0f</B></FONT></TD>\n" \
++              "<TD ALIGN=right><FONT SIZE=\"-1\"><B>%s</B></FONT></TD>\n" \
+               "<TD ALIGN=right><FONT SIZE=\"-2\">%3.02f%%</FONT></TD>\n"    \
+               "<TD ALIGN=right><FONT SIZE=\"-1\"><B>%lu</B></FONT></TD>\n"  \
+               "<TD ALIGN=right><FONT SIZE=\"-2\">%3.02f%%</FONT></TD>\n"    \
+               "<TD ALIGN=left NOWRAP><FONT SIZE=\"-1\">",
+               i+1,iptr->count,
+               (t_hit==0)?0:((float)iptr->count/t_hit)*100.0,iptr->files,
+-              (t_file==0)?0:((float)iptr->files/t_file)*100.0,iptr->xfer/1024,
++              (t_file==0)?0:((float)iptr->files/t_file)*100.0,hr_size(iptr->xfer),
+               (t_xfer==0)?0:((float)iptr->xfer/t_xfer)*100.0,iptr->visit,
+               (t_visit==0)?0:((float)iptr->visit/t_visit)*100.0);
+ 
+@@ -1866,10 +1963,10 @@
+       if (iptr->flag == OBJ_GRP)
+       {
+          fprintf(out_fp,
+-         "%-8lu %6.02f%%  %8lu %6.02f%%  %8.0f %6.02f%%  %8lu %6.02f%%  %s\n",
++         "%-8lu %6.02f%%  %8lu %6.02f%%  %8s %6.02f%%  %8lu %6.02f%%  %s\n",
+             iptr->count,
+             (t_hit==0)?0:((float)iptr->count/t_hit)*100.0,iptr->files,
+-            (t_file==0)?0:((float)iptr->files/t_file)*100.0,iptr->xfer/1024,
++            (t_file==0)?0:((float)iptr->files/t_file)*100.0,hr_size(iptr->xfer),
+             (t_xfer==0)?0:((float)iptr->xfer/t_xfer)*100.0,iptr->visit,
+             (t_visit==0)?0:((float)iptr->visit/t_visit)*100.0,
+             iptr->string);
+@@ -1887,10 +1984,10 @@
+       if (iptr->flag == OBJ_REG)
+       {
+          fprintf(out_fp,
+-         "%-8lu %6.02f%%  %8lu %6.02f%%  %8.0f %6.02f%%  %8lu %6.02f%%  %s\n",
++         "%-8lu %6.02f%%  %8lu %6.02f%%  %8s %6.02f%%  %8lu %6.02f%%  %s\n",
+             iptr->count,
+             (t_hit==0)?0:((float)iptr->count/t_hit)*100.0,iptr->files,
+-            (t_file==0)?0:((float)iptr->files/t_file)*100.0,iptr->xfer/1024,
++            (t_file==0)?0:((float)iptr->files/t_file)*100.0,hr_size(iptr->xfer),
+             (t_xfer==0)?0:((float)iptr->xfer/t_xfer)*100.0,iptr->visit,
+             (t_visit==0)?0:((float)iptr->visit/t_visit)*100.0,
+             iptr->string);
+@@ -1914,7 +2011,7 @@
+    int ctry_fnd;
+    u_long idx;
+    HNODEPTR hptr;
+-   char *domain;
++   char *domain, *country = NULL;
+    u_long pie_data[10];
+    char   *pie_legend[10];
+    char   pie_title[48];
+@@ -1922,6 +2019,12 @@
+ 
+    extern int ctry_graph;  /* include external flag */
+ 
++#ifdef USE_GEOIP
++   const char *result;
++   char code[3];
++   code[2]='\0';   
++#endif	/* USE_GEOIP */
++
+    /* scan hash table adding up domain totals */
+    for (i=0;i<MAXHASH;i++)
+    {
+@@ -1932,16 +2035,37 @@
+          {
+             domain = hptr->string+strlen(hptr->string)-1;
+             while ( (*domain!='.')&&(domain!=hptr->string)) domain--;
+-            if ((domain==hptr->string)||(isdigit((int)*++domain)))
++            if (domain==hptr->string)
++	       country=NULL;
++            else if (isdigit((int)*++domain))
+             {
+-               ctry[0].count+=hptr->count;
+-               ctry[0].files+=hptr->files;
+-               ctry[0].xfer +=hptr->xfer;
++#ifdef USE_GEOIP
++               if (use_geoip)
++               {
++                  result=GeoIP_country_code_by_addr(gi, hptr->string);
++                  if (!GEOIP_OK(result))
++                     country=NULL;
++                  else
++                  {
++                     code[0]=tolower(result[0]);
++                     code[1]=tolower(result[1]);
++
++                     country=code;
++                  }
++               }
++               else
++                  country=NULL;
++#else
++               country=NULL;
++#endif	/* USE_GEOIP */
+             }
+             else
++               country=domain;
++
++            ctry_fnd=0;
++            if (country!=NULL)
+             {
+-               ctry_fnd=0;
+-               idx=ctry_idx(domain);
++               idx=ctry_idx(country);
+                for (j=0;ctry[j].desc;j++)
+                {
+                   if (idx==ctry[j].idx)
+@@ -1953,12 +2077,19 @@
+                      break;
+                   }
+                }
+-               if (!ctry_fnd)
+-               {
+-                  ctry[0].count+=hptr->count;
+-                  ctry[0].files+=hptr->files;
+-                  ctry[0].xfer +=hptr->xfer;
+-               }
++            }
++            if ((!ctry_fnd)||(country==NULL))
++            {
++#ifdef USE_GEOIP
++               if (use_geoip && debug_mode)
++                  fprintf(stderr, "--> unresolved country for '%s' (GeoIP says %s:%s)\n",
++                          hptr->string,
++                          GeoIP_country_code_by_addr(gi, hptr->string),
++                          GeoIP_country_name_by_addr(gi, hptr->string));
++#endif	/* USE_GEOIP */
++    	       ctry[0].count+=hptr->count;
++    	       ctry[0].files+=hptr->files;
++    	       ctry[0].xfer +=hptr->xfer;
+             }
+          }
+          hptr=hptr->next;
+@@ -2036,14 +2167,14 @@
+               "<TD ALIGN=right><FONT SIZE=\"-2\">%3.02f%%</FONT></TD>\n"   \
+               "<TD ALIGN=right><FONT SIZE=\"-1\"><B>%lu</B></FONT></TD>\n" \
+               "<TD ALIGN=right><FONT SIZE=\"-2\">%3.02f%%</FONT></TD>\n"   \
+-              "<TD ALIGN=right><FONT SIZE=\"-1\"><B>%.0f</B></FONT></TD>\n" \
++              "<TD ALIGN=right><FONT SIZE=\"-1\"><B>%s</B></FONT></TD>\n" \
+               "<TD ALIGN=right><FONT SIZE=\"-2\">%3.02f%%</FONT></TD>\n"   \
+               "<TD ALIGN=left NOWRAP><FONT SIZE=\"-1\">%s</FONT></TD></TR>\n",
+               i+1,top_ctrys[i]->count,
+               (t_hit==0)?0:((float)top_ctrys[i]->count/t_hit)*100.0,
+               top_ctrys[i]->files,
+               (t_file==0)?0:((float)top_ctrys[i]->files/t_file)*100.0,
+-              top_ctrys[i]->xfer/1024,
++              hr_size(top_ctrys[i]->xfer),
+               (t_xfer==0)?0:((float)top_ctrys[i]->xfer/t_xfer)*100.0,
+               top_ctrys[i]->desc);
+    }
+@@ -2061,6 +2192,9 @@
+    FILE     *out_fp;
+    char     filename[256];
+    u_long   cnt=a_ctr;
++#ifdef USE_GEOIP
++   const char *result;
++#endif	/* USE_GEOIP */
+ 
+    /* generate file name */
+    sprintf(filename,"%s/site_%04d%02d.%s",
+@@ -2072,8 +2206,17 @@
+    /* need a header? */
+    if (dump_header)
+    {
++#ifdef USE_GEOIP
++      if (use_geoip)
++         fprintf(out_fp,"%s\t%s\t%s\t%s\t%s\tCountry\n",
++          msg_h_hits,msg_h_files,msg_h_xfer,msg_h_visits,msg_h_hname); 
++      else
++         fprintf(out_fp,"%s\t%s\t%s\t%s\t%s\n",
++          msg_h_hits,msg_h_files,msg_h_xfer,msg_h_visits,msg_h_hname); 
++#else
+       fprintf(out_fp,"%s\t%s\t%s\t%s\t%s\n",
+        msg_h_hits,msg_h_files,msg_h_xfer,msg_h_visits,msg_h_hname); 
++#endif	/* USE_GEOIP */
+    }
+ 
+    /* dump 'em */
+@@ -2083,10 +2226,26 @@
+       hptr=*pointer++;
+       if (hptr->flag != OBJ_GRP)
+       {
++#ifdef USE_GEOIP
++         if (use_geoip)
++         {
++            result=GeoIP_country_name_by_addr(gi, hptr->string);
++            fprintf(out_fp,
++            "%lu\t%lu\t%.0f\t%lu\t%s\t%s\n",
++               hptr->count,hptr->files,hptr->xfer/1024,
++               hptr->visit,hptr->string,GEOIP_OK(result)?result:"Unknown");
++         }
++         else
++            fprintf(out_fp,
++            "%lu\t%lu\t%.0f\t%lu\t%s\n",
++               hptr->count,hptr->files,hptr->xfer/1024,
++               hptr->visit,hptr->string);
++#else
+          fprintf(out_fp,
+          "%lu\t%lu\t%.0f\t%lu\t%s\n",
+             hptr->count,hptr->files,hptr->xfer/1024,
+             hptr->visit,hptr->string);
++#endif	/* USE_GEOIP */
+       }
+       cnt--;
+    }
+@@ -2402,8 +2561,8 @@
+                       hist_visit[s_mth]/days_in_month);
+       fprintf(out_fp,"<TD ALIGN=right><FONT SIZE=\"-1\">%lu</FONT></TD>\n",
+                       hist_site[s_mth]);
+-      fprintf(out_fp,"<TD ALIGN=right><FONT SIZE=\"-1\">%.0f</FONT></TD>\n",
+-                      hist_xfer[s_mth]);
++      fprintf(out_fp,"<TD ALIGN=right><FONT SIZE=\"-1\">%s</FONT></TD>\n",
++                      hr_size(hist_xfer[s_mth]*1024));
+       fprintf(out_fp,"<TD ALIGN=right><FONT SIZE=\"-1\">%lu</FONT></TD>\n",
+                       hist_visit[s_mth]);
+       fprintf(out_fp,"<TD ALIGN=right><FONT SIZE=\"-1\">%lu</FONT></TD>\n",
+@@ -2422,7 +2581,7 @@
+    fprintf(out_fp,"<TR><TH BGCOLOR=\"%s\" COLSPAN=6 ALIGN=left>"          \
+           "<FONT SIZE=\"-1\">%s</FONT></TH>\n",GREY,msg_h_totals);
+    fprintf(out_fp,"<TH BGCOLOR=\"%s\" ALIGN=right>"                       \
+-          "<FONT SIZE=\"-1\">%.0f</FONT></TH>\n",GREY,gt_xfer);
++          "<FONT SIZE=\"-1\">%s</FONT></TH>\n",GREY,hr_size(gt_xfer*1024));
+    fprintf(out_fp,"<TH BGCOLOR=\"%s\" ALIGN=right>"                       \
+           "<FONT SIZE=\"-1\">%.0f</FONT></TH>\n",GREY,gt_visits);
+    fprintf(out_fp,"<TH BGCOLOR=\"%s\" ALIGN=right>"                       \
+@@ -2750,3 +2909,31 @@
+    return out_fp;
+ }
+ 
++/*********************************************/
++/* HR_SIZE - Returns a human readable size   */
++/*********************************************/
++
++const char *hr_size(unsigned long long int size)
++{
++   int base=1024;
++   char suffixes[14]="??KBMBGBTBPBEB";
++   float n=size;
++   int usesuf=0;
++
++   if (wb_index<0 || wb_index>31)
++      wb_index=0;
++
++   while (n>=base && usesuf<=10)
++   {
++      n/=base;
++      usesuf+=2;
++   }
++
++   if (usesuf)
++      snprintf(warpbuf[wb_index], 31, \
++               "%.2f&nbsp;%c%c", n, suffixes[usesuf], suffixes[usesuf+1]);
++   else
++      snprintf(warpbuf[wb_index], 31, "%d&nbsp;bytes", (unsigned int) size);
++
++   return warpbuf[wb_index++];
++}
+diff -adNruX nodiff webalizer-orig/sample.conf webalizer-2.01-10/sample.conf
+--- webalizer-orig/sample.conf	2000-09-29 00:51:42.000000000 -0300
++++ webalizer-2.01-10/sample.conf	2002-07-17 07:36:03.000000000 -0300
+@@ -568,4 +568,12 @@
+ #DumpUsers	no
+ #DumpSearchStr  no
+ 
++# If you compiled Webalizer with GeoIP library, it becomes enabled
++# by default. But if you wish to disable it, just set GeoIP to 'no'.
++# You may also want to specify database file path manually, if you
++# don't have one installed on system (in case of static build).
++
++#GeoIP		yes
++#GeoIPDatabase	/usr/local/share/GeoIP/GeoIP.dat
++
+ # End of configuration file...  Have a nice day!
+diff -adNruX nodiff webalizer-orig/test.conf webalizer-2.01-10/test.conf
+--- webalizer-orig/test.conf	1969-12-31 21:00:00.000000000 -0300
++++ webalizer-2.01-10/test.conf	2005-05-20 15:29:56.000000000 -0300
+@@ -0,0 +1,579 @@
++#
++# Sample Webalizer configuration file
++# Copyright 1997-2000 by Bradford L. Barrett (brad@mrunix.net)
++#
++# Distributed under the GNU General Public License.  See the
++# files "Copyright" and "COPYING" provided with the webalizer
++# distribution for additional information.
++#
++# This is a sample configuration file for the Webalizer (ver 2.01)
++# Lines starting with pound signs '#' are comment lines and are
++# ignored.  Blank lines are skipped as well.  Other lines are considered
++# as configuration lines, and have the form "ConfigOption  Value" where
++# ConfigOption is a valid configuration keyword, and Value is the value
++# to assign that configuration option.  Invalid keyword/values are
++# ignored, with appropriate warnings being displayed.  There must be
++# at least one space or tab between the keyword and its value.
++#
++# As of version 0.98, The Webalizer will look for a 'default' configuration
++# file named "webalizer.conf" in the current directory, and if not found
++# there, will look for "/etc/webalizer.conf".
++
++
++# LogFile defines the web server log file to use.  If not specified
++# here or on on the command line, input will default to STDIN.  If
++# the log filename ends in '.gz' (ie: a gzip compressed file), it will
++# be decompressed on the fly as it is being read.
++
++#LogFile        /var/lib/httpd/logs/access_log
++
++# LogType defines the log type being processed.  Normally, the Webalizer
++# expects a CLF or Combined web server log as input.  Using this option,
++# you can process ftp logs as well (xferlog as produced by wu-ftp and
++# others), or Squid native logs.  Values can be 'clf', 'ftp' or 'squid',
++# with 'clf' the default.
++
++#LogType	clf
++
++# OutputDir is where you want to put the output files.  This should
++# should be a full path name, however relative ones might work as well.
++# If no output directory is specified, the current directory will be used.
++
++#OutputDir      /var/lib/httpd/htdocs/usage
++
++# HistoryName allows you to specify the name of the history file produced
++# by the Webalizer.  The history file keeps the data for up to 12 months
++# worth of logs, used for generating the main HTML page (index.html).
++# The default is a file named "webalizer.hist", stored in the specified
++# output directory.  If you specify just the filename (without a path),
++# it will be kept in the specified output directory.  Otherwise, the path
++# is relative to the output directory, unless absolute (leading /).
++
++#HistoryName	webalizer.hist
++
++# Incremental processing allows multiple partial log files to be used
++# instead of one huge one.  Useful for large sites that have to rotate
++# their log files more than once a month.  The Webalizer will save its
++# internal state before exiting, and restore it the next time run, in
++# order to continue processing where it left off.  This mode also causes
++# The Webalizer to scan for and ignore duplicate records (records already
++# processed by a previous run).  See the README file for additional
++# information.  The value may be 'yes' or 'no', with a default of 'no'.
++# The file 'webalizer.current' is used to store the current state data,
++# and is located in the output directory of the program (unless changed
++# with the IncrementalName option below).  Please read at least the section
++# on Incremental processing in the README file before you enable this option.
++
++#Incremental	no
++
++# IncrementalName allows you to specify the filename for saving the
++# incremental data in.  It is similar to the HistoryName option where the
++# name is relative to the specified output directory, unless an absolute
++# filename is specified.  The default is a file named "webalizer.current"
++# kept in the normal output directory.  If you don't specify "Incremental"
++# as 'yes' then this option has no meaning.
++
++#IncrementalName	webalizer.current
++
++# ReportTitle is the text to display as the title.  The hostname
++# (unless blank) is appended to the end of this string (seperated with
++# a space) to generate the final full title string.
++# Default is (for english) "Usage Statistics for".
++
++#ReportTitle    Usage Statistics for
++
++# HostName defines the hostname for the report.  This is used in
++# the title, and is prepended to the URL table items.  This allows
++# clicking on URL's in the report to go to the proper location in
++# the event you are running the report on a 'virtual' web server,
++# or for a server different than the one the report resides on.
++# If not specified here, or on the command line, webalizer will
++# try to get the hostname via a uname system call.  If that fails,
++# it will default to "localhost".
++
++#HostName       localhost
++
++# HTMLExtension allows you to specify the filename extension to use
++# for generated HTML pages.  Normally, this defaults to "html", but
++# can be changed for sites who need it (like for PHP embeded pages).
++
++#HTMLExtension  html
++
++# PageType lets you tell the Webalizer what types of URL's you
++# consider a 'page'.  Most people consider html and cgi documents
++# as pages, while not images and audio files.  If no types are
++# specified, defaults will be used ('htm*', 'cgi' and HTMLExtension
++# if different for web logs, 'txt' for ftp logs).
++
++PageType	htm*
++PageType	cgi
++#PageType	phtml
++#PageType	php3
++#PageType	pl
++
++# UseHTTPS should be used if the analysis is being run on a
++# secure server, and links to urls should use 'https://' instead
++# of the default 'http://'.  If you need this, set it to 'yes'.
++# Default is 'no'.  This only changes the behaviour of the 'Top
++# URL's' table.
++
++#UseHTTPS       no
++
++# DNSCache specifies the DNS cache filename to use for reverse DNS lookups.
++# This file must be specified if you wish to perform name lookups on any IP
++# addresses found in the log file.  If an absolute path is not given as
++# part of the filename (ie: starts with a leading '/'), then the name is
++# relative to the default output directory.  See the DNS.README file for
++# additional information.
++
++#DNSCache	dns_cache.db
++
++# DNSChildren allows you to specify how many "children" processes are
++# run to perform DNS lookups to create or update the DNS cache file.
++# If a number is specified, the DNS cache file will be created/updated
++# each time the Webalizer is run, immediately prior to normal processing,
++# by running the specified number of "children" processes to perform
++# DNS lookups.  If used, the DNS cache filename MUST be specified as
++# well.  The default value is zero (0), which disables DNS cache file
++# creation/updates at run time.  The number of children processes to
++# run may be anywhere from 1 to 100, however a large number may effect
++# normal system operations.  Reasonable values should be between 5 and
++# 20.  See the DNS.README file for additional information.
++
++#DNSChildren	0
++
++# HTMLPre defines HTML code to insert at the very beginning of the
++# file.  Default is the DOCTYPE line shown below.  Max line length
++# is 80 characters, so use multiple HTMLPre lines if you need more.
++
++#HTMLPre <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
++
++# HTMLHead defines HTML code to insert within the <HEAD></HEAD>
++# block, immediately after the <TITLE> line.  Maximum line length
++# is 80 characters, so use multiple lines if needed.
++
++#HTMLHead <META NAME="author" CONTENT="The Webalizer">
++
++# HTMLBody defined the HTML code to be inserted, starting with the
++# <BODY> tag.  If not specified, the default is shown below.  If
++# used, you MUST include your own <BODY> tag as the first line.
++# Maximum line length is 80 char, use multiple lines if needed.
++
++#HTMLBody <BODY BGCOLOR="#E8E8E8" TEXT="#000000" LINK="#0000FF" VLINK="#FF0000">
++
++# HTMLPost defines the HTML code to insert immediately before the
++# first <HR> on the document, which is just after the title and
++# "summary period"-"Generated on:" lines.  If anything, this should
++# be used to clean up in case an image was inserted with HTMLBody.
++# As with HTMLHead, you can define as many of these as you want and
++# they will be inserted in the output stream in order of apperance.
++# Max string size is 80 characters.  Use multiple lines if you need to.
++
++#HTMLPost 	<BR CLEAR="all">
++
++# HTMLTail defines the HTML code to insert at the bottom of each
++# HTML document, usually to include a link back to your home
++# page or insert a small graphic.  It is inserted as a table
++# data element (ie: <TD> your code here </TD>) and is right
++# alligned with the page.  Max string size is 80 characters.
++
++#HTMLTail <IMG SRC="msfree.png" ALT="100% Micro$oft free!">
++
++# HTMLEnd defines the HTML code to add at the very end of the
++# generated files.  It defaults to what is shown below.  If
++# used, you MUST specify the </BODY> and </HTML> closing tags
++# as the last lines.  Max string length is 80 characters.
++
++#HTMLEnd </BODY></HTML>
++
++# The Quiet option suppresses output messages... Useful when run
++# as a cron job to prevent bogus e-mails.  Values can be either
++# "yes" or "no".  Default is "no".  Note: this does not suppress
++# warnings and errors (which are printed to stderr).
++
++#Quiet		no
++
++# ReallyQuiet will supress all messages including errors and
++# warnings.  Values can be 'yes' or 'no' with 'no' being the
++# default.  If 'yes' is used here, it cannot be overriden from
++# the command line, so use with caution.  A value of 'no' has
++# no effect.
++
++#ReallyQuiet	no
++
++# TimeMe allows you to force the display of timing information
++# at the end of processing.  A value of 'yes' will force the
++# timing information to be displayed.  A value of 'no' has no
++# effect.
++
++#TimeMe		no
++
++# GMTTime allows reports to show GMT (UTC) time instead of local
++# time.  Default is to display the time the report was generated
++# in the timezone of the local machine, such as EDT or PST.  This
++# keyword allows you to have times displayed in UTC instead.  Use
++# only if you really have a good reason, since it will probably
++# screw up the reporting periods by however many hours your local
++# time zone is off of GMT.
++
++#GMTTime		no
++
++# Debug prints additional information for error messages.  This
++# will cause webalizer to dump bad records/fields instead of just
++# telling you it found a bad one.   As usual, the value can be
++# either "yes" or "no".  The default is "no".  It shouldn't be
++# needed unless you start getting a lot of Warning or Error
++# messages and want to see why.  (Note: warning and error messages
++# are printed to stderr, not stdout like normal messages).
++
++#Debug		no
++
++# FoldSeqErr forces the Webalizer to ignore sequence errors.
++# This is useful for Netscape and other web servers that cache
++# the writing of log records and do not guarentee that they
++# will be in chronological order.  The use of the FoldSeqErr
++# option will cause out of sequence log records to be treated
++# as if they had the same time stamp as the last valid record.
++# Default is to ignore out of sequence log records.
++
++#FoldSeqErr	no
++
++# VisitTimeout allows you to set the default timeout for a visit
++# (sometimes called a 'session').  The default is 30 minutes,
++# which should be fine for most sites.
++# Visits are determined by looking at the time of the current
++# request, and the time of the last request from the site.  If
++# the time difference is greater than the VisitTimeout value, it
++# is considered a new visit, and visit totals are incremented.
++# Value is the number of seconds to timeout (default=1800=30min)
++
++#VisitTimeout	1800
++
++# IgnoreHist shouldn't be used in a config file, but it is here
++# just because it might be usefull in certain situations.  If the
++# history file is ignored, the main "index.html" file will only
++# report on the current log files contents.  Usefull only when you
++# want to reproduce the reports from scratch.  USE WITH CAUTION!
++# Valid values are "yes" or "no".  Default is "no".
++
++#IgnoreHist	no
++
++# Country Graph allows the usage by country graph to be disabled.
++# Values can be 'yes' or 'no', default is 'yes'.
++
++#CountryGraph	yes
++
++# DailyGraph and DailyStats allows the daily statistics graph
++# and statistics table to be disabled (not displayed).  Values
++# may be "yes" or "no". Default is "yes".
++
++#DailyGraph	yes
++#DailyStats	yes
++
++# HourlyGraph and HourlyStats allows the hourly statistics graph
++# and statistics table to be disabled (not displayed).  Values
++# may be "yes" or "no". Default is "yes".
++
++#HourlyGraph	yes
++#HourlyStats	yes
++
++# GraphLegend allows the color coded legends to be turned on or off
++# in the graphs.  The default is for them to be displayed.  This only
++# toggles the color coded legends, the other legends are not changed.
++# If you think they are hideous and ugly, say 'no' here :)
++
++#GraphLegend	yes
++
++# GraphLines allows you to have index lines drawn behind the graphs.
++# I personally am not crazy about them, but a lot of people requested
++# them and they weren't a big deal to add.  The number represents the
++# number of lines you want displayed.  Default is 2, you can disable
++# the lines by using a value of zero ('0').  [max is 20]
++# Note, due to rounding errors, some values don't work quite right.
++# The lower the better, with 1,2,3,4,6 and 10 producing nice results.
++
++#GraphLines	2
++
++# The "Top" options below define the number of entries for each table.
++# Defaults are Sites=30, URL's=30, Referrers=30 and Agents=15, and
++# Countries=30. TopKSites and TopKURLs (by KByte tables) both default
++# to 10, as do the top entry/exit tables (TopEntry/TopExit).  The top
++# search strings and usernames default to 20.  Tables may be disabled
++# by using zero (0) for the value.
++
++#TopSites        30
++#TopKSites       10
++#TopURLs         30
++#TopKURLs        10
++#TopReferrers    30
++#TopAgents       15
++#TopCountries    30
++#TopEntry        10
++#TopExit         10
++#TopSearch       20
++#TopUsers        20
++
++# The All* keywords allow the display of all URL's, Sites, Referrers
++# User Agents, Search Strings and Usernames.  If enabled, a seperate
++# HTML page will be created, and a link will be added to the bottom
++# of the appropriate "Top" table.  There are a couple of conditions
++# for this to occur..  First, there must be more items than will fit
++# in the "Top" table (otherwise it would just be duplicating what is
++# already displayed).  Second, the listing will only show those items
++# that are normally visable, which means it will not show any hidden
++# items.  Grouped entries will be listed first, followed by individual
++# items.  The value for these keywords can be either 'yes' or 'no',
++# with the default being 'no'.  Please be aware that these pages can
++# be quite large in size, particularly the sites page,  and seperate
++# pages are generated for each month, which can consume quite a lot
++# of disk space depending on the traffic to your site.
++
++AllSites	yes
++AllURLs		yes
++AllReferrers	yes
++AllAgents	yes
++AllSearchStr	yes
++AllUsers        yes
++
++# The Webalizer normally strips the string 'index.' off the end of
++# URL's in order to consolidate URL totals.  For example, the URL
++# /somedir/index.html is turned into /somedir/ which is really the
++# same URL.  This option allows you to specify additional strings
++# to treat in the same way.  You don't need to specify 'index.' as
++# it is always scanned for by The Webalizer, this option is just to
++# specify _additional_ strings if needed.  If you don't need any,
++# don't specify any as each string will be scanned for in EVERY
++# log record... A bunch of them will degrade performance.  Also,
++# the string is scanned for anywhere in the URL, so a string of
++# 'home' would turn the URL /somedir/homepages/brad/home.html into
++# just /somedir/ which is probably not what was intended.
++
++#IndexAlias     home.htm
++#IndexAlias	homepage.htm
++
++# The Hide*, Group* and Ignore* and Include* keywords allow you to
++# change the way Sites, URL's, Referrers, User Agents and Usernames
++# are manipulated.  The Ignore* keywords will cause The Webalizer to
++# completely ignore records as if they didn't exist (and thus not
++# counted in the main site totals).  The Hide* keywords will prevent
++# things from being displayed in the 'Top' tables, but will still be
++# counted in the main totals.  The Group* keywords allow grouping
++# similar objects as if they were one.  Grouped records are displayed
++# in the 'Top' tables and can optionally be displayed in BOLD and/or
++# shaded. Groups cannot be hidden, and are not counted in the main
++# totals. The Group* options do not, by default, hide all the items
++# that it matches.  If you want to hide the records that match (so just
++# the grouping record is displayed), follow with an identical Hide*
++# keyword with the same value.  (see example below)  In addition,
++# Group* keywords may have an optional label which will be displayed
++# instead of the keywords value.  The label should be seperated from
++# the value by at least one 'white-space' character, such as a space
++# or tab.
++#
++# The value can have either a leading or trailing '*' wildcard
++# character.  If no wildcard is found, a match can occur anywhere
++# in the string. Given a string "www.yourmama.com", the values "your",
++# "*mama.com" and "www.your*" will all match.
++
++# Your own site should be hidden
++#HideSite	*mrunix.net
++#HideSite	localhost
++
++# Your own site gives most referrals
++#HideReferrer	mrunix.net/
++
++# This one hides non-referrers ("-" Direct requests)
++#HideReferrer	Direct Request
++
++# Usually you want to hide these
++HideURL		*.gif
++HideURL		*.GIF
++HideURL		*.jpg
++HideURL		*.JPG
++HideURL		*.png
++HideURL		*.PNG
++HideURL		*.ra
++
++# Hiding agents is kind of futile
++#HideAgent	RealPlayer
++
++# You can also hide based on authenticated username
++#HideUser	root
++#HideUser	admin
++
++# Grouping options
++#GroupURL	/cgi-bin/*	CGI Scripts
++#GroupURL	/images/*	Images
++
++#GroupSite	*.aol.com
++#GroupSite	*.compuserve.com
++
++#GroupReferrer	yahoo.com/	Yahoo!
++#GroupReferrer	excite.com/     Excite
++#GroupReferrer	infoseek.com/   InfoSeek
++#GroupReferrer	webcrawler.com/ WebCrawler
++
++#GroupUser      root            Admin users
++#GroupUser      admin           Admin users
++#GroupUser      wheel           Admin users
++
++# The following is a great way to get an overall total
++# for browsers, and not display all the detail records.
++# (You should use MangleAgent to refine further...)
++
++#GroupAgent	MSIE		Micro$oft Internet Exploder
++#HideAgent	MSIE
++#GroupAgent	Mozilla		Netscape
++#HideAgent	Mozilla
++#GroupAgent	Lynx*		Lynx
++#HideAgent	Lynx*
++
++# HideAllSites allows forcing individual sites to be hidden in the
++# report.  This is particularly useful when used in conjunction
++# with the "GroupDomain" feature, but could be useful in other
++# situations as well, such as when you only want to display grouped
++# sites (with the GroupSite keywords...).  The value for this
++# keyword can be either 'yes' or 'no', with 'no' the default,
++# allowing individual sites to be displayed.
++
++#HideAllSites	no
++
++# The GroupDomains keyword allows you to group individual hostnames
++# into their respective domains.  The value specifies the level of
++# grouping to perform, and can be thought of as 'the number of dots'
++# that will be displayed.  For example, if a visiting host is named
++# cust1.tnt.mia.uu.net, a domain grouping of 1 will result in just
++# "uu.net" being displayed, while a 2 will result in "mia.uu.net".
++# The default value of zero disable this feature.  Domains will only
++# be grouped if they do not match any existing "GroupSite" records,
++# which allows overriding this feature with your own if desired.
++
++#GroupDomains	0
++
++# The GroupShading allows grouped rows to be shaded in the report.
++# Useful if you have lots of groups and individual records that
++# intermingle in the report, and you want to diferentiate the group
++# records a little more.  Value can be 'yes' or 'no', with 'yes'
++# being the default.
++
++#GroupShading	yes
++
++# GroupHighlight allows the group record to be displayed in BOLD.
++# Can be either 'yes' or 'no' with the default 'yes'.
++
++#GroupHighlight	yes
++
++# The Ignore* keywords allow you to completely ignore log records based
++# on hostname, URL, user agent, referrer or username.  I hessitated in
++# adding these, since the Webalizer was designed to generate _accurate_
++# statistics about a web servers performance.  By choosing to ignore
++# records, the accuracy of reports become skewed, negating why I wrote
++# this program in the first place.  However, due to popular demand, here
++# they are.  Use the same as the Hide* keywords, where the value can have
++# a leading or trailing wildcard '*'.  Use at your own risk ;)
++
++#IgnoreSite	bad.site.net
++#IgnoreURL	/test*
++#IgnoreReferrer	file:/*
++#IgnoreAgent	RealPlayer
++#IgnoreUser     root
++
++# The Include* keywords allow you to force the inclusion of log records
++# based on hostname, URL, user agent, referrer or username.  They take
++# precidence over the Ignore* keywords.  Note: Using Ignore/Include
++# combinations to selectivly process parts of a web site is _extremely
++# inefficent_!!! Avoid doing so if possible (ie: grep the records to a
++# seperate file if you really want that kind of report).
++
++# Example: Only show stats on Joe User's pages...
++#IgnoreURL	*
++#IncludeURL	~joeuser*
++
++# Or based on an authenticated username
++#IgnoreUser     *
++#IncludeUser    someuser
++
++# The MangleAgents allows you to specify how much, if any, The Webalizer
++# should mangle user agent names.  This allows several levels of detail
++# to be produced when reporting user agent statistics.  There are six
++# levels that can be specified, which define different levels of detail
++# supression.  Level 5 shows only the browser name (MSIE or Mozilla)
++# and the major version number.  Level 4 adds the minor version number
++# (single decimal place).  Level 3 displays the minor version to two
++# decimal places.  Level 2 will add any sub-level designation (such
++# as Mozilla/3.01Gold or MSIE 3.0b).  Level 1 will attempt to also add
++# the system type if it is specified.  The default Level 0 displays the
++# full user agent field without modification and produces the greatest
++# amount of detail.  User agent names that can't be mangled will be
++# left unmodified.
++
++#MangleAgents    0
++
++# The SearchEngine keywords allow specification of search engines and
++# their query strings on the URL.  These are used to locate and report
++# what search strings are used to find your site.  The first word is
++# a substring to match in the referrer field that identifies the search
++# engine, and the second is the URL variable used by that search engine
++# to define it's search terms.
++
++SearchEngine	yahoo.com	p=
++SearchEngine	altavista.com	q=
++SearchEngine	google.com	q=
++SearchEngine	eureka.com	q=
++SearchEngine	lycos.com	query=
++SearchEngine	hotbot.com	MT=
++SearchEngine	msn.com		MT=
++SearchEngine	infoseek.com	qt=
++SearchEngine	webcrawler	searchText=
++SearchEngine	excite		search=
++SearchEngine	netscape.com	search=
++SearchEngine	mamma.com	query=
++SearchEngine	alltheweb.com	query=
++SearchEngine	northernlight.com  qr=
++
++# The Dump* keywords allow the dumping of Sites, URL's, Referrers
++# User Agents, Usernames and Search strings to seperate tab delimited
++# text files, suitable for import into most database or spreadsheet
++# programs.
++
++# DumpPath specifies the path to dump the files.  If not specified,
++# it will default to the current output directory.  Do not use a
++# trailing slash ('/').
++
++#DumpPath	/var/lib/httpd/logs
++
++# The DumpHeader keyword specifies if a header record should be
++# written to the file.  A header record is the first record of the
++# file, and contains the labels for each field written.  Normally,
++# files that are intended to be imported into a database system
++# will not need a header record, while spreadsheets usually do.
++# Value can be either 'yes' or 'no', with 'no' being the default.
++
++#DumpHeader	no
++
++# DumpExtension allow you to specify the dump filename extension
++# to use.  The default is "tab", but some programs are pickey about
++# the filenames they use, so you may change it here (for example,
++# some people may prefer to use "csv").
++
++#DumpExtension	tab
++
++# These control the dumping of each individual table.  The value
++# can be either 'yes' or 'no'.. the default is 'no'.
++
++DumpSites	yes
++DumpURLs	yes
++DumpReferrers	yes
++DumpAgents	yes
++DumpUsers	yes
++DumpSearchStr   yes
++
++# If you compiled Webalizer with GeoIP library, it becomes enabled
++# by default. But if you wish to disable it, just set GeoIP to 'no'.
++# You may also want to specify database file path manually, if you
++# don't have one installed on system (in case of static build).
++
++#GeoIP		yes
++#GeoIPDatabase	/usr/local/share/GeoIP/GeoIP.dat
++
++# End of configuration file...  Have a nice day!
+diff -adNruX nodiff webalizer-orig/webalizer.1 webalizer-2.01-10/webalizer.1
+--- webalizer-orig/webalizer.1	2001-10-23 04:05:50.000000000 -0200
++++ webalizer-2.01-10/webalizer.1	2004-02-16 14:40:32.000000000 -0300
+@@ -1,4 +1,4 @@
+-.TH webalizer 1 "22-Oct-2001" "Version 2.01" "The Webalizer"
++.TH webalizer 1 "16-Feb-2004" "Version 2.01-10-glzr" "The Webalizer"
+ .SH NAME
+ webalizer - A web server log file analysis tool.
+ .SH SYNOPSIS
+@@ -329,6 +329,14 @@
+ .TP 8
+ .B \-E \fInum\fP
+ \fBTopExit\fP.  Display the top \fInum\fP exit pages table.
++.PP
++.I GeoIP options
++.TP 8
++.B \-w
++\fBGeoIP\fP.  Disable GeoIP fearure
++.TP 8
++.B \-W \fIfile\fP
++\fBGeoIPDatabase\fP.  Use specific GeoIP database \fIfile\fP.
+ .SH CONFIGURATION FILES
+ Configuration files are standard \fBascii(7)\fP text files that may be created
+ or edited using any standard editor.  Blank lines and lines that begin
+@@ -669,6 +677,15 @@
+ Dump the search string data to a tab delimited file.  This data is only
+ available if processing a web log that contains referrer information and
+ had search string information present.
++.PP
++.I GeoIP Feature Keywords
++.TP 8
++.B GeoIP \fP( \fByes\fP | no )
++Enable/disable use of GeoIP feature.
++.TP 8
++.B GeoIPDatabase \fIfile\fP
++Specifies GeoIP database file. Defaults to libGeoIP precompiled one
++(normally \fI/usr/local/share/GeoIP/GeoIP.dat\fP).
+ .SH FILES
+ .TP 20
+ .I webalizer.conf
+@@ -697,3 +714,8 @@
+ supplied with all distributions for additional information.
+ .SH AUTHOR
+ Bradford L. Barrett <\fIbrad@mrunix.net\fP>
++.SH GEOLIZER PATCH
++Integration with \fIlibGeoIP (http://maxmind.com/geoip/)\fP made by
++Stanislaw Y. Pusep <\fIstanis@linuxmail.org\fP>.
++.PP
++Official project page is \fIhttp://sysd.org/proj/log.php#glzr\fP
+diff -adNruX nodiff webalizer-orig/webalizer.c webalizer-2.01-10/webalizer.c
+--- webalizer-orig/webalizer.c	2002-04-16 19:11:31.000000000 -0300
++++ webalizer-2.01-10/webalizer.c	2005-05-20 14:32:52.000000000 -0300
+@@ -71,6 +71,11 @@
+ #endif  /* HAVE_DB_185_H */
+ #endif  /* USE_DNS */
+ 
++#ifdef USE_GEOIP
++#include <GeoIP.h>
++#define GEOIP_FLAGS GEOIP_MEMORY_CACHE
++#endif	/* USE_GEOIP */
++
+ #include "webalizer.h"                         /* main header              */
+ #include "output.h"
+ #include "parser.h"
+@@ -101,8 +106,8 @@
+ /*********************************************/
+ 
+ char    *version     = "2.01";                /* program version          */
+-char    *editlvl     = "10";                  /* edit level               */
+-char    *moddate     = "16-Apr-2002";         /* modification date        */
++char    *editlvl     = "10-glzr";             /* edit level               */
++char    *moddate     = "20-May-2005";         /* modification date        */
+ char    *copyright   = "Copyright 1997-2001 by Bradford L. Barrett";
+ 
+ int     verbose      = 2;                     /* 2=verbose,1=err, 0=none  */ 
+@@ -139,6 +144,13 @@
+ char    *dns_cache   = NULL;                  /* DNS cache file name      */
+ int     dns_children = 0;                     /* DNS children (0=don't do)*/
+ 
++#ifdef USE_GEOIP
++int     use_geoip    = 1;                     /* Use GeoIP library        */
++char    *geoip_dbase = NULL;                  /* Use specific GeoIP dbase */
++GeoIP	*gi          = NULL;                  /* GeoIP handle             */
++char	gi_db_info[256];                      /* GeoIP db info (HTMLized) */
++#endif	/* USE_GEOIP */
++
+ int     ntop_sites   = 30;                    /* top n sites to display   */
+ int     ntop_sitesK  = 10;                    /* top n sites (by kbytes)  */
+ int     ntop_urls    = 30;                    /* top n url's to display   */
+@@ -209,7 +221,7 @@
+ 
+ time_t  now;                                  /* used by cur_time funct   */
+ struct  tm *tp;                               /* to generate timestamp    */
+-char    timestamp[32];                        /* for the reports          */
++char    timestamp[64];                        /* for the reports          */
+ 
+ gzFile  gzlog_fp;                             /* gzip logfile pointer     */
+ FILE    *log_fp;                              /* regular logfile pointer  */
+@@ -263,16 +275,24 @@
+    /* add default index. alias */
+    add_nlist("index.",&index_alias);
+ 
++#ifndef WIN32
+    sprintf(tmp_buf,"%s/webalizer.conf",ETCDIR);
++#endif	/* WIN32 */
+    /* check for default config file */
+    if (!access("webalizer.conf",F_OK))
+       get_config("webalizer.conf");
++#ifndef WIN32
+    else if (!access(tmp_buf,F_OK))
+       get_config(tmp_buf);
++#endif	/* WIN32 */
+ 
+    /* get command line options */
+    opterr = 0;     /* disable parser errors */
++#ifndef USE_GEOIP
+    while ((i=getopt(argc,argv,"a:A:c:C:dD:e:E:fF:g:GhHiI:l:Lm:M:n:N:o:pP:qQr:R:s:S:t:Tu:U:vVx:XY"))!=EOF)
++#else
++   while ((i=getopt(argc,argv,"a:A:c:C:dD:e:E:fF:g:GhHiI:l:Lm:M:n:N:o:pP:qQr:R:s:S:t:Tu:U:vVwW:x:XY"))!=EOF)
++#endif	/* USE_GEOIP */
+    {
+       switch (i)
+       {
+@@ -315,6 +335,10 @@
+         case 'U': ntop_urls=atoi(optarg);    break;  /* Top urls            */
+         case 'v':
+         case 'V': print_version();           break;  /* Version             */
++#ifdef USE_GEOIP
++        case 'w': use_geoip=0;               break;  /* Disable GeoIP       */
++        case 'W': geoip_dbase=optarg;        break;  /* Use GeoIP database  */
++#endif	/* USE_GEOIP */
+         case 'x': html_ext=optarg;           break;  /* HTML file extension */
+         case 'X': hide_sites=1;              break;  /* Hide ind. sites     */
+         case 'Y': ctry_graph=0;              break;  /* Supress ctry graph  */
+@@ -443,6 +467,43 @@
+       }
+    }
+ 
++#ifdef USE_GEOIP
++   /* Open GeoIP database */
++   if (use_geoip)
++   {
++      if (geoip_dbase!=NULL)
++      {
++         if (verbose>1) printf("Using GeoIP database %s:\n", geoip_dbase);
++         gi=GeoIP_open(geoip_dbase, GEOIP_FLAGS);
++      }
++      else
++      {
++         if (verbose>1) printf("Using default GeoIP database:\n");
++         gi=GeoIP_new(GEOIP_FLAGS);
++      }
++      
++      /* GeoIP already prints error (in English!) */
++      if (gi==NULL)
++         exit(1);
++
++      /* get database information */
++      cp1=GeoIP_database_info(gi);
++      if (verbose>1) printf("%s\n", cp1);
++
++      /* HTMLize db info */
++      memset(gi_db_info, 0, sizeof(gi_db_info));
++      if ((cp2=strstr(cp1, "MaxMind"))==NULL)
++         strncpy(gi_db_info, cp1, sizeof(gi_db_info)-1);
++      else
++      {
++         strncpy(gi_db_info, cp1, cp2-cp1);
++	 strcat(gi_db_info, "<A HREF=\"http://maxmind.com/geoip/\">MaxMind</A>");
++	 strcat(gi_db_info, cp2+7);
++      }
++      free(cp1);
++   }
++#endif	/* USE_GEOIP */
++
+    /* switch directories if needed */
+    if (out_dir)
+    {
+@@ -1345,6 +1406,10 @@
+       if (dns_db) close_cache();
+ #endif
+ 
++#ifdef USE_GEOIP
++      if (gi) GeoIP_delete(gi);
++#endif	/* USE_GEOIP */
++
+       /* Whew, all done! Exit with completion status (0) */
+       exit(0);
+    }
+@@ -1449,7 +1514,11 @@
+                      "DNSCache",          /* DNS Cache file name        84  */
+                      "DNSChildren",       /* DNS Children (0=no DNS)    85  */
+                      "DailyGraph",        /* Daily Graph (0=no)         86  */
+-                     "DailyStats"         /* Daily Stats (0=no)         87  */
++                     "DailyStats",        /* Daily Stats (0=no)         87  */
++#ifdef USE_GEOIP
++                     "GeoIP",             /* Use GeoIP library (0=no)   88  */
++                     "GeoIPDatabase",     /* GeoIP database             89  */
++#endif	/* USE_GEOIP */
+                    };
+ 
+    FILE *fp;
+@@ -1468,6 +1537,9 @@
+       return;
+    }
+ 
++   if (verbose && debug_mode)
++      fprintf(stderr,"Using config file %s\n",fname);
++
+    while ( (fgets(buffer,BUFSIZE,fp)) != NULL)
+    {
+       /* skip comments and blank lines */
+@@ -1593,6 +1665,10 @@
+ #endif  /* USE_DNS */
+         case 86: daily_graph=(value[0]=='n')?0:1; break;  /* HourlyGraph    */
+         case 87: daily_stats=(value[0]=='n')?0:1; break;  /* HourlyStats    */
++#ifdef USE_GEOIP
++        case 88: use_geoip=(value[0]=='n')?0:1; break;    /* GeoIP          */
++        case 89: geoip_dbase=save_opt(value); break;      /* GeoIPDatabase  */
++#endif	/* USE_GEOIP */
+       }
+    }
+    fclose(fp);
+@@ -1684,10 +1760,20 @@
+     printf("Mod date: %s  Options: ",moddate);
+ #ifdef USE_DNS
+     printf("DNS ");
+-#else
++#endif
++#ifdef USE_GEOIP
++    printf("GeoIP ");
++#endif	/* USE_GEOIP */
++
++#if !((defined(USE_DNS)) || (defined(USE_GEOIP)))
+     printf("none");
+ #endif
++
++#ifndef WIN32
+     printf("\nDefault config dir: %s\n\n",ETCDIR);
++#else
++    printf("\nNo default config dir (Win32 Build)\n\n");
++#endif	/* WIN32 */
+  }
+  else printf("\n");
+  exit(1);
+diff -adNruX nodiff webalizer-orig/webalizer.h webalizer-2.01-10/webalizer.h
+--- webalizer-orig/webalizer.h	2001-02-09 22:58:18.000000000 -0200
++++ webalizer-2.01-10/webalizer.h	2005-05-20 15:37:42.000000000 -0300
+@@ -16,8 +16,8 @@
+ #define MAXURL   1024                  /* Max HTTP request/URL field size  */
+ #define MAXURLH  128                   /* Max URL field size in htab       */
+ #define MAXREF   1024                  /* Max referrer field size          */
+-#define MAXREFH  128                   /* Max referrer field size in htab  */
+-#define MAXAGENT 64                    /* Max user agent field size        */
++#define MAXREFH  512                   /* Max referrer field size in htab  */
++#define MAXAGENT 256                   /* Max user agent field size        */
+ #define MAXCTRY  48                    /* Max country name size            */
+ #define MAXSRCH  256                   /* Max size of search string buffer */
+ #define MAXSRCHH 64                    /* Max size of search str in htab   */
+@@ -123,6 +123,10 @@
+ #endif  /* INADDR_NONE */
+ #endif
+ 
++#ifdef WIN32
++#include <windows.h>
++#endif
++
+ /* Response code structure */
+ struct response_code {     char    *desc;         /* response code struct  */
+                          u_long    count; };
+@@ -191,6 +195,12 @@
+ extern char    *dns_cache   ;                 /* DNS cache file name      */
+ extern int     dns_children ;                 /* # of DNS children        */
+ 
++#ifdef USE_GEOIP
++extern int     use_geoip    ;                 /* Use GeoIP library        */
++extern char    *geoip_dbase ;                 /* Use specific GeoIP dbase */
++extern char    gi_db_info[256];               /* GeoIP db info (HTMLized) */
++#endif	/* USE_GEOIP */
++
+ extern int     ntop_sites   ;                 /* top n sites to display   */
+ extern int     ntop_sitesK  ;                 /* top n sites (by kbytes)  */
+ extern int     ntop_urls    ;                 /* top n url's to display   */
+diff -adNruX nodiff webalizer-orig/win_port.c webalizer-2.01-10/win_port.c
+--- webalizer-orig/win_port.c	1969-12-31 21:00:00.000000000 -0300
++++ webalizer-2.01-10/win_port.c	2002-08-25 17:57:45.000000000 -0300
+@@ -0,0 +1,35 @@
++#include <time.h>
++#include <stdio.h>
++#include <ctype.h>
++#include <sys/utsname.h>
++#include <sys/times.h>
++
++int	uname(struct utsname *name)
++{
++	char buf[256];
++	DWORD size = MAX_COMPUTERNAME_LENGTH;
++	int i;
++	OSVERSIONINFO osver;
++
++	GetComputerName(buf, &size);
++	for (i = 0; i < strlen(buf); i++) {
++		name->nodename[i] = tolower(buf[i]);
++	}
++
++	osver.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
++	GetVersionEx(&osver);
++	sprintf(buf, "%ld.%ld (Build %d)", osver.dwMajorVersion, osver.dwMinorVersion, (int) (osver.dwBuildNumber & 0xffff));
++	strcpy(name->release, buf);
++
++	strcpy(name->sysname, "Windows");
++
++	if (osver.dwPlatformId == VER_PLATFORM_WIN32_NT)
++		strcat(name->sysname, " NT");
++
++	return 0;
++}
++
++clock_t	times(struct tms *buffer)
++{
++	return GetTickCount();
++}

@@ -1,0 +1,18 @@
+--- foomatic-filters-3.0.1/foomatic-rip.in.orig	2004-01-22 04:42:35.000000000 +0100
++++ foomatic-filters-3.0.1/foomatic-rip.in	2004-08-25 19:59:06.221371554 +0200
+@@ -124,6 +124,15 @@
+ #  USA.
+ #
+ 
++# strip out dangerous \x01 chars in arguments to avoid a security hole in cups.
++for (my $i=0; $i<=$#ARGV; $i++)
++{
++        if (defined($ARGV[$i]))
++        {
++                $ARGV[$i] =~ s/\001//g;
++        }
++}
++
+ my $added_lf = "\n";
+ 
+ # Flush everything immediately.

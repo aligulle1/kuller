@@ -1,0 +1,54 @@
+Index: src/support.c
+===================================================================
+--- src/support.c	(revision 1222)
++++ src/support.c	(revision 1223)
+@@ -2063,6 +2063,24 @@
+     return value;
+ }
+ 
++gint read_preference_int_with_default(gchar * key, gint default_value)
++{
++    gint value = 0;
++#ifdef HAVE_GCONF
++    gchar *full_key = NULL;
++
++    full_key = g_strdup_printf("/apps/gnome-mplayer/preferences/%s", key);
++    value = gconf_client_get_int(gconf, full_key, NULL);
++    g_free(full_key);
++#else
++	if (g_key_file_has_key(config,"gnome-mplayer",key,NULL))
++		value = g_key_file_get_integer(config, "gnome-mplayer", key, NULL);
++	else
++		value = default_value;
++#endif
++    return value;
++}
++
+ gfloat read_preference_float(gchar * key)
+ {
+     gfloat value = 0;
+Index: src/support.h
+===================================================================
+--- src/support.h	(revision 1222)
++++ src/support.h	(revision 1223)
+@@ -87,6 +87,7 @@
+ void init_preference_store();
+ gboolean read_preference_bool(gchar * key);
+ gint read_preference_int(gchar * key);
++gint read_preference_int_with_default(gchar * key, gint default_value);
+ gfloat read_preference_float(gchar * key);
+ gchar *read_preference_string(gchar * key);
+ void write_preference_bool(gchar * key, gboolean value);
+Index: src/main.c
+===================================================================
+--- src/main.c	(revision 1222)
++++ src/main.c	(revision 1223)
+@@ -621,7 +621,7 @@
+     disable_embeddedfonts = read_preference_bool(DISABLEEMBEDDEDFONTS);
+     disable_pause_on_click = read_preference_bool(DISABLEPAUSEONCLICK);
+     disable_animation = read_preference_bool(DISABLEANIMATION);
+-    auto_hide_timeout = read_preference_int(AUTOHIDETIMEOUT);
++    auto_hide_timeout = read_preference_int_with_default(AUTOHIDETIMEOUT,auto_hide_timeout);
+     disable_cover_art_fetch = read_preference_bool(DISABLE_COVER_ART_FETCH);
+     use_mediakeys = read_preference_bool(USE_MEDIAKEYS);
+     metadata_codepage = read_preference_string(METADATACODEPAGE);

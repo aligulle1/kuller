@@ -1,0 +1,22 @@
+diff -Nur madwifi-0.9.2/ath/if_ath.c madwifi-0.9.2-vmfix/ath/if_ath.c
+--- madwifi-0.9.2/ath/if_ath.c	2006-07-08 09:47:19.000000000 +0300
++++ madwifi-0.9.2-vmfix/ath/if_ath.c	2006-10-15 23:40:28.000000000 +0300
+@@ -676,6 +676,8 @@
+ 	dev->set_mac_address = ath_set_mac_address;
+  	dev->change_mtu = ath_change_mtu;
+ 	dev->tx_queue_len = ATH_TXBUF - 1;		/* 1 for mgmt frame */
++
++/* Vmware bridge fix -- see: http://madwifi.org/ticket/407
+ #ifdef USE_HEADERLEN_RESV
+ 	dev->hard_header_len += sizeof(struct ieee80211_qosframe) +
+ 				sizeof(struct llc) +
+@@ -686,7 +688,8 @@
+ 	dev->hard_header_len += ATH_FF_MAX_HDR;
+ #endif
+ #endif
+-	ic->ic_dev = dev;
++*/
++    ic->ic_dev = dev;
+ 	ic->ic_mgtstart = ath_mgtstart;
+ 	ic->ic_init = ath_init;
+ 	ic->ic_reset = ath_reset;

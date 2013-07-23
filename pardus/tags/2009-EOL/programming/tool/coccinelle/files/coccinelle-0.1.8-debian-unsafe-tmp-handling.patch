@@ -1,0 +1,19 @@
+Patch fixes unsafe temporary file handling (reported to upstream).
+
+Signed-off-by: Eugeniy Meshcheryakov <eugen@debian.org>
+
+diff -ur coccinelle-0.1.8/main.ml coccinelle-0.1.8.unsafe-tmp-handling/main.ml
+--- coccinelle-0.1.8/main.ml	2009-05-08 18:58:02.000000000 +0100
++++ coccinelle-0.1.8.unsafe-tmp-handling/main.ml	2009-05-22 12:09:23.094841485 +0100
+@@ -798,9 +798,11 @@
+ 	      
+ 	      if !output_file =$= "" 
+ 	      then begin
++		(*
+                 let tmpfile = "/tmp/"^Common.basename infile in
+                 pr2 (spf "One file modified. Result is here: %s" tmpfile);
+                 Common.command2 ("cp "^outfile^" "^tmpfile);
++		*)
+ 	      end
+ 	    ));
+           if !output_file <> "" then

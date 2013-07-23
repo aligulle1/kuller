@@ -1,0 +1,16 @@
+Index: plasma/shells/desktop/panelview.cpp
+===================================================================
+--- plasma/shells/desktop/panelview.cpp	(revision 976129)
++++ plasma/shells/desktop/panelview.cpp	(revision 976130)
+@@ -1082,6 +1082,11 @@
+         return false;
+     }
+ 
++    KWindowInfo activeWindow = KWindowSystem::windowInfo(KWindowSystem::activeWindow(), NET::WMState);
++    if (activeWindow.state() & NET::FullScreen) {
++        return false;
++    }
++
+     if (!shouldHintHide()) {
+         //kDebug() << "should not hint hide";
+         unhide(!dueToDnd);

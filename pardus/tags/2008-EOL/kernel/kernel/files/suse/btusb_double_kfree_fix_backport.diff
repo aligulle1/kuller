@@ -1,0 +1,22 @@
+From: Oliver Neukum<oneukum@suse.de>
+Subject: fix double kfree in btusb
+Reference: bnc#405546
+
+--- linux-2.6.25-SL110_BRANCH/drivers/bluetooth/btusb.c	2008-04-17 04:49:44.000000000 +0200
++++ alt/drivers/bluetooth/btusb.c	2008-12-08 12:25:49.190295000 +0100
+@@ -149,7 +149,6 @@ static inline int btusb_submit_intr_urb(
+ 		BT_ERR("%s urb %p submission failed (%d)",
+ 						hdev->name, urb, -err);
+ 		usb_unanchor_urb(urb);
+-		kfree(buf);
+ 	}
+ 
+ 	usb_free_urb(urb);
+@@ -227,7 +226,6 @@ static inline int btusb_submit_bulk_urb(
+ 		BT_ERR("%s urb %p submission failed (%d)",
+ 						hdev->name, urb, -err);
+ 		usb_unanchor_urb(urb);
+-		kfree(buf);
+ 	}
+ 
+ 	usb_free_urb(urb);

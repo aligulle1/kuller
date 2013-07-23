@@ -1,0 +1,16 @@
+SVN commit 665256 by dfaure:
+
+Fix lack of double-quotes around folder name, making GETQUOTAROOT fail on folders with a space in the name.
+Was already fixed in proko2 :(
+
+--- kioslaves/imap4/imapcommand.cc
+--- kioslaves/imap4/imapcommand.cc
+@@ -396,7 +396,7 @@
+ imapCommand *
+ imapCommand::clientGetQuotaroot( const QString& box )
+ {
+-  QString parameter = rfcDecoder::toIMAP (box);
++  QString parameter = QString("\"") + rfcDecoder::toIMAP (box) + '"';
+   return new imapCommand ("GETQUOTAROOT", parameter);
+ }
+ 

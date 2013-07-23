@@ -1,0 +1,109 @@
+diff -Nur mplayer-20071112-old/stream/http.c mplayer-20071112/stream/http.c
+--- mplayer-20071112-old/stream/http.c	2007-11-12 19:20:03.528921605 +0200
++++ mplayer-20071112/stream/http.c	2007-11-12 19:20:16.112008685 +0200
+@@ -721,7 +721,7 @@
+ 	HTTP_header_t *http_hdr = NULL;
+ 	unsigned int i;
+ 	int fd = stream->fd;
+-	int res = 0;
++	int res = STREAM_UNSUPPORTED;
+ 	int redirect = 0;
+ 	int auth_retry=0;
+ 	int seekable=0;
+@@ -836,6 +836,10 @@
+ 				next_url = http_get_field( http_hdr, "Location" );
+ 				if( next_url!=NULL ) {
+ 					stream->streaming_ctrl->url = url_redirect( &url, next_url );
++					if (strcasecmp(url->protocol, "http")) {
++						res = STREAM_REDIRECTED;
++						goto err_out;
++					}
+ 					redirect = 1;	
+ 				}
+ 				break;
+@@ -853,7 +857,6 @@
+ err_out:
+ 	if (fd > 0) closesocket( fd );
+ 	fd = -1;
+-	res = STREAM_UNSUPPORTED;
+ 	http_free( http_hdr );
+ 	http_hdr = NULL;
+ out:
+@@ -908,6 +911,8 @@
+ 		if (stream->fd >= 0)
+ 			closesocket(stream->fd);
+ 		stream->fd = -1;
++		if (seekable == STREAM_REDIRECTED)
++			return seekable;
+ 		streaming_ctrl_free(stream->streaming_ctrl);
+ 		stream->streaming_ctrl = NULL;
+ 		return STREAM_UNSUPPORTED;
+diff -Nur mplayer-20071112-old/stream/stream.c mplayer-20071112/stream/stream.c
+--- mplayer-20071112-old/stream/stream.c	2007-11-12 19:20:03.529921453 +0200
++++ mplayer-20071112/stream/stream.c	2007-11-12 19:20:16.112008685 +0200
+@@ -145,7 +145,8 @@
+ };
+ 
+ stream_t* open_stream_plugin(stream_info_t* sinfo,char* filename,int mode,
+-			     char** options, int* file_format, int* ret) {
++			     char** options, int* file_format, int* ret,
++			     char** redirected_url) {
+   void* arg = NULL;
+   stream_t* s;
+   m_struct_t* desc = (m_struct_t*)sinfo->opts;
+@@ -178,6 +179,16 @@
+   s->flags |= mode;
+   *ret = sinfo->open(s,mode,arg,file_format);
+   if((*ret) != STREAM_OK) {
++#ifdef MPLAYER_NETWORK
++    if (*ret == STREAM_REDIRECTED && redirected_url) {
++        if (s->streaming_ctrl && s->streaming_ctrl->url
++            && s->streaming_ctrl->url->url)
++          *redirected_url = strdup(s->streaming_ctrl->url->url);
++        else
++          *redirected_url = NULL;
++    }
++    streaming_ctrl_free(s->streaming_ctrl);
++#endif
+     free(s->url);
+     free(s);
+     return NULL;
+@@ -204,6 +215,7 @@
+   int i,j,l,r;
+   stream_info_t* sinfo;
+   stream_t* s;
++  char *redirected_url = NULL;
+ 
+   for(i = 0 ; auto_open_streams[i] ; i++) {
+     sinfo = auto_open_streams[i];
+@@ -218,9 +230,17 @@
+          ((strncmp(sinfo->protocols[j],filename,l) == 0) &&
+ 		      (strncmp("://",filename+l,3) == 0))) {
+ 	*file_format = DEMUXER_TYPE_UNKNOWN;
+-	s = open_stream_plugin(sinfo,filename,mode,options,file_format,&r);
++	s = open_stream_plugin(sinfo,filename,mode,options,file_format,&r,
++				&redirected_url);
+ 	if(s) return s;
+-	if(r != STREAM_UNSUPPORTED) {
++	if(r == STREAM_REDIRECTED && redirected_url) {
++	  mp_msg(MSGT_OPEN,MSGL_V, "[%s] open %s redirected to %s\n",
++		 sinfo->info, filename, redirected_url);
++	  s = open_stream_full(redirected_url, mode, options, file_format);
++	  free(redirected_url);
++	  return s;
++	}
++	else if(r != STREAM_UNSUPPORTED) {
+ 	  mp_msg(MSGT_OPEN,MSGL_ERR, MSGTR_FailedToOpen,filename);
+ 	  return NULL;
+ 	}
+diff -Nur mplayer-20071112-old/stream/stream.h mplayer-20071112/stream/stream.h
+--- mplayer-20071112-old/stream/stream.h	2007-11-12 19:20:03.527921757 +0200
++++ mplayer-20071112/stream/stream.h	2007-11-12 19:20:16.113008533 +0200
+@@ -48,6 +48,7 @@
+ #define STREAM_UNSUPPORTED -1
+ #define STREAM_ERROR 0
+ #define STREAM_OK    1
++#define STREAM_REDIRECTED -2
+ 
+ #define MAX_STREAM_PROTOCOLS 10
+ 

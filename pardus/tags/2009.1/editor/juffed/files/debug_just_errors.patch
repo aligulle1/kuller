@@ -1,0 +1,119 @@
+diff -urNaBw CMakeLists.txt.orig CMakeLists.txt
+--- CMakeLists.txt.orig	2009-05-20 20:39:42.903792920 +0200
++++ CMakeLists.txt	2009-05-20 20:41:01.835796830 +0200
+@@ -200,9 +200,9 @@
+ # definitions for the project
+ ADD_DEFINITIONS(
+ 	-Wall 
+-#	-DQT_NO_DEBUG
+-	-DJUFF_DEBUG
+-	-DJUFF_FULL_DEBUG
++	-DQT_NO_DEBUG
++#	-DJUFF_DEBUG
++#	-DJUFF_FULL_DEBUG
+ 	${QT_DEFINITIONS}
+ )
+ 
+diff -urNaBwp src/LexerStorage.cpp.orig src/LexerStorage.cpp
+--- src/LexerStorage.cpp.orig	2009-05-20 20:44:57.340793357 +0200
++++ src/LexerStorage.cpp	2009-05-20 20:47:09.185796563 +0200
+@@ -189,7 +189,6 @@ void LSInterior::readCustomStyle(const Q
+ 	QString fileName = QString("%1.xml").arg(nm);
+ 	fileName = AppInfo::configDirPath() + "/hlschemes/" + fileName;
+ 
+-	Log::debug(QString("Reading custom style from file '%1'...").arg(fileName), true);
+ 
+ 	QFile file(fileName);
+ 	if ( !file.open(QIODevice::ReadOnly) ) {
+@@ -197,7 +196,6 @@ void LSInterior::readCustomStyle(const Q
+ 		return;
+ 	}
+ 	else {
+-		Log::debug(QString("File '%1' opened successfully").arg(fileName), true);
+ 	}
+ 
+ 	QString err;
+@@ -209,7 +207,6 @@ void LSInterior::readCustomStyle(const Q
+ 		return;
+ 	}
+ 	else {
+-		Log::debug(QString("File '%1' was parsed successfully").arg(fileName), true);
+ 	}
+ 	
+ 	file.close();
+diff -urNaBwp src/Manager.cpp.orig src/Manager.cpp
+--- src/Manager.cpp.orig	2009-05-20 20:47:25.572793772 +0200
++++ src/Manager.cpp	2009-05-20 20:51:47.604795644 +0200
+@@ -669,7 +669,6 @@ void Manager::closeDoc(Document* doc) {
+ 	if ( !doc || doc->isNull() )
+ 		return;
+ 	
+-	Log::debug(doc->fileName());
+ 	
+ 	mInt_->docs1_.remove(doc->fileName());
+ 	mInt_->docs2_.remove(doc->fileName());
+@@ -787,7 +786,6 @@ bool Manager::fileSave() {
+ 		}
+ 	}
+ 	else {
+-		Log::debug("Null");
+ 		return false;
+ 	}
+ }
+@@ -1155,7 +1153,6 @@ void Manager::docModified(bool mod) {
+ 	Document* doc = qobject_cast<Document*>(sender());
+ 
+ 	if ( doc ) {
+-		Log::debug(doc->fileName() + (mod ? "isModified()" : " not modified"));
+ 		mInt_->gui_->updateTitle(doc->fileName(), mInt_->sessionName_, mod);
+ 		mInt_->viewer_->setDocModified(doc, mod);
+ 		mInt_->pluginManager_->notifyDocModified(doc->fileName(), mod);
+@@ -1206,7 +1203,6 @@ void Manager::onCurDocChanged(QWidget* w
+ 				handler->docActivated(doc);
+ 			}
+ 			else {
+-				Log::debug("<no type>");
+ 			}
+ 
+ 			//	status bar
+diff -urNaBwp src/NullDoc.cpp.orig src/NullDoc.cpp
+--- src/NullDoc.cpp.orig	2009-05-20 20:52:42.646792908 +0200
++++ src/NullDoc.cpp	2009-05-20 20:53:10.161799172 +0200
+@@ -69,7 +69,6 @@ NullDoc::NullDoc() : Juff::Document("") 
+ }
+ 	
+ void NullDoc::scream() const { 
+-	Log::debug("Empty document was called."); 
+ }
+ 
+ }	//	namespace Juff
+diff -urNaBwp src/PluginManager.cpp.orig src/PluginManager.cpp
+--- src/PluginManager.cpp.orig	2009-05-20 20:55:52.395794293 +0200
++++ src/PluginManager.cpp	2009-05-20 20:59:27.605797727 +0200
+@@ -46,7 +46,6 @@ public:
+ 	bool addPlugin(JuffPlugin* plugin) {
+ 		QString engine = plugin->targetEngine();
+ 
+-		Log::debug(engine);
+ 		
+ 		if ( engines_.contains(engine) ) {
+ 			//	plugin has specified its type and this type
+@@ -193,7 +192,6 @@ void PluginManager::loadPlugin(const QSt
+ 
+ 			if ( pmInt_->addPlugin(plugin) ) {
+ 
+-				qDebug(qPrintable(QString("-----=====((((( Plugin '%1' was loaded successfully! )))))=====-----").arg(plugin->name())));
+ 
+ 				//	context menu actions
+ 				QString type = plugin->targetEngine();
+diff -urNaBwp src/SocketListener.cpp.orig src/SocketListener.cpp
+--- src/SocketListener.cpp.orig	2009-05-20 20:59:50.749793930 +0200
++++ src/SocketListener.cpp	2009-05-20 21:04:04.930796810 +0200
+@@ -94,7 +94,6 @@ void SocketListener::run() {
+ 	//	times, thread exits
+ 	int fails = 0;
+ 	while ( true ) {
+-		Log::debug("Listening...");
+ 		int connected_sock = accept(socket_, &cl_addr, &addr_len);
+ 		if ( connected_sock == -1 ) {
+ 			//	error

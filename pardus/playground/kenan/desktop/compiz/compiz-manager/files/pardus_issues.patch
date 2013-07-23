@@ -1,0 +1,100 @@
+--- compiz-manager.orig	2008-08-15 00:46:33.000000000 +0300
++++ compiz-manager	2008-08-15 00:57:36.000000000 +0300
+@@ -27,16 +27,20 @@
+ # 
+ 
+ 
+-COMPIZ_BIN_PATH="/usr/local/bin/" # For window decorators and compiz
+-PLUGIN_PATH="/usr/local/lib/compiz/" 
++COMPIZ_BIN_PATH="/usr/bin/" # For window decorators and compiz
++PLUGIN_PATH="/usr/lib/compiz/" 
+ GLXINFO="/usr/bin/glxinfo"
+-KWIN="/usr/bin/kwin"
++KWIN=`which kwin`
+ METACITY="/usr/bin/metacity"
+ COMPIZ_NAME="compiz" # Final name for compiz (compiz.real) 
+ 
+ # For Xgl LD_PRELOAD
+-LIBGL_NVIDIA="/usr/lib/nvidia/libGL.so.1.2.xlibmesa"
+-LIBGL_FGLRX="/usr/lib/fglrx/libGL.so.1.2.xlibmesa"
++for driver in $LIBDIR/nvidia/libGL.so.*.xlibmesa ; do
++        LIBGL_NVIDIA=$driver
++done
++for driver in $LIBDIR/fglrx/libGL.so.*.xlibmesa ; do
++        LIBGL_FGLRX=$driver
++done
+ 
+ # Minimum amount of memory (in kilo bytes) that nVidia cards need
+ # to be allowed to start
+@@ -47,7 +51,12 @@
+ # For detecting what driver is in use, the + is for one or more /'s
+ XORG_DRIVER_PATH="/usr/lib/xorg/modules/drivers/+"
+ 
+-FALLBACKWM="${METACITY}"
++# FALLBACKWM should depend on the used desktop
++if [ -n "$KDE_FULL_SESSION" ]; then
++	FALLBACKWM="${KWIN}"
++else
++	FALLBACKWM="${METACITY}"
++fi
+ FALLBACKWM_OPTIONS="--replace $@"
+ 
+ # Driver whitelist
+@@ -65,8 +74,8 @@
+ COMPIZ_PLUGINS=""
+ ENV=""
+ 
+-# Use emerald by default if it exist
+-USE_EMERALD="yes"
++# Don't use emerald by default (to avoid additional requirements)
++USE_EMERALD=${USE_EMERALD:-no}
+ 
+ # No indirect by default
+ INDIRECT="no"
+@@ -267,14 +276,14 @@
+ # check pciid blacklist
+ have_blacklisted_pciid()
+ {
+-	OUTPUT=$(lspci -n)
++	OUTPUT=$(/usr/sbin/lspci -n)
+ 	for ID in ${BLACKLIST_PCIIDS}; do
+ 		if echo "$OUTPUT" | egrep -q "$ID"; then
+ 			verbose "Blacklisted PCIID '$ID' found \n"
+ 			return 0
+ 		fi
+ 	done
+-	OUTPUT=$(lspci -vn | grep -i VGA)
++	OUTPUT=$(/usr/sbin/lspci -vn | grep -i VGA)
+ 	verbose "Detected PCI ID for VGA: $OUTPUT\n"
+ 	return 1
+ }
+@@ -379,16 +388,24 @@
+ 	exit 0;
+ fi
+ # start the gtk-window-decorator if present
+-if [ -x ${COMPIZ_BIN_PATH}emerald ] && [ "$USE_EMERALD" = "yes" ]; then
++if [ -x ${COMPIZ_BIN_PATH}kde4-window-decorator ] && [ x$KDE_SESSION_VERSION = x"4" ]; then
++	verbose "Starting kde4-window-decorator\n"
++	${COMPIZ_BIN_PATH}kde4-window-decorator --replace &
++	FALLBACKWM="${KWIN}"
++elif [ -x ${COMPIZ_BIN_PATH}kde-window-decorator ] && [ -n "$KDE_FULL_SESSION" ]; then
++	verbose "Starting kde-window-decorator\n"
++	${COMPIZ_BIN_PATH}kde-window-decorator --replace &
++	FALLBACKWM="${KWIN}"
++elif [ -x ${COMPIZ_BIN_PATH}emerald ] && [ "$USE_EMERALD" = "yes" ]; then
+ 	verbose "Starting emerald\n"
+ 	${COMPIZ_BIN_PATH}emerald --replace &
+ elif [ -x ${COMPIZ_BIN_PATH}gtk-window-decorator ] && [ -n "$GNOME_DESKTOP_SESSION_ID" ]; then
+ 	verbose "Starting gtk-window-decorator\n"
+ 	${COMPIZ_BIN_PATH}gtk-window-decorator --replace &
+-elif [ -x ${COMPIZ_BIN_PATH}kde-window-decorator ] && [ -n "$KDE_FULL_SESSION" ]; then
+-	verbose "Starting kde-window-decorator\n"
+-	${COMPIZ_BIN_PATH}kde-window-decorator --replace &
+-	FALLBACKWM="${KWIN}"
++# Abort completely instead of having no window decoration
++elif [ ! -x ${COMPIZ_BIN_PATH}kde4-window-decorator ] && [ ! -x ${COMPIZ_BIN_PATH}kde-window-decorator ] && [ ! -x ${COMPIZ_BIN_PATH}gtk-window-decorator ] && [ ! -x ${COMPIZ_BIN_PATH}emerald ]; then
++	echo "No decoration manager found. Aborting..."
++	exit 1
+ fi
+ 
+ ${COMPIZ_BIN_PATH}${COMPIZ_NAME} $COMPIZ_OPTIONS "$@" $COMPIZ_PLUGINS || exec $FALLBACKWM $FALLBACKWM_OPTIONS

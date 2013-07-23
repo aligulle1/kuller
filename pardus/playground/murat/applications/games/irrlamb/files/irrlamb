@@ -1,0 +1,22 @@
+#!/bin/bash
+
+MAIN="irrlamb"
+
+DATADIR="/usr/share/$MAIN"
+
+TARGET="$HOME/.$MAIN"
+
+TOSYMLINK="art campaigns fonts levels meshes scenes scripts sounds terrain textures"
+
+if [ ! -e "$TARGET" ]; then
+        mkdir "$TARGET"
+fi
+for d in $TOSYMLINK; do
+        if [ ! -e "$TARGET/$d" ] ; then
+                ln -s "$DATADIR/$d" "$TARGET/$d"
+        fi
+done
+
+cd "$TARGET"
+
+exec /usr/bin/$MAIN.bin

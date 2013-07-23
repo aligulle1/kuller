@@ -1,0 +1,183 @@
+# RELAX NG schema file for PISI pspec.xml files
+
+# http://www.pardus.org.tr/projeler/pisi/
+
+# Start Document
+start = PISI
+# PISI Section
+PISI = element PISI { Source, Package+, History }
+# Source Section
+Source =
+  element Source {
+    Name,
+    Homepage,
+    Packager,
+    License+,
+    Icon?,
+    IsA+,
+    PartOf?,
+    Summary+,
+    # FIXME: should be oneOrMore
+    Description*,
+    Archive,
+    BuildDependencies?,
+    Patches?
+  }
+# Package Section
+Package =
+  element Package {
+    Name,
+    License?,
+    IsA*,
+    PartOf?,
+    Summary*,
+    Description*,
+    RuntimeDependencies?,
+    Conflicts?,
+    Replaces?,
+    Files,
+    AdditionalFiles?,
+    Provides?
+  }
+# History Section
+History = element History { Update+ }
+# Name
+Name =
+  element Name {
+    xsd:string { pattern = "[0-9a-zA-Z\-_+]*" maxLength = "255" }
+  }
+# Homepage
+Homepage = element Homepage { text }
+# Icon
+Icon = element Icon { text }
+# Packager
+Packager = element Packager { Packager.Name, Email }
+# Packager.Name
+Packager.Name =
+  element Name {
+    xsd:string { maxLength = "255" }
+  }
+# Email
+Email = element Email { text }
+# License
+License = element License { text }
+# IsA
+IsA =
+  element IsA {
+    "app"
+    | "app:console"
+    | "app:gui"
+    | "app:web"
+    | "library"
+    | "service"
+    | "data"
+    | "data:doc"
+    | "data:font"
+    | "kernel"
+    | "driver"
+    | "locale"
+    | "locale:tr"
+    | "locale:en"
+    | "locale:es"
+    | "locale:nl"
+    | "locale:fr"
+    | "locale:de"
+    | "locale:it"
+  }
+# PartOf
+PartOf = element PartOf { text }
+# Summary
+Summary = element Summary { attlist.Summary, text }
+# attlist.Summary
+attlist.Summary &= attribute xml:lang { text }?
+# Description
+Description = element Description { attlist.Description, text }
+# attlist.Description
+attlist.Description &= attribute xml:lang { text }?
+# Archive
+Archive = element Archive { attlist.Archive, text }
+# attlist.Archive
+attlist.Archive &=
+  attribute sha1sum { text },
+  attribute type {
+    "targz" | "tarbz2" | "tarlzma" | "tar" | "zip" | "gzip" | "binary"
+  }
+# BuildDependencies
+BuildDependencies = element BuildDependencies { Dependency+ }
+# Dependency
+Dependency = element Dependency { attlist.VersionReleaseToFrom, text }
+# attlist.VersionReleaseToFrom
+attlist.VersionReleaseToFrom =
+  attribute versionFrom { text }?,
+  attribute versionTo { text }?,
+  attribute version { text }?,
+  attribute releaseFrom { text }?,
+  attribute releaseTo { text }?,
+  attribute release { text }?
+# Patches
+Patches = element Patches { Patch+ }
+# Patch
+Patch = element Patch { attlist.Patch, text }
+# attlist.Patch
+attlist.Patch &=
+  attribute compressionType { text }?,
+  attribute level { text }?,
+  attribute target { text }?
+# Provides
+Provides = element Provides { COMAR+ }
+# COMAR
+COMAR = element COMAR { attlist.COMAR, text }
+# attlist.COMAR
+attlist.COMAR = attribute script { text }?
+# Conflicts
+Conflicts = element Conflicts { Conflicts.Package+ }
+Conflicts.Package =
+  element Package { attlist.VersionReleaseToFrom, text }
+# Replaces
+Replaces = element Replaces { Replaces.Package+ }
+Replaces.Package =
+  element Package { attlist.VersionReleaseToFrom, text }
+# AdditionalFiles
+AdditionalFiles = element AdditionalFiles { AdditionalFile+ }
+# AdditionalFile
+AdditionalFile = element AdditionalFile { attlist.AdditionalFile, text }
+# attlist.AdditionalFile
+attlist.AdditionalFile =
+  attribute target { text },
+  attribute permission { text }?,
+  attribute owner { text }?
+# RuntimeDependencies
+RuntimeDependencies = element RuntimeDependencies { Dependency+ }
+# Files
+Files = element Files { Path+ }
+# Path
+Path = element Path { attlist.Path, text }
+# attlist.Path
+attlist.Path &=
+  attribute fileType {
+    "executable"
+    | "library"
+    | "data"
+    | "config"
+    | "doc"
+    | "man"
+    | "info"
+    | "localedata"
+    | "header"
+  },
+  attribute permanent { "false" | "true" }?
+# Update
+Update =
+  element Update {
+    attlist.Update, Date, Version, Comment, Packager.Name, Email
+  }
+# attlist.Update
+attlist.Update &=
+  attribute release { text },
+  attribute type { "security" | "bug" }?
+# Date
+Date = element Date { xsd:date }
+# Version
+Version = element Version { text }
+# Comment
+Comment = element Comment { text }

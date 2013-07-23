@@ -1,0 +1,37 @@
+diff --git a/src/xcb_auth.c b/src/xcb_auth.c
+index ffc0515..9bd9a35 100644
+--- a/src/xcb_auth.c
++++ b/src/xcb_auth.c
+@@ -89,6 +89,7 @@ static Xauth *get_authptr(struct sockadd
+     char dispbuf[40];   /* big enough to hold more than 2^64 base 10 */
+     int authnamelens[N_AUTH_PROTOS];
+     int i;
++    Xauth *authptr = NULL;
+ 
+     family = FamilyLocal; /* 256 */
+     switch(sockname->sa_family)
+@@ -128,10 +129,20 @@ static Xauth *get_authptr(struct sockadd
+ 
+     for (i = 0; i < N_AUTH_PROTOS; i++)
+ 	authnamelens[i] = strlen(authnames[i]);
+-    return XauGetBestAuthByAddr (family,
+-                                 (unsigned short) addrlen, addr,
+-                                 (unsigned short) strlen(dispbuf), dispbuf,
+-                                 N_AUTH_PROTOS, authnames, authnamelens);
++    authptr = XauGetBestAuthByAddr (family,
++                                    (unsigned short) addrlen, addr,
++                                    (unsigned short) strlen(dispbuf), dispbuf,
++                                    N_AUTH_PROTOS, authnames, authnamelens);
++    // && !phostname
++    if ((!authptr || !authptr->data_length) && family == FamilyLocal) {
++	if ( (addr = getenv("XAUTHLOCALHOSTNAME")) ) {
++	    authptr = XauGetBestAuthByAddr (family,
++                                            (unsigned short) strlen(addr), addr,
++                                            (unsigned short) strlen(dispbuf), dispbuf,
++                                            N_AUTH_PROTOS, authnames, authnamelens);
++	}
++    }
++    return authptr;
+ }
+ 
+ #ifdef HASXDMAUTH

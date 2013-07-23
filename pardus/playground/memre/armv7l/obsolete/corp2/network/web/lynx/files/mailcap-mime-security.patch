@@ -1,0 +1,49 @@
+--- src/LYMain.c	2004-01-28 20:30:38.000000000 +0100
++++ src/LYMain.c	2006-11-27 07:45:51.000000000 +0100
+@@ -1145,9 +1145,17 @@
+     LYEscapeStartfile(&startfile);
+     StrAllocCopy(indexfile, DEFAULT_INDEX_FILE);
+     StrAllocCopy(global_type_map, GLOBAL_MAILCAP);
+-    StrAllocCopy(personal_type_map, PERSONAL_MAILCAP);
++
++    StrAllocCopy(personal_type_map, Home_Dir());
++    StrAllocCat(personal_type_map, "/");
++    StrAllocCat(personal_type_map, PERSONAL_MAILCAP);
++
+     StrAllocCopy(global_extension_map, GLOBAL_EXTENSION_MAP);
+-    StrAllocCopy(personal_extension_map, PERSONAL_EXTENSION_MAP);
++    
++    StrAllocCopy(personal_extension_map, Home_Dir());
++    StrAllocCat(personal_extension_map, "/");
++    StrAllocCat(personal_extension_map, PERSONAL_EXTENSION_MAP);
++
+     StrAllocCopy(language, PREFERRED_LANGUAGE);
+     StrAllocCopy(pref_charset, PREFERRED_CHARSET);
+     StrAllocCopy(system_mail, SYSTEM_MAIL);
+--- src/LYReadCFG.c	2004-01-28 20:30:38.000000000 +0100
++++ src/LYReadCFG.c	2006-11-27 07:45:51.000000000 +0100
+@@ -451,6 +451,15 @@
+     Config_Enum *table;
+ } Config_Type;
+ 
++static int set_personal_extension_map(char *value)
++{
++	StrAllocCopy(personal_extension_map, Home_Dir());
++	StrAllocCat(personal_extension_map, "/");
++    StrAllocCat(personal_extension_map, value);
++	return 0;
++}
++
++
+ static int assume_charset_fun(char *value)
+ {
+     UCLYhndl_for_unspec = safeUCGetLYhndl_byMIME(value);
+@@ -1454,7 +1463,7 @@
+ #ifdef USE_PERSISTENT_COOKIES
+      PARSE_SET(RC_PERSISTENT_COOKIES,   persistent_cookies),
+ #endif /* USE_PERSISTENT_COOKIES */
+-     PARSE_STR(RC_PERSONAL_EXTENSION_MAP, personal_extension_map),
++     PARSE_FUN(RC_PERSONAL_EXTENSION_MAP, set_personal_extension_map),
+      PARSE_STR(RC_PERSONAL_MAILCAP,     personal_type_map),
+      PARSE_STR(RC_PREFERRED_CHARSET,    pref_charset),
+      PARSE_ENU(RC_PREFERRED_ENCODING,   LYAcceptEncoding, tbl_preferred_encoding),

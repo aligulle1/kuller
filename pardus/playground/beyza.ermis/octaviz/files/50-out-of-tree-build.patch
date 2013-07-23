@@ -1,0 +1,52 @@
+diff -Nur octaviz/Common/CMakeLists.txt octaviz.new/Common/CMakeLists.txt
+--- octaviz/Common/CMakeLists.txt	2006-09-23 09:00:45.182130000 +0000
++++ octaviz.new/Common/CMakeLists.txt	2006-09-23 09:30:57.710623424 +0000
+@@ -1,5 +1,31 @@
+ SET(KIT_WRAP_DEPS)
+ 
++# files we need after vtkWrapOctave has been built 
++# => we copy them, so we can do out-of-tree builds
++CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/OctavizCommon.h
++        ${CMAKE_CURRENT_BINARY_DIR}/OctavizCommon.h
++        COPYONLY)
++CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/octaviz.h
++        ${CMAKE_CURRENT_BINARY_DIR}/octaviz.h
++        COPYONLY)
++CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/vtkInitializeInteractor.cc
++        ${CMAKE_CURRENT_BINARY_DIR}/vtkInitializeInteractor.cc
++        COPYONLY)
++CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/vtkRaiseWindow.cc
++        ${CMAKE_CURRENT_BINARY_DIR}/vtkRaiseWindow.cc
++        COPYONLY)
++CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/vtk_get_pointer.cc
++        ${CMAKE_CURRENT_BINARY_DIR}/vtk_get_pointer.cc
++        COPYONLY)
++# FIXME: not sure about these ones
++CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/vtk_init.cc
++        ${CMAKE_CURRENT_BINARY_DIR}/vtk_init.cc
++        COPYONLY)
++CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/vtk_print_ref_table.cc
++        ${CMAKE_CURRENT_BINARY_DIR}/vtk_print_ref_table.cc
++        COPYONLY)
++
++
+ OCTAVE_WRAP_VTK(Common COMMON "${KIT_WRAP_DEPS}")
+ EXEC_PROGRAM(${OCTAVE_CONFIG} ARGS "-p OCTINCLUDEDIR" OUTPUT_VARIABLE OCT_INC_DIR)
+ EXEC_PROGRAM(${OCTAVE_CONFIG} ARGS "-p OCTLIBDIR" OUTPUT_VARIABLE OCT_LIB_DIR)
+@@ -27,4 +53,4 @@
+ STRING(REGEX REPLACE "${CMAKE_INSTALL_PREFIX}" "" OUT_MTCH ${OCT_LIB_DIR})
+ INSTALL_TARGETS(${OUT_MTCH} octaviz)
+  
+- 
+\ No newline at end of file
++ 
+diff -Nur octaviz/Wrapping/CMakeLists.txt octaviz.new/Wrapping/CMakeLists.txt
+--- octaviz/Wrapping/CMakeLists.txt	2006-09-23 09:00:45.188129000 +0000
++++ octaviz.new/Wrapping/CMakeLists.txt	2006-09-23 09:30:57.710623424 +0000
+@@ -1 +1,6 @@
+ ADD_EXECUTABLE(vtkWrapOctave vtkWrapOctave.c vtkParse.tab.c)
++
++# We need the hints file after we have built vtkWrapOctave
++CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/hints 
++	${CMAKE_CURRENT_BINARY_DIR}/hints
++	COPYONLY) 

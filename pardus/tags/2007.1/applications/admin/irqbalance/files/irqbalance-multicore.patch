@@ -1,0 +1,36 @@
+--- irqbalance-1.13/irqbalance/cpuinfo.c.orig	2006-10-19 16:21:01.000000000 -0400
++++ irqbalance-1.13/irqbalance/cpuinfo.c	2006-10-19 16:40:54.000000000 -0400
+@@ -23,6 +23,7 @@
+ 
+ static int siblings[MAX_CPU];	         /* number of HT siblings for each cpu */
+ static unsigned int cpunumber[MAX_CPU];  /* physical package identifier for each CPU*/
++static unsigned int core_id[MAX_CPU];  /* physical package identifier for each CPU*/
+ int cpucount = -1;		         /* total number of CPU's */
+ int machineneedsbalance;		 /* set to 15 for Intel pIV, 0 or 1 elsewhere */
+ unsigned int cpubrother[MAX_CPU];        /* the cpu number of the HT sibling if present, if absent
+@@ -55,10 +56,11 @@
+ 			sscanf(linebuffer,"siblings\t: %i", &siblings[cpucount]);
+ 		else if (strstr(linebuffer,"physical id\t:"))
+ 			sscanf(linebuffer,"physical id\t: %ui", &cpunumber[cpucount]);
+-		else if (strstr(linebuffer,"GenuineIntel")) {
+-			if (!machineneedsbalance)
+-				machineneedsbalance = 1;
+-		} else if (machineneedsbalance && strstr(linebuffer,"cpu family\t:"))
++		else if (strstr(linebuffer,"GenuineIntel"))
++			machineneedsbalance = (!machineneedsbalance) ? 1 : 0;
++		else if (strstr(linebuffer,"core id\t:"))
++			sscanf(linebuffer, "core id\t: %ui", &core_id[cpucount]);	
++		else if (machineneedsbalance && strstr(linebuffer,"cpu family\t:"))
+ 			sscanf(linebuffer,"cpu family\t: %ui",&machineneedsbalance);
+ 	}
+ 	
+@@ -75,7 +77,8 @@
+ 	/* and brute-force the search */
+ 	for (i = 0; i < cpucount; i++)
+ 	 	for (j=0; j < cpucount; j++) {
+-	 		if ( (cpunumber[i]==cpunumber[j]) && (i!=j) && (siblings[i]>1)) {
++	 		if ( (cpunumber[i]==cpunumber[j]) && (i!=j) && 
++			     (siblings[i]>1) && (core_id[i]==core_id[j])) {
+ 	 			cpubrother[i] = j;
+ 	 			continue;
+ 	 		}

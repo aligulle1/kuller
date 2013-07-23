@@ -1,0 +1,34 @@
+qt-bugs@ issue : none
+Trolltech task ID : none
+bugs.kde.org number : none
+applied: yes
+author: Ménard Alexis <darktears31@gmail.com>
+
+Fix a crash when the qgraphicsproxywidget is deleted, the problem is when setWidget(0) is calling by the destructor of qgraphicsproxywidget, some stuff in setWidget_helper especially q pointer is partially deleted (i think). The fix is not really correct because i think a method which deconnect the destroyed signal and set the correct attributes on the old widget can be create instead of testing if we have a new widget.
+
+Index: src/gui/graphicsview/qgraphicsproxywidget.cpp
+===================================================================
+--- src/gui/graphicsview/qgraphicsproxywidget.cpp	(revision 806384)
++++ src/gui/graphicsview/qgraphicsproxywidget.cpp	(working copy)
+@@ -553,14 +553,17 @@
+         return;
+     if (widget) {
+         QObject::disconnect(widget, SIGNAL(destroyed()), q, SLOT(_q_removeWidgetSlot()));
+-        widget->removeEventFilter(q);
+         widget->setAttribute(Qt::WA_DontShowOnScreen, false);
+         widget->d_func()->extra->topextra->proxyWidget = 0;
+-        widget = 0;
++        if (newWidget) {
++            widget->removeEventFilter(q);
+ #ifndef QT_NO_CURSOR
+-        q->unsetCursor();
++            q->unsetCursor();
+ #endif
+-        q->setAcceptHoverEvents(false);
++            q->setAcceptHoverEvents(false);
++        }
++        widget = 0;
++
+     }
+     if (!newWidget)
+         return;

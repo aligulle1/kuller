@@ -1,0 +1,40 @@
+diff -up xdm-1.1.6/config/Makefile.am.authDir-var-bug388431 xdm-1.1.6/config/Makefile.am
+--- xdm-1.1.6/config/Makefile.am.authDir-var-bug388431	2007-01-02 22:45:08.000000000 +0100
++++ xdm-1.1.6/config/Makefile.am	2009-01-26 14:04:09.000000000 +0100
+@@ -52,6 +52,7 @@ MKTEMP_DEFINES = -DMKTEMP_COMMAND=$(MKTE
+ 
+ CPP_FILES_FLAGS = -DBINDIR="$(bindir)" -DDEFAULTVT="$(DEFAULTVT)" \
+     -DXDMDIR="$(XDMLIBDIR)" -DXDMLOGDIR="$(XDMLOGDIR)" \
++    -DXDMXAUTHDIR="$(XDMXAUTHDIR)" \
+     -DXDMPIDDIR="$(XDMPIDDIR)" -DXDMCONFIGDIR="$(XDMCONFIGDIR)" \
+     -DXDMSCRIPTDIR="$(XDMSCRIPTDIR)" -DSU="$(SU)" \
+     -DCHOOSERPATH="$(XDMLIBDIR)/chooser" $(XPMDEFINES) \
+diff -up xdm-1.1.6/configure.ac.authDir-var-bug388431 xdm-1.1.6/configure.ac
+--- xdm-1.1.6/configure.ac.authDir-var-bug388431	2007-08-16 23:46:47.000000000 +0200
++++ xdm-1.1.6/configure.ac	2009-01-26 14:03:03.000000000 +0100
+@@ -510,7 +510,13 @@ AC_DEFINE_DIR(DEF_CHOOSER, XDMLIBDIR/cho
+ 
+ # -DDEF_AUTH_DIR="$(XDMDIR)"
+ 
+-AC_DEFINE_DIR(DEF_AUTH_DIR, XDMCONFIGDIR, 
++AC_ARG_WITH(authdir,
++	AC_HELP_STRING([--with-authdir=<pathname>],
++	  [specify directory for X auth files (default=/var/lib/xdm)]),
++	[XDMXAUTHDIR="$withval"], [XDMXAUTHDIR="/var/lib/xdm"])
++AC_SUBST(XDMXAUTHDIR)
++
++AC_DEFINE_DIR(DEF_AUTH_DIR, XDMXAUTHDIR, 
+ 	[Define to pathname where authentication cookie files should be stored])
+ 
+ # -DDEF_GREETER_LIB="$(XDMDIR)/libXdmGreet.so"
+diff -up xdm-1.1.6/config/xdm-config.cpp.authDir-var-bug388431 xdm-1.1.6/config/xdm-config.cpp
+--- xdm-1.1.6/config/xdm-config.cpp.authDir-var-bug388431	2009-01-26 14:03:03.000000000 +0100
++++ xdm-1.1.6/config/xdm-config.cpp	2009-01-26 14:03:03.000000000 +0100
+@@ -12,6 +12,7 @@
+ #ifndef XDMSCRIPTDIR
+ #define XDMSCRIPTDIR XDMDIR
+ #endif
++DisplayManager.authDir:	XDMXAUTHDIR
+ DisplayManager.errorLogFile:	XDMLOGDIR/xdm.log
+ DisplayManager.pidFile:		XDMPIDDIR/xdm.pid
+ DisplayManager.keyFile:		XDMCONFIGDIR/xdm-keys

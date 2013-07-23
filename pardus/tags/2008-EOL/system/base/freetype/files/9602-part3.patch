@@ -1,0 +1,26 @@
+From 0a05ba257b6ddd87dacf8d54b626e4b360e0a596 Mon Sep 17 00:00:00 2001
+From: Werner Lemberg <wl@gnu.org>
+Date: Fri, 20 Mar 2009 06:19:45 +0000
+Subject: Protect against malformed compressed data.
+
+Problem reported by Tavis Ormandy <taviso@google.com>.
+
+* src/lsw/ftzopen.c (ft_lzwstate_io): Test whether `state->prefix' is
+zero.
+---
+diff --git a/src/lzw/ftzopen.c b/src/lzw/ftzopen.c
+index fc78315..c0483de 100644
+--- a/src/lzw/ftzopen.c
++++ b/src/lzw/ftzopen.c
+@@ -332,6 +332,9 @@
+ 
+           while ( code >= 256U )
+           {
++            if ( !state->prefix )
++              goto Eof;
++
+             FTLZW_STACK_PUSH( state->suffix[code - 256] );
+             code = state->prefix[code - 256];
+           }
+--
+cgit v0.8.2

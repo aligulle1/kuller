@@ -1,0 +1,102 @@
+Index: ChangeLog
+===================================================================
+RCS file: /cvs/hal/PolicyKit/ChangeLog,v
+retrieving revision 1.22
+diff -u -r1.22 ChangeLog
+--- ChangeLog	7 Jun 2006 00:26:55 -0000	1.22
++++ ChangeLog	25 Jul 2006 12:18:34 -0000
+@@ -1,3 +1,16 @@
++2006-07-25  Danny Kukawka  <danny.kukawka@web.de>
++
++	* pam-polkit-console/pam-polkit-console.c: (pam_sm_open_session),
++	(pam_sm_close_session): fixed usage of pam_get_item() to respect 
++	strict-aliasing rules
++
++	* polkitd/polkit-manager.c: (polkit_manager_get_caller_info): 
++	added ifdef around currently unused calling_selinux_context
++
++	* tools/polkit-grant-privilege.c: (grant_complete_cb): replaced
++	libpolkit_free_context() with correct libpolkit_grant_free_context()
++
++
+ 2006-06-06  David Zeuthen  <davidz@redhat.com>
+ 
+ 	* polkitd/polkit-manager.c (polkit_manager_get_caller_info): For
+ 	  or <code class="literal">Temporary</code> it means the user can
+Index: pam-polkit-console/pam-polkit-console.c
+===================================================================
+RCS file: /cvs/hal/PolicyKit/pam-polkit-console/pam-polkit-console.c,v
+retrieving revision 1.2
+diff -u -r1.2 pam-polkit-console.c
+--- pam-polkit-console/pam-polkit-console.c	6 Jun 2006 11:55:50 -0000	1.2
++++ pam-polkit-console/pam-polkit-console.c	25 Jul 2006 12:18:34 -0000
+@@ -169,7 +169,7 @@
+ 
+ 	_pam_log (pamh, LOG_ERR, TRUE, "pam_polkit_console open_session");
+ 	_parse_module_args (pamh, argc, argv);
+-	if(pam_get_item (pamh, PAM_USER_PROMPT, (const void **) &user_prompt) != PAM_SUCCESS) {
++	if(pam_get_item (pamh, PAM_USER_PROMPT, (const void **)(char*) &user_prompt) != PAM_SUCCESS) {
+ 		user_prompt = "user name: ";
+ 	}
+ 	username = NULL;
+@@ -178,7 +178,7 @@
+ 		return PAM_SESSION_ERR;
+ 	}
+ 
+-	pam_get_item(pamh, PAM_TTY, (const void**) &tty);
++	pam_get_item(pamh, PAM_TTY, (const void**)(char*) &tty);
+ 	if (tty == NULL || strlen (tty) == 0) {
+ 		_pam_log(pamh, LOG_ERR, TRUE, "TTY not defined");
+ 		return PAM_SESSION_ERR;
+@@ -216,7 +216,7 @@
+ 
+ 	_pam_log (pamh, LOG_ERR, TRUE, "pam_polkit_console close_session");
+ 	_parse_module_args (pamh, argc, argv);
+-	if (pam_get_item (pamh, PAM_USER_PROMPT, (const void **) &user_prompt) != PAM_SUCCESS) {
++	if (pam_get_item (pamh, PAM_USER_PROMPT, (const void **)(char*) &user_prompt) != PAM_SUCCESS) {
+ 		user_prompt = "user name: ";
+ 	}
+ 	username = NULL;
+@@ -225,7 +225,7 @@
+ 		return PAM_SESSION_ERR;
+ 	}
+ 
+-	pam_get_item (pamh, PAM_TTY, (const void**) &tty);
++	pam_get_item (pamh, PAM_TTY, (const void**)(char*) &tty);
+ 	if (tty == NULL || strlen (tty) == 0) {
+ 		_pam_log(pamh, LOG_ERR, TRUE, "TTY not defined");
+ 		return PAM_SESSION_ERR;
+Index: polkitd/polkit-manager.c
+===================================================================
+RCS file: /cvs/hal/PolicyKit/polkitd/polkit-manager.c,v
+retrieving revision 1.4
+diff -u -r1.4 polkit-manager.c
+--- polkitd/polkit-manager.c	7 Jun 2006 00:26:55 -0000	1.4
++++ polkitd/polkit-manager.c	25 Jul 2006 12:18:34 -0000
+@@ -315,8 +315,9 @@
+ 	gboolean res;
+ 	CallerInfo *caller_info;
+ 	GError *error = NULL;
++#if 0
+ 	GArray *calling_selinux_context;
+-
++#endif
+ 	res = FALSE;
+ 
+ 	if (sender == NULL)
+Index: tools/polkit-grant-privilege.c
+===================================================================
+RCS file: /cvs/hal/PolicyKit/tools/polkit-grant-privilege.c,v
+retrieving revision 1.5
+diff -u -r1.5 polkit-grant-privilege.c
+--- tools/polkit-grant-privilege.c	5 Jun 2006 23:39:00 -0000	1.5
++++ tools/polkit-grant-privilege.c	25 Jul 2006 12:18:34 -0000
+@@ -144,7 +144,7 @@
+ 		libpolkit_grant_close (ctx, FALSE);
+ 	}
+ 
+-	libpolkit_free_context (ctx);
++	libpolkit_grant_free_context (ctx);
+ 
+ 	exit (0);
+ }

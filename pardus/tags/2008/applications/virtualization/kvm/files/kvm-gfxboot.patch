@@ -1,0 +1,121 @@
+diff -ur kvm-65.orig/kernel/include/asm-x86/kvm_host.h kvm-65/kernel/include/asm-x86/kvm_host.h
+--- kvm-65.orig/kernel/include/asm-x86/kvm_host.h	2008-04-06 22:23:07.000000000 +0300
++++ kvm-65/kernel/include/asm-x86/kvm_host.h	2008-04-09 23:25:30.000000000 +0300
+@@ -216,6 +216,10 @@
+ 	unsigned long regs[NR_VCPU_REGS]; /* for rsp: vcpu_load_rsp_rip() */
+ 	unsigned long rip;      /* needs vcpu_load_rsp_rip() */
+ 
++	/* temporaries for gfxboot patching */
++	u16 backup_ss;
++	unsigned long backup_ss_rip;
++
+ 	unsigned long cr0;
+ 	unsigned long cr2;
+ 	unsigned long cr3;
+diff -ur kvm-65.orig/kernel/vmx.c kvm-65/kernel/vmx.c
+--- kvm-65.orig/kernel/vmx.c	2008-04-06 22:23:07.000000000 +0300
++++ kvm-65/kernel/vmx.c	2008-04-09 23:24:57.000000000 +0300
+@@ -1164,6 +1164,8 @@
+ static void enter_pmode(struct kvm_vcpu *vcpu)
+ {
+ 	unsigned long flags;
++	unsigned long rip;
++	u8 opcodes[2];
+ 
+ 	vcpu->arch.rmode.active = 0;
+ 
+@@ -1186,12 +1188,40 @@
+ 	fix_pmode_dataseg(VCPU_SREG_GS, &vcpu->arch.rmode.gs);
+ 	fix_pmode_dataseg(VCPU_SREG_FS, &vcpu->arch.rmode.fs);
+ 
++	/* Save real mode SS */
++	vcpu->arch.backup_ss = vmcs_read16(GUEST_SS_SELECTOR);
++
+ 	vmcs_write16(GUEST_SS_SELECTOR, 0);
+ 	vmcs_write32(GUEST_SS_AR_BYTES, 0x93);
+ 
+ 	vmcs_write16(GUEST_CS_SELECTOR,
+ 		     vmcs_read16(GUEST_CS_SELECTOR) & ~SELECTOR_RPL_MASK);
+ 	vmcs_write32(GUEST_CS_AR_BYTES, 0x9b);
++
++	/* VMX checks for SS.CPL = CS.CPL on VM entry, if we are in
++	 * protected mode. This fails on the transistion from real mode
++	 * to protected mode, as just after that, SS still contains the
++	 * real mode segment, which does not know anything about CPLs.
++	 * 
++	 * As far as I know only gfxboot exploits this feature, by using
++	 * the old real mode SS value to find a new SS selector in protected
++	 * mode. This happens using a mov %ss, %eax instruction, which we
++	 * can patch to an ud2 instruction and emulate later on, giving eax
++	 * the real SS value, that existed before the protected mode
++	 * switch. */
++	rip = vcpu->arch.rip + vmcs_readl(GUEST_CS_BASE) + 14;
++	emulator_read_std(rip, (void *)opcodes, 2, vcpu);
++
++	if ( opcodes[0] ==  0x8c && opcodes[1] == 0xd0 ) {
++		vcpu_printf(vcpu, "%s: patching mov SS\n", __FUNCTION__);
++		opcodes[0] = 0x0f;
++		opcodes[1] = 0x0b;
++		vcpu->arch.backup_ss_rip = rip;
++		if (emulator_write_emulated(rip, opcodes,
++		    2, vcpu) != X86EMUL_CONTINUE)
++			vcpu_printf(vcpu, "%s: unable to patch mov SS\n",
++				__FUNCTION__);
++	}
+ }
+ 
+ static gva_t rmode_tss_base(struct kvm *kvm)
+Yalnızca kvm-65/kernel'da: vmx.c.orig
+diff -ur kvm-65.orig/kernel/x86.c kvm-65/kernel/x86.c
+--- kvm-65.orig/kernel/x86.c	2008-04-06 22:23:07.000000000 +0300
++++ kvm-65/kernel/x86.c	2008-04-09 23:24:57.000000000 +0300
+@@ -2075,13 +2075,14 @@
+ 
+ 		r = x86_decode_insn(&vcpu->arch.emulate_ctxt, &emulate_ops);
+ 
+-		/* Reject the instructions other than VMCALL/VMMCALL when
++		/* Reject the instructions other than VMCALL/VMMCALL/UD2 when
+ 		 * try to emulate invalid opcode */
+ 		c = &vcpu->arch.emulate_ctxt.decode;
+ 		if ((emulation_type & EMULTYPE_TRAP_UD) &&
+-		    (!(c->twobyte && c->b == 0x01 &&
++		    ((!(c->twobyte && c->b == 0x01 &&
+ 		      (c->modrm_reg == 0 || c->modrm_reg == 3) &&
+-		       c->modrm_mod == 3 && c->modrm_rm == 1)))
++		       c->modrm_mod == 3 && c->modrm_rm == 1)) &&
++		       c->b != 0x0b))
+ 			return EMULATE_FAIL;
+ 
+ 		++vcpu->stat.insn_emulation;
+diff -ur kvm-65.orig/kernel/x86_emulate.c kvm-65/kernel/x86_emulate.c
+--- kvm-65.orig/kernel/x86_emulate.c	2008-04-06 22:23:07.000000000 +0300
++++ kvm-65/kernel/x86_emulate.c	2008-04-09 23:24:57.000000000 +0300
+@@ -181,7 +181,7 @@
+ static u16 twobyte_table[256] = {
+ 	/* 0x00 - 0x0F */
+ 	0, Group | GroupDual | Group7, 0, 0, 0, 0, ImplicitOps, 0,
+-	ImplicitOps, ImplicitOps, 0, 0, 0, ImplicitOps | ModRM, 0, 0,
++	ImplicitOps, ImplicitOps, 0, ImplicitOps, 0, ImplicitOps | ModRM, 0, 0,
+ 	/* 0x10 - 0x1F */
+ 	0, 0, 0, 0, 0, 0, 0, 0, ImplicitOps | ModRM, 0, 0, 0, 0, 0, 0, 0,
+ 	/* 0x20 - 0x2F */
+@@ -1774,6 +1774,19 @@
+ 	case 0x18:		/* Grp16 (prefetch/nop) */
+ 		c->dst.type = OP_NONE;
+ 		break;
++	case 0x0b: /* UD2 (used to patch mov %ss, %eax) */
++		/* This opcode is declared invalid, according to the Intel
++		 * specification and exploited here to circumvent a
++		 * VMX restriction. For more information, why this is
++		 * needed, please see vmx.c:enter_pmode.
++		 */
++		if (ctxt->vcpu->arch.backup_ss_rip == ctxt->vcpu->arch.rip + ctxt->cs_base) {
++			c->dst.type = OP_NONE;
++			c->regs[VCPU_REGS_RAX] = ctxt->vcpu->arch.backup_ss;
++		} else {
++			goto cannot_emulate;
++		}
++		break;
+ 	case 0x20: /* mov cr, reg */
+ 		if (c->modrm_mod != 3)
+ 			goto cannot_emulate;

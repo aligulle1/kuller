@@ -1,0 +1,38 @@
+From: Wolfgang Rosenauer <stark@suse.de>
+Subject: make pagesize postscript DSC conform
+References:
+http://www.cups.org/str.php?L1542
+https://bugzilla.mozilla.org/show_bug.cgi?id=334485
+
+Index: gfx/src/ps/nsPostScriptObj.cpp
+===================================================================
+RCS file: /cvsroot/mozilla/gfx/src/ps/nsPostScriptObj.cpp,v
+retrieving revision 1.124
+diff -u -p -6 -r1.124 nsPostScriptObj.cpp
+--- gfx/src/ps/nsPostScriptObj.cpp	26 Jul 2005 15:54:18 -0000	1.124
++++ gfx/src/ps/nsPostScriptObj.cpp	25 Apr 2006 18:10:34 -0000
+@@ -463,20 +463,23 @@ nsPostScriptObj::write_prolog(FILE *aHan
+     
+     // now begin prolog 
+   fprintf(f, "%%%%BeginProlog\n");
+ 
+   // Tell the printer what size paper it should use
+   fprintf(f,
++    "%%%%BeginFeature: *PageSize %s\n"
+     "/setpagedevice where\n"			// Test for the feature
+     "{ pop 2 dict\n"
+     "  dup /PageSize [ %s %s ] put\n"		// Paper dimensions
+     "  dup /Policies 1 dict\n"
+     "    dup /PageSize 3 put\n"			// Select the nearest page size to fit
+     "  put\n"
+     "  setpagedevice\n"				// Install settings
+-    "} if\n", 
++    "} if\n"
++    "%%%%EndFeature\n",
++    mPrintSetup->paper_name,
+     fpCString(NSTwipsToFloatPoints(paper_width)).get(),
+     fpCString(NSTwipsToFloatPoints(paper_height)).get());
+ 
+   fprintf(f, "[");
+   for (i = 0; i < 256; i++){
+ 	  if (*isotab[i] == '\0'){

@@ -1,0 +1,68 @@
+gui: Enable opening read-only documents
+
+This patch fixes bt#355
+
+If we try to open a read-only document gui will fail because it is opening
+each document as ReadWrite or Advanced (depending on the current setting).
+This means that CPdf::getInstance opens file with rb+ flags and thus fopen
+fails and throws PDFOpenException.
+We can prevent from that simply by falling back to ReadOnly if ReadWrite or
+Advanced modes fail.
+
+Currently we have two entry points for CPdf instance creation:
+	- getPdfInstance - used when a document is opened from GUI
+	- Base::getBasePdfInstance - used by scripting (loadPdf, Pdftoxml)
+
+Let's update all of them.
+Index: pdfedit-patches/src/gui/base.cc
+===================================================================
+--- pdfedit-patches.orig/src/gui/base.cc	2010-05-20 21:18:41.000000000 +0200
++++ pdfedit-patches/src/gui/base.cc	2010-05-20 21:45:59.000000000 +0200
+@@ -688,7 +688,20 @@ boost::shared_ptr<pdfobjects::CPdf> Base
+  if (openMode=="readonly") mode=CPdf::ReadOnly;
+  if (openMode=="readwrite") mode=CPdf::ReadWrite;
+  //Basic mode without asking a password (we do not know how)
+- return CPdf::getInstance(util::convertFromUnicode(filename,util::NAME).c_str(),mode);
++ boost::shared_ptr<pdfobjects::CPdf> pdf;
++ do {
++   try {
++     pdf = CPdf::getInstance(util::convertFromUnicode(filename,util::NAME).c_str(),mode);
++   }catch(PdfOpenException &e) {
++     // try to fallback to readonly mode
++     if (mode >= CPdf::ReadWrite) {
++       mode = CPdf::ReadOnly;
++       continue;
++     }
++     throw e;
++   }
++ }while(!pdf);
++ return pdf;
+ }
+ 
+ /** \copydoc loadFromFile */
+Index: pdfedit-patches/src/gui/pdfutil.cc
+===================================================================
+--- pdfedit-patches.orig/src/gui/pdfutil.cc	2010-05-20 21:18:41.000000000 +0200
++++ pdfedit-patches/src/gui/pdfutil.cc	2010-05-20 21:19:15.000000000 +0200
+@@ -451,7 +451,20 @@ QString annotTypeName(boost::shared_ptr<
+  @param askPassword If true, password will be asked for if necessary
+ */
+ boost::shared_ptr<CPdf> getPdfInstance(QWidget *parent, const QString &filename, CPdf::OpenMode mode, bool askPassword) {
+- boost::shared_ptr<CPdf> pdf=CPdf::getInstance(util::convertFromUnicode(filename,util::NAME).c_str(), mode);
++ boost::shared_ptr<pdfobjects::CPdf> pdf;
++ do {
++   try {
++     pdf = CPdf::getInstance(util::convertFromUnicode(filename,util::NAME).c_str(),mode);
++   }catch(PdfOpenException &e) {
++     // try to fallback to readonly mode
++     if (mode >= CPdf::ReadWrite) {
++       mode = CPdf::ReadOnly;
++       continue;
++     }
++     throw e;
++   }
++ }while(!pdf);
++
+  if (askPassword && pdf->needsCredentials()) {
+   for(;;) {
+    //Ask for password until we either get the right one or user gets bored with retrying

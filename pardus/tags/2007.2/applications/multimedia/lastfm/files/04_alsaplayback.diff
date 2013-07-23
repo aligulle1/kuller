@@ -1,0 +1,465 @@
+diff -urN last.fm-1.3.0.62-03/src/output/alsa-playback/alsaaudio.cpp last.fm-1.3.0.62-04/src/output/alsa-playback/alsaaudio.cpp
+--- last.fm-1.3.0.62-03/src/output/alsa-playback/alsaaudio.cpp	2007-06-27 10:12:26.000000000 -0700
++++ last.fm-1.3.0.62-04/src/output/alsa-playback/alsaaudio.cpp	2007-07-02 09:45:52.000000000 -0700
+@@ -63,6 +63,15 @@
+ }
+ 
+ 
++AlsaAudio::~AlsaAudio()
++{
++    // Close here just to be sure
++    // These are safe to call more than once
++    stopPlayback();
++    alsaClose();
++}
++
++
+ 
+ /******************************************************************************
+  * Device Detection
+@@ -176,17 +185,27 @@
+     Device Setup
+ ******************************************************************************/
+ 
+-bool AlsaAudio::alsaSetup( QString device, snd_pcm_uframes_t periodSize, uint periodCount, snd_format *f )
++bool
++AlsaAudio::alsaOpen( QString device, AFormat format, unsigned int rate,
++                      unsigned int channels, snd_pcm_uframes_t periodSize,
++                      unsigned int periodCount )
+ {
+-    Q_DEBUG_BLOCK;
+-
+     int err;
+     ssize_t hw_period_size;
+     snd_pcm_hw_params_t *hwparams;
+     snd_pcm_sw_params_t *swparams;
+     snd_pcm_uframes_t alsa_buffer_size, alsa_period_size;
+     snd_pcm_access_mask_t *mask;
+-    
++
++    Q_DEBUG_BLOCK << "Setting up Device:" << device;
++
++    inputf = snd_format_from_xmms( format, rate, channels );
++
++    // We'll be using this in alsaWrite
++    m_max_buffer_size = inputf->bps;
++
++    convertb = xmms_convert_buffers_new();
++
+     snd_output_stdio_attach( &logs, stderr, 0 );
+ 
+     alsa_convert_func = NULL;
+@@ -194,7 +213,7 @@
+     alsa_frequency_convert_func = NULL;
+ 
+     free( outputf );
+-    outputf = snd_format_from_xmms( f->xmms_format, f->rate, f->channels );
++    outputf = snd_format_from_xmms( inputf->xmms_format, inputf->rate, inputf->channels );
+ 
+ 
+     qDebug() << "Opening device:" << device;
+@@ -232,6 +251,7 @@
+     {
+         qDebug() << "No configuration available for playback: " 
+                  << snd_strerror( -err );
++        alsaClose();
+         return false;
+     }
+ 
+@@ -255,6 +275,7 @@
+                SND_PCM_ACCESS_RW_INTERLEAVED ) ) < 0 )
+         {
+             qDebug() << "Cannot set normal write mode: " << snd_strerror( -err );
++            alsaClose();
+             return false;
+         }
+     }
+@@ -280,41 +301,44 @@
+                 break;
+             }
+         }
+-        if ( outputf->format != f->format )
++        if ( outputf->format != inputf->format )
+         {
+             outputf->xmms_format = (AFormat)format_from_alsa( outputf->format );
+ 
+-            qDebug() << "Converting format from" << f->xmms_format << "to" << outputf->xmms_format;
++            qDebug() << "Converting format from" << inputf->xmms_format << "to" << outputf->xmms_format;
+ 
+             if ( outputf->xmms_format < 0 )
+                 return -1;
+-            alsa_convert_func = xmms_convert_get_func( outputf->xmms_format, f->xmms_format );
++            alsa_convert_func = xmms_convert_get_func( outputf->xmms_format, inputf->xmms_format );
+             if ( alsa_convert_func == NULL )
+             {
+-                qDebug() << "Format translation needed, but not available.  Input: " << f->xmms_format << "; Output: " << outputf->xmms_format ;
++                qDebug() << "Format translation needed, but not available.  Input: " << inputf->xmms_format << "; Output: " << outputf->xmms_format ;
++                alsaClose();
+                 return false;
+             }
+         }
+         else
+         {
+             qDebug() << "Sample format not available for playback: " << snd_strerror( -err );
++            alsaClose();
+             return false;
+         }
+     }
+ 
+     snd_pcm_hw_params_set_channels_near( alsa_pcm, hwparams, &outputf->channels );
+-    if ( outputf->channels != f->channels )
++    if ( outputf->channels != inputf->channels )
+     {
+ 
+-        qDebug() << "Converting channels from" << f->channels << "to" << outputf->channels;
++        qDebug() << "Converting channels from" << inputf->channels << "to" << outputf->channels;
+ 
+         alsa_stereo_convert_func =
+                 xmms_convert_get_channel_func( outputf->xmms_format,
+                                                outputf->channels,
+-                                               f->channels );
++                                               inputf->channels );
+         if ( alsa_stereo_convert_func == NULL )
+         {
+-            qDebug() << "No stereo conversion available.  Format: " << outputf->xmms_format << "; Input Channels: " << f->channels << "; Output Channels: " << outputf->channels ;
++            qDebug() << "No stereo conversion available.  Format: " << outputf->xmms_format << "; Input Channels: " << inputf->channels << "; Output Channels: " << outputf->channels ;
++            alsaClose();
+             return false;
+         }
+     }
+@@ -323,15 +347,17 @@
+     if ( outputf->rate == 0 )
+     {
+         qDebug() << "No usable samplerate available." ;
++        alsaClose();
+         return false;
+     }
+-    if ( outputf->rate != f->rate )
++    if ( outputf->rate != inputf->rate )
+     {
+-        qDebug() << "Converting samplerate from " << f->rate << "  to " << outputf->rate ;
++        qDebug() << "Converting samplerate from " << inputf->rate << "  to " << outputf->rate ;
+         if ( outputf->channels < 1 || outputf->channels > 2 )
+         {
+             qDebug() << "Unsupported number of channels: " << outputf->channels << ". Resample function not available" ;
+             alsa_frequency_convert_func = NULL;
++            alsaClose();
+             return false;
+         }
+         alsa_frequency_convert_func =
+@@ -340,6 +366,7 @@
+         if ( alsa_frequency_convert_func == NULL )
+         {
+             qDebug() << "Resample function not available.  Format " << outputf->xmms_format ;
++            alsaClose();
+             return false;
+         }
+     }
+@@ -351,6 +378,7 @@
+                                                          &periodSize, NULL ) ) < 0 )
+     {
+         qDebug() << "Set period size failed: " << snd_strerror( -err );
++        alsaClose();
+         return false;
+     }
+ 
+@@ -358,6 +386,7 @@
+          &periodCount, 0 ) ) < 0 )
+     {
+         qDebug() << "Set period count failed: " << snd_strerror( -err );
++        alsaClose();
+         return false;
+     }
+ 
+@@ -367,18 +396,21 @@
+         snd_pcm_hw_params_dump( hwparams, logs );
+ 
+         qDebug() << "Unable to install hw params" ;
++        alsaClose();
+         return false;
+     }
+ 
+     if ( ( err = snd_pcm_hw_params_get_buffer_size( hwparams, &alsa_buffer_size ) ) < 0 )
+     {
+         qDebug() << "snd_pcm_hw_params_get_buffer_size() failed: " << snd_strerror( -err );
++        alsaClose();
+         return false;
+     }
+ 
+     if ( ( err = snd_pcm_hw_params_get_period_size( hwparams, &alsa_period_size, 0 ) ) < 0 )
+     {
+         qDebug() << "snd_pcm_hw_params_get_period_size() failed: " << snd_strerror( -err );
++        alsaClose();
+         return false;
+     }
+     snd_pcm_sw_params_alloca( &swparams );
+@@ -390,6 +422,7 @@
+     if ( snd_pcm_sw_params( alsa_pcm, swparams ) < 0 )
+     {
+         qDebug() << "Unable to install sw params" ;
++        alsaClose();
+         return false;
+     }
+ 
+@@ -420,38 +453,32 @@
+ }
+ 
+ 
+-bool
+-AlsaAudio::alsaOpen( QString device, AFormat format, unsigned int rate, unsigned int channels, unsigned int buffer_time, unsigned int period_time )
++int
++AlsaAudio::startPlayback()
+ {
+-    Q_DEBUG_BLOCK << "Opening device:" << device;
++    int pthreadError = 0;
++
++    // We should double check this here.  AlsaPlayback::initAudio
++    // isn't having its emitted error caught.
++    // So double check here to avoid a potential assert.
++    if ( !alsa_pcm )
++        return 1;
+ 
+     //HACK because we should zero pad only after we have started
+     m_zero_pad = false;
+ 
+-    inputf = snd_format_from_xmms( format, rate, channels );
+-
+-    // We'll be using this in alsaWrite
+-    m_max_buffer_size = inputf->bps;
+-    
+     // And clear the buffer, just in case
+     clearBuffer();
+ 
+-    if (alsaSetup( device, buffer_time, period_time, inputf ) == false)
+-    {
+-        alsaClose();
+-        return false;
+-    }
+-
+     going = true;
+-    convertb = xmms_convert_buffers_new();
+ 
+     AlsaAudio* aaThread = new AlsaAudio();
+ 
+     qDebug() << "Starting thread";
+ 
+-    pthread_create( &audio_thread, NULL, &alsa_loop, (void*)aaThread );
++    pthreadError = pthread_create( &audio_thread, NULL, &alsa_loop, (void*)aaThread );
+ 
+-    return true;
++    return pthreadError;
+ }
+ 
+ void AlsaAudio::clearBuffer( void )
+@@ -503,24 +530,44 @@
+ 
+ 
+ void
+-AlsaAudio::alsaClose()
++AlsaAudio::stopPlayback()
+ {
+     if (going)
+     {
+         Q_DEBUG_BLOCK;
+-    
++
+         going = false;
+-    
++
+         pthread_join( audio_thread, NULL );
+-    
+-        xmms_convert_buffers_destroy( convertb );
+-        convertb = NULL;
++    }
++}
++
++
++
++void
++AlsaAudio::alsaClose()
++{
++    Q_DEBUG_BLOCK;
++
++    alsa_close_pcm();
++
++    xmms_convert_buffers_destroy( convertb );
++    convertb = NULL;
++
++    if ( inputf )
++    {
+         free( inputf );
+         inputf = NULL;
++    }
++    if (outputf )
++    {
+         free( outputf );
+         outputf = NULL;
+-    
++    }
++    if ( logs )
++    {
+         snd_output_close( logs );
++        logs = NULL;
+     }
+ }
+ 
+@@ -541,6 +588,7 @@
+ AlsaAudio::run()
+ {
+     int npfds = snd_pcm_poll_descriptors_count( alsa_pcm );
++    int err;
+     struct pollfd *pfds;
+     unsigned short *revents;
+ 
+@@ -548,6 +596,10 @@
+         goto _error;
+     pfds = (struct pollfd*)malloc( sizeof( *pfds ) * npfds );
+     revents = (unsigned short*)malloc( sizeof( *revents ) * npfds );
++    err = snd_pcm_prepare( alsa_pcm );
++    if ( err < 0 )
++        qDebug() << "snd_pcm_prepare error:" << snd_strerror( err );
++
+     while ( going && alsa_pcm )
+     {
+         if (audioData.size() < hw_period_size_in)
+@@ -598,7 +650,9 @@
+     free( revents );
+ 
+  _error:
+-    alsa_close_pcm();
++    err = snd_pcm_drop( alsa_pcm );
++    if ( err < 0 )
++        qDebug() << "snd_pcm_drop error:" << snd_strerror( err );
+     QMutexLocker locker( &mutex );
+     audioData.clear();
+     locker.unlock();
+@@ -784,7 +838,7 @@
+         int err;
+         snd_pcm_drop( alsa_pcm );
+         if ( ( err = snd_pcm_close( alsa_pcm ) ) < 0 )
+-            qDebug() << "alsa_pcm_close() failed: " << snd_strerror( -err );
++            qDebug() << "alsa_close_pcm() failed: " << snd_strerror( -err );
+         alsa_pcm = NULL;
+     }
+ }
+diff -urN last.fm-1.3.0.62-03/src/output/alsa-playback/alsaaudio.h last.fm-1.3.0.62-04/src/output/alsa-playback/alsaaudio.h
+--- last.fm-1.3.0.62-03/src/output/alsa-playback/alsaaudio.h	2007-06-27 10:12:26.000000000 -0700
++++ last.fm-1.3.0.62-04/src/output/alsa-playback/alsaaudio.h	2007-07-02 09:45:52.000000000 -0700
+@@ -65,12 +65,17 @@
+ {
+ public:
+     AlsaAudio();
++    ~AlsaAudio();
+ 
+     int getCards();
+     AlsaDeviceInfo getDeviceInfo( int device );
+ 
+-    bool alsaOpen( QString device, AFormat format, uint rate, uint channels, uint buffer_time, uint period_time );
++    bool alsaOpen( QString device, AFormat format, unsigned int rate, 
++                   unsigned int channels, snd_pcm_uframes_t periodSize,
++                   unsigned int periodCount );
++    int startPlayback();
+     void alsaWrite( const QByteArray* inputData );
++    void stopPlayback();
+     void alsaClose();
+ 
+     void setVolume ( float vol );
+diff -urN last.fm-1.3.0.62-03/src/output/alsa-playback/alsaplayback.cpp last.fm-1.3.0.62-04/src/output/alsa-playback/alsaplayback.cpp
+--- last.fm-1.3.0.62-03/src/output/alsa-playback/alsaplayback.cpp	2007-06-27 10:12:26.000000000 -0700
++++ last.fm-1.3.0.62-04/src/output/alsa-playback/alsaplayback.cpp	2007-07-02 09:45:52.000000000 -0700
+@@ -103,27 +103,17 @@
+ void
+ AlsaPlayback::startPlayback()
+ {
+-    int channels = 2;
+-    int sampleRate = 44100;
+-    int periodSize = 1024;  // According to mplayer, these two are good defaults.
+-    int periodCount = 16;   // They create a buffer size of 16384 frames.
+-    QString cardDevice;
+-
+     if (!m_audio)
+     {
+         Q_DEBUG_BLOCK << "No AlsaAudio instance available.";
+         goto _error;
+     }
+ 
+-    cardDevice = internalSoundCardID();
+-
+-// We assume host byte order
+-#ifdef WORDS_BIGENDIAN
+-    if (!m_audio->alsaOpen( cardDevice, FMT_S16_BE, sampleRate, channels, periodSize, periodCount ))
+-#else
+-    if (!m_audio->alsaOpen( cardDevice, FMT_S16_LE, sampleRate, channels, periodSize, periodCount ))
+-#endif
++    if ( m_audio->startPlayback() )
++    {
++        Q_DEBUG_BLOCK << "Error starting playback.";
+         goto _error;
++    }
+ 
+     return;
+ 
+@@ -131,7 +121,7 @@
+     // We need to send a stop signal to m_iInput here, otherwise
+     // it will keep running and filling up the buffers even though
+     // there is no available device.
+-        
++ 
+     emit error( Radio_NoSoundcard, tr("The ALSA soundsystem is either busy or not present.") );
+ }
+ 
+@@ -139,16 +129,41 @@
+ void
+ AlsaPlayback::stopPlayback()
+ {
+-    m_audio->alsaClose();
++    m_audio->stopPlayback();
+ }
+ 
+ 
+ void
+ AlsaPlayback::initAudio( long /*sampleRate*/, int /*channels*/ )
+ {
++    int channels = 2;
++    int sampleRate = 44100;
++    int periodSize = 1024;  // According to mplayer, these two are good defaults.
++    int periodCount = 16;   // They create a buffer size of 16384 frames.
++    QString cardDevice;
++
+     delete m_audio;
+     m_audio = new AlsaAudio;
+     m_audio->clearBuffer();
++
++    cardDevice = internalSoundCardID();
++
++    // We assume host byte order
++#ifdef WORDS_BIGENDIAN
++    if (!m_audio->alsaOpen( cardDevice, FMT_S16_BE, sampleRate, channels, periodSize, periodCount ))
++#else
++    if (!m_audio->alsaOpen( cardDevice, FMT_S16_LE, sampleRate, channels, periodSize, periodCount ))
++#endif
++        goto _error;
++
++    return;
++
++_error:
++    // We need to send a stop signal to m_iInput here, otherwise
++    // it will keep running and filling up the buffers even though
++    // there is no available device.
++ 
++    emit error( Radio_NoSoundcard, tr("The ALSA soundsystem is either busy or not present.") );
+ }
+ 
+ 
+diff -urN last.fm-1.3.0.62-03/src/settingsdialog.cpp last.fm-1.3.0.62-04/src/settingsdialog.cpp
+--- last.fm-1.3.0.62-03/src/settingsdialog.cpp	2007-07-02 09:45:38.000000000 -0700
++++ last.fm-1.3.0.62-04/src/settingsdialog.cpp	2007-07-02 09:45:52.000000000 -0700
+@@ -209,6 +209,8 @@
+     originalProxyPassword = The::settings().getProxyPassword();
+     originalProxyPort = The::settings().getProxyPort();
+     originalProxyUsage = The::settings().isUseProxy();
++    originalSoundCard = The::settings().soundCard();
++    originalSoundSystem = The::settings().soundSystem();
+ 
+     populateAccount();
+     populateRadio();

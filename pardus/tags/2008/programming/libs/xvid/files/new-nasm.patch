@@ -1,0 +1,38 @@
+--- configure.in	2005-11-22 23:01:33.000000000 +0200
++++ configure.in	2007-12-20 20:54:09.000000000 +0200
+@@ -16,7 +16,7 @@
+ API_MINOR="1"
+ 
+ dnl NASM version requirement
+-minimum_nasm_patch_version=34
++minimum_nasm_version=2.01
+ nasm_prog="nasm"
+ yasm_prog="yasm"
+ 
+@@ -360,18 +360,18 @@
+        AC_CHECK_PROG([ac_nasm], [$nasm_prog], [yes], [no], , [yes])
+        if test "$ac_nasm" = "yes" ; then
+            dnl
+-           dnl Checking nasm patch version
++           dnl Checking nasm version
+            dnl
+-           AC_MSG_CHECKING([for nasm patch version])
+-           nasm_patch=`$nasm_prog -r | cut -d '.' -f 3 | cut -d ' ' -f 1`
+-           if test -z $nasm_patch ; then
+-              nasm_patch=-1
++           AC_MSG_CHECKING([for nasm version])
++           nasm_version=`$nasm_prog  -v | cut -f3 -d " "`
++           if test -z $nasm_version ; then
++              nasm_version=-1
+            fi
+-           AC_MSG_RESULT([$nasm_patch])
++           AC_MSG_RESULT([$nasm_version])
+ 
+ 
+-           if test "$nasm_patch" -lt "$minimum_nasm_patch_version" ; then
+-               AC_MSG_WARN([nasm patch version is too old])
++           if test `expr $minimum_nasm_version ">" $nasm_version` -eq 1 ; then
++               AC_MSG_WARN([nasm version is too old])
+            else
+                found_nasm_comp_prog="yes"
+ 		       chosen_asm_prog="$nasm_prog"

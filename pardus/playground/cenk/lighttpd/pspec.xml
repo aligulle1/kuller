@@ -1,0 +1,93 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>lighttpd</Name>
+        <Homepage>http://www.lighttpd.net/</Homepage>
+        <Packager>
+            <Name>Cenk Güre</Name>
+            <Email>gure.cenk@gmail.com</Email>
+        </Packager>
+        <License>as-is</License>
+        <IsA>service</IsA>
+        <Summary>A secure, fast, compliant, and very flexible web-server</Summary>
+        <Archive sha1sum="b1f005315c8d3c182d8cc7dd82f774df3416f077" type="tarbz2">http://knec.org/dist/lighttpd-1.4.19_05082008.tar.bz2</Archive> 
+        <BuildDependencies>
+            <Dependency>openldap-server</Dependency>
+            <Dependency>mysql-server</Dependency>
+            <Dependency>mit-kerberos</Dependency>
+            <Dependency>gamin</Dependency>
+            <Dependency>rrdtool</Dependency>
+            <Dependency>sqlite</Dependency>
+            <Dependency>valgrind</Dependency>
+            <!--Dependency>libmemcache</Dependency-->
+            <Dependency versionFrom="5.1.3">lua</Dependency>
+        </BuildDependencies>
+    </Source>
+
+    <Package>
+        <Name>lighttpd</Name>
+        <RuntimeDependencies>
+            <Dependency>openldap-server</Dependency>
+            <Dependency>mit-kerberos</Dependency>
+            <Dependency>gamin</Dependency>
+            <Dependency>rrdtool</Dependency>
+            <Dependency>sqlite</Dependency>
+            <Dependency>valgrind</Dependency>
+            <!--Dependency>libmemcache</Dependency-->
+            <Dependency versionFrom="5.1.3">lua</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="executable">/usr/sbin</Path>
+            <Path fileType="executable">/usr/bin</Path>
+            <Path fileType="library">/usr/lib</Path>
+            <Path fileType="config">/etc</Path>
+            <Path fileType="config">/var/lighttpd</Path>
+            <Path fileType="data">/var/lib/lighttpd</Path>
+            <Path fileType="data">/var/cache/lighttpd</Path>
+            <Path fileType="data">/var/log/lighttpd</Path>
+            <Path fileType="data">/var/run/lighttpd</Path>
+            <Path fileType="man">/usr/share/man</Path>
+            <Path fileType="doc">/usr/share/doc</Path>
+        </Files>
+        <AdditionalFiles>
+            <!-- Configuration Files -->
+            <AdditionalFile owner="root" permission="0644" target="/etc/lighttpd/lighttpd.conf">pardus-lighttpd.conf</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/etc/lighttpd/mime-types.conf">mime-types.conf</AdditionalFile>
+
+            <!-- Default Lighttpd page -->
+            <AdditionalFile owner="root" permission="0644" target="/var/lighttpd/localhost/htdocs/index.html">default-page/index.html</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/var/lighttpd/localhost/htdocs/index-tr.html">default-page/index-tr.html</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/var/lighttpd/localhost/htdocs/lighttpd.css">default-page/lighttpd.css</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/var/lighttpd/localhost/htdocs/pardus.png">default-page/pardus.png</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/var/lighttpd/localhost/htdocs/lighttpd.gif">default-page/lighttpd.gif</AdditionalFile>
+        </AdditionalFiles>
+        <Provides>
+            <COMAR script="package.py">System.Package</COMAR>
+            <COMAR script="service.py">System.Service</COMAR>
+        </Provides>
+    </Package>
+
+    <Package>
+        <Name>lighttpd-mod-mysql-vhost</Name>
+        <RuntimeDependencies>
+            <Dependency>lighttpd</Dependency>
+            <Dependency>mysql-server</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="library">/usr/lib/lighttpd/mod_mysql_vhost.la</Path>
+            <Path fileType="library">/usr/lib/lighttpd/mod_mysql_vhost.so</Path>
+            <Path fileType="doc">/usr/share/doc/lighttpd-1.4.18-1/mysqlvhost.txt</Path>
+        </Files>
+    </Package>
+
+    <History>
+        <Update release="1">
+            <Date>2008-08-05</Date>
+            <Version>1.4.19_05082008</Version>
+            <Comment>First release</Comment>
+            <Name>Cenk Güre</Name>
+            <Email>gure.cenk@gmail.com</Email>
+        </Update>
+    </History>
+</PISI>

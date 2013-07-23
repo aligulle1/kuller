@@ -1,0 +1,77 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>snort</Name>
+        <Homepage>http://www.snort.org/</Homepage>
+        <Packager>
+            <Name>Erdem Bayer</Name>
+            <Email>ebayer@bayer.gen.tr</Email>
+        </Packager>
+        <License>GPLv2</License>
+        <Summary>Open source network intrusion prevention and detection system</Summary>
+        <Description>Snort is a libpcap-based packet sniffer/logger which can be used as a lightweight network intrusion detection system. It features rules based logging and can perform protocol analysis, content searching/matching and can be used to detect a variety of attacks and probes, such as buffer overflows, stealth port scans, CGI attacks, SMB probes, OS fingerprinting attempts, and much more. Snort has a real-time alerting capabilty, with alerts being sent to syslog, a separate "alert" file, or as a WinPopup message via Samba's smbclient.</Description>
+        <Archive sha1sum="88dc943733295468153e0f0ff8b7f782d7ff259a" type="targz">http://www.snort.org/downloads/752</Archive>
+        <BuildDependencies>
+            <Dependency>libpcap</Dependency>
+            <Dependency>libdnet</Dependency>
+            <Dependency>daq-devel</Dependency>
+            <Dependency>mysql-libs</Dependency>
+            <Dependency>postgresql-libs</Dependency>
+            <Dependency releaseFrom="35">iptables</Dependency>
+            <Dependency>libnfnetlink</Dependency>
+            <Dependency>libnetfilter_queue-devel</Dependency>
+        </BuildDependencies>
+    </Source>
+    
+    <Package>
+        <Name>snort</Name>
+        <RuntimeDependencies>
+            <Dependency>libpcap</Dependency>
+            <Dependency>libdnet</Dependency>
+            <Dependency>daq</Dependency>
+            <Dependency>iptables</Dependency>
+            <Dependency>libnfnetlink</Dependency>
+            <Dependency>libnetfilter_queue</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="config">/etc/snort</Path>
+            <Path fileType="config">/etc/conf.d/snort</Path>
+            <Path fileType="executable">/usr/bin</Path>
+            <Path fileType="library">/usr/lib/snort_dynamicengine</Path>
+            <Path fileType="library">/usr/lib/snort_dynamicpreprocessor</Path>
+            <Path fileType="library">/usr/lib/snort_dynamicrules</Path>
+            <Path fileType="doc">/usr/share/doc/snort</Path>
+            <Path fileType="man">/usr/share/man</Path>
+            <Path fileType="data">/var/log/snort</Path>
+        </Files>
+        <AdditionalFiles>
+            <AdditionalFile target="/etc/conf.d/snort" owner="root" group="root" permission="0644">snort.opts</AdditionalFile>
+        </AdditionalFiles>
+        <Provides>
+            <COMAR script="package.py">System.Package</COMAR>
+        </Provides>
+    </Package>
+
+    <Package>
+        <Name>snort-devel</Name>
+        <Summary>Development files for Snort Open source network intrusion prevention and detection system</Summary>
+        <RuntimeDependencies>
+            <Dependency release="current">snort</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="data">/usr/lib/pkgconfig</Path>
+            <Path fileType="header">/usr/src/snort_dynamicsrc</Path>
+        </Files>
+    </Package>
+    
+    <History>
+        <Update release="1">
+            <Date>2010-10-31</Date>
+            <Version>2.9.0.4</Version>
+            <Comment>First Release</Comment>
+            <Name>Erdem Bayer</Name>
+            <Email>ebayer@bayer.gen.tr</Email>
+        </Update>
+    </History>
+</PISI>

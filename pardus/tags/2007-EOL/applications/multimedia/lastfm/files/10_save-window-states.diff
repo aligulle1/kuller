@@ -1,0 +1,141 @@
+--- a/src/container.cpp
++++ b/src/container.cpp
+@@ -94,6 +94,8 @@
+         , m_sidebarEnabled( false )
+         , m_stopped( true ) 
+         , m_closingDown( false )
++        , m_wasShown( false )
++        , m_wasMaximized( false )
+ {
+     //TODO REFACTOR! The size of this monster is scary.
+ 
+@@ -470,15 +472,15 @@
+     ui.stationTimeBar->setStopWatch( &m_radio->stationStopWatch() );
+ 
+ //////
++    m_savedGeometry = The::settings().containerGeometry();
+   #ifdef Q_WS_MAC
+     // on mac qt returns height without unified toolbar height included :(
+-    QByteArray geometry = The::settings().containerGeometry();
+-    if (geometry.isEmpty())
++    if (m_savedGeometry.isEmpty())
+         resize( width(), 496 );
+     else
+-        restoreGeometry( geometry );
++        restoreGeometry( m_savedGeometry );
+   #else
+-    restoreGeometry( The::settings().containerGeometry() );
++    restoreGeometry( m_savedGeometry );
+   #endif
+     setWindowState( The::settings().containerWindowState() );
+ 
+@@ -724,6 +726,13 @@
+ 
+ 
+ void
++Container::showEvent( QShowEvent *e )
++{
++    m_wasShown = true;
++}
++
++
++void
+ Container::dragMoveEvent( QDragMoveEvent* event )
+ {
+   #ifndef HIDE_RADIO
+@@ -804,8 +813,24 @@
+         // save the geometry for the non-maximised state. So instead we must save it
+         // for *every* resize and move event. Yay!
+ 
++        // And sometimes it doesn't seem to remember the window position after it
++        // was maximized.  So only save the geometry if it's not maximized and if
++        // the previous state was unmaximized.
+         if (windowState() != Qt::WindowMaximized)
+-            The::settings().setContainerGeometry( saveGeometry() );
++        {
++            if ( m_wasMaximized )
++            {
++                m_wasMaximized = false;
++            }
++            else
++            {
++                m_savedGeometry = saveGeometry();
++            }
++        }
++        else
++        {
++            m_wasMaximized = true;
++        }
+     }
+ 
+     return QMainWindow::event( e );
+@@ -829,6 +854,11 @@
+ 
+     if ( okToClose )
+     {
++        // We have to get the window state before it's hidden
++        Qt::WindowStates winState;
++        if ( !isHidden() )
++            winState = windowState();
++
+         hide(); //makes it look like we have closed already to user
+ 
+         m_closingDown = true;
+@@ -866,10 +896,17 @@
+ 
+         // don't save if hidden as Qt is shit and this doesn't work, we save 
+         // just before hiding too to ensure we always have the state saved correctly
+-        if (m_sidebarEnabled)
++        // We also have to make sure that the window was made visible at least once
++        // in case someone started the client with -tray
++        if ( m_sidebarEnabled && m_wasShown )
+             The::settings().setSplitterState( ui.splitter->saveState() );
+ 
+-        The::settings().setContainerWindowState( windowState() );
++        // Here too
++        if ( m_wasShown )
++        {
++            The::settings().setContainerGeometry( m_savedGeometry );
++            The::settings().setContainerWindowState( winState );
++        }
+ 
+         The::settings().setVolume( ui_playcontrols.volume->value() );
+         The::currentUser().setSidebarEnabled( m_sidebarEnabled );
+--- a/src/container.h
++++ b/src/container.h
+@@ -95,6 +95,7 @@
+         void dragEnterEvent( QDragEnterEvent* );
+         void dragMoveEvent( QDragMoveEvent* );
+         bool event( QEvent* );
++        void showEvent( QShowEvent* );
+ 
+     private:
+         // Singleton, hence private ctor
+@@ -157,6 +158,10 @@
+         
+         bool m_closingDown;
+         
++        bool m_wasShown;
++        bool m_wasMaximized;
++        QByteArray m_savedGeometry;
++
+         QTimer* m_showRestStateTimer;
+ 
+     private slots:
+--- a/src/lastfmapplication.cpp
++++ b/src/lastfmapplication.cpp
+@@ -126,6 +126,14 @@
+ 
+     if ( !arguments().contains( "-tray" ) && !arguments().contains( "--tray" ) )
+     {
++      // On X11 if the app starts minimized to the taskbar and the user next
++      // toggles visibility via the tray icon, the window will become invisible
++      // until the user restarts the app.
++      #ifdef Q_WS_X11
++        if ( Container::instance().isMinimized() )
++            Container::instance().showNormal();
++        else
++      #endif
+         Container::instance().show();
+     }
+ }

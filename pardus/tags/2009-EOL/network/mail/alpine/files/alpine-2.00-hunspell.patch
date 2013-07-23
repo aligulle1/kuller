@@ -1,0 +1,104 @@
+diff -ru alpine-2.00.orig/configure.ac alpine-2.00/configure.ac
+--- alpine-2.00.orig/configure.ac	2009-06-28 16:52:14.000000000 +0100
++++ alpine-2.00/configure.ac	2009-07-02 15:22:43.000000000 +0100
+@@ -361,29 +361,36 @@
+       fi
+     ],
+     [
+-      SPELLPROG=yes
++      AC_CHECK_PROG([SPELLPROG], [hunspell], [hunspell], [])
++      if test -z "$SPELLPROG" ; then
++        AC_CHECK_PROG([SPELLPROG], [aspell], [aspell], [])
++        if test -z "$SPELLPROG" ; then
++          AC_CHECK_PROG([SPELLPROG], [ispell], [ispell], [])
++          if test -z "$SPELLPROG" ; then
++           SPELLPROG="spell"
++          fi
++        fi
++      fi
+     ])
+ 
+-case "$SPELLPROG" in
+-  no)
+-    ;;
+-  yes)
+-    AC_PATH_PROG(alpine_simple_spellcheck, [aspell])
+-    if test -n "$alpine_simple_spellcheck" ; then
+-      alpine_simple_spellcheck="$alpine_simple_spellcheck --dont-backup --mode=email list"
+-    else
+-      AC_PATH_PROG(alpine_simple_spellcheck, [ispell])
+-      if test -n "$alpine_simple_spellcheck" ; then
++if test "x$SPELLPROG" != "xno" ; then
++  AC_PATH_PROG(alpine_simple_spellcheck, $SPELLPROG)
++  if test -n "$alpine_simple_spellcheck" ; then
++    case "$SPELLPROG" in
++      hunspell)
+         alpine_simple_spellcheck="$alpine_simple_spellcheck -l"
+-      else
+-        AC_PATH_PROG(alpine_simple_spellcheck, [spell])
+-      fi
+-    fi
+-    ;;
+-  *)
+-    AC_PATH_PROG(alpine_simple_spellcheck, $SPELLPROG)
+-    ;;
+-esac
++        ;;
++      aspell)
++        alpine_simple_spellcheck="$alpine_simple_spellcheck --dont-backup --mode=email list"
++        ;;
++      ispell)
++        alpine_simple_spellcheck="$alpine_simple_spellcheck -l"
++        ;;
++      *)
++        ;;
++    esac
++  fi
++fi
+ 
+ dnl OPTION: interactive spell checking program
+ AC_ARG_WITH(interactive-spellcheck,
+@@ -394,24 +401,27 @@
+       fi
+     ],
+     [
+-      ISPELLPROG=yes
++      AC_CHECK_PROG([ISPELLPROG], [hunspell], [hunspell], [])
++      if test -z "$ISPELLPROG" ; then
++        AC_CHECK_PROG([ISPELLPROG], [aspell], [aspell], [])
++        if test -z "$SPELLPROG" ; then
++          ISPELLPROG="ispell"
++        fi
++      fi
+     ])
+ 
+-case "$ISPELLPROG" in
+-  no)
+-    ;;
+-  yes)
+-    AC_PATH_PROG(alpine_interactive_spellcheck, [aspell])
+-    if test -n "$alpine_interactive_spellcheck" ; then
+-      alpine_interactive_spellcheck="$alpine_interactive_spellcheck --dont-backup --mode=email check"
+-    else
+-      AC_PATH_PROG(alpine_interactive_spellcheck, [ispell])
+-    fi
+-    ;;
+-  *)
+-    AC_PATH_PROG(alpine_interactive_spellcheck, $withval)
+-    ;;
+-esac
++if test "x$ISPELLPROG" != "xno" ; then
++  AC_PATH_PROG(alpine_interactive_spellcheck, $ISPELLPROG)
++  if test -n "$alpine_interactive_spellcheck" ; then
++    case "$ISPELLPROG" in
++      aspell)
++        alpine_interactive_spellcheck="$alpine_interactive_spellcheck --dont-backup --mode=email check"
++        ;;
++      *)
++        ;;
++    esac
++  fi
++fi
+ 
+ if test -z "$alpine_simple_spellcheck" -a -n "$alpine_interactive_spellcheck" ; then
+   alpine_simple_spellcheck=test

@@ -1,0 +1,105 @@
+From d507f60689f4e14383b0d24e63afc8cf836360d5 Mon Sep 17 00:00:00 2001
+From: Peter Hutterer <peter.hutterer@redhat.com>
+Date: Wed, 26 Nov 2008 14:15:04 +1000
+Subject: [PATCH] xfree86: don't FatalError on "too many input devices".
+
+Just ignore devices after MAXDEVICES has been reached, but warn the user that
+the devices are ignored.
+
+Signed-off-by: Peter Hutterer <peter.hutterer@redhat.com>
+---
+ hw/xfree86/common/xf86InPriv.h |    2 +-
+ hw/xfree86/common/xf86Init.c   |    4 +++-
+ hw/xfree86/common/xf86Xinput.c |   29 ++++++++++++++++++++++++-----
+ hw/xfree86/common/xf86Xinput.h |    2 +-
+ 4 files changed, 29 insertions(+), 8 deletions(-)
+
+Index: xorg-server-1.4.2/hw/xfree86/common/xf86InPriv.h
+===================================================================
+--- xorg-server-1.4.2/hw/xfree86/common/xf86InPriv.h.orig
++++ xorg-server-1.4.2/hw/xfree86/common/xf86InPriv.h
+@@ -39,6 +39,7 @@ extern int xf86NumInputDrivers;
+ 
+ /* xf86Xinput.c */
+ void xf86ActivateDevice(InputInfoPtr pInfo);
++int xf86ActivateDeviceReal(InputInfoPtr pInfo);
+ 
+ /* xf86Helper.c */
+ InputDriverPtr xf86LookupInputDriver(const char *name);
+Index: xorg-server-1.4.2/hw/xfree86/common/xf86Init.c
+===================================================================
+--- xorg-server-1.4.2/hw/xfree86/common/xf86Init.c.orig
++++ xorg-server-1.4.2/hw/xfree86/common/xf86Init.c
+@@ -954,7 +954,8 @@ InitInput(argc, argv)
+     pInfo = xf86InputDevs;
+     while (pInfo) {
+         xf86Msg(X_INFO, "evaluating device (%s)\n", pInfo->name);
+-	xf86ActivateDevice(pInfo);
++	if (!xf86ActivateDeviceReal(pInfo))
++		break;
+ 	pInfo = pInfo->next;
+     }
+ 
+Index: xorg-server-1.4.2/hw/xfree86/common/xf86Xinput.c
+===================================================================
+--- xorg-server-1.4.2/hw/xfree86/common/xf86Xinput.c.orig
++++ xorg-server-1.4.2/hw/xfree86/common/xf86Xinput.c
+@@ -139,7 +139,7 @@ xf86ProcessCommonOptions(LocalDevicePtr 
+ /***********************************************************************
+  *
+  * xf86ActivateDevice --
+- * 
++ *
+  *	Initialize an input device.
+  *
+  ***********************************************************************
+@@ -147,14 +147,25 @@ xf86ProcessCommonOptions(LocalDevicePtr 
+ _X_EXPORT void
+ xf86ActivateDevice(LocalDevicePtr local)
+ {
++    xf86ActivateDeviceReal(local);
++}
++
++int
++xf86ActivateDeviceReal(LocalDevicePtr local)
++{
+     DeviceIntPtr	dev;
+ 
+     if (local->flags & XI86_CONFIGURED) {
+         dev = AddInputDevice(local->device_control, TRUE);
+ 
+         if (dev == NULL)
+-            FatalError("Too many input devices");
+-        
++        {
++            xf86Msg(X_ERROR, "Too many input devices. Ignoring %s\n",
++                    local->name);
++            local->dev = NULL;
++            return FALSE;
++        }
++
+         local->atom = MakeAtom(local->type_name,
+                                strlen(local->type_name),
+                                TRUE);
+@@ -174,6 +185,8 @@ xf86ActivateDevice(LocalDevicePtr local)
+             xf86Msg(X_INFO, "XINPUT: Adding extended input device \"%s\" (type: %s)\n",
+                     local->name, local->type_name);
+     }
++
++    return TRUE;
+ }
+ 
+ 
+@@ -409,7 +422,11 @@ NewInputDeviceRequest (InputOption *opti
+         goto unwind;
+     }
+ 
+-    xf86ActivateDevice(pInfo);
++    if (!xf86ActivateDeviceReal(pInfo))
++    {
++        rval = BadAlloc;
++        goto unwind;
++    }
+ 
+     dev = pInfo->dev;
+     ActivateDevice(dev);

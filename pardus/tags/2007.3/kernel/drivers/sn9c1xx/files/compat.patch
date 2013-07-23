@@ -1,0 +1,133 @@
+--- sn9c1xx-1.48/sn9c102_core.c	2007-06-12 16:51:50.000000000 +0300
++++ sn9c1xx-1.48/sn9c102_core.c	2007-07-17 18:12:23.000000000 +0300
+@@ -40,6 +40,7 @@
+ #include <asm/uaccess.h>
+ 
+ #include "sn9c102.h"
++#include "v4l2_enumfrmfmt.h"
+ 
+ /*****************************************************************************/
+ 
+--- sn9c1xx-1.48/v4l2_enumfrmfmt.h	1970-01-01 02:00:00.000000000 +0200
++++ sn9c1xx-1.48-mod/v4l2_enumfrmfmt.h	2007-07-17 18:11:32.000000000 +0300
+@@ -0,0 +1,120 @@
++#ifndef __V4L2_ENUMFRMFMT_H
++#define __V4L2_ENUMFRMFMT_H
++
++/*
++ * Enums
++ */
++
++enum v4l2_frmsizetypes {
++	V4L2_FRMSIZE_TYPE_DISCRETE		= 1,
++	V4L2_FRMSIZE_TYPE_CONTINUOUS,
++	V4L2_FRMSIZE_TYPE_STEPWISE,
++};
++
++enum v4l2_frmivaltypes {
++	V4L2_FRMIVAL_TYPE_DISCRETE		= 1,
++	V4L2_FRMIVAL_TYPE_CONTINUOUS,
++	V4L2_FRMIVAL_TYPE_STEPWISE,
++};
++
++/*
++ * Structs
++ */
++
++struct v4l2_frmsize_discrete {
++	/* Width of the frame [pixel] */
++	__u32		width;
++
++	/* Height of the frame [pixel] */
++	__u32		height;
++};
++
++struct v4l2_frmsize_stepwise {
++	/* Minimum frame width [pixel] */
++	__u32		min_width;
++
++	/* Maximum frame width [pixel] */
++	__u32		max_width;
++
++	/* Frame width step size [pixel] */
++	__u32		step_width;
++
++	/* Minimum frame height [pixel] */
++	__u32		min_height;
++
++	/* Maximum frame height [pixel] */
++	__u32		max_height;
++
++	/* Frame height step size [pixel] */
++	__u32		step_height;
++};
++
++struct v4l2_frmsizeenum {
++	/* IN: Index of the given frame size in the enumeration. */
++	__u32		index;
++
++	/* IN: Pixel format for which the frame sizes are enumerated. */
++	__u32		pixel_format;
++
++	/* OUT: Frame size type the device supports. */
++	__u32		type;
++
++	/* OUT: Frame size with the given index */
++	union {
++		struct v4l2_frmsize_discrete	discrete;
++
++		struct v4l2_frmsize_stepwise	stepwise;
++	};
++
++	/* Reserved space for future use */
++	__u32	reserved[2];
++};
++
++struct v4l2_frmival_stepwise {
++	/* Minimum frame interval [s] */
++	struct v4l2_fract		min;
++
++	/* Maximum frame interval [s] */
++	struct v4l2_fract		max;
++
++	/* Frame interval step size [s] */
++	struct v4l2_fract		step;
++};
++
++struct v4l2_frmivalenum {
++	/* IN: Index of the given frame interval in the enumeration. */
++	__u32			index;
++
++	/* IN: Pixel format for which the frame intervals are enumerated. */
++	__u32			pixel_format;
++
++	/* IN: Frame width for which the frame intervals are enumerated. */
++	__u32			width;
++
++	/* IN: Frame height for which the frame intervals are enumerated. */
++	__u32			height;
++
++	/* OUT: Frame interval type the device supports. */
++	__u32			type;
++
++	/* OUT: Frame interval with the given index. */
++	union {
++		/* Frame interval [s] */
++		struct v4l2_fract			discrete;
++
++		struct v4l2_frmival_stepwise		stepwise;
++	};
++
++	/* Reserved space for future use */
++	__u32	reserved[2];
++};
++
++/*
++ * Ioctls
++ */
++
++#define VIDIOC_ENUM_FRAMESIZES		_IOWR ('V', BASE_VIDIOC_PRIVATE + 52, struct v4l2_frmsizeenum)
++#define VIDIOC_ENUM_FRAMEINTERVALS	_IOWR ('V', BASE_VIDIOC_PRIVATE + 53, struct v4l2_frmivalenum)
++
++#endif /* __V4L2_ENUMFRMFMT_H */
++

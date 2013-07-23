@@ -1,0 +1,24 @@
+--- vbox-ose-1.3.8/src/VBox/Devices/Network/ne2000.c	2007-03-13 19:23:02.000000000 +0200
++++ vbox-mod/src/VBox/Devices/Network/ne2000.c	2007-05-01 15:33:55.000000000 +0300
+@@ -317,7 +317,7 @@
+ {
+     NE2000State *s = opaque;
+     uint8_t *p;
+-    int total_len, next, avail, len, index;
++    unsigned int total_len, next, avail, len, index;
+     uint8_t buf1[60];
+ 
+ #ifdef DEBUG_NE2000
+@@ -352,7 +352,10 @@
+ 
+     /* write packet data */
+     while (size > 0) {
+-        avail = s->stop - index;
++	if (index <= s->stop)
++	    avail = s->stop - index;
++	else
++	    avail = 0;
+         len = size;
+         if (len > avail)
+             len = avail;
+ 

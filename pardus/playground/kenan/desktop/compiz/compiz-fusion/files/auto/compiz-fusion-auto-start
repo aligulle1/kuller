@@ -1,0 +1,96 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+# See the file http://www.gnu.org/licenses/old-licenses/gpl-2.0.txt
+
+# This is a simple script to start compiz-manager automatically
+# in accordance with the desktop environment.
+
+import os
+from subprocess import call
+
+# Autostart desktop file
+desktop_file = ('''[Desktop Entry]
+Encoding=UTF-8
+Exec=fusion-icon --no-start
+Type=Application
+StartupNotify=false
+X-KDE-autostart-after=kdesktop
+
+Name=Fusion-icon
+''')
+
+COMPIZ = '/usr/bin/compiz-manager'
+
+def user():
+    return unicode(os.getenv('USER'))
+
+def desktopSession():
+    return os.getenv("DESKTOP_SESSION")
+
+def kdeSessionVersion():
+    return os.getenv("KDE_SESSION_VERSION")
+
+def kdeVersion():
+    if kdeSessionVersion() == '4':
+        VERSION = '4'
+    elif desktopSession() in ('default', 'kde'):
+        VERSION = '3.5'
+    else:
+        print 'No supported Desktop Environment found...\nExiting...'
+        sys.exit()
+
+    return VERSION
+
+def kWin():
+    if kdeVersion():
+        KWIN = '/usr/kde%s/bin/kwin' % kdeVersion()
+    else:
+        print 'No supported window decorator found...\nExiting...'
+        sys.exit()
+
+    return KWIN
+
+def kdePath(version):
+    PATH = os.path.join('/home', user(), '.kde%s/Autostart' % version)
+    if not os.path.exists(PATH):
+        os.mkdir(PATH)
+
+    return PATH
+
+def desktopKdePath():
+    return os.path.join(kdePath(kdeVersion()), 'fusion-icon-auto-start.desktop')
+
+def directRendering():
+    cmd = os.popen('glxinfo | grep -i "direct rendering"')
+    DIRECT_RENDERING = cmd.read().strip().split(":")[-1]
+    cmd.close()
+
+    return DIRECT_RENDERING
+
+def writeDesktopFile(path):
+    _file = file(os.path.join(path), 'w')
+    _file.write(desktop_file)
+    _file.close()
+
+def main():
+    if kWin() and directRendering() == ' Yes':
+        writeDesktopFile(desktopKdePath())
+
+        # Everything is fine so far and we are ready to power up...
+        call(COMPIZ)
+
+    else:
+        if os.path.exists(desktopKdePath()):
+            os.remove(desktopKdePath())
+
+        print 'Direct rendering is not suppported.\nCompiz-manager will not start...'
+        sys.exit()
+
+if __name__ == '__main__':
+    import sys
+    sys.exit(main())

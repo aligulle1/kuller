@@ -1,0 +1,34 @@
+qt-bugs@ issue : N127404
+Trolltech task ID : 127604
+applied: no
+author: Thomas Zander
+When asking for the character properties of the first char in a paragraph, it returns the properties of the previous paragraph instead. This patch fixes that.
+Index: src/gui/text/qtextcursor.cpp
+===================================================================
+--- src/gui/text/qtextcursor.cpp	(revision 576484)
++++ src/gui/text/qtextcursor.cpp	(working copy)
+@@ -1484,18 +1484,14 @@
+         return QTextCharFormat();
+ 
+     int idx = d->currentCharFormat;
+-    if (idx == -1) {
++    if (idx == -1) { // no format
+         int pos = d->position - 1;
+-        if (pos == -1) {
+-            idx = d->priv->blockCharFormatIndex(d->priv->blockMap().firstNode());
+-        } else {
+-            Q_ASSERT(pos >= 0 && pos < d->priv->length());
++        pos = qMax(d->block().position(), pos); // keep it in this block
++        Q_ASSERT(pos >= 0 && pos < d->priv->length());
+ 
+-
+-            QTextDocumentPrivate::FragmentIterator it = d->priv->find(pos);
+-            Q_ASSERT(!it.atEnd());
+-            idx = it.value()->format;
+-        }
++        QTextDocumentPrivate::FragmentIterator it = d->priv->find(pos);
++        Q_ASSERT(!it.atEnd());
++        idx = it.value()->format;
+     }
+ 
+     QTextCharFormat cfmt = d->priv->formatCollection()->charFormat(idx);

@@ -1,0 +1,48 @@
+Index: systemsettings/mainwindow.cpp
+===================================================================
+--- systemsettings/mainwindow.cpp	(revision 938558)
++++ systemsettings/mainwindow.cpp	(working copy)
+@@ -45,6 +45,7 @@
+ #include <kcategorizedview.h>
+ #include <kcategorydrawer.h>
+ #include <kiconloader.h>
++#include <kstandarddirs.h>
+ #include <kfileitemdelegate.h>
+ 
+ #include "kcmodulemodel.h"
+@@ -204,6 +205,8 @@ void MainWindow::buildMainWidget()
+ 
+ void MainWindow::buildActions()
+ {
++    QString brandIcon = KStandardDirs::locate("appdata", "brandicon.png");
++
+     actionCollection()->addAction(
+             KStandardAction::Quit,
+             qobject_cast<QObject*>(this),
+@@ -214,7 +217,7 @@ void MainWindow::buildActions()
+             qobject_cast<QObject*>(this),
+             SLOT(showOverview()));
+     showOverviewAction->setText(
+-            i18n("Overview (%1)", showOverviewAction->shortcut().primary().toString(QKeySequence::NativeText)));
++            i18n("Back"));
+     showOverviewAction->setEnabled(false);
+ 
+     QWidget *searchWid = new QWidget( this );
+@@ -247,6 +250,9 @@ void MainWindow::buildActions()
+     // Is that needed? I thought that's what a buddy is for?
+     connect(searchText, SIGNAL(triggered()), search, SLOT(setFocus()));
+ 
++    QLabel *brandIconWidget = new QLabel( hbox );
++    brandIconWidget->setPixmap( QPixmap(brandIcon) );
++
+     QWidget* vbox = new QWidget(hbox);
+     // Set a non empty content to prevent the toolbar from getting taller when
+     // starting a search (at least with Oxygen style).
+@@ -266,6 +272,7 @@ void MainWindow::buildActions()
+     hlayout->setMargin(0);
+     hlayout->addWidget(search);
+     hlayout->addWidget(vbox);
++    hlayout->addWidget(brandIconWidget);
+     hlayout->setStretchFactor(search,1);
+     hlayout->setStretchFactor(vbox,1);
+     hbox->setLayout(hlayout);

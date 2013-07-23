@@ -1,0 +1,991 @@
+Index: parted-1.8.8/configure.ac
+===================================================================
+--- parted-1.8.8.orig/configure.ac
++++ parted-1.8.8/configure.ac
+@@ -5,7 +5,7 @@ dnl
+ dnl This file may be modified and/or distributed without restriction.
+ 
+ AC_PREREQ(2.61)
+-AC_INIT([GNU parted],[1.8.8],[bug-parted@gnu.org])
++AC_INIT([GNU parted],[1.8.9],[bug-parted@gnu.org])
+ 
+ AC_CONFIG_SRCDIR(include/parted/parted.h)
+ 
+@@ -24,7 +24,7 @@ dnl function signatures changed),
+ dnl set PED_BINARY_AGE _and_ PED_INTERFACE_AGE to 0.
+ PED_MAJOR_VERSION=1
+ PED_MINOR_VERSION=8
+-PED_MICRO_VERSION=8
++PED_MICRO_VERSION=9
+ PED_INTERFACE_AGE=0
+ PED_BINARY_AGE=0
+ PED_VERSION_SUFFIX=
+@@ -471,14 +471,7 @@ AC_CHECK_HEADER([execinfo.h], [
+ 	])
+ ])
+ 
+-dnl Checks for #defines.
+-AC_COMPILE_IFELSE([
+-	AC_LANG_PROGRAM([[
+-	#if defined __s390__ || defined __s390x__
+-	#  message s390 defined
+-	#endif
+-	]])], [compile_for_s390="no"], [compile_for_s390="yes"])
+-AM_CONDITIONAL([COMPILE_FOR_S390], [test "$compile_for_s390" = "yes"])
++AM_CONDITIONAL([COMPILE_FOR_S390], [test "$host_cpu" = s390 || test "$host_cpu" = s390x])
+ 
+ dnl check for "check", unit testing library/header
+ PKG_CHECK_MODULES([CHECK], [check >= 0.9.3], have_check=yes, have_check=no)
+Index: parted-1.8.8/doc/C/parted.8
+===================================================================
+--- parted-1.8.8.orig/doc/C/parted.8
++++ parted-1.8.8/doc/C/parted.8
+@@ -124,6 +124,18 @@ and a human-friendly form for output).
+ .B version
+ Display version information and a copyright message.
+ .RE
++.SH KNOWN ISSUES
++ext3 filesystem resizing does not currently work, please use
++.BR resize2fs (8)
++instead.
++
++Resizing partitions with an ext3 filesystem will not generally work because
++of the above issue.  Use
++.BR resize2fs (8)
++to resize the filesystem and resize the partition manually using
++.BR fdisk (8)
++or a similar tool.  For LVM situations, you will need to use the LVM commands
++to resize the LVM elements.
+ .SH REPORTING BUGS
+ Report bugs to <bug-parted@gnu.org>
+ .SH SEE ALSO
+Index: parted-1.8.8/doc/parted.texi
+===================================================================
+--- parted-1.8.8.orig/doc/parted.texi
++++ parted-1.8.8/doc/parted.texi
+@@ -14,7 +14,7 @@ resizing, checking and copy partitions a
+ @ifnottex @c texi2pdf don't understand copying and insertcopying ???
+ @c modifications must also be done in the titlepage
+ @copying
+-Copyright @copyright{} 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007
++Copyright @copyright{} 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008
+ Free Software Foundation, Inc.
+ 
+ Permission is granted to copy, distribute and/or modify this document
+@@ -63,7 +63,7 @@ Free Documentation License''.
+ 
+ @c WTF doesn't texi2html include the titlepage?
+ @ifhtml
+-@insertcopying 
++@insertcopying
+ @end ifhtml
+ 
+ This document describes the use of GNU Parted, a program for creating,
+@@ -257,7 +257,7 @@ $ @kbd{make}
+ However, there are a few options for @command{configure}:
+ 
+ @table @code
+-@item --without-readline		
++@item --without-readline
+ turns off use of readline.  This is useful for making rescue disks,
+ etc., where few libraries are available.
+ 
+@@ -275,12 +275,12 @@ you don't need the flexibility.
+ @item --disable-fs
+ disable all file system support
+ 
+-@item --disable-nls			
++@item --disable-nls
+ turns off native language support.  This is useful for use with old
+ versions of glibc, or a trimmed down version of glibc suitable for
+ rescue disks.
+ 
+-@item --disable-shared		
++@item --disable-shared
+ turns off shared libraries.  This may be necessary for use with old
+ versions of GNU libc, if you get a compile error about a ``spilled
+ register''.  Also useful for boot/rescue disks.
+@@ -301,7 +301,7 @@ disable writing (for debugging)
+ 
+ @node Static binaries
+ @section Using static binaries of GNU Parted
+-@cindex static binary 
++@cindex static binary
+ @cindex unsupported platforms
+ @cindex resizing root device
+ 
+@@ -320,7 +320,7 @@ of the latest GNU Parted version is avai
+ 
+ @subsection Creating the Parted disk
+ @enumerate
+-@item Boot your system 
++@item Boot your system
+ 
+ @item Download @file{parted-static-VERSION.tgz} from @uref{ftp://ftp.gnu.org/gnu/parted/static}
+ @item Unpack the tarball, resulting in a file called ``parted.static".
+@@ -329,7 +329,7 @@ of the latest GNU Parted version is avai
+ 
+ @item Do a low-level format on it (on GNU/Linux this can be achieved with
+       the tool ``fdformat" from the ``util-linux" package.
+-      This is basically a sanity check because floppy disks often 
++      This is basically a sanity check because floppy disks often
+       contain bad blocks.
+ 
+ @item Create a file system. Example:
+@@ -359,7 +359,7 @@ $ @kbd{umount /mnt/floppy}
+ 
+ @subsection Using the Parted disk
+ @enumerate
+-@item Choose a rescue disk that suits you. 
++@item Choose a rescue disk that suits you.
+ 
+ @item Boot off your rescue disk.  Mount the disk you copied Parted onto.
+ 
+@@ -383,7 +383,7 @@ $ @kbd{umount /mnt/floppy}
+ @end menu
+ 
+ @node Partitioning
+-@section Introduction to Partitioning 
++@section Introduction to Partitioning
+ @cindex partitioning overview
+ 
+ Unfortunately, partitioning your disk is rather complicated.  This is
+@@ -566,7 +566,7 @@ Supported file systems:
+ (provided the destination partition is larger than the source partition)
+ 
+ @item fat16, fat32
+-@item linux-swap	
++@item linux-swap
+ (equivalent to mkswap on destination partition)
+ @item reiserfs (if libreiserfs is installed)
+ 
+@@ -918,7 +918,7 @@ partitions can be resized only so long a
+ completely contains all logical partitions.
+ 
+ Note that Parted can manipulate partitions whether or not they have been
+-defragmented, so you do not need to defragmenting the disk before
++defragmented, so you do not need to defragment the disk before
+ using Parted.
+ 
+ Supported file systems:
+@@ -1031,7 +1031,7 @@ Microsoft operating systems.
+ 
+ @item raid
+ (MS-DOS) - this flag can be enabled to tell linux the partition is a
+-software RAID partition. 
++software RAID partition.
+ 
+ @item LVM
+ (MS-DOS) - this flag can be enabled to tell linux the partition is a
+@@ -1109,59 +1109,59 @@ specified after an input number.  Input 
+ an unit (without any space or other character between them), in
+ which case this unit apply instead of the default unit for this
+ particular number, but CHS and cylinder units are not supported as
+-a suffix.  If no suffix is given, then the default unit is assumed. 
++a suffix.  If no suffix is given, then the default unit is assumed.
+ Parted will compute sensible ranges for the locations you specify
+ (e.g. a range of +/- 500 MB when you specify the location in ``G'')
+ and will select the nearest location in this range from the one you
+ wrote that satisfies constraints from both the operation, the
+ filesystem being worked on, the disk label, other partitions and so
+ on.  Use the sector unit ``s'' to specify exact locations (if they
+-do not satisfy all onstraints, Parted will ask you for the nearest 
++do not satisfy all onstraints, Parted will ask you for the nearest
+ solution).  Note that negative numbers count back from the end of
+-the disk, with ``-1s'' pointing to the end of the disk.  
++the disk, with ``-1s'' pointing to the end of the disk.
+ 
+ Example:
+ 
+ @example
+ @group
+-(parted) unit compact                                                     
+-(parted) print                                                            
++(parted) unit compact
++(parted) print
+ Disk geometry for /dev/hda: 0kB - 123GB
+ Disk label type: msdos
+ Number  Start   End     Size    Type      File system  Flags
+ 1       32kB    1078MB  1077MB  primary   reiserfs     boot
+-2       1078MB  2155MB  1078MB  primary   linux-swap   
+-3       2155MB  123GB   121GB   extended               
+-5       2155MB  7452MB  5297MB  logical   reiserfs     
++2       1078MB  2155MB  1078MB  primary   linux-swap
++3       2155MB  123GB   121GB   extended
++5       2155MB  7452MB  5297MB  logical   reiserfs
+ @end group
+ @group
+-(parted) unit chs print                                                   
++(parted) unit chs print
+ Disk geometry for /dev/hda: 0,0,0 - 14946,225,62
+ BIOS cylinder,head,sector geometry: 14946,255,63.  Each cylinder
+ is 8225kB.
+ Disk label type: msdos
+ Number  Start       End         Type      File system  Flags
+ 1       0,1,0       130,254,62  primary   reiserfs     boot
+-2       131,0,0     261,254,62  primary   linux-swap   
+-3       262,0,0     14945,254,62 extended               
+-5       262,2,0     905,254,62  logical   reiserfs     
++2       131,0,0     261,254,62  primary   linux-swap
++3       262,0,0     14945,254,62 extended
++5       262,2,0     905,254,62  logical   reiserfs
+ @end group
+ @group
+-(parted) unit mb print                                                    
++(parted) unit mb print
+ Disk geometry for /dev/hda: 0MB - 122942MB
+ Disk label type: msdos
+ Number  Start   End     Size    Type      File system  Flags
+ 1       0MB     1078MB  1077MB  primary   reiserfs     boot
+-2       1078MB  2155MB  1078MB  primary   linux-swap   
+-3       2155MB  122935MB 120780MB extended               
+-5       2155MB  7452MB  5297MB  logical   reiserfs     
++2       1078MB  2155MB  1078MB  primary   linux-swap
++3       2155MB  122935MB 120780MB extended
++5       2155MB  7452MB  5297MB  logical   reiserfs
+ @end group
+ @end example
+ 
+ @end deffn
+ 
+ @node Related information
+-@chapter Related information 
++@chapter Related information
+ @cindex further reading
+ @cindex related documentation
+ 
+Index: parted-1.8.8/include/parted/constraint.h
+===================================================================
+--- parted-1.8.8.orig/include/parted/constraint.h
++++ parted-1.8.8/include/parted/constraint.h
+@@ -22,6 +22,7 @@
+ typedef struct _PedConstraint	PedConstraint;
+ 
+ #include <parted/device.h>
++#include <parted/geom.h>
+ #include <parted/natmath.h>
+ 
+ struct _PedConstraint {
+Index: parted-1.8.8/include/parted/device.h
+===================================================================
+--- parted-1.8.8.orig/include/parted/device.h
++++ parted-1.8.8/include/parted/device.h
+@@ -26,6 +26,7 @@
+ #ifndef PED_DEVICE_H_INCLUDED
+ #define PED_DEVICE_H_INCLUDED
+ 
++#include <parted/constraint.h>
+ #include <parted/timer.h>
+ 
+ /** We can address 2^63 sectors */
+Index: parted-1.8.8/include/parted/disk.h
+===================================================================
+--- parted-1.8.8.orig/include/parted/disk.h
++++ parted-1.8.8/include/parted/disk.h
+@@ -1,6 +1,6 @@
+ /*
+     libparted - a library for manipulating disk partitions
+-    Copyright (C) 1999, 2000, 2001, 2002, 2007 Free Software Foundation, Inc.
++    Copyright (C) 1999, 2000, 2001, 2002, 2007, 2008 Free Software Foundation, Inc.
+ 
+     This program is free software; you can redistribute it and/or modify
+     it under the terms of the GNU General Public License as published by
+@@ -52,10 +52,11 @@ enum _PedPartitionFlag {
+         PED_PARTITION_HPSERVICE=8,
+         PED_PARTITION_PALO=9,
+         PED_PARTITION_PREP=10,
+-        PED_PARTITION_MSFT_RESERVED=11
++        PED_PARTITION_MSFT_RESERVED=11,
++        PED_PARTITION_BIOS_GRUB=12
+ };
+ #define PED_PARTITION_FIRST_FLAG        PED_PARTITION_BOOT
+-#define PED_PARTITION_LAST_FLAG         PED_PARTITION_MSFT_RESERVED
++#define PED_PARTITION_LAST_FLAG         PED_PARTITION_BIOS_GRUB
+ 
+ enum _PedDiskTypeFeature {
+         PED_DISK_TYPE_EXTENDED=1,       /**< supports extended partitions */
+Index: parted-1.8.8/include/parted/linux.h
+===================================================================
+--- parted-1.8.8.orig/include/parted/linux.h
++++ parted-1.8.8/include/parted/linux.h
+@@ -22,7 +22,7 @@
+ #include <parted/parted.h>
+ #include <parted/device.h>
+ 
+-#if defined __s390__ || defined __s390x__
++#if defined(__s390__) || defined(__s390x__)
+ #  include <parted/fdasd.h>
+ #endif
+ 
+Index: parted-1.8.8/include/parted/natmath.h
+===================================================================
+--- parted-1.8.8.orig/include/parted/natmath.h
++++ parted-1.8.8/include/parted/natmath.h
+@@ -30,6 +30,7 @@
+ typedef struct _PedAlignment	PedAlignment;
+ 
+ #include <parted/disk.h>
++#include <parted/device.h>
+ 
+ #define PED_MIN(a, b)	( ((a)<(b)) ? (a) : (b) )
+ #define PED_MAX(a, b)	( ((a)>(b)) ? (a) : (b) )
+Index: parted-1.8.8/libparted/arch/linux.c
+===================================================================
+--- parted-1.8.8.orig/libparted/arch/linux.c
++++ parted-1.8.8/libparted/arch/linux.c
+@@ -69,7 +69,7 @@
+ #define HDIO_GETGEO             0x0301  /* get device geometry */
+ #define HDIO_GET_IDENTITY       0x030d  /* get IDE identification info */
+ 
+-#if defined(O_DIRECT) && (!defined(__s390__) || !defined(__s390x__))
++#if defined(O_DIRECT) && !(defined(__s390__) || defined(__s390x__))
+ #define RD_MODE (O_RDONLY | O_DIRECT)
+ #define WR_MODE (O_WRONLY | O_DIRECT)
+ #define RW_MODE (O_RDWR | O_DIRECT)
+@@ -1005,7 +1005,7 @@ error:
+ }
+ 
+ static int
+-init_dasd (PedDevice* dev, char* model_name)
++init_dasd (PedDevice* dev, const char* model_name)
+ {
+         struct stat             dev_stat;
+         struct hd_geometry      geo;
+@@ -1061,7 +1061,7 @@ error:
+ }
+ 
+ static int
+-init_generic (PedDevice* dev, char* model_name)
++init_generic (PedDevice* dev, const char* model_name)
+ {
+         struct stat             dev_stat;
+         PedExceptionOption      ex_status;
+Index: parted-1.8.8/libparted/disk.c
+===================================================================
+--- parted-1.8.8.orig/libparted/disk.c
++++ parted-1.8.8/libparted/disk.c
+@@ -224,23 +224,24 @@ static int
+ _add_duplicate_part (PedDisk* disk, PedPartition* old_part)
+ {
+ 	PedPartition*	new_part;
+-	PedConstraint*	constraint_exact;
++	int ret;
+ 
+ 	new_part = disk->type->ops->partition_duplicate (old_part);
+ 	if (!new_part)
+ 		goto error;
+ 	new_part->disk = disk;
+ 
+-	constraint_exact = ped_constraint_exact (&new_part->geom);
+-	if (!constraint_exact)
++	_disk_push_update_mode (disk);
++	ret = _disk_raw_add (disk, new_part);
++	_disk_pop_update_mode (disk);
++	if (!ret)
+ 		goto error_destroy_new_part;
+-	if (!ped_disk_add_partition (disk, new_part, constraint_exact))
+-       		goto error_destroy_constraint_exact;
+-	ped_constraint_destroy (constraint_exact);
++#ifdef DEBUG
++	if (!_disk_check_sanity (disk))
++		goto error_destroy_new_part;
++#endif
+ 	return 1;
+ 
+-error_destroy_constraint_exact:
+-	ped_constraint_destroy (constraint_exact);
+ error_destroy_new_part:
+ 	ped_partition_destroy (new_part);
+ error:
+@@ -2186,6 +2187,8 @@ ped_partition_flag_get_name (PedPartitio
+ 	switch (flag) {
+ 	case PED_PARTITION_BOOT:
+ 		return N_("boot");
++	case PED_PARTITION_BIOS_GRUB:
++		return N_("bios_grub");
+ 	case PED_PARTITION_ROOT:
+ 		return N_("root");
+ 	case PED_PARTITION_SWAP:
+Index: parted-1.8.8/libparted/exception.c
+===================================================================
+--- parted-1.8.8.orig/libparted/exception.c
++++ parted-1.8.8/libparted/exception.c
+@@ -1,6 +1,6 @@
+ /*
+     libparted - a library for manipulating disk partitions
+-    Copyright (C) 1999, 2000, 2007 Free Software Foundation, Inc.
++    Copyright (C) 1999, 2000, 2007-2008 Free Software Foundation, Inc.
+ 
+     This program is free software; you can redistribute it and/or modify
+     it under the terms of the GNU General Public License as published by
+@@ -73,7 +73,7 @@ static PedExceptionHandler*	ex_handler =
+ static PedException*		ex = NULL;
+ static int			ex_fetch_count = 0;
+ 
+-static char*	type_strings [] = {
++static const char *const type_strings [] = {
+ 	N_("Information"),
+ 	N_("Warning"),
+ 	N_("Error"),
+@@ -82,7 +82,7 @@ static char*	type_strings [] = {
+ 	N_("No Implementation")
+ };
+ 
+-static char*	option_strings [] = {
++static const char *const option_strings [] = {
+ 	N_("Fix"),
+ 	N_("Yes"),
+ 	N_("No"),
+@@ -98,7 +98,7 @@ static char*	option_strings [] = {
+ char*
+ ped_exception_get_type_string (PedExceptionType ex_type)
+ {
+-	return type_strings [ex_type - 1];
++	return (char *) type_strings [ex_type - 1];
+ }
+ 
+ /* FIXME: move this out to the prospective math.c */
+@@ -121,7 +121,7 @@ ped_log2 (int n)
+ char*
+ ped_exception_get_option_string (PedExceptionOption ex_opt)
+ {
+-	return option_strings [ped_log2 (ex_opt)];
++	return (char *) option_strings [ped_log2 (ex_opt)];
+ }
+ 
+ static PedExceptionOption
+@@ -243,8 +243,8 @@ ped_exception_throw (PedExceptionType ex
+ 	ex->type = ex_type;
+ 	ex->options = ex_opts;
+ 
+-	while (1) {
+-			ex->message = (char*) malloc (size);
++	while (message) {
++			ex->message = (char*) malloc (size * sizeof (char));
+ 			if (!ex->message)
+ 					goto no_memory;
+ 
+@@ -256,6 +256,7 @@ ped_exception_throw (PedExceptionType ex
+ 					break;
+ 
+ 			size += 10;
++			ped_free (ex->message);
+ 	}
+ 
+ 	return do_throw ();
+Index: parted-1.8.8/libparted/fs/ext2/ext2_block_relocator.c
+===================================================================
+--- parted-1.8.8.orig/libparted/fs/ext2/ext2_block_relocator.c
++++ parted-1.8.8/libparted/fs/ext2/ext2_block_relocator.c
+@@ -691,10 +691,11 @@ static int ext2_block_relocator_flush(st
+ 		{
+ 			/* FIXXXME gross hack */
+ 			fprintf(stderr, "relocating %s blocks",
+-				((char *[4]){"direct",
+-						     "singly indirect",
+-						     "doubly indirect",
+-						     "triply indirect"})[i]);
++				((const char *const [4])
++				 {"direct",
++				  "singly indirect",
++				  "doubly indirect",
++				  "triply indirect"})[i]);
+ 			fflush(stderr);
+ 		}
+ 
+Index: parted-1.8.8/libparted/fs/ext2/ext2.c
+===================================================================
+--- parted-1.8.8.orig/libparted/fs/ext2/ext2.c
++++ parted-1.8.8/libparted/fs/ext2/ext2.c
+@@ -727,7 +727,10 @@ struct ext2_fs *ext2_open(struct ext2_de
+ 			    EXT2_FEATURE_RO_COMPAT_LARGE_FILE)))
+ 	{
+ 		ped_exception_throw (PED_EXCEPTION_ERROR, PED_EXCEPTION_CANCEL,
+-		     _("File system has an incompatible feature enabled."));
++		     _("File system has an incompatible feature enabled.  "
++		       "Compatible features are has_journal, dir_index, "
++		       "filetype, sparse_super and large_file.  "
++		       "Use tune2fs or debugfs to remove features."));
+ 		goto error_free_fs;
+ 	}
+ 
+Index: parted-1.8.8/libparted/fs/ext2/ext2_mkfs.c
+===================================================================
+--- parted-1.8.8.orig/libparted/fs/ext2/ext2_mkfs.c
++++ parted-1.8.8/libparted/fs/ext2/ext2_mkfs.c
+@@ -1,6 +1,6 @@
+ /*
+     ext2_mkfs.c -- ext2 fs creator
+-    Copyright (C) 1999, 2000, 2001, 2007 Free Software Foundation, Inc.
++    Copyright (C) 1999, 2000, 2001, 2007-2008 Free Software Foundation, Inc.
+ 
+     This program is free software; you can redistribute it and/or modify
+     it under the terms of the GNU General Public License as published by
+@@ -263,7 +263,7 @@ error:
+ 
+ /* returns the offset into the buffer of the start of the next dir entry */
+ static int _set_dirent(void* buf, int offset, int block_size, int is_last,
+-		       uint32_t inode, char* name, int file_type)
++		       uint32_t inode, const char* name, int file_type)
+ {
+ 	struct ext2_dir_entry_2 *dirent = (void*) (((char*)buf) + offset);
+ 	int name_len = strlen(name);
+Index: parted-1.8.8/libparted/fs/fat/resize.c
+===================================================================
+--- parted-1.8.8.orig/libparted/fs/fat/resize.c
++++ parted-1.8.8/libparted/fs/fat/resize.c
+@@ -1,6 +1,6 @@
+ /*
+     libparted
+-    Copyright (C) 1998, 1999, 2000, 2007 Free Software Foundation, Inc.
++    Copyright (C) 1998, 1999, 2000, 2007-2008 Free Software Foundation, Inc.
+ 
+     This program is free software; you can redistribute it and/or modify
+     it under the terms of the GNU General Public License as published by
+@@ -481,8 +481,8 @@ ask_type (PedFileSystem* fs, int fat16_o
+ {
+ 	FatSpecific*		fs_info = FAT_SPECIFIC (fs);
+ 	PedExceptionOption	status;
+-	char*			fat16_msg;
+-	char*			fat32_msg;
++	const char*		fat16_msg;
++	const char*		fat32_msg;
+ 
+ 	if (fs_info->fat_type == FAT_TYPE_FAT16)
+ 		fat16_msg = _("If you leave your file system as FAT16, "
+Index: parted-1.8.8/libparted/fs/fat/traverse.c
+===================================================================
+--- parted-1.8.8.orig/libparted/fs/fat/traverse.c
++++ parted-1.8.8/libparted/fs/fat/traverse.c
+@@ -120,7 +120,7 @@ fat_traverse_mark_dirty (FatTraverseInfo
+ 
+ FatTraverseInfo*
+ fat_traverse_begin (PedFileSystem* fs, FatCluster start_cluster,
+-		    char* dir_name)
++		    const char* dir_name)
+ {
+ 	FatSpecific*		fs_info = FAT_SPECIFIC (fs);
+ 	FatTraverseInfo*	trav_info;
+Index: parted-1.8.8/libparted/fs/fat/traverse.h
+===================================================================
+--- parted-1.8.8.orig/libparted/fs/fat/traverse.h
++++ parted-1.8.8/libparted/fs/fat/traverse.h
+@@ -42,7 +42,8 @@ extern int fat_traverse_entries_per_buff
+ /* starts traversal at an arbitary cluster.  if start_cluster==0, then uses
+    root directory */
+ extern FatTraverseInfo* fat_traverse_begin (PedFileSystem* fs,
+-				     FatCluster start_cluster, char* dir_name);
++					    FatCluster start_cluster,
++					    const char* dir_name);
+ 
+ extern int fat_traverse_complete (FatTraverseInfo* trav_info);
+ 
+Index: parted-1.8.8/libparted/labels/fdasd.c
+===================================================================
+--- parted-1.8.8.orig/libparted/labels/fdasd.c
++++ parted-1.8.8/libparted/labels/fdasd.c
+@@ -149,7 +149,7 @@ fdasd_error (fdasd_anchor_t *anc, enum f
+ 		case device_verification_failed:
+ 			sprintf(error, "fdasd: %s -- %s\n",
+ 				_("Device verification failed"),
+-				_("The specified device is not a valid DASD device"));,
++				_("The specified device is not a valid DASD device"));
+ 			break;
+ 		default: 
+ 			sprintf(error, "fdasd: %s: %s\n", _("Fatal error"), str);
+Index: parted-1.8.8/libparted/labels/gpt.c
+===================================================================
+--- parted-1.8.8.orig/libparted/labels/gpt.c
++++ parted-1.8.8/libparted/labels/gpt.c
+@@ -4,7 +4,7 @@
+     original version by Matt Domsch <Matt_Domsch@dell.com>
+     Disclaimed into the Public Domain
+ 
+-    Portions Copyright (C) 2001, 2002, 2003, 2005, 2006, 2007
++    Portions Copyright (C) 2001, 2002, 2003, 2005, 2006, 2007, 2008
+         Free Software Foundation, Inc.
+ 
+     EFI GUID Partition Table handling
+@@ -86,6 +86,10 @@ typedef struct {
+     ((efi_guid_t) { PED_CPU_TO_LE32 (0xC12A7328), PED_CPU_TO_LE16 (0xF81F), \
+     		    PED_CPU_TO_LE16 (0x11d2), 0xBA, 0x4B, \
+ 		    { 0x00, 0xA0, 0xC9, 0x3E, 0xC9, 0x3B }})
++#define PARTITION_BIOS_GRUB_GUID \
++    ((efi_guid_t) { PED_CPU_TO_LE32 (0x21686148), PED_CPU_TO_LE16 (0x6449), \
++    		    PED_CPU_TO_LE16 (0x6E6f), 0x74, 0x4E, \
++		    { 0x65, 0x65, 0x64, 0x45, 0x46, 0x49 }})
+ #define LEGACY_MBR_PARTITION_GUID \
+     ((efi_guid_t) { PED_CPU_TO_LE32 (0x024DEE41), PED_CPU_TO_LE16 (0x33E7), \
+ 		    PED_CPU_TO_LE16 (0x11d3, 0x9D, 0x69, \
+@@ -246,6 +250,7 @@ typedef struct _GPTPartitionData {
+ 	int		lvm;
+ 	int		raid;
+ 	int		boot;
++	int		bios_grub;
+ 	int		hp_service;
+         int             hidden;
+         int             msftres;
+@@ -759,13 +764,16 @@ _parse_part_entry (PedDisk* disk, GuidPa
+         
+         gpt_part_data->lvm = gpt_part_data->raid 
+                 = gpt_part_data->boot = gpt_part_data->hp_service
+-                = gpt_part_data->hidden = gpt_part_data->msftres = 0;
++                = gpt_part_data->hidden = gpt_part_data->msftres
++                = gpt_part_data->bios_grub = 0;
+ 
+         if (pte->Attributes.RequiredToFunction & 0x1)
+                 gpt_part_data->hidden = 1;
+        
+ 	if (!guid_cmp (gpt_part_data->type, PARTITION_SYSTEM_GUID))
+ 		gpt_part_data->boot = 1;
++	else if (!guid_cmp (gpt_part_data->type, PARTITION_BIOS_GRUB_GUID))
++		gpt_part_data->bios_grub = 1;
+ 	else if (!guid_cmp (gpt_part_data->type, PARTITION_RAID_GUID))
+ 		gpt_part_data->raid = 1;
+ 	else if (!guid_cmp (gpt_part_data->type, PARTITION_LVM_GUID))
+@@ -1209,6 +1217,7 @@ gpt_partition_new (const PedDisk* disk,
+ 	gpt_part_data->lvm = 0;
+ 	gpt_part_data->raid = 0;
+ 	gpt_part_data->boot = 0;
++	gpt_part_data->bios_grub = 0;
+ 	gpt_part_data->hp_service = 0;
+         gpt_part_data->hidden = 0;
+         gpt_part_data->msftres = 0;
+@@ -1287,6 +1296,10 @@ gpt_partition_set_system (PedPartition* 
+ 		gpt_part_data->type = PARTITION_SYSTEM_GUID;
+ 		return 1;
+ 	}
++	if (gpt_part_data->bios_grub) {
++		gpt_part_data->type = PARTITION_BIOS_GRUB_GUID;
++		return 1;
++	}
+ 	if (gpt_part_data->hp_service) {
+ 		gpt_part_data->type = PARTITION_HPSERVICE_GUID;
+ 		return 1;
+@@ -1385,6 +1398,16 @@ gpt_partition_set_flag(PedPartition *par
+ 		if (state)
+                         gpt_part_data->raid 
+                                 = gpt_part_data->lvm
++                                = gpt_part_data->bios_grub
++                                = gpt_part_data->hp_service
++                                = gpt_part_data->msftres = 0;
++		return gpt_partition_set_system (part, part->fs_type);
++	case PED_PARTITION_BIOS_GRUB:
++		gpt_part_data->bios_grub = state;
++		if (state)
++                        gpt_part_data->raid 
++                                = gpt_part_data->lvm
++                                = gpt_part_data->boot
+                                 = gpt_part_data->hp_service
+                                 = gpt_part_data->msftres = 0;
+ 		return gpt_partition_set_system (part, part->fs_type);
+@@ -1393,6 +1416,7 @@ gpt_partition_set_flag(PedPartition *par
+ 		if (state)
+                         gpt_part_data->boot
+                                 = gpt_part_data->lvm
++                                = gpt_part_data->bios_grub
+                                 = gpt_part_data->hp_service
+                                 = gpt_part_data->msftres = 0;
+ 		return gpt_partition_set_system (part, part->fs_type);
+@@ -1401,6 +1425,7 @@ gpt_partition_set_flag(PedPartition *par
+ 		if (state)
+                         gpt_part_data->boot
+                                 = gpt_part_data->raid
++                                = gpt_part_data->bios_grub
+                                 = gpt_part_data->hp_service
+                                 = gpt_part_data->msftres = 0;
+ 		return gpt_partition_set_system (part, part->fs_type);
+@@ -1410,6 +1435,7 @@ gpt_partition_set_flag(PedPartition *par
+                         gpt_part_data->boot
+                                 = gpt_part_data->raid
+                                 = gpt_part_data->lvm
++                                = gpt_part_data->bios_grub
+                                 = gpt_part_data->msftres = 0;
+ 		return gpt_partition_set_system (part, part->fs_type);
+         case PED_PARTITION_MSFT_RESERVED:
+@@ -1418,6 +1444,7 @@ gpt_partition_set_flag(PedPartition *par
+                         gpt_part_data->boot
+                                 = gpt_part_data->raid
+                                 = gpt_part_data->lvm
++                                = gpt_part_data->bios_grub
+                                 = gpt_part_data->hp_service = 0;
+                 return gpt_partition_set_system (part, part->fs_type);
+         case PED_PARTITION_HIDDEN:
+@@ -1446,6 +1473,8 @@ gpt_partition_get_flag(const PedPartitio
+ 		return gpt_part_data->lvm;
+ 	case PED_PARTITION_BOOT:
+ 		return gpt_part_data->boot;
++	case PED_PARTITION_BIOS_GRUB:
++		return gpt_part_data->bios_grub;
+ 	case PED_PARTITION_HPSERVICE:
+ 		return gpt_part_data->hp_service;
+         case PED_PARTITION_MSFT_RESERVED:
+@@ -1469,6 +1498,7 @@ gpt_partition_is_flag_available(const Pe
+ 	case PED_PARTITION_RAID:
+ 	case PED_PARTITION_LVM:
+ 	case PED_PARTITION_BOOT:
++	case PED_PARTITION_BIOS_GRUB:
+ 	case PED_PARTITION_HPSERVICE:
+         case PED_PARTITION_MSFT_RESERVED:
+         case PED_PARTITION_HIDDEN:        
+Index: parted-1.8.8/libparted/labels/mac.c
+===================================================================
+--- parted-1.8.8.orig/libparted/labels/mac.c
++++ parted-1.8.8/libparted/labels/mac.c
+@@ -1,6 +1,6 @@
+ /*
+     libparted - a library for manipulating disk partitions
+-    Copyright (C) 2000, 2002, 2004, 2007 Free Software Foundation, Inc.
++    Copyright (C) 2000, 2002, 2004, 2007-2008 Free Software Foundation, Inc.
+ 
+     This program is free software; you can redistribute it and/or modify
+     it under the terms of the GNU General Public License as published by
+@@ -376,19 +376,19 @@ mac_clobber (PedDevice* dev)
+ #endif /* !DISCOVER_ONLY */
+ 
+ static int
+-_rawpart_cmp_type (MacRawPartition* raw_part, char* type)
++_rawpart_cmp_type (const MacRawPartition* raw_part, const char* type)
+ {
+ 	return strncasecmp (raw_part->type, type, 32) == 0;
+ }
+ 
+ static int
+-_rawpart_cmp_name (MacRawPartition* raw_part, char* name)
++_rawpart_cmp_name (const MacRawPartition* raw_part, const char* name)
+ {
+ 	return strncasecmp (raw_part->name, name, 32) == 0;
+ }
+ 
+ static int
+-_rawpart_is_partition_map (MacRawPartition* raw_part)
++_rawpart_is_partition_map (const MacRawPartition* raw_part)
+ {
+ 	return _rawpart_cmp_type (raw_part, "Apple_partition_map");
+ }
+@@ -408,7 +408,7 @@ strncasestr (const char* haystack, const
+ }
+ 
+ static int
+-_rawpart_is_boot (MacRawPartition* raw_part)
++_rawpart_is_boot (const MacRawPartition* raw_part)
+ {
+ 	if (!strcasecmp(raw_part->type, "Apple_Bootstrap"))
+ 		return 1;
+@@ -420,7 +420,7 @@ _rawpart_is_boot (MacRawPartition* raw_p
+ }
+ 
+ static int
+-_rawpart_is_driver (MacRawPartition* raw_part)
++_rawpart_is_driver (const MacRawPartition* raw_part)
+ {
+ 	if (strncmp (raw_part->type, "Apple_", 6) != 0)
+ 		return 0;
+@@ -430,7 +430,7 @@ _rawpart_is_driver (MacRawPartition* raw
+ }
+ 
+ static int
+-_rawpart_has_driver (MacRawPartition* raw_part, MacDiskData* mac_disk_data)
++_rawpart_has_driver (const MacRawPartition* raw_part, MacDiskData* mac_disk_data)
+ {
+ 	MacDeviceDriver *driverlist;
+ 	uint16_t i, bsz;
+Index: parted-1.8.8/libparted/tests/Makefile.am
+===================================================================
+--- parted-1.8.8.orig/libparted/tests/Makefile.am
++++ parted-1.8.8/libparted/tests/Makefile.am
+@@ -3,13 +3,17 @@
+ #
+ # This file may be modified and/or distributed without restriction.
+ 
+-TESTS = t1000-label.sh
++TESTS = t1000-label.sh t2000-disk.sh
+ EXTRA_DIST = $(TESTS)
+-bin_PROGRAMS     = label
++bin_PROGRAMS     = label disk
+ label_CFLAGS    = $(CHECK_CFLAGS) -I$(top_srcdir)/include
+ label_LDADD     = $(CHECK_LIBS) $(top_builddir)/libparted/libparted.la
+ label_SOURCES   = common.h common.c label.c
+ 
++disk_CFLAGS    = $(CHECK_CFLAGS) -I$(top_srcdir)/include
++disk_LDADD     = $(CHECK_LIBS) $(top_builddir)/libparted/libparted.la
++disk_SOURCES   = common.h common.c disk.c
++
+ MAINTAINERCLEANFILES = Makefile.in
+ 
+ CLEANFILES = init.sh
+Index: parted-1.8.8/parted/parted.c
+===================================================================
+--- parted-1.8.8.orig/parted/parted.c
++++ parted-1.8.8/parted/parted.c
+@@ -79,7 +79,7 @@ typedef struct {
+         time_t  predicted_time_left;
+ } TimerContext;
+ 
+-static struct option    options[] = {
++static const struct option const options[] = {
+         /* name, has-arg, string-return-val, char-return-val */
+         {"help",        0, NULL, 'h'},
+         {"list",        0, NULL, 'l'},
+@@ -90,7 +90,7 @@ static struct option    options[] = {
+         {NULL,          0, NULL, 0}
+ };
+ 
+-static char*    options_help [][2] = {
++static const char *const options_help [][2] = {
+         {"help",        N_("displays this help message")},
+         {"list",        N_("lists partition layout on all block devices")},
+         {"machine",     N_("displays machine parseable output")},
+@@ -107,26 +107,26 @@ int     opt_machine_mode = 0;
+ int     disk_is_modified = 0;
+ int     is_toggle_mode = 0;
+ 
+-static char* number_msg = N_(
++static const char* number_msg = N_(
+ "NUMBER is the partition number used by Linux.  On MS-DOS disk labels, the "
+ "primary partitions number from 1 to 4, logical partitions from 5 onwards.\n");
+ 
+-static char* label_type_msg_start = N_("LABEL-TYPE is one of: ");
+-static char* flag_msg_start =   N_("FLAG is one of: ");
+-static char* unit_msg_start =   N_("UNIT is one of: ");
+-static char* part_type_msg =    N_("PART-TYPE is one of: primary, logical, "
++static const char* label_type_msg_start = N_("LABEL-TYPE is one of: ");
++static const char* flag_msg_start =   N_("FLAG is one of: ");
++static const char* unit_msg_start =   N_("UNIT is one of: ");
++static const char* part_type_msg =    N_("PART-TYPE is one of: primary, logical, "
+                                    "extended\n");
+-static char* fs_type_msg_start = N_("FS-TYPE is one of: ");
+-static char* start_end_msg =    N_("START and END are disk locations, such as "
++static const char* fs_type_msg_start = N_("FS-TYPE is one of: ");
++static const char* start_end_msg =    N_("START and END are disk locations, such as "
+                 "4GB or 10%.  Negative values count from the end of the disk.  "
+                 "For example, -1s specifies exactly the last sector.\n");
+-static char* state_msg =        N_("STATE is one of: on, off\n");
+-static char* device_msg =       N_("DEVICE is usually /dev/hda or /dev/sda\n");
+-static char* name_msg =         N_("NAME is any word you want\n");
+-static char* resize_msg_start = N_("The partition must have one of the "
++static const char* state_msg =        N_("STATE is one of: on, off\n");
++static const char* device_msg =       N_("DEVICE is usually /dev/hda or /dev/sda\n");
++static const char* name_msg =         N_("NAME is any word you want\n");
++static const char* resize_msg_start = N_("The partition must have one of the "
+                                    "following FS-TYPEs: ");
+ 
+-static char* copyright_msg = N_(
++static const char* copyright_msg = N_(
+ "Copyright (C) 1998 - 2006 Free Software Foundation, Inc.\n"
+ "This program is free software, covered by the GNU General Public License.\n"
+ "\n"
+@@ -1226,7 +1226,7 @@ partition_print (PedPartition* part)
+         putchar ('\n');
+ 
+         flags = partition_print_flags (part);
+-     
++
+         printf (_("Minor: %d\n"), part->num);
+         printf (_("Flags: %s\n"), flags);
+         printf (_("File System: %s\n"), fs->type->name);
+@@ -1473,7 +1473,9 @@ do_print (PedDevice** dev)
+                                     str_list_append (row, name);
+                             }
+ 
+-                            str_list_append (row, partition_print_flags (part));
++                            flags = partition_print_flags (part);
++                            str_list_append (row, flags);
++                            ped_free (flags);
+                     } else {
+                             if (has_extended)
+                                     str_list_append (row, "");
+@@ -1486,6 +1488,10 @@ do_print (PedDevice** dev)
+                     //PED_ASSERT (row.cols == caption.cols)
+                     table_add_row_from_strlist (table, row);
+                     str_list_destroy (row);
++                    ped_free (tmp);
++                    ped_free (start);
++                    ped_free (end);
++                    ped_free (size);
+             }
+ 
+             table_rendered = table_render (table); 
+Index: parted-1.8.8/parted/ui.c
+===================================================================
+--- parted-1.8.8.orig/parted/ui.c
++++ parted-1.8.8/parted/ui.c
+@@ -154,17 +154,17 @@ struct siginfo_t {
+ #  define ILL_BADSTK (INTMAX - 8)
+ #endif
+ 
+-char* prog_name = "GNU Parted " VERSION "\n";
++const char* prog_name = "GNU Parted " VERSION "\n";
+ 
+-static char* banner_msg = N_(
++static const char* banner_msg = N_(
+ "Welcome to GNU Parted! Type 'help' to view a list of commands.\n");
+ 
+-static char* usage_msg = N_(
++static const char* usage_msg = N_(
+ "Usage: parted [OPTION]... [DEVICE [COMMAND [PARAMETERS]...]...]\n"
+ "Apply COMMANDs with PARAMETERS to DEVICE.  If no COMMAND(s) are given, "
+ "run in\ninteractive mode.\n");
+ 
+-static char* bug_msg = N_(
++static const char* bug_msg = N_(
+ "\n\nYou found a bug in GNU Parted! Here's what you have to do:\n\n"
+ "Don't panic! The bug has most likely not affected any of your data.\n"
+ "Help us to fix this bug by doing the following:\n\n"
+@@ -218,7 +218,7 @@ screen_width ()
+ 
+ /* HACK: don't specify termcap separately - it'll annoy the users. */
+ #ifdef HAVE_LIBREADLINE
+-        width = tgetnum ("co");
++        width = tgetnum ((char *) "co");
+ #endif
+ 
+         if (width <= 0)
+@@ -579,7 +579,9 @@ _readline (const char* prompt, const Str
+                         fputs (line, stdout);
+                         fflush (stdout);
+ #endif
+-                        line [strlen (line) - 1] = 0;    /* kill trailing CR */
++                        /* kill trailing NL */
++                        if (strlen (line))
++                                line [strlen (line) - 1] = 0;
+                 } else {
+                         free (line);
+                         line = NULL;
+Index: parted-1.8.8/parted/ui.h
+===================================================================
+--- parted-1.8.8.orig/parted/ui.h
++++ parted-1.8.8/parted/ui.h
+@@ -1,6 +1,6 @@
+ /*
+     parted - a frontend to libparted
+-    Copyright (C) 1999, 2000, 2001, 2007 Free Software Foundation, Inc.
++    Copyright (C) 1999, 2000, 2001, 2007-2008 Free Software Foundation, Inc.
+ 
+     This program is free software; you can redistribute it and/or modify
+     it under the terms of the GNU General Public License as published by
+@@ -21,7 +21,7 @@
+ 
+ #include "strlist.h"
+ 
+-extern char*	prog_name;
++extern const char *prog_name;
+ 
+ extern int init_ui ();
+ extern int non_interactive_mode (PedDevice** dev, Command* cmd_list[],
+Index: parted-1.8.8/tests/Makefile.am
+===================================================================
+--- parted-1.8.8.orig/tests/Makefile.am
++++ parted-1.8.8/tests/Makefile.am
+@@ -5,8 +5,10 @@ TESTS = \
+   t1100-busy-label.sh \
+   t1500-small-ext2.sh \
+   t2000-mkfs.sh \
++  t2200-dos-label-recog.sh \
+   t3000-constraints.sh \
+-  t3100-resize-ext2-partion.sh
++  t3100-resize-ext2-partion.sh \
++  t5000-tags.sh
+ 
+ EXTRA_DIST = \
+   $(TESTS) test-lib.sh mkdtemp

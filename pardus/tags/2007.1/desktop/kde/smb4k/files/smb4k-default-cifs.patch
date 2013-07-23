@@ -1,0 +1,57 @@
+diff -ur smb4k-0.8.0.orig/smb4k/core/smb4kcore.cpp smb4k-0.8.0/smb4k/core/smb4kcore.cpp
+--- smb4k-0.8.0.orig/smb4k/core/smb4kcore.cpp	2006-11-26 17:48:55.000000000 +0200
++++ smb4k-0.8.0/smb4k/core/smb4kcore.cpp	2006-12-22 21:37:53.131940017 +0200
+@@ -343,7 +343,7 @@
+       // only modify, if the user does *not* use super or sudo.
+ 
+       config()->setGroup( "Samba" );
+-      QString filesystem = config()->readEntry( "Mount Filesystem", "smbfs" );
++      QString filesystem = config()->readEntry( "Mount Filesystem", "cifs" );
+ 
+       config()->setGroup( "Super User Privileges" );
+       bool run_suid = config()->readBoolEntry( "Run SUID", false );
+diff -ur smb4k-0.8.0.orig/smb4k/core/smb4kmounter.cpp smb4k-0.8.0/smb4k/core/smb4kmounter.cpp
+--- smb4k-0.8.0.orig/smb4k/core/smb4kmounter.cpp	2006-11-17 20:30:47.000000000 +0200
++++ smb4k-0.8.0/smb4k/core/smb4kmounter.cpp	2006-12-22 21:39:46.233745929 +0200
+@@ -621,7 +621,7 @@
+ 
+   config()->setGroup( "Samba" );
+ #ifndef __FreeBSD__
+-  QString default_fs = config()->readEntry( "Mount Filesystem", "smbfs" );
++  QString default_fs = config()->readEntry( "Mount Filesystem", "cifs" );
+   p.setFilesystem( info && !info->filesystem().isEmpty() ? info->filesystem() : default_fs );
+ #else
+   int default_port = config()->readNumEntry( "Port", 139 );
+diff -ur smb4k-0.8.0.orig/smb4k/widgets/smb4koptionsdlg.cpp smb4k-0.8.0/smb4k/widgets/smb4koptionsdlg.cpp
+--- smb4k-0.8.0.orig/smb4k/widgets/smb4koptionsdlg.cpp	2006-11-12 15:04:20.000000000 +0200
++++ smb4k-0.8.0/smb4k/widgets/smb4koptionsdlg.cpp	2006-12-22 21:40:43.737004105 +0200
+@@ -962,7 +962,7 @@
+   //
+   config()->setGroup( "Samba" );
+   int default_port = config()->readNumEntry( "Port", 139 );
+-  QString default_filesystem = config()->readEntry( "Mount Filesystem", "smbfs" );
++  QString default_filesystem = config()->readEntry( "Mount Filesystem", "cifs" );
+   QString default_protocol = config()->readEntry( "Net Protocol", "auto" );
+   bool default_kerberos = config()->readBoolEntry( "Use Kerberos", false );
+   bool default_rw = config()->readBoolEntry( "Mount ReadWrite", true );
+diff -ur smb4k-0.8.0.orig/smb4k/widgets/smb4ksambaoptions.cpp smb4k-0.8.0/smb4k/widgets/smb4ksambaoptions.cpp
+--- smb4k-0.8.0.orig/smb4k/widgets/smb4ksambaoptions.cpp	2006-11-12 15:04:20.000000000 +0200
++++ smb4k-0.8.0/smb4k/widgets/smb4ksambaoptions.cpp	2006-12-22 21:43:12.015462353 +0200
+@@ -179,7 +179,7 @@
+   m_filesystem = new KComboBox( filesystem );
+   m_filesystem->insertItem( "SMBFS", 0 );
+   m_filesystem->insertItem( "CIFS", 1 );
+-//   m_filesystem->setCurrentText( "SMBFS" );
++  m_filesystem->setCurrentText( "CIFS" );
+   QLabel *note = new QLabel( i18n( "NOTE: You might need to enable support for either <i>super</i> or <i>sudo</i> in the Super User tab." ), filesystem );
+   note->setTextFormat( QLabel::RichText );
+ 
+@@ -394,6 +394,8 @@
+            this,                SLOT( slotCustomUIDChanged( int ) ) );
+   connect( m_custom_gid,        SIGNAL( activated( int ) ),
+            this,                SLOT( slotCustomGIDChanged( int ) ) );
++
++  slotSambaFileSystem("CIFS");
+ }
+ 
+ 

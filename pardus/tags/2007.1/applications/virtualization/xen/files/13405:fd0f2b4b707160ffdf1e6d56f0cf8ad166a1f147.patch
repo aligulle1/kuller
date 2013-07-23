@@ -1,0 +1,44 @@
+
+# HG changeset patch
+# User Alastair Tse <atse@xensource.com>
+# Date 1169202123 0
+# Node ID 08d791bd01e95bcce6f112ccca284a662f9adc63
+# Parent f98a6a9df1b4ea6022d05cdb2d189cb7645408d2
+[XEND] Fix order of kernel argument construction to prevent arg repeat bug
+
+Make sure user specified kernel args are appended at the end but also
+make sure that we do not duplicate root= and ip=.
+
+Signed-off-by: Alastair Tse <atse@xensource.com>
+
+Based on xen-unstable changeset: 13405:fd0f2b4b707160ffdf1e6d56f0cf8ad166a1f147
+
+--- a/tools/python/xen/xend/XendConfig.py	Mon Jan 08 12:54:41 2007 -0800
++++ b/tools/python/xen/xend/XendConfig.py	Fri Jan 19 10:22:03 2007 +0000
+@@ -1104,19 +1104,18 @@ class XendConfig(dict):
+ 
+         self['PV_kernel'] = sxp.child_value(image_sxp, 'kernel','')
+         self['PV_ramdisk'] = sxp.child_value(image_sxp, 'ramdisk','')
+-        kernel_args = ""
++
++        # user-specified args must come last: previous releases did this and
++        # some domU kernels rely upon the ordering.
++        kernel_args = sxp.child_value(image_sxp, 'args', '')
+         
+         # attempt to extract extra arguments from SXP config
+         arg_ip = sxp.child_value(image_sxp, 'ip')
+         if arg_ip and not re.search(r'ip=[^ ]+', kernel_args):
+-            kernel_args += 'ip=%s ' % arg_ip
++            kernel_args = 'ip=%s ' % arg_ip + kernel_args
+         arg_root = sxp.child_value(image_sxp, 'root')
+         if arg_root and not re.search(r'root=', kernel_args):
+-            kernel_args += 'root=%s ' % arg_root
+-
+-        # user-specified args must come last: previous releases did this and
+-        # some domU kernels rely upon the ordering.
+-        kernel_args += sxp.child_value(image_sxp, 'args', '')
++            kernel_args = 'root=%s ' % arg_root + kernel_args
+ 
+         self['PV_args'] = kernel_args
+ 
+

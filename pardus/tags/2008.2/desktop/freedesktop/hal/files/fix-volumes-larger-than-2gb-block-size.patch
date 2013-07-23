@@ -1,0 +1,20 @@
+Index: hal-0.5.11/hald/linux/blockdev.c
+===================================================================
+--- hal-0.5.11.orig/hald/linux/blockdev.c
++++ hal-0.5.11/hald/linux/blockdev.c
+@@ -1435,13 +1435,13 @@ hotplug_event_begin_add_blockdev (const 
+ 		 * (block size requires opening the device file)
+ 		 */
+ 		hal_device_property_set_int (d, "volume.block_size", 512);
+-		if (!hal_util_set_int_from_file (d, "volume.num_blocks", sysfs_path_real, "size", 0)) {
++		if (!hal_util_set_uint64_from_file (d, "volume.num_blocks", sysfs_path_real, "size", 0)) {
+ 			HAL_INFO (("Ignoring hotplug event - cannot read 'size'"));
+ 			goto error;
+ 		}
+ 		hal_device_property_set_uint64 (
+ 			d, "volume.size",
+-			((dbus_uint64_t)(512)) * ((dbus_uint64_t)(hal_device_property_get_int (d, "volume.num_blocks"))));
++			((dbus_uint64_t)(512)) * ((dbus_uint64_t)(hal_device_property_get_uint64 (d, "volume.num_blocks"))));
+ 		/* TODO: move to prober? */
+ 		if (is_physical_partition) {
+ 			guint64 start_block;

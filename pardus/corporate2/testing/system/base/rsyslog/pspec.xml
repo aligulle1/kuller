@@ -1,0 +1,177 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>rsyslog</Name>
+        <Homepage>http://www.rsyslog.com</Homepage>
+        <Packager>
+            <Name>Pardus</Name>
+            <Email>admins@pardus.org.tr</Email>
+        </Packager>
+        <License>GPLv3+</License>
+        <IsA>service</IsA>
+        <Summary>Enhanced system logging and kernel message trapping daemons</Summary>
+        <Description>rsyslog is an enhanced multi-threaded syslogd supporting, among others, MySQL, syslog/tcp, RFC 3195, permitted sender lists, filtering on any message part, and fine grain output format control. It is quite compatible with stock sysklogd and can be used as a drop-in replacement.</Description>
+        <Archive sha1sum="212401ef4928b876d8d7a3fde4a29e71085e16ba" type="targz">http://www.rsyslog.com/files/download/rsyslog/rsyslog-5.7.2.tar.gz</Archive>
+        <BuildDependencies>
+            <Dependency>gnutls</Dependency>
+            <Dependency>zlib-devel</Dependency>
+            <Dependency>postgresql-libs</Dependency>
+            <Dependency>mit-kerberos-devel</Dependency>
+            <Dependency releaseFrom="58">mysql-libs</Dependency>
+        </BuildDependencies>
+    </Source>
+
+    <Package>
+        <Name>rsyslog</Name>
+        <RuntimeDependencies>
+            <Dependency>zlib</Dependency>
+        </RuntimeDependencies>
+        <Replaces>
+            <Package>sysklogd</Package>
+        </Replaces>
+        <Files>
+            <Path fileType="executable">/sbin/rsyslogd</Path>
+            <Path fileType="library">/usr/lib/rsyslog</Path>
+            <Path fileType="man">/usr/share/man</Path>
+            <Path fileType="doc">/usr/share/doc</Path>
+            <Path fileType="config">/etc/logrotate.d</Path>
+            <Path fileType="config">/etc/conf.d</Path>
+            <Path fileType="config">/etc/rsyslog.conf</Path>
+            <Path fileType="config">/etc/rsyslog.d</Path>
+        </Files>
+        <AdditionalFiles>
+            <AdditionalFile owner="root" permission="0644" target="/etc/logrotate.d/rsyslog">rsyslog.logrotate</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/etc/rsyslog.conf">rsyslog.conf</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/etc/conf.d/rsyslog">rsyslog.sysconfig</AdditionalFile>
+        </AdditionalFiles>
+        <Provides>
+            <COMAR script="service.py">System.Service</COMAR>
+        </Provides>
+    </Package>
+
+    <Package>
+        <Name>rsyslog-module-postgresql</Name>
+        <PartOf>util.admin</PartOf>
+        <Summary>PostgreSQL support for rsyslog</Summary>
+        <RuntimeDependencies>
+            <Dependency>postgresql-libs</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="library">/usr/lib/rsyslog/ompgsql.so</Path>
+            <Path fileType="data">/usr/share/doc/rsyslog/createPgSQLDB.sql</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>rsyslog-module-mysql</Name>
+        <PartOf>util.admin</PartOf>
+        <Summary>MySQL support for rsyslog</Summary>
+        <RuntimeDependencies>
+            <Dependency releaseFrom="58">mysql-libs</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="library">/usr/lib/rsyslog/ommysql.so</Path>
+            <Path fileType="data">/usr/share/doc/rsyslog/createMySQLDB.sql</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>rsyslog-module-gnutls</Name>
+        <PartOf>util.admin</PartOf>
+        <Summary>GnuTLS support for rsyslog</Summary>
+        <RuntimeDependencies>
+            <Dependency>gnutls</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="library">/usr/lib/rsyslog/lmnsd_gtls.so</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>rsyslog-module-gssapi</Name>
+        <PartOf>util.admin</PartOf>
+        <Summary>GSSAPI authentication and encryption support for rsyslog</Summary>
+        <RuntimeDependencies>
+            <Dependency>mit-kerberos-libs</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="library">/usr/lib/rsyslog/lmgssutil.so</Path>
+            <Path fileType="library">/usr/lib/rsyslog/imgssapi.so</Path>
+            <Path fileType="library">/usr/lib/rsyslog/omgssapi.so</Path>
+        </Files>
+    </Package>
+
+    <History>
+        <Update release="10">
+            <Date>2011-10-21</Date>
+            <Version>5.7.2</Version>
+            <Comment>Fix path for the kill utility (pb#19378)</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="9">
+            <Date>2011-04-13</Date>
+            <Version>5.7.2</Version>
+            <Comment>Create rsyslog.d directory to include extra config files provided by other packages</Comment>
+            <Name>Erdem Bayer</Name>
+            <Email>ebayer@bayer.gen.tr</Email>
+        </Update>
+        <Update release="8">
+            <Date>2011-02-23</Date>
+            <Version>5.7.2</Version>
+            <Comment>Rotate more log files</Comment>
+            <Name>Erdem Bayer</Name>
+            <Email>ebayer@bayer.gen.tr</Email>
+        </Update>
+        <Update release="7">
+            <Date>2011-01-07</Date>
+            <Version>5.7.2</Version>
+            <Comment>Version bump.</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="6">
+            <Date>2011-01-04</Date>
+            <Version>4.6.3</Version>
+            <Comment>Rebuild for MySQL 5.5</Comment>
+            <Name>H. İbrahim Güngör</Name>
+            <Email>ibrahim@pardus.org.tr</Email>
+        </Update>
+        <Update release="5">
+            <Date>2010-11-23</Date>
+            <Version>4.6.3</Version>
+            <Comment>Depend on mit-kerberos-devel.</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="4">
+            <Date>2010-11-12</Date>
+            <Version>4.6.3</Version>
+            <Comment>Fix script extensions</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="3">
+            <Date>2010-11-11</Date>
+            <Version>4.6.3</Version>
+            <Comment>Enable mysql,pgsql,gssapi and gnutls modules.</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="2">
+            <Date>2010-10-26</Date>
+            <Version>4.6.3</Version>
+            <Comment>Mass rebuild for Pardus Corporate 2 Alpha 3</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="1">
+            <Date>2010-07-09</Date>
+            <Version>4.6.3</Version>
+            <Comment>Initial release.</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+    </History>
+</PISI>

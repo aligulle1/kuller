@@ -1,0 +1,100 @@
+Index: kdebase-workspace-4.3.2/plasma/dataengines/hotplug/hotplugengine.cpp
+===================================================================
+--- kdebase-workspace-4.3.2.orig/plasma/dataengines/hotplug/hotplugengine.cpp
++++ kdebase-workspace-4.3.2/plasma/dataengines/hotplug/hotplugengine.cpp
+@@ -30,7 +30,9 @@
+ #include <solid/devicenotifier.h>
+ #include <solid/device.h>
+ #include <solid/deviceinterface.h>
++#include <solid/genericinterface.h>
+ 
++#include <knotification.h>
+ 
+ 
+ HotplugEngine::HotplugEngine(QObject* parent, const QVariantList& args)
+@@ -40,7 +42,7 @@ HotplugEngine::HotplugEngine(QObject* pa
+ 
+ HotplugEngine::~HotplugEngine()
+ {
+-
++    pluggedDevices.clear();
+ }
+ 
+ void HotplugEngine::init()
+@@ -48,7 +50,7 @@ void HotplugEngine::init()
+     findPredicates();
+     const QString query("[ Is StorageAccess OR [ Is StorageDrive OR [ Is StorageVolume OR [ Is OpticalDrive OR [ Is PortableMediaPlayer OR [ Is SmartCardReader OR Is Camera ] ] ] ] ] ]");
+     foreach (const Solid::Device &dev, Solid::Device::listFromQuery(query)) {
+-        onDeviceAdded(dev.udi());
++        onDeviceAdded(dev.udi(), true);
+     }
+     m_predicates.clear();
+ 
+@@ -72,13 +74,26 @@ void HotplugEngine::findPredicates()
+     }
+ }
+ 
+-void HotplugEngine::onDeviceAdded(const QString &udi)
++void HotplugEngine::onDeviceAdded(const QString &udi, const bool firstRun)
+ {
+     if (m_predicates.isEmpty()) {
+         findPredicates();
+     }
+ 
+     Solid::Device device(udi);
++
++    QString deviceInfo = device.vendor() + " " + device.product();
++
++    // Notify when a new device plugged-in
++    Solid::GenericInterface *interface = device.as<Solid::GenericInterface>();
++    if (interface) {
++        if (interface->property("info.subsystem").toString() == "usb_device"){
++            pluggedDevices.insert(udi, deviceInfo);
++            if (!firstRun)
++                KNotification::event (KNotification::Notification, i18n("Device <b>%1</b> plugged in.", deviceInfo));
++        }
++    }
++
+     QStringList interestingDesktopFiles;
+     //search in all desktop configuration file if the device inserted is a correct device
+     QHashIterator<QString, Solid::Predicate> it(m_predicates);
+@@ -115,6 +130,13 @@ void HotplugEngine::onDeviceAdded(const 
+ 
+ void HotplugEngine::onDeviceRemoved(const QString &udi)
+ {
++
++    if (pluggedDevices.contains(udi)) {
++        QString deviceInfo = pluggedDevices[udi];
++        KNotification::event (KNotification::Notification, i18n("Device <b>%1</b> plugged out.", deviceInfo));
++        pluggedDevices.remove(udi);
++    }
++
+     removeSource(udi);
+ 
+     //kDebug() << "remove hardware solid : " << udi;
+Index: kdebase-workspace-4.3.2/plasma/dataengines/hotplug/hotplugengine.h
+===================================================================
+--- kdebase-workspace-4.3.2.orig/plasma/dataengines/hotplug/hotplugengine.h
++++ kdebase-workspace-4.3.2/plasma/dataengines/hotplug/hotplugengine.h
+@@ -22,6 +22,7 @@
+ #define HOTPLUGENGINE_H
+ 
+ #include <QObject>
++#include <QHash>
+ 
+ #include <Plasma/DataEngine>
+ 
+@@ -40,11 +41,12 @@ class HotplugEngine : public Plasma::Dat
+         void init();
+ 
+     protected slots :
+-        void onDeviceAdded(const QString &udi);
++        void onDeviceAdded(const QString &udi, const bool firstRun = false);
+         void onDeviceRemoved(const QString &udi);
+ 
+     private :
+         void findPredicates();
++        QHash<QString, QString> pluggedDevices;
+ 
+         QHash<QString, Solid::Predicate> m_predicates;
+ };

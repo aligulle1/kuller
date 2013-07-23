@@ -1,0 +1,46 @@
+diff -Nur nexuiz-2.4-old/darkplaces/makefile.inc nexuiz-2.4/darkplaces/makefile.inc
+--- nexuiz-2.4-old/darkplaces/makefile.inc	2008-03-14 02:27:43.979822403 +0200
++++ nexuiz-2.4/darkplaces/makefile.inc	2008-03-14 02:37:21.132081923 +0200
+@@ -1,5 +1,5 @@
+ # Choose the compiler you want to use
+-CC=gcc
++CC=pardusCC
+ 
+ # athlon optimizations
+ #CPUOPTIMIZATIONS=-march=athlon
+@@ -14,7 +14,7 @@
+ # 686 (Pentium Pro/II) optimizations
+ #CPUOPTIMIZATIONS=-march=i686
+ # No specific CPU (386 compatible)
+-CPUOPTIMIZATIONS=
++CPUOPTIMIZATIONS=pardusCFLAGS
+ 
+ SDL_CONFIG?=sdl-config
+ SDLCONFIG_UNIXCFLAGS?=`$(SDL_CONFIG) --cflags`
+@@ -44,7 +44,7 @@
+ 
+ # Advanced Linux Sound Architecture (Linux)
+ OBJ_SND_ALSA=$(OBJ_SND_COMMON) snd_alsa.o
+-LIB_SND_ALSA=-lasound $(LIB_SND_MODPLUG)
++LIB_SND_ALSA=`pkg-config --libs alsa` $(LIB_SND_MODPLUG)
+ 
+ # Core Audio (Mac OS X)
+ OBJ_SND_COREAUDIO=$(OBJ_SND_COMMON) snd_coreaudio.c
+@@ -176,7 +176,7 @@
+ 
+ OBJ_GLX= builddate.c sys_linux.o vid_glx.o $(OBJ_SOUND) $(OBJ_CD) $(OBJ_COMMON)
+ 
+-LDFLAGS_UNIXCOMMON=-lm
++LDFLAGS_UNIXCOMMON=pardusLDFLAGS
+ LDFLAGS_UNIXCL=-L$(UNIX_X11LIBPATH) -lX11 -lXpm -lXext -lXxf86dga -lXxf86vm $(LIB_SOUND)
+ LDFLAGS_UNIXCL_PRELOAD=-lz -ljpeg -lpng -lvorbis -lvorbisfile -lcurl -lmodplug
+ LDFLAGS_UNIXSV_PRELOAD=-lz -lcurl
+@@ -399,7 +399,7 @@
+ 		DP_MAKE_TARGET=$(DP_MAKE_TARGET) DP_SOUND_API=$(DP_SOUND_API) \
+ 		CFLAGS="$(CFLAGS_COMMON) $(CFLAGS_EXTRA) $(CFLAGS_RELEASE) $(OPTIM_RELEASE)"\
+ 		LDFLAGS="$(LDFLAGS_RELEASE) $(LDFLAGS_COMMON)"
+-	$(STRIP) $(EXE)
++	# $(STRIP) $(EXE)
+ 
+ snd_modplug.o: snd_modplug.c
+ 	$(DO_CC) $(CFLAGS_SND_MODPLUG)

@@ -1,0 +1,100 @@
+Index: mozilla/security/nss/lib/ckfw/builtins/config.mk
+===================================================================
+--- mozilla.orig/security/nss/lib/ckfw/builtins/config.mk
++++ mozilla/security/nss/lib/ckfw/builtins/config.mk
+@@ -65,3 +65,8 @@ DSO_LDOPTS = -bundle
+ endif
+ endif
+ 
++ifeq ($(OS_TARGET),Linux)
++# The -R '$ORIGIN' linker option instructs this library to search for its
++# dependencies in the same directory where it resides.
++DSO_LDOPTS += -Wl,-R,'$$ORIGIN'
++endif
+Index: mozilla/security/nss/lib/ckfw/capi/config.mk
+===================================================================
+--- mozilla.orig/security/nss/lib/ckfw/capi/config.mk
++++ mozilla/security/nss/lib/ckfw/capi/config.mk
+@@ -65,3 +65,9 @@ DSO_LDOPTS = -bundle
+ endif
+ endif
+ 
++ifeq ($(OS_TARGET),Linux)
++# The -R '$ORIGIN' linker option instructs this library to search for its
++# dependencies in the same directory where it resides.
++DSO_LDOPTS += -Wl,-R,'$$ORIGIN'
++endif
++
+Index: mozilla/security/nss/lib/freebl/Makefile
+===================================================================
+--- mozilla.orig/security/nss/lib/freebl/Makefile
++++ mozilla/security/nss/lib/freebl/Makefile
+@@ -155,6 +155,7 @@ endif
+ endif
+ 
+ ifeq ($(OS_TARGET),Linux)
++DSO_LDOPTS += -Wl,-R,'$$ORIGIN'
+ ifeq ($(CPU_ARCH),x86_64)
+     ASFILES  = arcfour-amd64-gas.s mpi_amd64_gas.s
+     ASFLAGS += -march=opteron -m64 -fPIC -Wa,--noexecstack
+Index: mozilla/security/nss/lib/nss/config.mk
+===================================================================
+--- mozilla.orig/security/nss/lib/nss/config.mk
++++ mozilla/security/nss/lib/nss/config.mk
+@@ -85,6 +85,11 @@ EXTRA_SHARED_LIBS += \
+ 
+ endif
+ 
++ifeq ($(OS_TARGET),Linux)
++# The -R '$ORIGIN' linker option instructs this library to search for its
++# dependencies in the same directory where it resides.
++DSO_LDOPTS += -Wl,-R,'$$ORIGIN'
++endif
+ 
+ # $(PROGRAM) has explicit dependencies on $(EXTRA_LIBS)
+ SHARED_LIBRARY_LIBS = \
+Index: mozilla/security/nss/lib/smime/config.mk
+===================================================================
+--- mozilla.orig/security/nss/lib/smime/config.mk
++++ mozilla/security/nss/lib/smime/config.mk
+@@ -93,3 +93,8 @@ SHARED_LIBRARY_DIRS = \
+ 	../pkcs7 \
+ 	$(NULL)
+ 
++ifeq ($(OS_TARGET),Linux)
++# The -R '$ORIGIN' linker option instructs this library to search for its
++# dependencies in the same directory where it resides.
++DSO_LDOPTS += -Wl,-R,'$$ORIGIN'
++endif
+Index: mozilla/security/nss/lib/softoken/config.mk
+===================================================================
+--- mozilla.orig/security/nss/lib/softoken/config.mk
++++ mozilla/security/nss/lib/softoken/config.mk
+@@ -99,6 +99,12 @@ ifeq ($(OS_TARGET),SunOS)
+ OS_LIBS += -lbsm 
+ endif
+ 
++ifeq ($(OS_TARGET),Linux)
++# The -R '$ORIGIN' linker option instructs this library to search for its
++# dependencies in the same directory where it resides.
++DSO_LDOPTS += -Wl,-R,'$$ORIGIN'
++endif
++
+ ifeq ($(OS_TARGET),WINCE)
+ DEFINES += -DDBM_USING_NSPR
+ endif
+Index: mozilla/security/nss/lib/ssl/config.mk
+===================================================================
+--- mozilla.orig/security/nss/lib/ssl/config.mk
++++ mozilla/security/nss/lib/ssl/config.mk
+@@ -107,4 +107,10 @@ ifeq ($(OS_ARCH), BeOS)
+ EXTRA_SHARED_LIBS += -lbe
+ endif
+ 
++ifeq ($(OS_TARGET),Linux)
++# The -R '$ORIGIN' linker option instructs this library to search for its
++# dependencies in the same directory where it resides.
++DSO_LDOPTS += -Wl,-R,'$$ORIGIN'
++endif
++
+ endif

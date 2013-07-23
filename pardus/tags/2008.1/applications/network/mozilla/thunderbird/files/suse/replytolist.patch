@@ -1,0 +1,244 @@
+Index: mailnews/compose/public/nsIMsgComposeParams.idl
+===================================================================
+RCS file: /cvsroot/mozilla/mailnews/compose/public/nsIMsgComposeParams.idl,v
+retrieving revision 1.8
+diff -u -p -r1.8 nsIMsgComposeParams.idl
+--- mailnews/compose/public/nsIMsgComposeParams.idl	16 Sep 2005 15:18:32 -0000	1.8
++++ mailnews/compose/public/nsIMsgComposeParams.idl	6 Apr 2006 02:26:57 -0000
+@@ -59,6 +59,7 @@ interface nsIMsgCompType {
+     const long Template                 = 10;
+     const long MailToUrl                = 11;
+     const long ReplyWithTemplate        = 12;
++    const long ReplyToList              = 13;
+ };
+ 
+ 
+Index: mailnews/mime/public/nsMailHeaders.h
+===================================================================
+RCS file: /cvsroot/mozilla/mailnews/mime/public/nsMailHeaders.h,v
+retrieving revision 1.11
+diff -u -p -6 -r1.11 nsMailHeaders.h
+--- mailnews/mime/public/nsMailHeaders.h	28 Feb 2005 17:10:57 -0000	1.11
++++ mailnews/mime/public/nsMailHeaders.h	14 Aug 2006 07:31:12 -0000
+@@ -62,12 +62,13 @@
+ #define HEADER_DISTRIBUTION					        "Distribution"
+ #define HEADER_FCC							            "FCC"
+ #define HEADER_FOLLOWUP_TO					        "Followup-To"
+ #define HEADER_FROM							            "From"
+ #define HEADER_STATUS							            "Status"
+ #define HEADER_LINES						            "Lines"
++#define HEADER_LIST_POST                    "List-Post"
+ #define HEADER_MAIL_FOLLOWUP_TO				      "Mail-Followup-To"
+ #define HEADER_MAIL_REPLY_TO				       "Mail-Reply-To"
+ #define HEADER_MESSAGE_ID					          "Message-ID"
+ #define HEADER_MIME_VERSION					        "MIME-Version"
+ #define HEADER_NEWSGROUPS					          "Newsgroups"
+ #define HEADER_ORGANIZATION					        "Organization"
+@@ -99,12 +100,13 @@
+ #define HEADER_X_SUN_CONTENT_LINES		      "X-Sun-Content-Lines"
+ #define HEADER_X_SUN_DATA_DESCRIPTION	    	"X-Sun-Data-Description"
+ #define HEADER_X_SUN_DATA_NAME			      	"X-Sun-Data-Name"
+ #define HEADER_X_SUN_DATA_TYPE			      	"X-Sun-Data-Type"
+ #define HEADER_X_SUN_ENCODING_INFO		    	"X-Sun-Encoding-Info"
+ #define HEADER_X_PRIORITY                   "X-Priority"
++#define HEADER_X_REPLY_TO                   "X-Reply-To"
+ 
+ #define HEADER_PARM_CHARSET                 "charset"     
+ #define HEADER_PARM_START                   "start"     
+ #define HEADER_PARM_BOUNDARY				        "BOUNDARY"
+ #define HEADER_PARM_FILENAME				        "FILENAME"
+ #define HEADER_PARM_NAME					          "NAME"
+Index: mail/base/content/mailCommands.js
+===================================================================
+RCS file: /cvsroot/mozilla/mail/base/content/mailCommands.js,v
+retrieving revision 1.20.2.5
+diff -u -p -6 -r1.20.2.5 mailCommands.js
+--- mail/base/content/mailCommands.js	10 Jul 2006 19:44:11 -0000	1.20.2.5
++++ mail/base/content/mailCommands.js	21 Nov 2006 07:35:42 -0000
+@@ -260,12 +260,13 @@ function ComposeMessage(type, format, fo
+       var messageID = hdr.messageId;
+       var messageIDScheme = messageID ? messageID.split(":")[0] : "";
+       if (messageIDScheme && (messageIDScheme == 'http' || messageIDScheme == 'https') &&  "openComposeWindowForRSSArticle" in this)
+         openComposeWindowForRSSArticle(messageID, hdr, type);
+       else if (type == msgComposeType.Reply ||
+                type == msgComposeType.ReplyAll ||
++	       type == msgComposeType.ReplyToList ||
+                type == msgComposeType.ForwardInline ||
+                type == msgComposeType.ReplyToGroup ||
+                type == msgComposeType.ReplyToSender ||
+                type == msgComposeType.ReplyToSenderAndGroup ||
+                type == msgComposeType.Template ||
+                type == msgComposeType.Draft)
+Index: mailnews/base/resources/content/mailCommands.js
+===================================================================
+RCS file: /cvsroot/mozilla/mailnews/base/resources/content/mailCommands.js,v
+retrieving revision 1.96.4.4
+diff -u -p -6 -r1.96.4.4 mailCommands.js
+--- mailnews/base/resources/content/mailCommands.js	25 Jun 2006 08:56:04 -0000	1.96.4.4
++++ mailnews/base/resources/content/mailCommands.js	21 Nov 2006 07:35:51 -0000
+@@ -267,12 +267,13 @@ function ComposeMessage(type, format, fo
+             identity = tmpIdentity;
+         }
+       }
+ 
+       if (type == msgComposeType.Reply ||
+         type == msgComposeType.ReplyAll ||
++	type == msgComposeType.ReplyToList ||
+         type == msgComposeType.ForwardInline ||
+         type == msgComposeType.ReplyToGroup ||
+         type == msgComposeType.ReplyToSender ||
+         type == msgComposeType.ReplyToSenderAndGroup ||
+         type == msgComposeType.Template ||
+         type == msgComposeType.Draft)
+Index: mailnews/compose/src/nsMsgCompose.cpp
+===================================================================
+RCS file: /cvsroot/mozilla/mailnews/compose/src/nsMsgCompose.cpp,v
+retrieving revision 1.460.2.27
+diff -u -p -6 -r1.460.2.27 nsMsgCompose.cpp
+--- mailnews/compose/src/nsMsgCompose.cpp	4 Jan 2007 19:34:56 -0000	1.460.2.27
++++ mailnews/compose/src/nsMsgCompose.cpp	10 Jan 2007 09:01:35 -0000
+@@ -1748,12 +1748,13 @@ nsresult nsMsgCompose::CreateMessage(con
+ 
+       switch (type)
+       {
+         default: break;
+         case nsIMsgCompType::Reply :
+         case nsIMsgCompType::ReplyAll:
++        case nsIMsgCompType::ReplyToList:
+         case nsIMsgCompType::ReplyToGroup:
+         case nsIMsgCompType::ReplyToSender:
+         case nsIMsgCompType::ReplyToSenderAndGroup:
+           {
+             if (!isFirstPass)       // safeguard, just in case...
+             {
+@@ -2192,14 +2193,18 @@ NS_IMETHODIMP QuotingOutputStreamListene
+     compose->GetType(&type);
+ 
+     // Assign cite information if available...
+     if (!mCiteReference.IsEmpty())
+       compose->SetCiteReference(mCiteReference);
+ 
+-    if (mHeaders && (type == nsIMsgCompType::Reply || type == nsIMsgCompType::ReplyAll || type == nsIMsgCompType::ReplyToSender ||
+-                     type == nsIMsgCompType::ReplyToGroup || type == nsIMsgCompType::ReplyToSenderAndGroup) && mQuoteOriginal)
++    if (mHeaders && (type == nsIMsgCompType::Reply || 
++                     type == nsIMsgCompType::ReplyAll || 
++                     type == nsIMsgCompType::ReplyToList ||
++                     type == nsIMsgCompType::ReplyToSender ||
++                     type == nsIMsgCompType::ReplyToGroup || 
++                     type == nsIMsgCompType::ReplyToSenderAndGroup) && mQuoteOriginal)
+     {
+       nsCOMPtr<nsIMsgCompFields> compFields;
+       compose->GetCompFields(getter_AddRefs(compFields));
+       if (compFields)
+       {
+         aCharset.AssignLiteral("UTF-8");
+@@ -2210,12 +2215,13 @@ NS_IMETHODIMP QuotingOutputStreamListene
+         nsAutoString mailReplyTo;
+         nsAutoString mailFollowupTo;
+         nsAutoString newgroups;
+         nsAutoString followUpTo;
+         nsAutoString messageId;
+         nsAutoString references;
++        nsAutoString listPost;
+         nsXPIDLCString outCString;
+         PRBool needToRemoveDup = PR_FALSE;
+         if (!mMimeConverter)
+         {
+           mMimeConverter = do_GetService(NS_MIME_CONVERTER_CONTRACTID, &rv);
+           NS_ENSURE_SUCCESS(rv, rv);
+@@ -2263,13 +2269,36 @@ NS_IMETHODIMP QuotingOutputStreamListene
+             recipient += cc;
+             compFields->SetCc(recipient);
+           }
+ 
+           needToRemoveDup = PR_TRUE;
+         }
+-              
++
++        mHeaders->ExtractHeader(HEADER_LIST_POST, PR_TRUE, getter_Copies(outCString));
++        if (!outCString.IsEmpty())
++          mMimeConverter->DecodeMimeHeader(outCString, listPost, charset);
++
++        if (type == nsIMsgCompType::ReplyToList && ! listPost.IsEmpty())
++        {
++          nsString::const_iterator mailtoStart, mailtoEnd;
++          listPost.BeginReading(mailtoStart);
++          listPost.EndReading(mailtoEnd);
++          nsAutoString mailtoText(NS_LITERAL_STRING("<mailto:"));
++          PRBool mailtoFound = FindInReadable(mailtoText, mailtoStart, mailtoEnd);
++          
++          // Strip off the leading "<mailto:" and trailing ">"
++          if (mailtoFound && listPost.Equals(mailtoStart.get()) &&
++              listPost.RFindChar('>') == listPost.Length() - 1)
++          {
++            listPost.Cut(0, mailtoText.Length());
++            listPost.Cut(listPost.Length() - 1, 1);
++
++            compFields->SetTo(listPost);
++          }
++        }
++
+         mHeaders->ExtractHeader(HEADER_REPLY_TO, PR_FALSE, getter_Copies(outCString));
+         if (outCString)
+         {
+           mMimeConverter->DecodeMimeHeader(outCString, replyTo, charset);
+         }
+ 
+@@ -2300,13 +2329,14 @@ NS_IMETHODIMP QuotingOutputStreamListene
+         mHeaders->ExtractHeader(HEADER_REFERENCES, PR_FALSE, getter_Copies(outCString));
+         if (outCString)
+         {
+           mMimeConverter->DecodeMimeHeader(outCString, references, charset);
+         }
+ 
+-        if (! ((type == nsIMsgCompType::ReplyAll) && ! mailFollowupTo.IsEmpty()))
++        if (! ((type == nsIMsgCompType::ReplyAll) && ! mailFollowupTo.IsEmpty()) &&
++            ! ((type == nsIMsgCompType::ReplyToList) && ! listPost.IsEmpty()))
+         {
+           if (! mailReplyTo.IsEmpty())
+           { // handle Mail-Reply-To (http://cr.yp.to/proto/replyto.html)
+             compFields->SetTo(mailReplyTo);
+             needToRemoveDup = PR_TRUE;
+           }
+@@ -2805,12 +2835,13 @@ void nsMsgCompose::CleanUpRecipients(nsS
+ NS_IMETHODIMP nsMsgCompose::RememberQueuedDisposition()
+ {
+   // need to find the msg hdr in the saved folder and then set a property on 
+   // the header that we then look at when we actually send the message.
+   if (mType == nsIMsgCompType::Reply || 
+     mType == nsIMsgCompType::ReplyAll ||
++    mType == nsIMsgCompType::ReplyToList ||
+     mType == nsIMsgCompType::ReplyToGroup ||
+     mType == nsIMsgCompType::ReplyToSender ||
+     mType == nsIMsgCompType::ReplyToSenderAndGroup ||
+     mType == nsIMsgCompType::ForwardAsAttachment ||              
+     mType == nsIMsgCompType::ForwardInline)
+   {
+@@ -2843,12 +2874,13 @@ nsresult nsMsgCompose::ProcessReplyFlags
+ {
+   nsresult rv;
+   // check to see if we were doing a reply or a forward, if we were, set the answered field flag on the message folder
+   // for this URI.
+   if (mType == nsIMsgCompType::Reply || 
+       mType == nsIMsgCompType::ReplyAll ||
++      mType == nsIMsgCompType::ReplyToList ||
+       mType == nsIMsgCompType::ReplyToGroup ||
+       mType == nsIMsgCompType::ReplyToSender ||
+       mType == nsIMsgCompType::ReplyToSenderAndGroup ||
+       mType == nsIMsgCompType::ForwardAsAttachment ||              
+       mType == nsIMsgCompType::ForwardInline ||
+       mDraftDisposition != nsIMsgFolder::nsMsgDispositionState_None)
+@@ -3775,12 +3807,13 @@ nsMsgCompose::BuildBodyMessageAndSignatu
+   switch (mType)
+   {
+     case nsIMsgCompType::New :
+     case nsIMsgCompType::MailToUrl :    /* same as New */
+     case nsIMsgCompType::Reply :        /* should not happen! but just in case */
+     case nsIMsgCompType::ReplyAll :       /* should not happen! but just in case */
++    case nsIMsgCompType::ReplyToList :    /* should not happen! but just in case */
+     case nsIMsgCompType::ForwardAsAttachment :  /* should not happen! but just in case */
+     case nsIMsgCompType::ForwardInline :
+     case nsIMsgCompType::NewsPost :
+     case nsIMsgCompType::ReplyToGroup :
+     case nsIMsgCompType::ReplyToSender : 
+     case nsIMsgCompType::ReplyToSenderAndGroup :

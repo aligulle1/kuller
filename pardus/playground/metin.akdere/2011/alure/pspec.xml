@@ -1,0 +1,85 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>alure</Name>
+        <Homepage>http://kcat.strangesoft.net/alure.html</Homepage>
+        <Packager>
+            <Name>Metin Akdere</Name>
+            <Email>metin@pardus.org.tr</Email>
+        </Packager>
+        <License>MIT</License>
+        <IsA>library</IsA>
+        <Summary>Audio Library Utilities REtooled</Summary>
+        <Description>alure is a utility library to help manage common tasks with OpenAL applications. This includes device enumeration and initialization, file loading, and streaming.</Description>
+        <Archive sha1sum="f033f0820c449ebff7b4b0254a7b1f26c0ba485b" type="tarbz2">http://kcat.strangesoft.net/alure-releases/alure-1.2.tar.bz2</Archive>
+        <BuildDependencies>
+            <Dependency>libvorbis-devel</Dependency>
+            <Dependency>libsndfile-devel</Dependency>
+            <Dependency>openal-devel</Dependency>
+            <Dependency>flac-devel</Dependency>
+            <Dependency>dumb-devel</Dependency>
+            <Dependency>fluidsynth-devel</Dependency>
+            <Dependency>mpg123-devel</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <Patch level="1">compiler-flags-change.patch</Patch>
+            <Patch level="1">use_lpthread.diff</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>alure</Name>
+        <RuntimeDependencies>
+            <Dependency>openal</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="executable">/usr/bin</Path>
+            <Path fileType="library">/usr/lib</Path>
+            <Path fileType="doc">/usr/share/doc</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>alure-devel</Name>
+        <Summary>Development files for alure</Summary>
+        <RuntimeDependencies>
+            <Dependency release="current">alure</Dependency>
+            <Dependency>openal-devel</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="header">/usr/include</Path>
+            <Path fileType="header">/usr/lib/pkgconfig</Path>
+        </Files>
+    </Package>
+
+    <History>
+        <Update release="2">
+            <Date>2011-09-13</Date>
+            <Version>1.2</Version>
+            <Comment>
+                * Version bump
+                * Use -lpthread instead of -pthread.
+                * Grab a debian patch to fix compiler flags.
+                * Fixed potential lockup when the library is shutdown with streams open.
+                * Added ALURE_VERSION* macros to detect the version being compiled with.
+                * Introduced alureGetStreamLength to get the approximate number of samples in a stream, if known.
+                * Not all codecs can accurately supply this information, if at all (the sndfile, vorbisfile, FLAC, and wav/aiff codecs will attempt to get it).
+                * The vorbisfile codec now works with libvorbisidec, for Tremor support.
+                * Improved detection for OpenAL and some support libs during compilation.
+                * Compilation now uses a version script on non-Windows, non-Apple systems to better control the exported functions.
+                * Made alureSetStreamPatchset more efficient when the default IO functions are in use.
+                * The play and stream examples are now installed by default, but can be disabled with the BUILD_EXAMPLES and INSTALL_EXAMPLES options to cmake.
+            </Comment>
+            <Name>Metin Akdere</Name>
+            <Email>metin@pardus.org.tr</Email>
+        </Update>
+        <Update release="1">
+            <Date>2011-06-07</Date>
+            <Version>1.1</Version>
+            <Comment>First release.</Comment>
+            <Name>Metin Akdere</Name>
+            <Email>metin@pardus.org.tr</Email>
+        </Update>
+    </History>
+</PISI>

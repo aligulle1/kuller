@@ -1,0 +1,87 @@
+--- kdeui/klineedit.h	(.../3.5.7/kdelibs/kdeui/klineedit.h)	(revision 667419)
++++ kdeui/klineedit.h	(.../3.5.6/kdelibs/kdeui/klineedit.h)	(revision 667419)
+@@ -528,13 +528,6 @@
+     /**
+     * Re-implemented for internal reasons.  API not affected.
+     *
+-    * See QLineEdit::mouseReleaseEvent().
+-    */
+-    virtual void mouseReleaseEvent( QMouseEvent * );
+-
+-    /**
+-    * Re-implemented for internal reasons.  API not affected.
+-    *
+     * See QLineEdit::contextMenuEvent().
+     */
+     virtual void contextMenuEvent( QContextMenuEvent * );
+@@ -628,8 +621,6 @@
+      */
+     void init();
+ 
+-    bool copySqueezedText( bool clipboard ) const;
+-
+     /**
+      * Checks whether we should/should not consume a key used as
+      * an accelerator.
+--- kdeui/klineedit.cpp	(.../3.5.7/kdelibs/kdeui/klineedit.cpp)	(revision 667419)
++++ kdeui/klineedit.cpp	(.../3.5.6/kdelibs/kdeui/klineedit.cpp)	(revision 667419)
+@@ -396,18 +396,12 @@
+ 
+ void KLineEdit::copy() const
+ {
+-    if( !copySqueezedText(true))
+-        QLineEdit::copy();
+-}
+-
+-bool KLineEdit::copySqueezedText(bool clipboard) const
+-{
+    if (!d->squeezedText.isEmpty() && d->squeezedStart)
+    {
+       int start, end;
+       KLineEdit *that = const_cast<KLineEdit *>(this);
+       if (!that->getSelection(&start, &end))
+-         return false;
++         return;
+       if (start >= d->squeezedStart+3)
+          start = start - 3 - d->squeezedStart + d->squeezedEnd;
+       else if (start > d->squeezedStart)
+@@ -417,16 +411,17 @@
+       else if (end > d->squeezedStart)
+          end = d->squeezedEnd;
+       if (start == end)
+-         return false;
++         return;
+       QString t = d->squeezedText;
+       t = t.mid(start, end - start);
+       disconnect( QApplication::clipboard(), SIGNAL(selectionChanged()), this, 0);
+-      QApplication::clipboard()->setText( t, clipboard ? QClipboard::Clipboard : QClipboard::Selection );
++      QApplication::clipboard()->setText( t );
+       connect( QApplication::clipboard(), SIGNAL(selectionChanged()), this,
+                SLOT(clipboardChanged()) );
+-      return true;
++      return;
+    }
+-   return false;
++
++   QLineEdit::copy();
+ }
+ 
+ void KLineEdit::resizeEvent( QResizeEvent * ev )
+@@ -837,17 +832,6 @@
+     QLineEdit::mousePressEvent( e );
+ }
+ 
+-void KLineEdit::mouseReleaseEvent( QMouseEvent* e )
+-{
+-    QLineEdit::mouseReleaseEvent( e );
+-    if (QApplication::clipboard()->supportsSelection() ) {
+-        if ( e->button() == LeftButton ) {
+-            // Fix copying of squeezed text if needed
+-            copySqueezedText( false );
+-        }
+-    }
+-}
+-
+ void KLineEdit::tripleClickTimeout()
+ {
+     possibleTripleClick=false;

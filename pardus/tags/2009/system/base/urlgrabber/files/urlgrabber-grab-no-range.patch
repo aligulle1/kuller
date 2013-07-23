@@ -1,0 +1,67 @@
+Index: urlgrabber-3.1.0/urlgrabber/grabber.py
+===================================================================
+--- urlgrabber-3.1.0.orig/urlgrabber/grabber.py
++++ urlgrabber-3.1.0/urlgrabber/grabber.py
+@@ -402,6 +402,11 @@ except ImportError, msg:
+     HTTPException = None
+ 
+ try:
++    from httplib import HTTPResponse
++except ImportError, msg:
++    HTTPResponse = None
++
++try:
+     # This is a convenient way to make keepalive optional.
+     # Just rename the module so it can't be imported.
+     import keepalive
+@@ -1069,8 +1074,21 @@ class URLGrabberFileObject:
+         req = urllib2.Request(self.url, self.opts.data) # build request object
+         self._add_headers(req) # add misc headers that we need
+         self._build_range(req) # take care of reget and byterange stuff
++        
++        def _checkNoReget(fo):
++            # HTTP can disallow Range requests
++            
++            if self.opts.reget is None:
++                return False
++            if 'Range' not in req.headers:
++                return False
++            if not isinstance(fo, HTTPResponse):
++                return False
++
++            return fo.code != 206
+ 
+         fo, hdr = self._make_request(req, opener)
++        fetch_again = 0
+         if self.reget_time and self.opts.reget == 'check_timestamp':
+             # do this if we have a local file with known timestamp AND
+             # we're in check_timestamp reget mode.
+@@ -1082,14 +1100,27 @@ class URLGrabberFileObject:
+             except (TypeError,):
+                 fetch_again = 1
+             
++        if _checkNoReget(fo): # doing a "reget" didn't work, so fixup
++            fetch_again = 0
++            self.opts.reget = None
++            self.append = 0
++            self._amount_read = 0
++
++        if True:
+             if fetch_again:
+                 # the server version is newer than the (incomplete) local
+                 # version, so we should abandon the version we're getting
+                 # and fetch the whole thing again.
+                 fo.close()
++                #  Without this we'll have to read all of the previous request
++                # data. For "large" requests, this is very bad.
++                fo.close_connection()
+                 self.opts.reget = None
+-                del req.headers['Range']
++                if req.headers.has_key('Range'):
++                    del req.headers['Range']
+                 self._build_range(req)
++                # This doesn't get reset in _build_range() *sigh*
++                self._amount_read = 0
+                 fo, hdr = self._make_request(req, opener)
+ 
+         (scheme, host, path, parm, query, frag) = urlparse.urlparse(self.url)

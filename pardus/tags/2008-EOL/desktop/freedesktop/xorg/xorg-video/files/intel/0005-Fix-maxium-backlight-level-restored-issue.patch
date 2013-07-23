@@ -1,0 +1,33 @@
+From 3d51a0856b46309b23c0e09eecba947077369c9d Mon Sep 17 00:00:00 2001
+From: Zhenyu Wang <zhenyu.z.wang@intel.com>
+Date: Thu, 4 Dec 2008 18:43:03 +0800
+Subject: [PATCH 05/20] Fix maxium backlight level restored issue
+
+The origin check for bring back max value for '0'
+backlight level is ok for legacy or combo control method
+as '0' mostly doesn't act in ideal lowest level. But it
+breaks in using kernel control method which should provide
+a reasonable backlight range.
+
+This is tested fine on T61 with thinkpad_acpi module.
+---
+ src/i830_lvds.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
+
+diff --git xf86-video-intel-2.4.3/src/i830_lvds.c xf86-video-intel-2.4.3/src/i830_lvds.c
+index a8687b6..81e37f6 100644
+--- xf86-video-intel-2.4.3/src/i830_lvds.c
++++ xf86-video-intel-2.4.3/src/i830_lvds.c
+@@ -402,7 +402,8 @@ i830SetLVDSPanelPower(xf86OutputPtr output, Bool on)
+ 	 * they'll always re-maximize the brightness.
+ 	 */
+ 	if (!(INREG(PP_CONTROL) & POWER_TARGET_ON) &&
+-	    dev_priv->backlight_duty_cycle == 0)
++	    dev_priv->backlight_duty_cycle == 0 &&
++	    pI830->backlight_control_method < BCM_KERNEL)
+ 	    dev_priv->backlight_duty_cycle = dev_priv->backlight_max;
+ 
+ 	OUTREG(PP_CONTROL, INREG(PP_CONTROL) | POWER_TARGET_ON);
+-- 
+1.6.2
+

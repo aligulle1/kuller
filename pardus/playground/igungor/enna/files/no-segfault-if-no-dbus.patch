@@ -1,0 +1,29 @@
+Description: Don't segfault if dbus is not running
+Author: Davide Cavalca <davide@geexbox.org>
+Forwarded: yes
+Origin: upstream, http://hg.geexbox.org/enna/diff/f5f3ee23a64b/src/modules/volume/hal/hal.c
+
+Index: enna-0.4.0/src/modules/volume/hal/hal.c
+===================================================================
+--- enna-0.4.0.orig/src/modules/volume/hal/hal.c	2010-01-05 12:01:11.000000000 +0100
++++ enna-0.4.0/src/modules/volume/hal/hal.c	2010-01-05 12:01:42.000000000 +0100
+@@ -264,7 +264,8 @@
+     return;
+ 
+ dbus_error:
+-    e_dbus_connection_close (dbus_conn);
++    if (dbus_conn)
++        e_dbus_connection_close (dbus_conn);
+     e_hal_shutdown();
+     e_dbus_shutdown ();
+     return;
+@@ -277,7 +278,8 @@
+ 
+     mod = em->mod;;
+ 
+-    e_dbus_connection_close (dbus_conn);
++    if (dbus_conn)
++        e_dbus_connection_close (dbus_conn);
+     e_hal_shutdown();
+     e_dbus_shutdown ();
+ }

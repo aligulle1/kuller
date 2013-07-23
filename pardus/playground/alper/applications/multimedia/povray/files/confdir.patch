@@ -1,0 +1,38 @@
+--- Makefile.am.orig	2004-08-03 02:20:02.000000000 +0300
++++ Makefile.am	2008-02-10 03:59:48.000000000 +0200
+@@ -29,7 +29,7 @@
+ povlibdir = @datadir@/@PACKAGE@-@VERSION_BASE@
+ povdocdir = @datadir@/doc/@PACKAGE@-@VERSION_BASE@
+ povconfdir = @sysconfdir@/@PACKAGE@/@VERSION_BASE@
+-povconfuser = $(HOME)/.@PACKAGE@/@VERSION_BASE@
++povconfuser = $(DESTDIR)/etc/@PACKAGE@/@VERSION_BASE@
+ 
+ # Directories to build.
+ SUBDIRS = libraries source unix
+@@ -59,7 +59,7 @@
+ # Install configuration and INI files in povconfdir.
+ dist_povconf_DATA = povray.conf
+ povray.conf:
+-
++        cat $(top_srcdir)/povray.conf | sed "s,__POVLIBDIR__,$(povlibdir),g" > $(top_builddir)/povray.conf
+ povconf_DATA = povray.ini
+ povray.ini:
+ 	cat $(top_srcdir)/povray.ini.in | sed "s,__POVLIBDIR__,$(povlibdir),g" > $(top_builddir)/povray.ini
+@@ -134,11 +134,11 @@
+ 	if test -d $(DESTDIR)$(sysconfdir)/@PACKAGE@ && test -z "`ls -A $(DESTDIR)$(sysconfdir)/@PACKAGE@`"; then \
+ 	  rm -f -r $(DESTDIR)$(sysconfdir)/@PACKAGE@; \
+ 	fi
+-	-rm -f $(HOME)/.@PACKAGE@/@VERSION_BASE@/povray.conf
+-	-rm -f $(HOME)/.@PACKAGE@/@VERSION_BASE@/povray.ini
+-	if test -d $(HOME)/.@PACKAGE@/@VERSION_BASE@ && test -z "`ls -A $(HOME)/.@PACKAGE@/@VERSION_BASE@`"; then \
+-	  rm -f -r $(HOME)/.@PACKAGE@/@VERSION_BASE@; \
++	-rm -f $(DESTDIR)/etc/@PACKAGE@/@VERSION_BASE@/povray.conf
++	-rm -f $(DESTDIR)/etc/@PACKAGE@/@VERSION_BASE@/povray.ini
++	if test -d $(DESTDIR)/etc/@PACKAGE@/@VERSION_BASE@ && test -z "`ls -A $(DESTDIR)/etc/@PACKAGE@/@VERSION_BASE@`"; then \
++	  rm -f -r $(DESTDIR)/etc/@PACKAGE@/@VERSION_BASE@; \
+ 	fi
+-	if test -d $(HOME)/.@PACKAGE@ && test -z "`ls -A $(HOME)/.@PACKAGE@`"; then \
+-	  rm -f -r $(HOME)/.@PACKAGE@; \
++	if test -d $(DESTDIR)/etc/@PACKAGE@ && test -z "`ls -A $(DESTDIR)/etc/@PACKAGE@`"; then \
++	  rm -f -r $(DESTDIR)/etc/@PACKAGE@; \
+ 	fi

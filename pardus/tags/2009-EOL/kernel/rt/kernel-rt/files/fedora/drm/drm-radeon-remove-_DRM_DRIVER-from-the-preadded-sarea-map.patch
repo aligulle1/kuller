@@ -1,0 +1,24 @@
+commit df4f7fe7bd516b3833e25c692c3970e22038a6ca
+Author: Dave Airlie <airlied@redhat.com>
+Date:   Thu Jun 11 16:16:10 2009 +1000
+
+    radeon: remove _DRM_DRIVER from the preadded sarea map
+    
+    This shouldn't be there and is what broke r600 late in the 2.6.30
+    release cycle with Ben's patch.
+    
+    Signed-off-by: Dave Airlie <airlied@redhat.com>
+
+diff --git a/drivers/gpu/drm/radeon/radeon_cp.c b/drivers/gpu/drm/radeon/radeon_cp.c
+index 77a7a4d..521ef6a 100644
+--- a/drivers/gpu/drm/radeon/radeon_cp.c
++++ b/drivers/gpu/drm/radeon/radeon_cp.c
+@@ -2109,7 +2109,7 @@ int radeon_master_create(struct drm_device *dev, struct drm_master *master)
+ 
+ 	/* prebuild the SAREA */
+ 	sareapage = max_t(unsigned long, SAREA_MAX, PAGE_SIZE);
+-	ret = drm_addmap(dev, 0, sareapage, _DRM_SHM, _DRM_CONTAINS_LOCK|_DRM_DRIVER,
++	ret = drm_addmap(dev, 0, sareapage, _DRM_SHM, _DRM_CONTAINS_LOCK,
+ 			 &master_priv->sarea);
+ 	if (ret) {
+ 		DRM_ERROR("SAREA setup failed\n");

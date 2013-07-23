@@ -1,0 +1,20 @@
+#!/bin/bash
+
+# Skype does not work well with newer version of GSPCA Webcams driver
+# (Linux Kernel >=2.6.27), possible workaround.
+# http://share.skype.com/sites/garage/2010/01/skype_21_beta_2_aka_talking_sc.html
+
+ARCH=`uname -m`
+
+if [ $ARCH == "x86_64" ]; then
+    libdir=/usr/lib32/libv4l
+else
+    libdir=/usr/lib/libv4l
+fi
+
+v4lcompat=$libdir/v4l1compat.so
+if [ -e $v4lcompat ]; then
+    LD_PRELOAD=$v4lcompat /usr/bin/skype.bin
+else
+    /usr/bin/skype.bin
+fi

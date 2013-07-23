@@ -1,0 +1,55 @@
+--- startkde.cmake.orig	2010-01-06 16:02:08.582815824 +0200
++++ startkde.cmake	2010-01-06 16:46:39.484816356 +0200
+@@ -36,6 +36,31 @@
+ # we have to unset this for Darwin since it will screw up KDE's dynamic-loading
+ unset DYLD_FORCE_FLAT_NAMESPACE
+ 
++# The user's personal KDE directory is usually ~/.kde, but this setting
++# may be overridden by setting KDEHOME.
++
++kdehome=$HOME/@KDE_DEFAULT_HOME@
++test -n "$KDEHOME" && kdehome=`echo "$KDEHOME"|sed "s,^~/,$HOME/,"`
++
++cd $HOME
++
++if test -d ".kde3.5" -a ! -L ".kde4" ; then
++    unlink .kde3.5/cache-*
++    unlink .kde3.5/socket-*
++    unlink .kde3.5/tmp-*
++
++    if test -d ".kde4" ; then
++        cp -a .kde4/* .kde3.5
++        rm -rf .kde4
++    fi
++
++    ln -s .kde3.5 .kde4
++else
++    mkdir -m 700 -p $kdehome
++fi
++
++cd -
++
+ # in case we have been started with full pathname spec without being in PATH
+ bindir=`echo "$0" | sed -n 's,^\(/.*\)/[^/][^/]*$,\1,p'`
+ if [ -n "$bindir" ]; then
+@@ -66,12 +91,6 @@
+ #
+ # * Then ksmserver is started which takes control of the rest of the startup sequence
+ 
+-# The user's personal KDE directory is usually ~/.kde, but this setting
+-# may be overridden by setting KDEHOME.
+-
+-kdehome=$HOME/@KDE_DEFAULT_HOME@
+-test -n "$KDEHOME" && kdehome=`echo "$KDEHOME"|sed "s,^~/,$HOME/,"`
+-
+ # Read LANG and write the country part to kdeglobals
+ # de_AT.UTF-8 => Country=at
+ # This is necessary because klocale.cpp (kdelibs) does only try to read the value
+@@ -102,7 +121,6 @@
+ fi
+ 
+ # see kstartupconfig source for usage
+-mkdir -m 700 -p $kdehome
+ mkdir -m 700 -p $kdehome/share
+ mkdir -m 700 -p $kdehome/share/config
+ cat >$kdehome/share/config/startupconfigkeys <<EOF

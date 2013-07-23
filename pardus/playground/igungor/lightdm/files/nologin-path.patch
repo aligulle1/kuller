@@ -1,0 +1,39 @@
+Index: lightdm-0.4.4/data/lightdm.conf
+===================================================================
+--- lightdm-0.4.4.orig/data/lightdm.conf
++++ lightdm-0.4.4/data/lightdm.conf
+@@ -85,7 +85,7 @@ seats=seat-0
+ #load-users=true
+ #minimum-uid=500
+ #hidden-users=nobody nobody4 noaccess
+-#hidden-shells=/bin/false /usr/sbin/nologin
++#hidden-shells=/bin/false /sbin/nologin
+ 
+ #
+ # Guest account configuration
+Index: lightdm-0.4.4/liblightdm-gobject/greeter.c
+===================================================================
+--- lightdm-0.4.4.orig/liblightdm-gobject/greeter.c
++++ lightdm-0.4.4/liblightdm-gobject/greeter.c
+@@ -708,7 +708,7 @@ load_users (LdmGreeter *greeter)
+ 
+     value = g_key_file_get_string (greeter->priv->config, "UserManager", "hidden-shells", NULL);
+     if (!value)
+-        value = g_strdup ("/bin/false /usr/sbin/nologin");
++        value = g_strdup ("/bin/false /sbin/nologin");
+     hidden_shells = g_strsplit (value, " ", -1);
+     g_free (value);
+ 
+Index: lightdm-0.4.4/liblightdm-qt/QLightDM/config.cpp
+===================================================================
+--- lightdm-0.4.4.orig/liblightdm-qt/QLightDM/config.cpp
++++ lightdm-0.4.4/liblightdm-qt/QLightDM/config.cpp
+@@ -51,7 +51,7 @@ QStringList Config::hiddenShells() const
+     if (d->settings->contains("UserManager/hidden-shells")) {
+         return d->settings->value("UserManager/hidden-shells").toString().split(" ");
+     } else {
+-        return QStringList() << "/bin/false" << "/usr/sbin/nologin";
++        return QStringList() << "/bin/false" << "/sbin/nologin";
+     }
+ }
+ 

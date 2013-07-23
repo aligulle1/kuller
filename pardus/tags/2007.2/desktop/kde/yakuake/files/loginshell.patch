@@ -1,0 +1,328 @@
+diff -ur yakuake-2.7.5.orig/po/tr/yakuake.po yakuake-2.7.5/po/tr/yakuake.po
+--- yakuake-2.7.5.orig/po/tr/yakuake.po	2006-03-21 20:20:44.000000000 +0200
++++ yakuake-2.7.5/po/tr/yakuake.po	2006-04-04 00:54:54.000000000 +0300
+@@ -128,6 +128,10 @@
+ msgid "Force Background Refresh"
+ msgstr "Arkaplan Yenilenmesini Zorla"
+ 
++#: main_window.cpp:569
++msgid "Use Login Shell"
++msgstr "Giriş Kabuğunu Kullan"
++
+ #: src/main_window.cpp:572
+ msgid "Shortcuts"
+ msgstr "Kısayollar"
+diff -ur yakuake-2.7.5.orig/yakuake/src/main_window.cpp yakuake-2.7.5/yakuake/src/main_window.cpp
+--- yakuake-2.7.5.orig/yakuake/src/main_window.cpp	2006-04-04 00:54:25.000000000 +0300
++++ yakuake-2.7.5/yakuake/src/main_window.cpp	2006-04-04 01:07:35.000000000 +0300
+@@ -32,7 +32,7 @@
+         step(0)
+ {
+     isShuttingDown = false;
+-    KConfig config(CONFIG_FILE);
++    KConfig *config = kapp->config();
+ 
+     initWindowProps();
+ 
+@@ -49,8 +49,8 @@
+ 
+     // Initializes the skin (1) ---------------------------
+ 
+-    config.setGroup("Options");
+-    skin = config.readEntry("skin", "default");
++    config->setGroup("Options");
++    skin = config->readEntry("skin", "default");
+ 
+     // Initializes the skin (2) ---------------------------
+ 
+@@ -72,14 +72,15 @@
+ 
+     // Initializes the properties -------------------------
+ 
+-    slotSetSpeed(config.readNumEntry("steps", 20));
+-    slotSetSizeW(config.readNumEntry("width", 100));
+-    slotSetSizeH(config.readNumEntry("height", 50));
+-    slotSetScreen(config.readNumEntry("screen", 1));
+-    slotSetLocationH(config.readNumEntry("location", 50));
+-    slotSetTabsPolicy(config.readBoolEntry("tabs", true));
+-    slotSetFocusPolicy(config.readBoolEntry("focus", true));
+-    slotSetBackgroundPolicy(config.readBoolEntry("background", false));
++    slotSetSpeed(config->readNumEntry("steps", 20));
++    slotSetSizeW(config->readNumEntry("width", 100));
++    slotSetSizeH(config->readNumEntry("height", 50));
++    slotSetScreen(config->readNumEntry("screen", 1));
++    slotSetLocationH(config->readNumEntry("location", 50));
++    slotSetTabsPolicy(config->readBoolEntry("tabs", true));
++    slotSetFocusPolicy(config->readBoolEntry("focus", true));
++    slotSetBackgroundPolicy(config->readBoolEntry("background", false));
++    slotSetLoginShellPolicy(config->readBoolEntry("loginshell", false));
+ 
+     // Add first session --------------------------------
+ 
+@@ -92,7 +93,7 @@
+                        i18n("Toggles the open/close state of Yakuake"),
+                        Key_F12, 0, this, SLOT(slotToggleState()));
+ 
+-    global_key->readSettings(&config);
++    global_key->readSettings(config);
+     global_key->updateConnections();
+ 
+     // Initializes controls keys ------------------------
+@@ -117,7 +118,7 @@
+                                this, SLOT(slotInteractiveRename()),
+                                actionCollection(), "edit_name");
+ 
+-    actionCollection()->readShortcutSettings("Shortcuts", &config);
++    actionCollection()->readShortcutSettings("Shortcuts", config);
+ 
+     // Connects slots to signals --------------------------
+ 
+@@ -566,6 +567,7 @@
+     menu->insertItem(i18n("Show the Tab Bar"), this, SLOT(slotSetTabsPolicy()), 0, 1);
+     menu->insertItem(i18n("Retract when Focus is Lost"), this, SLOT(slotSetFocusPolicy()), 0, 2);
+     menu->insertItem(i18n("Force Background Refresh"), this, SLOT(slotSetBackgroundPolicy()), 0, 3);
++    menu->insertItem(i18n("Use Login Shell"), this, SLOT(slotSetLoginShellPolicy()), 0, 4);
+ 
+     // Adds the shortcuts modifiers -----------------------
+ 
+@@ -596,12 +598,12 @@
+ 
+ void    MainWindow::slotSetAccessKey()
+ {
+-    KConfig config(CONFIG_FILE);
++    KConfig *config = kapp->config();
+ 
+     KKeyDialog::configure(global_key);
+ 
+     global_key->updateConnections();
+-    global_key->writeSettings(&config);
++    global_key->writeSettings(config);
+ }
+ 
+ 
+@@ -611,11 +613,11 @@
+ 
+ void    MainWindow::slotSetControlKeys()
+ {
+-    KConfig config(CONFIG_FILE);
++    KConfig *config = kapp->config();
+ 
+     KKeyDialog::configure(actionCollection());
+ 
+-    actionCollection()->writeShortcutSettings("Shortcuts", &config);
++    actionCollection()->writeShortcutSettings("Shortcuts", config);
+ }
+ 
+ 
+@@ -642,10 +644,10 @@
+ 
+     // Updates the configuration --------------------------
+ 
+-    KConfig config(CONFIG_FILE);
++    KConfig *config = kapp->config();
+ 
+-    config.setGroup("Options");
+-    config.writeEntry("tabs", tabs_policy);
++    config->setGroup("Options");
++    config->writeEntry("tabs", tabs_policy);
+ }
+ 
+ 
+@@ -665,10 +667,10 @@
+ 
+     // Updates the configuration --------------------------
+ 
+-    KConfig config(CONFIG_FILE);
++    KConfig *config = kapp->config();
+ 
+-    config.setGroup("Options");
+-    config.writeEntry("focus", focus_policy);
++    config->setGroup("Options");
++    config->writeEntry("focus", focus_policy);
+ }
+ 
+ 
+@@ -688,12 +690,33 @@
+ 
+     // Updates the configuration --------------------------
+ 
+-    KConfig config(CONFIG_FILE);
++    KConfig *config = kapp->config();
+ 
+-    config.setGroup("Options");
+-    config.writeEntry("background", background_policy);
++    config->setGroup("Options");
++    config->writeEntry("background", background_policy);
+ }
+ 
++/******************************************************************************
++** Sets the login shell
++*****************************/
++
++void    MainWindow::slotSetLoginShellPolicy()
++{
++    slotSetLoginShellPolicy(!loginshell_policy);
++}
++
++void    MainWindow::slotSetLoginShellPolicy(bool loginshell_policy)
++{
++    menu->setItemChecked(4, loginshell_policy);
++    this->loginshell_policy = loginshell_policy;
++
++    // Updates the configuration --------------------------
++
++    KConfig *config = kapp->config();
++
++    config->setGroup("Options");
++    config->writeEntry("loginshell", loginshell_policy);
++}
+ 
+ /******************************************************************************
+ ** Sets the animation speed
+@@ -708,10 +731,10 @@
+ 
+     // Updates the configuration --------------------------
+ 
+-    KConfig config(CONFIG_FILE);
++    KConfig *config = kapp->config();
+ 
+-    config.setGroup("Options");
+-    config.writeEntry("steps", steps);
++    config->setGroup("Options");
++    config->writeEntry("steps", steps);
+ }
+ 
+ 
+@@ -727,10 +750,10 @@
+ 
+     // Updates the configuration --------------------------
+ 
+-    KConfig config(CONFIG_FILE);
++    KConfig *config = kapp->config();
+ 
+-    config.setGroup("Options");
+-    config.writeEntry("height", sizeH);
++    config->setGroup("Options");
++    config->writeEntry("height", sizeH);
+ 
+     // Updates the size of the window ---------------------
+ 
+@@ -750,10 +773,10 @@
+ 
+     // Updates the configuration --------------------------
+ 
+-    KConfig config(CONFIG_FILE);
++    KConfig *config = kapp->config();
+ 
+-    config.setGroup("Options");
+-    config.writeEntry("width", sizeW);
++    config->setGroup("Options");
++    config->writeEntry("width", sizeW);
+ 
+     // Updates the size of the window ---------------------
+ 
+@@ -775,10 +798,10 @@
+ 
+     // Updates the configuration --------------------------
+ 
+-    KConfig config(CONFIG_FILE);
++    KConfig *config = kapp->config();
+ 
+-    config.setGroup("Options");
+-    config.writeEntry("screen", screen);
++    config->setGroup("Options");
++    config->writeEntry("screen", screen);
+ 
+     // Updates the size of the window ---------------------
+ 
+@@ -798,10 +821,10 @@
+ 
+     // Updates the configuration --------------------------
+ 
+-    KConfig config(CONFIG_FILE);
++    KConfig *config = kapp->config();
+ 
+-    config.setGroup("Options");
+-    config.writeEntry("location", locationH);
++    config->setGroup("Options");
++    config->writeEntry("location", locationH);
+ 
+     // Updates the size of the window ---------------------
+ 
+diff -ur yakuake-2.7.5.orig/yakuake/src/main_window.h yakuake-2.7.5/yakuake/src/main_window.h
+--- yakuake-2.7.5.orig/yakuake/src/main_window.h	2006-03-21 20:14:26.000000000 +0200
++++ yakuake-2.7.5/yakuake/src/main_window.h	2006-04-04 01:00:27.000000000 +0300
+@@ -52,11 +52,6 @@
+ #include "dcop_interface.h"
+ 
+ 
+-//== DEFINE PREPROCESSOR VARIABLES ==========================================//
+-
+-#define CONFIG_FILE     "yakuakerc"
+-
+-
+ //== DEFINE CLASS & DATATYPES ===============================================//
+ 
+ /*
+@@ -92,7 +87,7 @@
+     int             tabs_policy;
+     int             focus_policy;
+     int             background_policy;
+-
++    int             loginshell_policy;
+ 
+     /*
+     ** Maximum height value */
+@@ -222,7 +217,8 @@
+     void    slotSetFocusPolicy(bool);
+     void    slotSetBackgroundPolicy();
+     void    slotSetBackgroundPolicy(bool);
+-
++    void    slotSetLoginShellPolicy();
++    void    slotSetLoginShellPolicy(bool);
+ 
+ 
+ protected:
+diff -ur yakuake-2.7.5.orig/yakuake/src/shell_session.cpp yakuake-2.7.5/yakuake/src/shell_session.cpp
+--- yakuake-2.7.5.orig/yakuake/src/shell_session.cpp	2006-03-21 20:14:26.000000000 +0200
++++ yakuake-2.7.5/yakuake/src/shell_session.cpp	2006-04-04 01:05:49.000000000 +0300
+@@ -47,17 +47,18 @@
+ 
+         session_terminal = (TerminalInterface *) (session_part->qt_cast("TerminalInterface"));
+ 
+-/* We don't actually want a login shell_session
+ 
+-        args.append("-l");
+-        shell = getenv("SHELL");
+-        if (shell == NULL || *shell == '\0')
+-            shell = "/bin/sh";
++        KConfig *config = kapp->config();
++        config->setGroup("Options");
+ 
+-        session_terminal->startProgram(shell, args);
+-*/
+-
+-        // Connects signals to slots ----------------------
++        if(config->readBoolEntry("loginshell"))
++        {
++                args.append("-l");
++                shell = getenv("SHELL");
++                if (shell == NULL || *shell == '\0')
++                    shell = "/bin/sh";
++                session_terminal->startProgram(shell, args);
++        }
+ 
+         connect(session_part, SIGNAL(destroyed()), this, SLOT(slotDestroySession()));
+         connect(session_part, SIGNAL(setWindowCaption(const QString &)), this, SLOT(slotUpdateSessionTitle(const QString &)));
+diff -ur yakuake-2.7.5.orig/yakuake/src/shell_session.h yakuake-2.7.5/yakuake/src/shell_session.h
+--- yakuake-2.7.5.orig/yakuake/src/shell_session.h	2006-03-21 20:14:26.000000000 +0200
++++ yakuake-2.7.5/yakuake/src/shell_session.h	2006-04-04 01:06:20.000000000 +0300
+@@ -30,6 +30,8 @@
+ #include <klibloader.h>
+ #include <kparts/part.h>
+ #include <kde_terminal_interface.h>
++#include <kapplication.h>
++#include <kconfig.h>
+ 
+ 
+ //== DEFINE CLASS & DATATYPES ===============================================//

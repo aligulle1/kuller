@@ -1,0 +1,99 @@
+From dc6dbfc8a5d14141edd507875c1061d1296dae93 Mon Sep 17 00:00:00 2001
+From: Olivier Fourdan <fourdan@xfce.org>
+Date: Tue, 30 Sep 2008 12:53:11 -0700
+Subject: [PATCH] Fix ordering of VGA vs. plane disable
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: 8bit
+
+From the Intel 965 Programmer’s Reference Manual, volume 3,
+chapter 2.2.2 "Mode Switch Programming Sequence".
+
+The disable sequence should be:
+
+ - Disable planes (VGA or hires)
+ - Disable pipe
+ - Disable VGA display in 0x71400 bit 31
+
+This patch implements that order plus waits for a vblank at the end.
+
+Fixes bug #17756.
+(cherry picked from commit 497b7420c4a76df553ed53322a390a1c754ce30c)
+---
+ src/i830_display.c |   48 +++++++++++++++++++++++++++++-------------------
+ 1 files changed, 29 insertions(+), 19 deletions(-)
+
+diff --git xf86-video-intel-2.4.2/src/i830_display.c xf86-video-intel-2.4.2/src/i830_display.c
+index f81847b..1ae0c3d 100644
+--- xf86-video-intel-2.4.3/src/i830_display.c
++++ xf86-video-intel-2.4.3/src/i830_display.c
+@@ -854,27 +854,31 @@ i830_crtc_dpms(xf86CrtcPtr crtc, int mode)
+ 	/* Give the overlay scaler a chance to disable if it's on this pipe */
+ 	i830_crtc_dpms_video(crtc, FALSE);
+ 
+-	/* Disable the VGA plane that we never use */
+-	OUTREG(VGACNTRL, VGA_DISP_DISABLE);
++	/* 
++	 * The documentation says :
++	 * - Disable planes (VGA or hires)
++	 * - Disable pipe
++	 * - Disable VGA display
++	 */
+ 
+-	/* May need to leave pipe A on */
+-	if ((pipe != 0) || !(pI830->quirk_flag & QUIRK_PIPEA_FORCE))
++	/* Disable display plane */
++	temp = INREG(dspcntr_reg);
++	if ((temp & DISPLAY_PLANE_ENABLE) != 0)
+ 	{
+-		/* Disable display plane */
+-		temp = INREG(dspcntr_reg);
+-		if ((temp & DISPLAY_PLANE_ENABLE) != 0)
+-		{
+-		    OUTREG(dspcntr_reg, temp & ~DISPLAY_PLANE_ENABLE);
+-		    /* Flush the plane changes */
+-		    OUTREG(dspbase_reg, INREG(dspbase_reg));
+-		    POSTING_READ(dspbase_reg);
+-		}
++	    OUTREG(dspcntr_reg, temp & ~DISPLAY_PLANE_ENABLE);
++	    /* Flush the plane changes */
++	    OUTREG(dspbase_reg, INREG(dspbase_reg));
++	    POSTING_READ(dspbase_reg);
++	}
+ 
+-		if (!IS_I9XX(pI830)) {
+-		    /* Wait for vblank for the disable to take effect */
+-		    i830WaitForVblank(pScrn);
+-		}
++	if (!IS_I9XX(pI830)) {
++	    /* Wait for vblank for the disable to take effect */
++	    i830WaitForVblank(pScrn);
++	}
+ 
++	/* May need to leave pipe A on */
++	if ((pipe != 0) || !(pI830->quirk_flag & QUIRK_PIPEA_FORCE))
++	{
+ 		/* Next, disable display pipes */
+ 		temp = INREG(pipeconf_reg);
+ 		if ((temp & PIPEACONF_ENABLE) != 0) {
+@@ -890,9 +894,15 @@ i830_crtc_dpms(xf86CrtcPtr crtc, int mode)
+ 		    OUTREG(dpll_reg, temp & ~DPLL_VCO_ENABLE);
+ 		    POSTING_READ(dpll_reg);
+ 		}
++
++		/* Wait for the clocks to turn off. */
++		usleep(150);
+ 	}
+-	/* Wait for the clocks to turn off. */
+-	usleep(150);
++
++	/* Disable the VGA plane that we never use. */
++	OUTREG(VGACNTRL, VGA_DISP_DISABLE);
++	i830WaitForVblank(pScrn);
++
+ 	break;
+     }
+ 
+-- 
+1.6.0.2
+

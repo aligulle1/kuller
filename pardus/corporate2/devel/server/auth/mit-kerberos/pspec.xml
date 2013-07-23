@@ -1,0 +1,444 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>mit-kerberos</Name>
+        <Homepage>http://web.mit.edu/kerberos/www</Homepage>
+        <Packager>
+            <Name>Pardus</Name>
+            <Email>admins@pardus.org.tr</Email>
+        </Packager>
+        <License>as-is</License>
+        <IsA>library</IsA>
+        <IsA>app:console</IsA>
+        <Summary>The Kerberos network authentication system.</Summary>
+        <Description>Kerberos is a network authentication protocol. It is designed to provide strong authentication for client/server applications by using secret-key cryptography.</Description>
+        <Archive sha1sum="2ddba6e8c3c07c80522a4ec5faf7057fdc80106d" type="targz">http://cekirdek.pardus.org.tr/~ozan/dist/sources/krb5-1.8.3.tar.gz</Archive>
+        <AdditionalFiles>
+            <AdditionalFile target="manpaths.txt">fedora/krb5-1.8-manpaths.txt</AdditionalFile>
+        </AdditionalFiles>
+
+        <BuildDependencies>
+            <Dependency>keyutils-devel</Dependency>
+            <!-- FIXME: openldap-client requires mit-kerberos too -->
+            <Dependency>openldap-client</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <!-- Fedora patches -->
+            <Patch level="1">fedora/krb5-1.8-pam.patch</Patch>
+            <Patch level="1">fedora/krb5-1.8-manpaths.patch</Patch>
+            <Patch level="1">fedora/krb5-1.8-selinux-label.patch</Patch>
+            <Patch level="1">fedora/krb5-1.8-ksu-access.patch</Patch>
+            <Patch level="1">fedora/krb5-1.8-ksu-path.patch</Patch>
+            <Patch level="1">fedora/krb5-1.7-ktany.patch</Patch>
+            <Patch level="1">fedora/krb5-1.7-buildconf.patch</Patch>
+            <Patch level="1">fedora/krb5-1.3.1-dns.patch</Patch>
+            <Patch level="1">fedora/krb5-1.8-kprop-mktemp.patch</Patch>
+            <Patch level="1">fedora/krb5-1.3.4-send-pr-tempfile.patch</Patch>
+            <Patch level="1">fedora/krb5-1.8-api.patch</Patch>
+            <Patch level="1">fedora/krb5-1.7-nodeplibs.patch</Patch>
+            <Patch level="1">fedora/krb5-1.7-doublelog.patch</Patch>
+            <Patch level="1">fedora/krb5-1.8-key_exp.patch</Patch>
+            <Patch level="1">fedora/krb5-1.8-kpasswd_tcp.patch</Patch>
+            <!--<Patch level="0">fedora/krb5-trunk-kpasswd_tcp2.patch</Patch>-->
+            <Patch level="1">fedora/krb5-1.8-dirsrv-accountlock.patch</Patch>
+            <Patch level="0">fedora/krb5-trunk-explife.patch</Patch>
+            <Patch level="0">fedora/krb5-trunk-key_usage.patch</Patch>
+            <Patch level="0">fedora/krb5-trunk-signed.patch</Patch>
+            <Patch level="1">fedora/krb5-trunk-k5login.patch</Patch>
+
+            <!-- Fix CVE-2010-1322 -->
+            <Patch level="1">fedora/krb5-1.8.x-authdata.patch</Patch>
+
+            <Patch level="1">fix-python-detection.patch</Patch>
+            <Patch level="1">fix-overlinking.patch</Patch>
+            <!--<Patch level="1">fix-failing-dbtree-test.patch</Patch>-->
+
+            <!-- Mandriva patches -->
+            <Patch level="1">mandriva/krb5-1.8.1-fix-format-errors.patch</Patch>
+
+            <!-- Fix multiple checksum handling vulnerabilities CVE-2010-{1323,1324,4020} (#15414) -->
+            <Patch level="1">2010-007-patch.txt</Patch>
+            <!-- kpropd denial of service CVE-2010-4022 (#16879) -->
+            <Patch level="1">2011-001-patch.txt</Patch>
+            <!-- denial of service attacks CVE-2011-{0281,0282} (#16875) -->
+            <Patch level="1">2011-002-patch-r18.txt</Patch>
+
+            <!-- Fix KDC vulnerable to double-free when PKINIT enabled (CVE-2011-0284) (bzp#17193) -->
+            <Patch level="1">2011-003-patch.txt</Patch>
+
+            <!-- kadmind invalid pointer free() (CVE-2011-0285) (pb#17796) -->
+            <Patch level="1">2011-004-patch-r18.txt</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>krb5-plugin-pkinit-openssl</Name>
+        <Summary>PKINIT module for Kerberos 5</Summary>
+        <Description>krb5-plugin-pkinit-openssl contains the PKINIT plugin which uses OpenSSL to allow clients to obtain initial credentials from a KDC using a private key and a certificate.</Description>
+        <RuntimeDependencies>
+            <Dependency release="current">mit-kerberos-libs</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="library">/usr/lib/krb5/plugins/preauth/pkinit.so</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>mit-kerberos-devel</Name>
+        <Summary>Development files and headers for mit-kerberos</Summary>
+        <RuntimeDependencies>
+            <Dependency release="current">mit-kerberos-libs</Dependency>
+            <Dependency>keyutils-devel</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="header">/usr/include</Path>
+            <Path fileType="executable">/usr/bin/krb5-config</Path>
+            <Path fileType="executable">/usr/bin/sim_client</Path>
+            <Path fileType="executable">/usr/sbin/sim_server</Path>
+            <Path fileType="executable">/usr/bin/gss-client</Path>
+            <Path fileType="executable">/usr/sbin/gss-server</Path>
+            <Path fileType="executable">/usr/bin/uuclient</Path>
+            <Path fileType="executable">/usr/sbin/uuserver</Path>
+            <Path fileType="man">/usr/share/man/man1/krb5-config.1*</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>mit-kerberos-libs</Name>
+        <Summary>The shared libraries used by mit-kerberos</Summary>
+        <RuntimeDependencies>
+            <Dependency>keyutils</Dependency>
+        </RuntimeDependencies>
+        <Replaces>
+            <Package>mit-kerberos</Package>
+        </Replaces>
+        <Files>
+            <Path fileType="library">/usr/lib/krb5/plugins/preauth/encrypted_challenge.so</Path>
+            <Path fileType="library">/usr/lib/krb5/plugins/kdb/db2.so</Path>
+            <Path fileType="library">/usr/lib/libkadm5clnt*</Path>
+            <Path fileType="library">/usr/lib/libkadm5srv*</Path>
+            <Path fileType="library">/usr/lib/libkdb5.so*</Path>
+            <Path fileType="library">/usr/lib/libgssapi_krb5.so*</Path>
+            <Path fileType="library">/usr/lib/libgssrpc.so*</Path>
+            <Path fileType="library">/usr/lib/libk5crypto.so*</Path>
+            <Path fileType="library">/usr/lib/libkrb5.so*</Path>
+            <Path fileType="library">/usr/lib/libkrb5support.so*</Path>
+            <Path fileType="man">/usr/share/man/man1/kerberos.1*</Path>
+            <Path fileType="man">/usr/share/man/man5/.k5login.5*</Path>
+            <Path fileType="man">/usr/share/man/man5/krb5.conf.5*</Path>
+            <Path fileType="config">/etc/krb5.conf</Path>
+        </Files>
+        <AdditionalFiles>
+            <AdditionalFile owner="root" permission="0644" target="/etc/krb5.conf">fedora/krb5.conf</AdditionalFile>
+        </AdditionalFiles>
+    </Package>
+
+    <Package>
+        <Name>mit-kerberos-workstation</Name>
+        <Summary>mit-kerberos programs for use on workstations</Summary>
+        <RuntimeDependencies>
+            <Dependency release="current">mit-kerberos-libs</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="config">/etc/pam.d/ksu</Path>
+            <Path fileType="executable">/usr/bin/kdestroy</Path>
+            <Path fileType="executable">/usr/bin/kinit</Path>
+            <Path fileType="executable">/usr/bin/klist</Path>
+            <Path fileType="executable">/usr/bin/kpasswd</Path>
+            <Path fileType="executable">/usr/bin/kvno</Path>
+            <Path fileType="executable">/usr/bin/kadmin</Path>
+            <Path fileType="executable">/usr/bin/k5srvutil</Path>
+            <Path fileType="executable">/usr/bin/ktutil</Path>
+            <Path fileType="executable">/usr/bin/ksu</Path>
+            <Path fileType="executable">/usr/sbin/krb5-send-pr</Path>
+            <Path fileType="man">/usr/share/man/man1/kdestroy.1*</Path>
+            <Path fileType="man">/usr/share/man/man1/kinit.1*</Path>
+            <Path fileType="man">/usr/share/man/man1/klist.1*</Path>
+            <Path fileType="man">/usr/share/man/man1/kpasswd.1*</Path>
+            <Path fileType="man">/usr/share/man/man1/kvno.1*</Path>
+            <Path fileType="man">/usr/share/man/man1/kadmin.1*</Path>
+            <Path fileType="man">/usr/share/man/man1/k5srvutil.1*</Path>
+            <Path fileType="man">/usr/share/man/man1/ktutil.1*</Path>
+            <Path fileType="man">/usr/share/man/man1/ksu.1*</Path>
+            <Path fileType="data">/usr/share/gnats</Path>
+            <Path fileType="data">/usr/share/gnats/mit</Path>
+            <Path fileType="info">/usr/share/info/krb5-user.*</Path>
+            <Path fileType="man">/usr/share/man/man1/krb5-send-pr.1*</Path>
+        </Files>
+        <AdditionalFiles>
+            <AdditionalFile owner="root" permission="0644" target="/etc/pam.d/ksu">fedora/ksu.pamd</AdditionalFile>
+        </AdditionalFiles>
+    </Package>
+
+    <Package>
+        <Name>mit-kerberos-server</Name>
+        <Summary>The KDC and related programs for mit-kerberos</Summary>
+        <RuntimeDependencies>
+            <Dependency release="current">mit-kerberos-libs</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="config">/etc</Path>
+            <Path fileType="config">/var/kerberos/krb5kdc/kdc.conf</Path>
+            <Path fileType="config">/var/kerberos/krb5kdc/kadm5.acl</Path>
+            <Path fileType="executable">/usr/bin</Path>
+            <Path fileType="executable">/usr/sbin</Path>
+            <Path fileType="executable">/usr/bin/sclient</Path>
+            <Path fileType="executable">/usr/sbin/sserver</Path>
+            <Path fileType="library">/usr/lib</Path>
+            <Path fileType="data">/usr/share</Path>
+            <Path fileType="data">/var/kerberos</Path>
+            <Path fileType="info">/usr/share/info</Path>
+            <Path fileType="man">/usr/share/man/man1/sclient.1*</Path>
+            <Path fileType="man">/usr/share/man/man8/sserver.8*</Path>
+            <Path fileType="man">/usr/share/man</Path>
+        </Files>
+        <AdditionalFiles>
+            <AdditionalFile owner="root" permission="0644" target="/etc/conf.d/krb5kdc">fedora/krb5kdc.sysconfig</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/etc/conf.d/kadmin">fedora/kadmin.sysconfig</AdditionalFile>
+            <AdditionalFile owner="root" permission="0600" target="/var/kerberos/krb5kdc/kdc.conf">fedora/kdc.conf</AdditionalFile>
+            <AdditionalFile owner="root" permission="0600" target="/var/kerberos/krb5kdc/kadm5.acl">fedora/kadm5.acl</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/etc/logrotate.d/krb5kdc">fedora/krb5kdc.logrotate</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/etc/logrotate.d/kadmind">fedora/kadmind.logrotate</AdditionalFile>
+        </AdditionalFiles>
+        <Provides>
+            <COMAR script="kadmind.py" name="kadmind">System.Service</COMAR>
+            <COMAR script="kpropd.py" name="kpropd">System.Service</COMAR>
+            <COMAR script="krb5kdc.py" name="krb5kdc">System.Service</COMAR>
+        </Provides>
+    </Package>
+
+    <Package>
+        <Name>mit-kerberos-server-ldap</Name>
+        <Summary>The LDAP storage plugin for the Kerberos 5 KDC</Summary>
+        <RuntimeDependencies>
+            <Dependency>openldap-client</Dependency>
+            <Dependency release="current">mit-kerberos-libs</Dependency>
+            <Dependency release="current">mit-kerberos-server</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="executable">/usr/sbin/kdb5_ldap_util</Path>
+            <Path fileType="library">/usr/lib/krb5/plugins/kdb/kldap.so</Path>
+            <Path fileType="library">/usr/lib/libkdb_ldap.so*</Path>
+            <Path fileType="man">/usr/share/man/man8/kdb5_ldap_util.8*</Path>
+            <Path fileType="doc">/usr/share/doc/mit-kerberos/kerberos.ldif</Path>
+            <Path fileType="doc">/usr/share/doc/mit-kerberos/kerberos.schema</Path>
+        </Files>
+    </Package>
+
+    <History>
+        <Update release="28">
+            <Date>2011-06-16</Date>
+            <Version>1.8.3</Version>
+            <Comment>Add missing name= attributes (pb#18400).</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="27">
+            <Date>2011-06-02</Date>
+            <Version>1.8.3</Version>
+            <Comment>kadmind invalid pointer free() (CVE-2011-0285) (pb#17796)</Comment>
+            <Type package="mit-kerberos-server">security</Type>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="26">
+            <Date>2011-03-21</Date>
+            <Version>1.8.3</Version>
+            <Comment>Fix KDC vulnerable to double-free when PKINIT enabled (CVE-2011-0284 (bzp#17193).</Comment>
+            <Type package="mit-kerberos-server">security</Type>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="25" type="security">
+            <Date>2011-02-14</Date>
+            <Version>1.8.3</Version>
+            <Comment>
+                * Fix kpropd denial of service CVE-2010-4022 (#16881)
+                * Fix denial of service attacks CVE-2011-{0281,0282} (#16877)
+            </Comment>
+            <Name>H. İbrahim Güngör</Name>
+            <Email>ibrahim@pardus.org.tr</Email>
+        </Update>
+        <Update release="24" type="security">
+            <Date>2010-12-06</Date>
+            <Version>1.8.3</Version>
+            <Comment>Fix multiple checksum handling vulnerabilities (#15414).</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="23">
+            <Date>2010-11-25</Date>
+            <Version>1.8.3</Version>
+            <Comment>Add services.</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="22">
+            <Date>2010-11-23</Date>
+            <Version>1.8.3</Version>
+            <Comment>Replace mit-kerberos with mit-kerberos-libs.</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="21">
+            <Date>2010-11-08</Date>
+            <Version>1.8.3</Version>
+            <Comment>Version bump</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="20">
+            <Date>2010-10-27</Date>
+            <Version>1.7.1</Version>
+            <Comment>Mass rebuild for Pardus Corporate 2 Alpha 3</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="19">
+            <Date>2010-05-25</Date>
+            <Version>1.7.1</Version>
+            <Comment>
+                - Fix GSSAPI library null pointer dereference which could be
+                triggered by malformed client requests (CVE-2010-1321) (#13133).
+            </Comment>
+            <Type>security</Type>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="18">
+            <Date>2010-03-15</Date>
+            <Version>1.7.1</Version>
+            <Comment>Add a fedora patch and enable ldap</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="17">
+            <Date>2010-02-25</Date>
+            <Version>1.7.1</Version>
+            <Comment>Version bump.</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="16" type="security">
+            <Date>2010-01-07</Date>
+            <Version>1.7</Version>
+            <Comment>
+                - Add Upstream patch for KDC crash during referral processing (CVE-2009-3295) (#11934),
+                - Try to make gss_krb5_copy_ccache() work correctly for spnego.
+            </Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="15">
+            <Date>2009-10-22</Date>
+            <Version>1.7</Version>
+            <Comment>
+                - Switch to 1.7 release,
+                - Resync fedora patches,
+                - Add Suse patches,
+                - Install additional header files.
+            </Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="14">
+            <Date>2008-04-29</Date>
+            <Version>1.6.3</Version>
+            <Comment>Keyutils dependency.</Comment>
+            <Name>Bahadır Kandemir</Name>
+            <Email>bahadir@pardus.org.tr</Email>
+        </Update>
+        <Update release="13">
+            <Date>2008-04-21</Date>
+            <Version>1.6.3</Version>
+            <Comment>Lots of patches from Fedora.</Comment>
+            <Name>Bahadır Kandemir</Name>
+            <Email>bahadir@pardus.org.tr</Email>
+        </Update>
+        <Update release="12" type="security">
+            <Date>2008-04-09</Date>
+            <Version>1.6.3</Version>
+            <Comment>Fix multiple vulnerabilities (CVE-2009-{0844, 0846, 0847}), (bug#9531)</Comment>
+            <Name>Pınar Yanardağ</Name>
+            <Email>pinar@pardus.org.tr</Email>
+        </Update>
+        <Update release="11" type="security">
+            <Date>2008-03-18</Date>
+            <Version>1.6.3</Version>
+            <Comment>Security fixes for CVE-2008-0062-0063-0947-0948</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="10">
+            <Date>2007-12-30</Date>
+            <Version>1.6.3</Version>
+            <Comment>Version bump</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="9" type="security">
+            <Date>2007-09-06</Date>
+            <Version>1.5.4</Version>
+            <Comment>Fix CVE-2007-3999 and CVE-2007-4000</Comment>
+            <Name>Ali Erdinç Köroğlu</Name>
+            <Email>erdinc@pardus.org.tr</Email>
+        </Update>
+        <Update release="8">
+            <Date>2007-07-13</Date>
+            <Version>1.5.4</Version>
+            <Comment>Stable update</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="7" type="security">
+            <Date>2007-06-26</Date>
+            <Version>1.5.1</Version>
+            <Comment>Fix CVE-2007-2442,CVE-2007-2443 and CVE-2007-2798</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="6" type="security">
+            <Date>2007-04-03</Date>
+            <Version>1.5.1</Version>
+            <Comment>Fix CVE-2007-0956, CVE-2007-0957 and CVE-2007-1216</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="5">
+            <Date>2007-01-15</Date>
+            <Version>1.5.1</Version>
+            <Comment>Reset LDFLAGS in krb5-config</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="4" type="security">
+            <Date>2007-01-09</Date>
+            <Version>1.5.1</Version>
+            <Comment>Stable update and fix CVE-2006-614{3,4}</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="3">
+            <Date>2006-10-01</Date>
+            <Version>1.5</Version>
+            <Comment>Rlogin conflict fix</Comment>
+            <Name>Ali Erdinç Köroğlu</Name>
+            <Email>erdinc@pardus.org.tr</Email>
+        </Update>
+        <Update release="2" type="security">
+            <Date>2006-08-09</Date>
+            <Version>1.5</Version>
+            <Comment>Version bump and fix CVE-2006-3084</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="1">
+            <Date>2005-12-29</Date>
+            <Version>1.4.3</Version>
+            <Comment>First release.</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+    </History>
+</PISI>

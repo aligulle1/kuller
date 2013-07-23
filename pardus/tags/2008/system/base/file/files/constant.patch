@@ -1,0 +1,185 @@
+Index: file-4.23/src/apprentice.c
+===================================================================
+--- file-4.23.orig/src/apprentice.c
++++ file-4.23/src/apprentice.c
+@@ -151,13 +151,13 @@ main(int argc, char *argv[])
+ #endif /* COMPILE_ONLY */
+ 
+ static const struct type_tbl_s {
+-	const char *name;
++	const char name[16];
+ 	const size_t len;
+ 	const int type;
+ 	const int format;
+ } type_tbl[] = {
+ # define XX(s)		s, (sizeof(s) - 1)
+-# define XX_NULL	NULL, 0
++# define XX_NULL	"", 0
+ 	{ XX("byte"),		FILE_BYTE,		FILE_FMT_NUM },
+ 	{ XX("short"),		FILE_SHORT,		FILE_FMT_NUM },
+ 	{ XX("default"),	FILE_DEFAULT,		FILE_FMT_STR },
+@@ -206,7 +206,7 @@ get_type(const char *l, const char **t)
+ {
+ 	const struct type_tbl_s *p;
+ 
+-	for (p = type_tbl; p->name; p++) {
++	for (p = type_tbl; p->len; p++) {
+ 		if (strncmp(l, p->name, p->len) == 0) {
+ 			if (t)
+ 				*t = l + p->len;
+@@ -226,7 +226,7 @@ init_file_tables(void)
+ 		return;
+ 	done++;
+ 
+-	for (p = type_tbl; p->name; p++) {
++	for (p = type_tbl; p->len; p++) {
+ 		assert(p->type < FILE_NAMES_SIZE);
+ 		file_names[p->type] = p->name;
+ 		file_formats[p->type] = p->format;
+@@ -771,19 +771,19 @@ get_op(char c)
+ private int
+ get_cond(const char *l, const char **t)
+ {
+-	static struct cond_tbl_s {
+-		const char *name;
+-		const size_t len;
+-		const int cond;
++	static const struct cond_tbl_s {
++		char name[8];
++		size_t len;
++		int cond;
+ 	} cond_tbl[] = {
+ 		{ "if",		2,	COND_IF },
+ 		{ "elif",	4,	COND_ELIF },
+ 		{ "else",	4,	COND_ELSE },
+-		{ NULL, 	0,	COND_NONE },
++		{ "",		0,	COND_NONE },
+ 	};
+-	struct cond_tbl_s *p;
++	const struct cond_tbl_s *p;
+ 
+-	for (p = cond_tbl; p->name; p++) {
++	for (p = cond_tbl; p->len; p++) {
+ 		if (strncmp(l, p->name, p->len) == 0 &&
+ 		    isspace((unsigned char)l[p->len])) {
+ 			if (t)
+Index: file-4.23/src/ascmagic.c
+===================================================================
+--- file-4.23.orig/src/ascmagic.c
++++ file-4.23/src/ascmagic.c
+@@ -74,7 +74,7 @@ file_ascmagic(struct magic_set *ms, cons
+ 	unsigned char *nbuf = NULL;
+ 	unichar *ubuf = NULL;	
+ 	size_t ulen;
+-	struct names *p;
++	const struct names *p;
+ 	int rv = -1;
+ 	int mime = ms->flags & MAGIC_MIME;
+ 
+Index: file-4.23/src/compress.c
+===================================================================
+--- file-4.23.orig/src/compress.c
++++ file-4.23/src/compress.c
+@@ -59,10 +59,10 @@
+ FILE_RCSID("@(#)$File: compress.c,v 1.54 2007/12/02 00:28:10 christos Exp $")
+ #endif
+ 
+-private struct {
+-	const char *magic;
++private const struct {
++	const char magic[8];
+ 	size_t maglen;
+-	const char *const argv[3];
++	const char *argv[3];
+ 	int silent;
+ } compr[] = {
+ 	{ "\037\235", 2, { "gzip", "-cdq", NULL }, 1 },		/* compressed */
+Index: file-4.23/src/is_tar.c
+===================================================================
+--- file-4.23.orig/src/is_tar.c
++++ file-4.23/src/is_tar.c
+@@ -53,7 +53,7 @@ FILE_RCSID("@(#)$File: is_tar.c,v 1.29 2
+ private int is_tar(const unsigned char *, size_t);
+ private int from_oct(int, const char *);	/* Decode octal number */
+ 
+-static const char *tartype[] = {
++static const char tartype[][32] = {
+ 	"tar archive",
+ 	"POSIX tar archive",
+ 	"POSIX tar archive (GNU)",
+Index: file-4.23/src/names.h
+===================================================================
+--- file-4.23.orig/src/names.h
++++ file-4.23/src/names.h
+@@ -57,8 +57,8 @@
+ #define	L_PO	13		/* PO */
+ 
+ static const struct {
+-	const char *human;
+-	const char *mime;
++	char human[48];
++	char mime[16];
+ } types[] = {
+ 	{ "C program",					"text/x-c", },
+ 	{ "C++ program",				"text/x-c++" },
+@@ -74,8 +74,7 @@ static const struct {
+ 	{ "BCPL program",				"text/x-bcpl" },
+ 	{ "M4 macro language pre-processor",		"text/x-m4" },
+ 	{ "PO (gettext message catalogue)",             "text/x-po" },
+-	{ "cannot happen error on names.h/types",	"error/x-error" },
+-	{ 0, 0}
++	{ "cannot happen error on names.h/types",	"error/x-error" }
+ };
+ 
+ /*
+@@ -114,8 +113,8 @@ static const struct {
+  * as Java, as it comes after "the" and "The".  Perhaps we need a fancier
+  * heuristic to identify Java?
+  */
+-static struct names {
+-	const char *name;
++static const struct names {
++	char name[14];
+ 	short type;
+ } names[] = {
+ 	/* These must be sorted by eye for optimal hit rate */
+@@ -180,7 +179,6 @@ static struct names {
+ 	{"<body",	L_HTML},
+ 	{"<BODY",	L_HTML},
+ 	{"<html",	L_HTML},
+-	{"<HTML",	L_HTML},
+-	{NULL,		0}
++	{"<HTML",	L_HTML}
+ };
+-#define NNAMES ((sizeof(names)/sizeof(struct names)) - 1)
++#define NNAMES (sizeof(names)/sizeof(struct names))
+Index: file-4.23/src/readelf.c
+===================================================================
+--- file-4.23.orig/src/readelf.c
++++ file-4.23/src/readelf.c
+@@ -189,14 +189,14 @@ getu64(int swap, uint64_t value)
+ 			 : prpsoffsets64[i])
+ 
+ #ifdef ELFCORE
+-size_t	prpsoffsets32[] = {
++static const size_t	prpsoffsets32[] = {
+ 	8,		/* FreeBSD */
+ 	44,		/* Linux (path name) */
+ 	28,		/* Linux 2.0.36 (short name) */
+ 	84,		/* SunOS 5.x */
+ };
+ 
+-size_t	prpsoffsets64[] = {
++static const size_t	prpsoffsets64[] = {
+ 	16,		/* FreeBSD, 64-bit */
+ 	56,		/* Linux (path name) */
+ 	40,             /* Linux (tested on core from 2.4.x, short name) */
+@@ -233,7 +233,7 @@ size_t	prpsoffsets64[] = {
+ #define	OS_STYLE_FREEBSD	1
+ #define	OS_STYLE_NETBSD		2
+ 
+-private const char *os_style_names[] = {
++private const char os_style_names[][8] = {
+ 	"SVR4",
+ 	"FreeBSD",
+ 	"NetBSD",

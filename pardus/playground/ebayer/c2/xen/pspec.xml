@@ -1,0 +1,124 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>xen</Name>
+        <Homepage>http://www.xen.org/</Homepage>
+        <Packager>
+            <Name>Erdem Bayer</Name>
+            <Email>ebayer@bayer.gen.tr</Email>
+        </Packager>
+        <License>GPLv2</License>
+        <Summary>Xen hypervisor</Summary>
+        <Description>Xen hypervisor</Description>
+        <Archive sha1sum="964a56b6aeb54d6ba3ddaacf19657de8a20d193e" type="targz">http://bits.xensource.com/oss-xen/release/4.0.1/xen-4.0.1.tar.gz</Archive>
+        <BuildDependencies>
+            <Dependency>dev86</Dependency>
+            <Dependency>libX11-devel</Dependency>
+            <Dependency>bridge-utils</Dependency>
+            <Dependency>iproute2</Dependency>
+            <!-- xen-stubdom dependency -->
+            <Dependency>acpica</Dependency>
+            <Dependency>xz</Dependency>
+            <Dependency>git</Dependency>
+            <!-- xen-doc dependency -->
+            <!-- <Dependency>transfig</Dependency> -->
+        </BuildDependencies>
+        <Patches>
+            <Patch level="1">tools-blktap2-libs.patch</Patch>
+            <Patch level="1">xen-loader-bzip2-lzma-xen34-fixed-makefile.patch</Patch>
+            <Patch level="1">blktap2-linker.patch</Patch>
+            <Patch level="1">xenpaging-makefile.patch</Patch>
+            <Patch level="1">newlib-configure.patch</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>xen</Name>
+        <Files>
+            <Path fileType="executable">/boot</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>xen-tools</Name>
+        <RuntimeDependencies>
+            <Dependency>bridge-utils</Dependency>
+            <Dependency>iproute2</Dependency>
+            <Dependency>udev</Dependency>
+            <Dependency>xen</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="config">/etc</Path>
+            <Path fileType="executable">/usr/bin</Path>
+            <Path fileType="header">/usr/include</Path>
+            <Path fileType="library">/usr/lib/*.so*</Path>
+            <Path fileType="library">/usr/lib/*.a</Path>
+            <Path fileType="library">/usr/lib/fs</Path>
+            <Path fileType="library">/usr/lib64/*.so*</Path>
+            <Path fileType="library">/usr/lib64/*.a</Path>
+            <Path fileType="library">/usr/lib64/fs</Path>
+            <Path fileType="library">/usr/lib/python2.6</Path>
+            <Path fileType="executable">/usr/lib/xen/bin/qemu-dm</Path>
+            <Path fileType="executable">/usr/lib/xen/boot/hvmloader</Path>
+            <Path fileType="executable">/usr/lib*/xen/bin/imqebt</Path>
+            <Path fileType="executable">/usr/lib*/xen/bin/lsevtchn</Path>
+            <Path fileType="executable">/usr/lib*/xen/bin/readnotes</Path>
+            <Path fileType="executable">/usr/lib*/xen/bin/xc_restore</Path>
+            <Path fileType="executable">/usr/lib*/xen/bin/xc_save</Path>
+            <Path fileType="executable">/usr/lib*/xen/bin/xenconsole</Path>
+            <Path fileType="executable">/usr/lib*/xen/bin/xenctx</Path>
+            <Path fileType="executable">/usr/sbin</Path>
+            <Path fileType="doc">/usr/share/doc/xen/README.blktap</Path>
+            <Path fileType="doc">/usr/share/doc/xen/README.xenmon</Path>
+            <Path fileType="man">/usr/share/man/man1/xentop.1</Path>
+            <Path fileType="man">/usr/share/man/man1/xentrace_format.1</Path>
+            <Path fileType="man">/usr/share/man/man8/xentrace.8</Path>
+            <Path fileType="data">/usr/share/xen/</Path>
+            <Path fileType="data">/var/xen/dump</Path>
+            <Path fileType="data">/var/lock/subsys</Path>
+            <Path fileType="data">/var/log/xen</Path>
+            <Path fileType="data">/var/lib/xen</Path>
+            <Path fileType="data">/var/lib/xenstored</Path>
+            <Path fileType="data">/var/run/xend</Path>
+            <Path fileType="data">/var/run/xenstored</Path>
+            <Path fileType="data">/usr/share/locale</Path>
+        </Files>
+    </Package>
+
+    <!-- <Package> -->
+    <!--     <Name>xen-stubdom</Name> -->
+    <!--     <Files> -->
+    <!--         <Path fileType="executable">/usr/lib/xen/bin/stubdom-dm</Path> -->
+    <!--         <Path fileType="executable">/usr/lib/xen/bin/stubdompath.sh</Path> -->
+    <!--         <Path fileType="executable">/usr/lib/xen/boot/ioemu-stubdom.gz</Path> -->
+    <!--         <Path fileType="executable">/usr/lib/xen/boot/pv-grub-x86_32.gz</Path> -->
+    <!--         <Path fileType="doc">/usr/share/doc/xen/README.stubdom</Path> -->
+    <!--     </Files> -->
+    <!-- </Package> -->
+
+    <!-- <Package> -->
+    <!--     <Name>xen-doc</Name> -->
+    <!--     <Files> -->
+    <!--         <Path fileType="doc">/usr/share/doc/xen/pdf/interface.pdf</Path> -->
+    <!--         <Path fileType="doc">/usr/share/doc/xen/pdf/user.pdf</Path> -->
+    <!--         <Path fileType="doc">/usr/share/doc/xen/pdf/xenapi.pdf</Path> -->
+    <!--         <Path fileType="doc">/usr/share/doc/xen/ps/interface.ps</Path> -->
+    <!--         <Path fileType="doc">/usr/share/doc/xen/ps/user.ps</Path> -->
+    <!--         <Path fileType="doc">/usr/share/doc/xen/ps/xenapi.ps</Path> -->
+    <!--         <Path fileType="man">/usr/share/man/man1/xm.1</Path> -->
+    <!--         <Path fileType="man">/usr/share/man/man5/xend-config.sxp.5</Path> -->
+    <!--         <Path fileType="man">/usr/share/man/man5/xmdomain.cfg.5</Path> -->
+    <!--     </Files> -->
+    <!-- </Package> -->
+
+    <History>
+        <Update release="1">
+            <Date>2010-06-30</Date>
+            <Version>4.0.1</Version>
+            <Comment>First release.</Comment>
+            <Name>Erdem Bayer</Name>
+            <Email>ebayer@bayer.gen.tr</Email>
+        </Update>
+    </History>
+</PISI>

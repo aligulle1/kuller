@@ -1,0 +1,109 @@
+diff -Naur nmm-0.9.1/nmm/plugins/av/mpeg/FFAVFormat.cpp nmm/nmm/plugins/av/mpeg/FFAVFormat.cpp
+--- nmm-0.9.1/nmm/plugins/av/mpeg/FFAVFormat.cpp	2006-02-09 16:28:59.000000000 +0100
++++ nmm/nmm/plugins/av/mpeg/FFAVFormat.cpp	2006-02-09 13:48:07.000000000 +0100
+@@ -59,18 +59,26 @@
+ 		fmtctx->oformat = NULL;
+ 		
+ 		url_open_buf(&fmtctx->pb,buffer,4096,URL_WRONLY); // the URL_WRONLY is important; otherwise there is no data written
+-		fmtctx->pb.write_packet = io_writePacket;
++		fmtctx->pb.write_packet = (int (*)(void*, uint8_t*, int))io_writePacket;
+ 		fmtctx->pb.opaque = this;
+ 	} // FFAVFormat::FFAVFormat()
+ 	
+ 	
+ 	FFAVFormat::~FFAVFormat(void) {
+ 	  if (a_stream) {
++			#if LIBAVCODEC_BUILD >= 4754 
++    	avcodec_close(a_stream->codec);
++			#else
+     	avcodec_close(&a_stream->codec);
++    	#endif
+ 	  }
+ 	
+ 		if (v_stream) {
++			#if LIBAVCODEC_BUILD >= 4754 
++			avcodec_close(v_stream->codec);
++			#else
+ 			avcodec_close(&v_stream->codec);
++			#endif
+ 		}
+ 		
+ 		delete[] io_buffer;
+@@ -100,7 +108,11 @@
+ 	  }
+ 	
+ 		AVCodecContext* ctx;
++		#if LIBAVCODEC_BUILD >= 4754 
++		ctx              = a_stream->codec;
++		#else
+ 		ctx              = &(a_stream->codec);
++		#endif
+ 		ctx->codec_id    = (CodecID)codecId;
+ 		ctx->codec_type  = CODEC_TYPE_AUDIO;
+ 		ctx->bit_rate    = bitrate;
+@@ -127,14 +139,23 @@
+ 		}
+ 		
+ 		AVCodecContext* c;
++		#if LIBAVCODEC_BUILD >= 4754 
++		c                  = v_stream->codec;
++		#else
+ 		c                  = &(v_stream->codec);
++		#endif
+ 		c->codec_id        = (CodecID)codecId;
+ 		c->codec_type      = CODEC_TYPE_VIDEO;
+ 		c->bit_rate        = bitrate;
+ 		c->width           = width;
+ 		c->height          = height;
++		#if LIBAVCODEC_BUILD >= 4754
++		c->time_base.den   = int(framerate*1000);
++		c->time_base.num	 = 1000;
++		#else
+ 		c->frame_rate      = int(framerate*1000);
+ 		c->frame_rate_base = 1000;
++		#endif
+ 		avcodec_open(c,avcodec_find_encoder((CodecID)codecId));
+ 		
+ 		GLOBAL_DEBUG_STREAM("added video stream" << std::endl);
+diff -Naur nmm-0.9.1/nmm/plugins/video/ffmpeg/FFMpegDecodeNode.cpp nmm/nmm/plugins/video/ffmpeg/FFMpegDecodeNode.cpp
+--- nmm-0.9.1/nmm/plugins/video/ffmpeg/FFMpegDecodeNode.cpp	2006-02-09 16:28:59.000000000 +0100
++++ nmm/nmm/plugins/video/ffmpeg/FFMpegDecodeNode.cpp	2006-02-09 14:08:23.000000000 +0100
+@@ -58,7 +58,7 @@
+       width(0),
+       width_half(0),
+       framerate(0),
+-      framerate_base(1000),
++      framerate_base(FRAME_RATE_BASE),
+       int_framerate(0),
+       bitrate(0),
+       gop_size(0),
+@@ -344,7 +344,12 @@
+     /* init context */
+     ffmpeg->ffavcc->width = width;
+     ffmpeg->ffavcc->height = height;
++    #if LIBAVCODEC_BUILD >= 4754
++    ffmpeg->ffavcc->time_base.den = (int) (framerate * FRAME_RATE_BASE);
++    ffmpeg->ffavcc->time_base.num = FRAME_RATE_BASE;
++    #else
+     ffmpeg->ffavcc->frame_rate = (int) (framerate * FRAME_RATE_BASE);
++    #endif
+ 
+     /* open the codec */
+     if(avcodec_open(ffmpeg->ffavcc, ffmpeg->ffAVCodec) < 0) {
+diff -Naur nmm-0.9.1/nmm/plugins/video/ffmpeg/FFMpegEncodeNode.cpp nmm/nmm/plugins/video/ffmpeg/FFMpegEncodeNode.cpp
+--- nmm-0.9.1/nmm/plugins/video/ffmpeg/FFMpegEncodeNode.cpp	2006-02-09 16:28:59.000000000 +0100
++++ nmm/nmm/plugins/video/ffmpeg/FFMpegEncodeNode.cpp	2006-02-09 13:43:59.000000000 +0100
+@@ -420,8 +420,13 @@
+     /* init context */
+     ffmpeg->ffavcc->width = width;
+     ffmpeg->ffavcc->height = height;
++    #if LIBAVCODEC_BUILD >= 4754 
++    ffmpeg->ffavcc->time_base.den = static_cast<int>(framerate * FRAME_RATE_BASE);
++    ffmpeg->ffavcc->time_base.num = FRAME_RATE_BASE;
++    #else
+     ffmpeg->ffavcc->frame_rate = static_cast<int>(framerate * FRAME_RATE_BASE);
+     ffmpeg->ffavcc->frame_rate_base = FRAME_RATE_BASE;
++    #endif
+     ffmpeg->ffavcc->bit_rate = bitrate;
+ 
+     if (compressor == "DIVX") {

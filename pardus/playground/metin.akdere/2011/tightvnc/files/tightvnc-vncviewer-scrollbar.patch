@@ -1,0 +1,39 @@
+--- vnc_unixsrc.orig/vncviewer/Vncviewer
++++ vnc_unixsrc/vncviewer/Vncviewer
+@@ -43,6 +43,18 @@
+ *viewport.useRight: True
+ *viewport*Scrollbar*thumb: None
+ 
++!
++! Override the confusing Xaw scrollbar button semantics
++!
++
++*Scrollbar.translations: #override\
++  <Btn1Down>: StartScroll(Continuous) MoveThumb() NotifyThumb() \n\
++  <Btn1Motion>: MoveThumb() NotifyThumb() \n\
++  <Btn2Down>: StartScroll(Continuous) MoveThumb() NotifyThumb() \n\
++  <Btn2Motion>: MoveThumb() NotifyThumb() \n\
++  <Btn3Down>: StartScroll(Continuous) MoveThumb() NotifyThumb() \n\
++  <Btn3Motion>: MoveThumb() NotifyThumb() \n\
++  <BtnUp>: NotifyScroll(Proportional) EndScroll()
+ 
+ !
+ ! Default translations on desktop window.
+--- vnc_unixarc.orig/vncviewer/argsresources.c
++++ vnc_unixsrc/vncviewer/argsresources.c
+@@ -45,6 +45,15 @@
+   "*viewport.useRight: True",
+   "*viewport*Scrollbar*thumb: None",
+ 
++  "*Scrollbar.translations: #override\
++     <Btn1Down>: StartScroll(Continuous) MoveThumb() NotifyThumb() \\n\
++     <Btn1Motion>: MoveThumb() NotifyThumb() \\n\
++     <Btn2Down>: StartScroll(Continuous) MoveThumb() NotifyThumb() \\n\
++     <Btn2Motion>: MoveThumb() NotifyThumb() \\n\
++     <Btn3Down>: StartScroll(Continuous) MoveThumb() NotifyThumb() \\n\
++     <Btn3Motion>: MoveThumb() NotifyThumb() \\n\
++     <BtnUp>: NotifyScroll(Proportional) EndScroll()",
++
+   "*desktop.baseTranslations:\
+      <Key>F8: ShowPopup()\\n\
+      <ButtonPress>: SendRFBEvent()\\n\

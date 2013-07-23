@@ -1,0 +1,118 @@
+Index: nm-applet/contents/code/widgets/configs.py
+===================================================================
+--- nm-applet/contents/code/widgets/configs.py	(revision 25829)
++++ nm-applet/contents/code/widgets/configs.py	(revision 25846)
+@@ -3,6 +3,7 @@
+ 
+ # Qt
+ from PyQt4 import QtGui
++from PyQt4.Qt import QVariant
+ 
+ # Configuration widgets
+ from configIconui import Ui_configIcon
+@@ -17,18 +18,18 @@
+         self.parseConf(config)
+ 
+     def parseConf(self, config):
+-        self.ui.spinInterval.setValue(int(config.readEntry("pollinterval", "5")))
+-        self.ui.checkTraffic.setChecked(config.readEntry("showtraffic", "true") == "true")
+-        self.ui.checkWifi.setChecked(config.readEntry("showwifi", "true") == "true")
+-        self.ui.checkStatus.setChecked(config.readEntry("showstatus", "true") == "true")
+-        self.ui.checkBattery.setChecked(config.readEntry("followsolid", "true") == "true")
++        self.ui.spinInterval.setValue(int(config.readEntry("pollinterval", QVariant("5")).toInt()[0]))
++        self.ui.checkTraffic.setChecked(config.readEntry("showtraffic", QVariant("true")).toBool())
++        self.ui.checkWifi.setChecked(config.readEntry("showwifi", QVariant("true")).toBool())
++        self.ui.checkStatus.setChecked(config.readEntry("showstatus", QVariant("true")).toBool())
++        self.ui.checkBattery.setChecked(config.readEntry("followsolid", QVariant("true")).toBool())
+ 
+     def writeConf(self, config):
+-        config.writeEntry("showtraffic", str(self.ui.checkTraffic.isChecked()).lower())
+-        config.writeEntry("showwifi", str(self.ui.checkWifi.isChecked()).lower())
+-        config.writeEntry("showstatus", str(self.ui.checkStatus.isChecked()).lower())
+-        config.writeEntry("followsolid", str(self.ui.checkBattery.isChecked()).lower())
+-        config.writeEntry("pollinterval", str(self.ui.spinInterval.value()))
++        config.writeEntry("showtraffic", QVariant(self.ui.checkTraffic.isChecked()))
++        config.writeEntry("showwifi", QVariant(self.ui.checkWifi.isChecked()))
++        config.writeEntry("showstatus", QVariant(self.ui.checkStatus.isChecked()))
++        config.writeEntry("followsolid", QVariant(self.ui.checkBattery.isChecked()))
++        config.writeEntry("pollinterval", QVariant(self.ui.spinInterval.value()))
+ 
+ class ConfigPopup(QtGui.QWidget):
+ 
+Index: nm-applet/contents/code/main.py
+===================================================================
+--- nm-applet/contents/code/main.py	(revision 25829)
++++ nm-applet/contents/code/main.py	(revision 25846)
+@@ -121,8 +121,8 @@
+ 
+     def solidState(self):
+         if self.hasBattery:
+-            return (not self._config['followsolid'] == 'true') or \
+-                    (self._config['followsolid'] == 'true' and self.chargeState == Solid.Battery.Charging)
++            return (not self._config['followsolid']) or \
++                    (self._config['followsolid'] and self.chargeState == Solid.Battery.Charging)
+         return True
+ 
+     def batteryStateChanged(self, newstate, udi):
+@@ -146,11 +146,11 @@
+     def readEntries(self):
+         config = self.config()
+         self._config = {}
+-        self._config["pollinterval"] = int(config.readEntry("pollinterval", "5")) * 1000
+-        self._config["showtraffic"] = config.readEntry("showtraffic", "true")
+-        self._config["showwifi"] = config.readEntry("showwifi", "true")
+-        self._config["showstatus"] = config.readEntry("showstatus", "true")
+-        self._config["followsolid"] = config.readEntry("followsolid", "true")
++        self._config["pollinterval"] = config.readEntry("pollinterval", QVariant("5")).toInt()[0] * 1000
++        self._config["showtraffic"] = config.readEntry("showtraffic", QVariant("true")).toBool()
++        self._config["showwifi"] = config.readEntry("showwifi", QVariant("true")).toBool()
++        self._config["showstatus"] = config.readEntry("showstatus", QVariant("true")).toBool()
++        self._config["followsolid"] = config.readEntry("followsolid", QVariant("true")).toBool()
+ 
+     def initPopup(self):
+         self.dialog = Plasma.Dialog()
+@@ -190,7 +190,7 @@
+             paint.fillPath(_path, self.transmitterBlinker.color)
+ 
+         # Draw Emblem
+-        if self._config['showstatus'] == 'true':
++        if self._config['showstatus']:
+             paint.drawPixmap(0,0,emblem)
+         paint.end()
+ 
+@@ -201,7 +201,7 @@
+     def dataUpdated(self):
+         if self.lastActiveDevice:
+             if self.lastActivePackage == 'wireless_tools':
+-                if self._config['showwifi'] == 'true' and self.solidState():
++                if self._config['showwifi'] and self.solidState():
+                     # Show SIGNAL Strength
+                     strength = int(round((self.iface.strength(self.lastActiveDevice)*5) / self.maxQuality))
+                     if not strength in range(1,6):
+@@ -211,7 +211,7 @@
+                     self.defaultIcon = WIRELESS
+             else:
+                 self.defaultIcon = WIRED
+-            if self._config['showtraffic'] == 'true' and self.solidState():
++            if self._config['showtraffic'] and self.solidState():
+                 self.receiverBlinker.update(self.iface.stat(self.lastActiveDevice)[0])
+                 self.transmitterBlinker.update(self.iface.stat(self.lastActiveDevice)[1])
+             else:
+@@ -221,7 +221,7 @@
+             self.receiverBlinker.stop()
+             self.transmitterBlinker.stop()
+         self.update()
+-        if self._config['showwifi'] == 'true' or self._config['showtraffic'] == 'true':
++        if self._config['showwifi'] or self._config['showtraffic']:
+             if self.solidState():
+                 QTimer.singleShot(self._config['pollinterval'], self.dataUpdated)
+ 
+@@ -256,7 +256,7 @@
+                     self.connectedDevices.append(connection)
+ 
+                 # Update Max Quality value
+-                if self.lastActivePackage == 'wireless_tools' and self._config['showwifi'] == 'true':
++                if self.lastActivePackage == 'wireless_tools' and self._config['showwifi']:
+                     self.maxQuality = self.iface.getMaxQuality(self.lastActiveDevice)
+ 
+                 # Current Ip

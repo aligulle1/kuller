@@ -1,0 +1,89 @@
+diff -ur kdebase-3.5.5.orig/kioslave/media/mediamanager/mediamanager.cpp kdebase-3.5.5/kioslave/media/mediamanager/mediamanager.cpp
+--- kdebase-3.5.5.orig/kioslave/media/mediamanager/mediamanager.cpp	2006-11-27 18:15:46.000000000 +0200
++++ kdebase-3.5.5/kioslave/media/mediamanager/mediamanager.cpp	2006-11-27 18:19:08.000000000 +0200
+@@ -330,6 +330,53 @@
+     emit mediumChanged(name);
+ }
+ 
++QString MediaManager::unmountAllSuspend()
++{
++    QPtrList<Medium> list = m_mediaList.list();
++
++    QPtrList<Medium>::const_iterator it = list.begin();
++    QPtrList<Medium>::const_iterator end = list.end();
++
++    QString result;
++
++    for (; it!=end; ++it)
++    {
++        if ( (*it)->isMounted() && (*it)->halMounted() )
++        {
++            QString tmp = unmount( (*it)->id() );
++            if ( !tmp.isEmpty() ) // umount failed
++                result = tmp;
++            else
++                m_suspendResumeMountList.append( *it );
++        }
++    }
++
++    // return last error
++    return result;
++}
++
++QString MediaManager::remountAllResume()
++{
++    QPtrList<Medium>::const_iterator it = m_suspendResumeMountList.begin();
++    QPtrList<Medium>::const_iterator end = m_suspendResumeMountList.end();
++
++    QString result;
++
++    for (; it!=end; ++it)
++    {
++        if ( (*it)->needMounting() )
++        {
++            QString tmp = mount( (*it)->id() );
++            if ( !tmp.isEmpty() ) // mount failed
++                result = tmp;
++            else
++                m_suspendResumeMountList.remove(); // remove the media from the list when remount succeeds
++        }
++    }
++
++    // return last error
++    return result;
++}
+ 
+ extern "C" {
+     KDE_EXPORT KDEDModule *create_mediamanager(const QCString &obj)
+diff -ur kdebase-3.5.5.orig/kioslave/media/mediamanager/mediamanager.h kdebase-3.5.5/kioslave/media/mediamanager/mediamanager.h
+--- kdebase-3.5.5.orig/kioslave/media/mediamanager/mediamanager.h	2006-10-01 20:31:54.000000000 +0300
++++ kdebase-3.5.5/kioslave/media/mediamanager/mediamanager.h	2006-11-27 18:20:14.000000000 +0200
+@@ -58,6 +58,20 @@
+ 	bool removableUnplug(const QString &devNode);
+ 	bool removableCamera(const QString &devNode);
+ 
++	/**
++	* Unmount manually all partitions when going to suspend
++	*
++	* @return last error if any
++	*/
++	QString unmountAllSuspend();
++
++	/**
++	* Remount previously unmounted partitions in unmountAllSuspend()
++	*
++	* @return last error if any
++	*/
++	QString remountAllResume();
++
+ k_dcop_signals:
+ 	void mediumAdded(const QString &name, bool allowNotification);
+ 	void mediumRemoved(const QString &name, bool allowNotification);
+@@ -85,6 +99,7 @@
+ 	HALBackend *m_halbackend;
+ 	MediaDirNotify m_dirNotify;
+ 	FstabBackend *m_fstabbackend;
++	QPtrList<Medium> m_suspendResumeMountList;
+ };
+ 
+ #endif

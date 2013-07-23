@@ -1,0 +1,31 @@
+From 48a9996192613ab259549cdb7c8735d2fb31ed78 Mon Sep 17 00:00:00 2001
+From: Peter Hutterer <peter.hutterer@who-t.net>
+Date: Tue, 29 Jul 2008 10:00:01 +0930
+Subject: [PATCH] Xi: ChangeDeviceControl presence events should set the appropriate devchange.
+
+Requires inputproto 1.4.4 or higher.
+(cherry picked from commit 591ef3c047ab3597fef9d687205e99c254ff2040)
+
+Modified to use the numeric value of DeviceControlChanged instead of the
+define, just so we don't bork out if someone rebuilds without updating
+inputproto. This is a released server, after all.
+---
+ Xi/chgdctl.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/Xi/chgdctl.c b/Xi/chgdctl.c
+index 9676fb7..38793c9 100644
+--- xorg-server-1.4.2/Xi/chgdctl.c
++++ xorg-server-1.4.2/Xi/chgdctl.c
+@@ -261,7 +261,7 @@ out:
+     if (ret == Success) {
+         dpn.type = DevicePresenceNotify;
+         dpn.time = currentTime.milliseconds;
+-        dpn.devchange = 1;
++        dpn.devchange = 5; /* DeviceControlChanged */
+         dpn.deviceid = dev->id;
+         dpn.control = stuff->control;
+         SendEventToAllWindows(dev, DevicePresenceNotifyMask,
+-- 
+1.5.6.5
+

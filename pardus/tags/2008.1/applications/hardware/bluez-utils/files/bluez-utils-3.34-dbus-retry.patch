@@ -1,0 +1,47 @@
+diff -Nur bluez-utils-3.34/gdbus/mainloop.c bluez-utils-3.34-new/gdbus/mainloop.c
+--- bluez-utils-3.34/gdbus/mainloop.c	2008-06-18 19:24:51.000000000 +0300
++++ bluez-utils-3.34-new/gdbus/mainloop.c	2008-07-01 15:26:14.000000000 +0300
+@@ -37,6 +37,7 @@
+ #include "gdbus.h"
+ 
+ #define DISPATCH_TIMEOUT  0
++#define MAX_DBUS_RETRY    12
+ 
+ #define info(fmt...)
+ #define error(fmt...)
+@@ -244,7 +245,23 @@
+ {
+ 	DBusConnection *conn;
+ 
+-	conn = dbus_bus_get(type, error);
++    int retry = 0;
++    conn = dbus_bus_get(type, error);
++
++    do {
++        if (dbus_error_is_set(error))
++            dbus_error_free(error);
++
++        conn = dbus_bus_get(type, error);
++        if (conn)
++            break;
++
++        if (!retry)
++            info("Can't connect to DBUS. Will retry %i times.", MAX_DBUS_RETRY);
++
++        sleep(5);
++        retry++;
++    } while (!conn && retry < MAX_DBUS_RETRY);
+ 
+ 	if (error != NULL) {
+ 		if (dbus_error_is_set(error) == TRUE)
+diff -Nur bluez-utils-3.34/hcid/dbus-common.c bluez-utils-3.34-new/hcid/dbus-common.c
+--- bluez-utils-3.34/hcid/dbus-common.c	2008-06-18 19:24:52.000000000 +0300
++++ bluez-utils-3.34-new/hcid/dbus-common.c	2008-07-01 15:27:14.000000000 +0300
+@@ -57,6 +57,7 @@
+ #define BLUEZ_NAME "org.bluez"
+ 
+ #define RECONNECT_RETRY_TIMEOUT	5000
++#define MAX_DBUS_RETRY 12
+ 
+ static int experimental = 0;
+ 

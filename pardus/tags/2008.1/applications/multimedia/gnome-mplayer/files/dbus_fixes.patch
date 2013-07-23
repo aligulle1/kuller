@@ -1,0 +1,51 @@
+Index: src/gui.c
+===================================================================
+--- src/gui.c	(revision 758)
++++ src/gui.c	(working copy)
+@@ -725,6 +725,11 @@
+     return FALSE;
+ }
+ 
++gboolean get_show_controls()
++{
++	return gtk_check_menu_item_get_active(GTK_CHECK_MENU_ITEM(menuitem_showcontrols));
++}
++
+ gboolean popup_handler(GtkWidget * widget, GdkEvent * event, void *data)
+ {
+     GtkMenu *menu;
+Index: src/dbus-interface.c
+===================================================================
+--- src/dbus-interface.c	(revision 758)
++++ src/dbus-interface.c	(working copy)
+@@ -719,15 +719,16 @@
+                 }
+                 if (dbus_message_is_method_call(message, "com.gnome.mplayer", "GetFullScreen")) {
+                     reply_message = dbus_message_new_method_return(message);
+-                    dbus_message_append_args(reply_message, DBUS_TYPE_BOOLEAN, fullscreen,
++                    dbus_message_append_args(reply_message, DBUS_TYPE_BOOLEAN, &fullscreen,
+                                              DBUS_TYPE_INVALID);
+                     dbus_connection_send(connection, reply_message, NULL);
+                     dbus_message_unref(reply_message);
+                     return DBUS_HANDLER_RESULT_HANDLED;
+                 }
+                 if (dbus_message_is_method_call(message, "com.gnome.mplayer", "GetShowControls")) {
++					showcontrols = get_show_controls();
+                     reply_message = dbus_message_new_method_return(message);
+-                    dbus_message_append_args(reply_message, DBUS_TYPE_BOOLEAN, fullscreen,
++                    dbus_message_append_args(reply_message, DBUS_TYPE_BOOLEAN, &showcontrols,
+                                              DBUS_TYPE_INVALID);
+                     dbus_connection_send(connection, reply_message, NULL);
+                     dbus_message_unref(reply_message);
+Index: src/common.h
+===================================================================
+--- src/common.h	(revision 758)
++++ src/common.h	(working copy)
+@@ -284,6 +284,7 @@
+ gboolean set_volume(void *data);
+ gboolean set_fullscreen(void *data);
+ gboolean set_show_controls(void *data);
++gboolean get_show_controls();
+ gboolean set_window_visible(void *data);
+ gboolean make_panel_and_mouse_invisible(gpointer data);
+ void make_button(gchar * src, gchar * href);

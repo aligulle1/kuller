@@ -1,0 +1,80 @@
+--- systemv/hal_lpadmin	2008-05-15 19:55:40.000000000 +0300
++++ systemv/hal_lpadmin.new	2008-06-17 14:32:10.000000000 +0300
+@@ -1,14 +1,16 @@
+-#!/bin/env python
++#!/usr/bin/env python
+ import dbus, sys, os, time, signal, re
+ import traceback
+ sys.path.append("/usr/share/system-config-printer")
+ import cups, cupshelpers, ppds
++import comar.service
+ from syslog import *
+ 
++
+ def get_location ():
+     p = os.popen ('/bin/hostname', 'r')
+     location = p.read ().strip ()
+-    p.close ()
++    #p.close ()
+     return location
+ 
+ def get_hplip_uris_for_usb (fax=False, checkuri=None):
+@@ -50,6 +52,40 @@
+         self.get_properties()
+         self.uris = None
+         self.hp_fax_uris = None
++
++        # Check for CUPS status
++        # If set to 'on' just wait a little while,
++        # if not, start it manually
++
++        bus = dbus.SystemBus()
++
++        try:
++            obj = bus.get_object("tr.org.pardus.comar", "/package/cups", introspect=False)
++            state = obj.info(dbus_interface="tr.org.pardus.comar.System.Service")
++            state = str(state[2])
++            syslog (LOG_INFO, "Checking CUPS state: %s" % state)
++
++        except dbus.DBusException, e:
++            syslog (LOG_DEBUG, "D-Bus method call failed: %s" % e)
++
++        # will autostart
++        if state == 'stopped':
++            syslog (LOG_INFO, "Waiting for CUPS to start...")
++            comar.service.waitBus("/var/run/cups/cups.sock")
++        elif state == 'off':
++            # start it manually
++            syslog (LOG_INFO, "Starting CUPS manually using comar..")
++            try:
++                obj = bus.get_object("tr.org.pardus.comar", "/package/cups", introspect=False)
++                obj.start(dbus_interface="tr.org.pardus.comar.System.Service")
++
++            except dbus.DBusException, e:
++                syslog (LOG_DEBUG, "D-Bus method call failed: %s" % e)
++        else:
++            pass
++
++        bus.close()
++
+         try:
+             self.cups_connection = cups.Connection()
+         except RuntimeError, e:
+@@ -317,10 +353,17 @@
+ 
+                 info = "%s %s" % (self.make, self.model)
+ 
++                # if there's no printer configured, set the new one as default
++                set_as_default = (len(self.cups_connection.getPrinters()) == 0)
++
+                 self.cups_connection.addPrinter(self.name,
+                                                 device=self.get_cups_uri(),
+                                                 ppdname=ppdname, info=info,
+                                                 location=get_location ())
++                if set_as_default:
++                    syslog (LOG_INFO, "Setting %s as the system default printer" % self.name)
++                    self.cups_connection.setDefault(self.name)
++
+                 self.cups_connection.enablePrinter(self.name)
+                 self.cups_connection.acceptJobs(self.name)
+                 syslog (LOG_INFO, "Added printer %s" % self.name)

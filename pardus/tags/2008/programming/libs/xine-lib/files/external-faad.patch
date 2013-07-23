@@ -1,0 +1,124 @@
+diff -urN xine-lib-1.1.9.orig/configure.ac xine-lib-1.1.9/configure.ac
+--- xine-lib-1.1.9.orig/configure.ac	2008-01-04 20:02:22 +0200
++++ xine-lib-1.1.9/configure.ac	2008-01-10 21:20:00 +0200
+@@ -1945,11 +1945,49 @@
+ AM_CONDITIONAL(BUILD_NOSEFART, test "x$enable_nosefart" != "xno")
+ 
+ dnl ---------------------------------------------
+-dnl FAAD build can be optional
++dnl FAAD build can be optional or external
+ dnl ---------------------------------------------
+ 
+-AC_ARG_ENABLE([faad], AS_HELP_STRING([--disable-faad], [do not build FAAD decoder]))
+-AM_CONDITIONAL(BUILD_FAAD, test "x$enable_faad" != "xno")
++AC_ARG_ENABLE(faad, AC_HELP_STRING([--disable-faad], [Disable support for AAC decoding library (default: enabled)]),
++              [enable_faad="$enableval"], [enable_faad="yes"])
++AC_ARG_WITH(external-faad, AC_HELP_STRING([--with-external-faad], [use external faad library (not recommended)]),
++            [external_faad="$withval"], [external_faad="no"])
++
++have_faad="no"
++
++if test x"$enable_faad" = "xno"; then
++  AC_MSG_RESULT([faad support disabled])
++elif test x"$external_faad" = "xyes"; then
++  have_faad="yes"
++  AC_CHECK_HEADERS([faad.h],, have_faad="no",
++[
++  #ifdef HAVE_SYS_TYPES_H
++  # include <sys/types.h>
++  #endif
++  #ifdef HAVE_INTTYPES_H
++  # include <inttypes.h>
++  #endif
++  #ifdef HAVE_STDINT_H
++  # include <stdint.h>
++  #endif
++
++  #include <faad.h>
++])
++  SAVE_LIBS="$LIBS"
++  AC_CHECK_LIB([faad], [faacDecInit],, have_faad="no", [])
++  if test "x$have_faad" = "xno"; then
++    AC_CHECK_LIB([faad], [NeAACDecInit], have_faad="yes", , [])
++  fi
++  LIBS="$SAVE_LIBS"
++  if test "x$have_faad" = "xno"; then
++    AC_MSG_RESULT([*** no usable version of faad found, using internal copy ***])
++  fi
++else
++  AC_MSG_RESULT([Use included faad support])
++fi
++
++AM_CONDITIONAL(BUILD_FAAD, test x"$enable_faad" = "xyes")
++AM_CONDITIONAL(EXTERNAL_FAAD, test x"$have_faad" = "xyes")
+ 
+ dnl ---------------------------------------------
+ dnl Optional and external libdts
+diff -urN xine-lib-1.1.9.orig/src/libfaad/Makefile.am xine-lib-1.1.9/src/libfaad/Makefile.am
+--- xine-lib-1.1.9.orig/src/libfaad/Makefile.am	2008-01-01 19:07:56 +0200
++++ xine-lib-1.1.9/src/libfaad/Makefile.am	2008-01-10 21:22:31 +0200
+@@ -1,6 +1,10 @@
+ include $(top_srcdir)/misc/Makefile.common
+ 
++if EXTERNAL_FAAD
++SUBDIRS =
++else
+ SUBDIRS = codebook
++endif
+ 
+ if BUILD_FAAD
+ faad_module = xineplug_decode_faad.la
+@@ -11,7 +15,11 @@
+ VPATH = @srcdir@:@srcdir@/codebook:
+ 
+ xineplug_decode_faad_la_CFLAGS = $(VISIBILITY_FLAG) $(AM_CFLAGS) -fno-strict-aliasing
+-xineplug_decode_faad_la_SOURCES = \
++
++if EXTERNAL_FAAD
++internal_sources =
++else
++internal_sources = \
+ 	bits.c \
+ 	cfft.c \
+ 	common.c \
+@@ -49,11 +57,19 @@
+ 	ssr_fb.c \
+ 	ssr_ipqf.c \
+ 	syntax.c \
+-	tns.c \
+-	xine_faad_decoder.c
++	tns.c
++endif
++
++xineplug_decode_faad_la_SOURCES = \
++	xine_faad_decoder.c \
++	$(internal_sources)
+ 
+ xineplug_decode_faad_la_LDFLAGS = $(xineplug_ldflags)
++if EXTERNAL_FAAD
++xineplug_decode_faad_la_LIBADD = $(XINE_LIB) -lfaad $(LTLIBINTL)
++else
+ xineplug_decode_faad_la_LIBADD = $(XINE_LIB) -lm $(LTLIBINTL)
++endif
+ 
+ noinst_HEADERS = \
+ 	analysis.h \
+diff -urN xine-lib-1.1.9.orig/src/libfaad/xine_faad_decoder.c xine-lib-1.1.9/src/libfaad/xine_faad_decoder.c
+--- xine-lib-1.1.9.orig/src/libfaad/xine_faad_decoder.c	2008-01-01 15:30:08 +0200
++++ xine-lib-1.1.9/src/libfaad/xine_faad_decoder.c	2008-01-10 21:20:00 +0200
+@@ -35,10 +35,15 @@
+ #include "audio_out.h"
+ #include "buffer.h"
+ #include "xineutils.h"
++
++#ifdef HAVE_FAAD_H
++#include <faad.h>
++#else
+ #include "common.h"
+ #include "structs.h"
+ #include "decoder.h"
+ #include "syntax.h"
++#endif
+ 
+ #define FAAD_MIN_STREAMSIZE 768 /* 6144 bits/channel */
+ 

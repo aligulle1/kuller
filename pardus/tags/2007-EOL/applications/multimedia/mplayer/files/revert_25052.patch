@@ -1,0 +1,35 @@
+diff -Nur mplayer-20071127-old/stream/stream_dvdnav.c mplayer-20071127/stream/stream_dvdnav.c
+--- mplayer-20071127-old/stream/stream_dvdnav.c	2007-11-27 23:49:17.094063106 +0200
++++ mplayer-20071127/stream/stream_dvdnav.c	2007-11-27 23:52:15.556932625 +0200
+@@ -325,6 +325,7 @@
+       *((double *)arg) = !ar ? 4.0/3.0 : 16.0/9.0;
+       return 1;
+     }
++#ifdef MP_DVDNAV
+     case STREAM_CTRL_GET_CURRENT_TIME:
+     {
+       double tm;
+@@ -343,6 +344,7 @@
+         return 1;
+       break;
+     }
++#endif
+   }
+ 
+   return STREAM_UNSUPPORTED;
+@@ -497,6 +499,7 @@
+   uint8_t format, lg;
+   uint16_t lang, lcode;;
+ 
++#ifdef DVDNAV_FORMAT_AC3
+   while(language && strlen(language)>=2) {
+     lcode = (language[0] << 8) | (language[1]);
+     for(k=0; k<32; k++) {
+@@ -522,6 +525,7 @@
+     language += 2;
+     while(language[0]==',' || language[0]==' ') ++language;
+   }
++#endif
+   return -1;
+ }
+ 

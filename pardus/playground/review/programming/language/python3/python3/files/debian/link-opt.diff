@@ -1,0 +1,24 @@
+# Pardus: Call the linker with -Bsymbolic-functions an pardus ldflags
+
+--- a/configure.in
++++ b/configure.in
+@@ -1703,8 +1703,8 @@
+ 		fi
+ 		;;
+ 	Linux*|GNU*|QNX*)
+-		LDSHARED='$(CC) -shared'
+-		LDCXXSHARED='$(CXX) -shared';;
++		LDSHARED='$(CC) -shared -Wl,-O1 -Wl,-z,relro -Wl,--hash-style=gnu -Wl,--as-needed -Wl,--sort-common -Wl,-Bsymbolic-functions'
++		LDCXXSHARED='$(CXX) -shared -Wl,-O1 -Wl,-z,relro -Wl,--hash-style=gnu -Wl,--as-needed -Wl,--sort-common -Wl,-Bsymbolic-functions';;
+ 	BSD/OS*/4*)
+ 		LDSHARED="gcc -shared"
+ 		LDCXXSHARED="g++ -shared";;
+@@ -1802,7 +1802,7 @@
+ 	    LINKFORSHARED="-Wl,-E -Wl,+s";;
+ #	    LINKFORSHARED="-Wl,-E -Wl,+s -Wl,+b\$(BINLIBDEST)/lib-dynload";;
+ 	BSD/OS/4*) LINKFORSHARED="-Xlinker -export-dynamic";;
+-	Linux*|GNU*) LINKFORSHARED="-Xlinker -export-dynamic";;
++	Linux*|GNU*) LINKFORSHARED="-Xlinker -export-dynamic -Wl,-O1 -Wl,-z,relro -Wl,--hash-style=gnu -Wl,--as-needed -Wl,--sort-common -Wl,-Bsymbolic-functions";;
+ 	# -u libsys_s pulls in all symbols in libsys
+ 	Darwin/*)
+ 		LINKFORSHARED="$extra_undefs -framework CoreFoundation"

@@ -1,0 +1,569 @@
+commit 57f5b1590f2d801a3a7f072e2c65f14d4545852c
+Author: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+Date:   Wed May 28 00:54:01 2008 -0400
+
+    Input: atkbd - mark keyboard as disabled when suspending/unloading
+    
+    This will shut off garbage that may come from KBD port during resume.
+    
+    Signed-off-by: Dmitry Torokhov <dtor@mail.ru>
+
+diff --git a/drivers/input/keyboard/atkbd.c b/drivers/input/keyboard/atkbd.c
+index 4a95adc..af58a6f 100644
+--- a/drivers/input/keyboard/atkbd.c
++++ b/drivers/input/keyboard/atkbd.c
+@@ -807,6 +807,8 @@ static int atkbd_activate(struct atkbd *atkbd)
+ static void atkbd_cleanup(struct serio *serio)
+ {
+ 	struct atkbd *atkbd = serio_get_drvdata(serio);
++
++	atkbd_disable(atkbd);
+ 	ps2_command(&atkbd->ps2dev, NULL, ATKBD_CMD_RESET_BAT);
+ }
+ 
+
+commit f6d65610df3bd4e7138da03aec391224219df135
+Author: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+Date:   Mon Jun 2 00:39:45 2008 -0400
+
+    Input: atkbd - use ushort instead of uchar keymap
+    
+    Since some of the keycodes defined in input.h have values greater
+    than 255 we should use unsigned shorts in keymaps.
+    
+    Tested-by: Carlos Corbacho <carlos@strangeworlds.co.uk>
+    Signed-off-by: Dmitry Torokhov <dtor@mail.ru>
+
+diff --git a/drivers/input/keyboard/atkbd.c b/drivers/input/keyboard/atkbd.c
+index 4a95adc..56857d1 100644
+--- a/drivers/input/keyboard/atkbd.c
++++ b/drivers/input/keyboard/atkbd.c
+@@ -68,7 +68,7 @@ MODULE_PARM_DESC(extra, "Enable extra LEDs and keys on IBM RapidAcces, EzKey and
+  * are loadable via an userland utility.
+  */
+ 
+-static unsigned char atkbd_set2_keycode[512] = {
++static const unsigned short atkbd_set2_keycode[512] = {
+ 
+ #ifdef CONFIG_KEYBOARD_ATKBD_HP_KEYCODES
+ 
+@@ -99,7 +99,7 @@ static unsigned char atkbd_set2_keycode[512] = {
+ #endif
+ };
+ 
+-static unsigned char atkbd_set3_keycode[512] = {
++static const unsigned short atkbd_set3_keycode[512] = {
+ 
+ 	  0,  0,  0,  0,  0,  0,  0, 59,  1,138,128,129,130, 15, 41, 60,
+ 	131, 29, 42, 86, 58, 16,  2, 61,133, 56, 44, 31, 30, 17,  3, 62,
+@@ -115,7 +115,7 @@ static unsigned char atkbd_set3_keycode[512] = {
+ 	148,149,147,140
+ };
+ 
+-static unsigned char atkbd_unxlate_table[128] = {
++static const unsigned short atkbd_unxlate_table[128] = {
+           0,118, 22, 30, 38, 37, 46, 54, 61, 62, 70, 69, 78, 85,102, 13,
+          21, 29, 36, 45, 44, 53, 60, 67, 68, 77, 84, 91, 90, 20, 28, 27,
+          35, 43, 52, 51, 59, 66, 75, 76, 82, 14, 18, 93, 26, 34, 33, 42,
+@@ -161,7 +161,7 @@ static unsigned char atkbd_unxlate_table[128] = {
+ #define ATKBD_SCR_LEFT		249
+ #define ATKBD_SCR_RIGHT		248
+ 
+-#define ATKBD_SPECIAL		248
++#define ATKBD_SPECIAL		ATKBD_SCR_RIGHT
+ 
+ #define ATKBD_LED_EVENT_BIT	0
+ #define ATKBD_REP_EVENT_BIT	1
+@@ -173,7 +173,7 @@ static unsigned char atkbd_unxlate_table[128] = {
+ #define ATKBD_XL_HANGEUL	0x10
+ #define ATKBD_XL_HANJA		0x20
+ 
+-static struct {
++static const struct {
+ 	unsigned char keycode;
+ 	unsigned char set2;
+ } atkbd_scroll_keys[] = {
+@@ -200,7 +200,7 @@ struct atkbd {
+ 	char phys[32];
+ 
+ 	unsigned short id;
+-	unsigned char keycode[512];
++	unsigned short keycode[512];
+ 	DECLARE_BITMAP(force_release_mask, 512);
+ 	unsigned char set;
+ 	unsigned char translated;
+@@ -357,7 +357,7 @@ static irqreturn_t atkbd_interrupt(struct serio *serio, unsigned char data,
+ 	unsigned int code = data;
+ 	int scroll = 0, hscroll = 0, click = -1;
+ 	int value;
+-	unsigned char keycode;
++	unsigned short keycode;
+ 
+ #ifdef ATKBD_DEBUG
+ 	printk(KERN_DEBUG "atkbd.c: Received %02x flags %02x\n", data, flags);
+@@ -959,16 +959,16 @@ static void atkbd_set_device_attrs(struct atkbd *atkbd)
+ 		input_dev->evbit[0] |= BIT_MASK(EV_REL);
+ 		input_dev->relbit[0] = BIT_MASK(REL_WHEEL) |
+ 			BIT_MASK(REL_HWHEEL);
+-		set_bit(BTN_MIDDLE, input_dev->keybit);
++		__set_bit(BTN_MIDDLE, input_dev->keybit);
+ 	}
+ 
+ 	input_dev->keycode = atkbd->keycode;
+-	input_dev->keycodesize = sizeof(unsigned char);
++	input_dev->keycodesize = sizeof(unsigned short);
+ 	input_dev->keycodemax = ARRAY_SIZE(atkbd_set2_keycode);
+ 
+ 	for (i = 0; i < 512; i++)
+ 		if (atkbd->keycode[i] && atkbd->keycode[i] < ATKBD_SPECIAL)
+-			set_bit(atkbd->keycode[i], input_dev->keybit);
++			__set_bit(atkbd->keycode[i], input_dev->keybit);
+ }
+ 
+ /*
+
+commit 15439dd37f92f930ac7fc65a4f261834e4215bb0
+Merge: 39ab9dd 90d95ef
+Author: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+Date:   Tue Jun 17 12:02:44 2008 -0400
+
+    Merge branch 'for-linus' into next
+    
+    Conflicts:
+    
+    	drivers/input/mouse/appletouch.c
+
+commit 5a54c0115757fd98ca05efae626e6aebf54a8427
+Author: Jiri Kosina <jkosina@suse.cz>
+Date:   Thu Jun 26 10:46:38 2008 -0400
+
+    Input: atkbd - fix HP 2133 not sending release event for video switch
+    
+    Video switch key on HP 2133 doesn't send release event, so we
+    have to create workaround similar to what we do for Dell Latitude,
+    i.e. perform DMI match for the system and generate 'false' release
+    event ourselves, so that userspace doesn't think that the key is
+    stuck forever.
+    
+    Signed-off-by: Jiri Kosina <jkosina@suse.cz>
+    Signed-off-by: Dmitry Torokhov <dtor@mail.ru>
+
+diff --git a/drivers/input/keyboard/atkbd.c b/drivers/input/keyboard/atkbd.c
+index c27537b..b1ce10f 100644
+--- a/drivers/input/keyboard/atkbd.c
++++ b/drivers/input/keyboard/atkbd.c
+@@ -851,6 +851,23 @@ static void atkbd_latitude_keymap_fixup(struct atkbd *atkbd)
+ }
+ 
+ /*
++ * Perform fixup for HP system that doesn't generate release
++ * for its video switch
++ */
++static void atkbd_hp_keymap_fixup(struct atkbd *atkbd)
++{
++	const unsigned int forced_release_keys[] = {
++		0x94,
++	};
++	int i;
++
++	if (atkbd->set == 2)
++		for (i = 0; i < ARRAY_SIZE(forced_release_keys); i++)
++			__set_bit(forced_release_keys[i],
++					atkbd->force_release_mask);
++}
++
++/*
+  * atkbd_set_keycode_table() initializes keyboard's keycode table
+  * according to the selected scancode set
+  */
+@@ -1452,6 +1469,15 @@ static struct dmi_system_id atkbd_dmi_quirk_table[] __initdata = {
+ 		.callback = atkbd_setup_fixup,
+ 		.driver_data = atkbd_latitude_keymap_fixup,
+ 	},
++	{
++		.ident = "HP 2133",
++		.matches = {
++			DMI_MATCH(DMI_SYS_VENDOR, "Hewlett-Packard"),
++			DMI_MATCH(DMI_PRODUCT_NAME, "HP 2133"),
++		},
++		.callback = atkbd_setup_fixup,
++		.driver_data = atkbd_hp_keymap_fixup,
++	},
+ 	{ }
+ };
+ 
+
+commit 8948ecffc8c56009c4580e684d6e385b2bad96df
+Author: Matthew Garrett <mjg59@srcf.ucam.org>
+Date:   Fri Aug 15 13:54:51 2008 -0400
+
+    Input: atkbd - expand Latitude's force release quirk to other Dells
+    
+    Bug: #284066
+    
+    Dell laptops fail to send key up events for several of their special
+    keys. There's an existing quirk in the kernel to handle this, but it's
+    limited to the Latitude range. This patch extends it to cover all
+    portable Dells.
+    
+    Signed-off-by: Matthew Garrett <mjg@redhat.com>
+    Signed-off-by: Dmitry Torokhov <dtor@mail.ru>
+    Signed-off-by: Tim Gardner <tim.gardner@canonical.com>
+
+diff --git a/drivers/input/keyboard/atkbd.c b/drivers/input/keyboard/atkbd.c
+index b1ce10f..e32c24d 100644
+--- a/drivers/input/keyboard/atkbd.c
++++ b/drivers/input/keyboard/atkbd.c
+@@ -834,10 +834,10 @@ static void atkbd_disconnect(struct serio *serio)
+ }
+ 
+ /*
+- * Most special keys (Fn+F?) on Dell Latitudes do not generate release
++ * Most special keys (Fn+F?) on Dell laptops do not generate release
+  * events so we have to do it ourselves.
+  */
+-static void atkbd_latitude_keymap_fixup(struct atkbd *atkbd)
++static void atkbd_dell_laptop_keymap_fixup(struct atkbd *atkbd)
+ {
+ 	const unsigned int forced_release_keys[] = {
+ 		0x85, 0x86, 0x87, 0x88, 0x89, 0x8a, 0x8b, 0x8f, 0x93,
+@@ -1461,13 +1461,13 @@ static int __init atkbd_setup_fixup(const struct dmi_system_id *id)
+ 
+ static struct dmi_system_id atkbd_dmi_quirk_table[] __initdata = {
+ 	{
+-		.ident = "Dell Latitude series",
++		.ident = "Dell Laptop",
+ 		.matches = {
+ 			DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+-			DMI_MATCH(DMI_PRODUCT_NAME, "Latitude"),
++			DMI_MATCH(DMI_CHASSIS_TYPE, "8"), /* Portable */
+ 		},
+ 		.callback = atkbd_setup_fixup,
+-		.driver_data = atkbd_latitude_keymap_fixup,
++		.driver_data = atkbd_dell_laptop_keymap_fixup,
+ 	},
+ 	{
+ 		.ident = "HP 2133",
+
+commit a04882d5b96f9abcb7e8afe11399e2eb8b7d8446
+Author: Matthew Garrett <mjg@redhat.com>
+Date:   Tue Nov 11 09:40:42 2008 -0500
+
+    Input: atkbd - add keymap quirk for Inventec Symphony systems
+    
+    commit a8215b81cc31cf267506bc6a4a4bfe93f4ca1652 upstream.
+    
+    The Zepto 6615WD laptop (rebranded Inventec Symphony system) needs a
+    key release quirk for its volume keys to work. The attached patch adds
+    the quirk to the atkbd driver.
+    
+    Fixes: https://bugzilla.redhat.com/show_bug.cgi?id=460237
+    
+    Signed-off-by: Matthew Garrett <mjg@redhat.com>
+    Signed-off-by: Adel Gadllah <adel.gadllah@gmail.com>
+    Signed-off-by: Dmitry Torokhov <dtor@mail.ru>
+    Signed-off-by: Greg Kroah-Hartman <gregkh@suse.de>
+    Signed-off-by: Tim Gardner <tim.gardner@canonical.com>
+
+diff --git a/drivers/input/keyboard/atkbd.c b/drivers/input/keyboard/atkbd.c
+index e32c24d..c694eaa 100644
+--- a/drivers/input/keyboard/atkbd.c
++++ b/drivers/input/keyboard/atkbd.c
+@@ -868,6 +868,22 @@ static void atkbd_hp_keymap_fixup(struct atkbd *atkbd)
+ }
+ 
+ /*
++ * Inventec system with broken key release on volume keys
++ */
++static void atkbd_inventec_keymap_fixup(struct atkbd *atkbd)
++{
++	const unsigned int forced_release_keys[] = {
++		0xae, 0xb0,
++	};
++	int i;
++
++	if (atkbd->set == 2)
++		for (i = 0; i < ARRAY_SIZE(forced_release_keys); i++)
++			__set_bit(forced_release_keys[i],
++				  atkbd->force_release_mask);
++}
++
++/*
+  * atkbd_set_keycode_table() initializes keyboard's keycode table
+  * according to the selected scancode set
+  */
+@@ -1478,6 +1494,15 @@ static struct dmi_system_id atkbd_dmi_quirk_table[] __initdata = {
+ 		.callback = atkbd_setup_fixup,
+ 		.driver_data = atkbd_hp_keymap_fixup,
+ 	},
++	{
++		.ident = "Inventec Symphony",
++		.matches = {
++			DMI_MATCH(DMI_SYS_VENDOR, "INVENTEC"),
++			DMI_MATCH(DMI_PRODUCT_NAME, "SYMPHONY 6.0/7.0"),
++		},
++		.callback = atkbd_setup_fixup,
++		.driver_data = atkbd_inventec_keymap_fixup,
++	},
+ 	{ }
+ };
+ 
+
+commit aa085ec46c542ebcb952c41409a23ceb72d92664
+Author: Rikard Ljungstrand <lrikard@student.chalmers.se>
+Date:   Fri Dec 19 21:59:20 2008 -0500
+
+    Input: atkbd - add keyboard quirk for HP Pavilion ZV6100 laptop
+    
+    Bug: #291878
+    
+    commit 181f63827a7655e84781fe0494189c1fea52816f upstream
+    
+    Add quirk for misbehaving volume buttons on HP Pavilion ZV6100 laptop which
+    are not sending keyrelease events, as reported by Aaron Pickett.
+    
+    Signed-off-by: Rikard Ljungstrand <lrikard@student.chalmers.se>
+    Signed-off-by: Dmitry Torokhov <dtor@mail.ru>
+    Signed-off-by: Andy Whitcroft <apw@canonical.com>
+    Acked-by: Tim Gardner <tim.gardner@canonical.com>
+    Acked-by: Stefan Bader <stefan.bader@canonical.com>
+
+diff --git a/drivers/input/keyboard/atkbd.c b/drivers/input/keyboard/atkbd.c
+index c694eaa..1aa2eaf 100644
+--- a/drivers/input/keyboard/atkbd.c
++++ b/drivers/input/keyboard/atkbd.c
+@@ -884,6 +884,23 @@ static void atkbd_inventec_keymap_fixup(struct atkbd *atkbd)
+ }
+ 
+ /*
++ * Perform fixup for HP Pavilion ZV6100 laptop that doesn't generate release
++ * for its volume buttons
++ */
++static void atkbd_hp_zv6100_keymap_fixup(struct atkbd *atkbd)
++{
++	const unsigned int forced_release_keys[] = {
++		0xae, 0xb0,
++	};
++	int i;
++
++	if (atkbd->set == 2)
++		for (i = 0; i < ARRAY_SIZE(forced_release_keys); i++)
++			__set_bit(forced_release_keys[i],
++					atkbd->force_release_mask);
++}
++
++/*
+  * atkbd_set_keycode_table() initializes keyboard's keycode table
+  * according to the selected scancode set
+  */
+@@ -1495,6 +1512,15 @@ static struct dmi_system_id atkbd_dmi_quirk_table[] __initdata = {
+ 		.driver_data = atkbd_hp_keymap_fixup,
+ 	},
+ 	{
++		.ident = "HP Pavilion ZV6100",
++		.matches = {
++			DMI_MATCH(DMI_SYS_VENDOR, "Hewlett-Packard"),
++			DMI_MATCH(DMI_PRODUCT_NAME, "Pavilion ZV6100"),
++		},
++		.callback = atkbd_setup_fixup,
++		.driver_data = atkbd_hp_zv6100_keymap_fixup,
++	},
++	{
+ 		.ident = "Inventec Symphony",
+ 		.matches = {
+ 			DMI_MATCH(DMI_SYS_VENDOR, "INVENTEC"),
+
+commit 0cbc5c9e5316272fed962581104bdb8debdc9251
+Author: Matthew Garrett <mjg59@srcf.ucam.org>
+Date:   Tue Dec 30 00:43:11 2008 -0800
+
+    Input: atkbd - broaden the Dell DMI signatures
+    
+    Bug: #328652
+    
+    commit 2a3ec3265741c3b2a7ebbd1b33f538e5a5583c48 upstream.
+    
+    Some Dells need the dell input quirk applied but have a different vendor
+    string in their DMI tables. Add an extra entry to cover these machines as
+    well.
+    
+    Signed-off-by: Matthew Garrett <mjg@redhat.com>
+    Signed-off-by: Dmitry Torokhov <dtor@mail.ru>
+    Cc: Chuck Ebbert <cebbert@redhat.com>
+    Signed-off-by: Greg Kroah-Hartman <gregkh@suse.de>
+    Signed-off-by: Stefan Bader <stefan.bader@canonical.com>
+    Acked-by: Tim Gardner <tim.gardner@canonical.com>
+
+diff --git a/drivers/input/keyboard/atkbd.c b/drivers/input/keyboard/atkbd.c
+index 1aa2eaf..72860af 100644
+--- a/drivers/input/keyboard/atkbd.c
++++ b/drivers/input/keyboard/atkbd.c
+@@ -1503,6 +1503,15 @@ static struct dmi_system_id atkbd_dmi_quirk_table[] __initdata = {
+ 		.driver_data = atkbd_dell_laptop_keymap_fixup,
+ 	},
+ 	{
++		.ident = "Dell Laptop",
++		.matches = {
++			DMI_MATCH(DMI_SYS_VENDOR, "Dell Computer Corporation"),
++			DMI_MATCH(DMI_CHASSIS_TYPE, "8"), /* Portable */
++		},
++		.callback = atkbd_setup_fixup,
++		.driver_data = atkbd_dell_laptop_keymap_fixup,
++	},
++	{
+ 		.ident = "HP 2133",
+ 		.matches = {
+ 			DMI_MATCH(DMI_SYS_VENDOR, "Hewlett-Packard"),
+
+commit c40367c7d5026cbab6b51cce974f1a7f66bed19a
+Author: Stuart Hopkins <stuart@dodgy-geeza.com>
+Date:   Sat Dec 20 04:12:33 2008 -0500
+
+    Input: atkbd - Samsung NC10 key repeat fix
+    
+    Bug: #328652
+    
+    commit 4200844bd9dc511088258437d564a187f0ffc94e upstream.
+    
+    This patch fixes the key repeat issue with the Fn+F? keys on the new
+    Samsung NC10 Netbook, so that the keys can be defined and used within
+    ACPID correctly, otherwise the keys repeat indefinately.
+    
+    This solves part of http://bugzilla.kernel.org/show_bug.cgi?id=12021
+    
+    Signed-off-by: Stuart Hopkins <stuart@dodgy-geeza.com>
+    Signed-off-by: Dmitry Torokhov <dtor@mail.ru>
+    Cc: Chuck Ebbert <cebbert@redhat.com>
+    Signed-off-by: Greg Kroah-Hartman <gregkh@suse.de>
+    Signed-off-by: Stefan Bader <stefan.bader@canonical.com>
+    Acked-by: Tim Gardner <tim.gardner@canonical.com>
+
+diff --git a/drivers/input/keyboard/atkbd.c b/drivers/input/keyboard/atkbd.c
+index 72860af..3f3543d 100644
+--- a/drivers/input/keyboard/atkbd.c
++++ b/drivers/input/keyboard/atkbd.c
+@@ -901,6 +901,22 @@ static void atkbd_hp_zv6100_keymap_fixup(struct atkbd *atkbd)
+ }
+ 
+ /*
++ * Samsung NC10 with Fn+F? key release not working
++ */
++static void atkbd_samsung_keymap_fixup(struct atkbd *atkbd)
++{
++	const unsigned int forced_release_keys[] = {
++		0x82, 0x83, 0x84, 0x86, 0x88, 0x89, 0xb3, 0xf7, 0xf9,
++	};
++	int i;
++
++	if (atkbd->set == 2)
++		for (i = 0; i < ARRAY_SIZE(forced_release_keys); i++)
++			__set_bit(forced_release_keys[i],
++				  atkbd->force_release_mask);
++}
++
++/*
+  * atkbd_set_keycode_table() initializes keyboard's keycode table
+  * according to the selected scancode set
+  */
+@@ -1538,6 +1554,15 @@ static struct dmi_system_id atkbd_dmi_quirk_table[] __initdata = {
+ 		.callback = atkbd_setup_fixup,
+ 		.driver_data = atkbd_inventec_keymap_fixup,
+ 	},
++	{
++		.ident = "Samsung NC10",
++		.matches = {
++			DMI_MATCH(DMI_SYS_VENDOR, "SAMSUNG ELECTRONICS CO., LTD."),
++			DMI_MATCH(DMI_PRODUCT_NAME, "NC10"),
++		},
++		.callback = atkbd_setup_fixup,
++		.driver_data = atkbd_samsung_keymap_fixup,
++	},
+ 	{ }
+ };
+ 
+
+commit 400e26a872c8e2f1e59d97d67b963393957d5e0e
+Author: Andy Whitcroft <apw@canonical.com>
+Date:   Mon Feb 23 18:23:53 2009 +0000
+
+    UBUNTU: SAUCE: hotkey quirks for various Zepto Znote and Fujitsu Amilo laptops
+    
+    OriginalAuthor: Marius Wenderoth <scale87@web.de>
+    Bug: #330259
+    
+    Add model specific quirks for the hotkeys for the laptops below:
+    
+    	Zepto Znote 6615WD
+    	Zepto Znote 6625WD
+    	FUJITSU SIEMENS AMILO Xi 2428
+    
+    In each case the volume keys and the mute key do not correctly produce
+    key release events.  Quirk these to force a key release.
+    
+    Signed-off-by: Marius Wenderoth <scale87@web.de>
+    Signed-off-by: Andy Whitcroft <apw@canonical.com>
+    Acked-by: Tim Gardner <tim.gardner@canonical.com>
+    Acked-by: Stefan Bader <stefan.bader@canonical.com>
+
+diff --git a/drivers/input/keyboard/atkbd.c b/drivers/input/keyboard/atkbd.c
+index 3f3543d..80d7bd4 100644
+--- a/drivers/input/keyboard/atkbd.c
++++ b/drivers/input/keyboard/atkbd.c
+@@ -917,6 +917,22 @@ static void atkbd_samsung_keymap_fixup(struct atkbd *atkbd)
+ }
+ 
+ /*
++ * Fujitsu Siemens system with broken key release on volume keys and mute key
++ */
++static void atkbd_amilo_xi_2428_keymap_fixup(struct atkbd *atkbd)
++{
++	const unsigned int forced_release_keys[] = {
++		0xa0, 0xae, 0xb0,
++	};
++	int i;
++
++	if (atkbd->set == 2)
++		for (i = 0; i < ARRAY_SIZE(forced_release_keys); i++)
++			__set_bit(forced_release_keys[i],
++				  atkbd->force_release_mask);
++}
++
++/*
+  * atkbd_set_keycode_table() initializes keyboard's keycode table
+  * according to the selected scancode set
+  */
+@@ -1563,6 +1579,34 @@ static struct dmi_system_id atkbd_dmi_quirk_table[] __initdata = {
+ 		.callback = atkbd_setup_fixup,
+ 		.driver_data = atkbd_samsung_keymap_fixup,
+ 	},
++	{
++		.ident = "Znote 6615WD",
++		.matches = {
++			DMI_MATCH(DMI_SYS_VENDOR, "Zepto"),
++			DMI_MATCH(DMI_PRODUCT_NAME, "Znote 6615WD"),
++		},
++		.callback = atkbd_setup_fixup,
++		.driver_data = atkbd_inventec_keymap_fixup,
++	},
++	{
++		.ident = "Znote 6625WD",
++		.matches = {
++			DMI_MATCH(DMI_SYS_VENDOR, "Zepto"),
++			DMI_MATCH(DMI_PRODUCT_NAME, "Znote"),
++			DMI_MATCH(DMI_PRODUCT_VERSION, "6625WD"),
++		},
++		.callback = atkbd_setup_fixup,
++		.driver_data = atkbd_inventec_keymap_fixup,
++	},
++	{
++		.ident = "AMILO Xi 2428",
++		.matches = {
++			DMI_MATCH(DMI_SYS_VENDOR, "FUJITSU SIEMENS"),
++			DMI_MATCH(DMI_PRODUCT_NAME, "AMILO Xi 2428"),
++		},
++		.callback = atkbd_setup_fixup,
++		.driver_data = atkbd_amilo_xi_2428_keymap_fixup,
++	},
+ 	{ }
+ };
+ 

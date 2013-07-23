@@ -1,0 +1,46 @@
+Date: Fri, 23 Sep 2005 09:40:01 -0700
+From: thockin@hockin.org
+To: Stefan Seyfried <seife@suse.de>
+Cc: Timo Hoenig <thoenig@suse.de>, Thomas Renninger <trenn@suse.de>
+Subject: Re: acpid client disconnect fix
+Message-ID: <20050923164001.GA10845@hockin.org>
+References: <1127469283.13743.119.camel@f100.suse.de> <20050923162037.GA9805@hockin.org> <4334293F.9050809@suse.de>
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <4334293F.9050809@suse.de>
+User-Agent: Mutt/1.4.1i
+Sender: <thockin@teetot.devrandom.net>
+
+On Fri, Sep 23, 2005 at 06:11:43PM +0200, Stefan Seyfried wrote:
+> thockin@hockin.org wrote:
+> > On Fri, Sep 23, 2005 at 11:54:43AM +0200, Timo Hoenig wrote:
+> >> Nevertheless I'm sending you a patch to close a client's fd once it
+> >> disconnects.  Otherwise acpid leaks one fd for each client
+> >> disconnecting.
+> > 
+> > It also seems to leak the rule structure.  Woops.
+> 
+> If you fix it, it would be nice if you pass the patch on to me :-)
+
+Fixed in CVS.  Do you think it's worth making a new (1.5?) release?
+
+Tim
+
+
+Index: event.c
+===================================================================
+RCS file: /cvsroot/acpid/acpid/event.c,v
+retrieving revision 1.9
+diff -u -u -r1.9 event.c
+--- event.c	25 Oct 2004 04:24:21 -0000	1.9
++++ event.c	23 Sep 2005 16:17:15 -0000
+@@ -590,6 +590,8 @@
+ 		/* closed */
+ 		acpid_log("client has disconnected\n");
+ 		delist_rule(&client_list, rule);
++		close(rule->action.fd);
++		free_rule(rule);
+ 		return -1;
+ 	}
+ 	safe_write(client, "\n", 1);

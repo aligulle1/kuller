@@ -1,0 +1,46 @@
+diff -Nur ffmpeg-old/libavcodec/imgconvert.c ffmpeg/libavcodec/imgconvert.c
+--- ffmpeg-old/libavcodec/imgconvert.c	2008-06-09 15:30:09.000000000 +0300
++++ ffmpeg/libavcodec/imgconvert.c	2008-06-09 15:32:38.000000000 +0300
+@@ -2108,7 +2108,7 @@
+ }
+ #endif
+ 
+-#ifndef CONFIG_SWSCALE
++#if 1
+ static uint8_t y_ccir_to_jpeg[256];
+ static uint8_t y_jpeg_to_ccir[256];
+ static uint8_t c_ccir_to_jpeg[256];
+diff -Nur ffmpeg-old/libavcodec/imgresample.c ffmpeg/libavcodec/imgresample.c
+--- ffmpeg-old/libavcodec/imgresample.c	2008-06-09 15:30:09.000000000 +0300
++++ ffmpeg/libavcodec/imgresample.c	2008-06-09 15:34:27.000000000 +0300
+@@ -512,6 +512,7 @@
+     av_free(s);
+ }
+ 
++#if 0
+ static const char *context_to_name(void* ptr)
+ {
+     return "imgconvert";
+@@ -694,6 +695,7 @@
+     return res;
+ }
+ 
++#endif
+ 
+ #ifdef TEST
+ #include <stdio.h>
+diff -Nur ffmpeg-old/libavcodec/Makefile ffmpeg/libavcodec/Makefile
+--- ffmpeg-old/libavcodec/Makefile	2008-06-09 15:30:09.000000000 +0300
++++ ffmpeg/libavcodec/Makefile	2008-06-09 15:32:16.000000000 +0300
+@@ -370,9 +370,9 @@
+ 
+ OBJS-$(HAVE_XVMC)                      += xvmcvideo.o
+ 
+-ifndef CONFIG_SWSCALE
++#ifndef CONFIG_SWSCALE
+ OBJS += imgresample.o
+-endif
++#endif
+ 
+ # processor-specific code
+ ifdef HAVE_MMX

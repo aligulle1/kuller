@@ -1,0 +1,61 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>openssl-compatibility</Name>
+        <Homepage>http://www.openssl.org</Homepage>
+        <Packager>
+            <Name>Anıl Özbek</Name>
+            <Email>ozbekanil@gmail.com</Email>
+        </Packager>
+        <License>as-is</License>
+        <IsA>app:console</IsA>
+        <IsA>library</IsA>
+        <Summary>Toolkit for SSL v2/v3 and TLS v1</Summary>
+        <Description>OpenSSL is a cryptography toolkit implementing the Secure Sockets Layer (SSL v2/v3) and Transport Layer Security (TLS v1) network protocols and related cryptography standards required by them.</Description>
+        <Archive sha1sum="a02411e5f4d463cac4a2a4a357a4a0b93bf65e72" type="targz">http://www.openssl.org/source/openssl-0.9.8r.tar.gz</Archive>
+        <BuildDependencies>
+            <Dependency>perl</Dependency>
+            <Dependency>sed</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <Patch level="1">openssl-0.9.8i-tls-extensions.patch</Patch>
+            <Patch level="1">openssl-0.9.8h-ldflags.patch</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>openssl-compatibility</Name>
+        <Files>
+            <Path fileType="library">/usr/lib</Path>
+            <Path fileType="doc">/usr/share/doc</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>openssl-compatibility-32bit</Name>
+        <PartOf>emul32</PartOf>
+        <Summary>32-bit shared libraries for openssl-compatibility</Summary>
+        <BuildType>emul32</BuildType>
+        <BuildDependencies>
+            <Dependency>zlib-32bit</Dependency>
+        </BuildDependencies>
+        <RuntimeDependencies>
+            <Dependency release="current">openssl-compatibility</Dependency>
+            <Dependency>zlib-32bit</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="library">/usr/lib32</Path>
+        </Files>
+    </Package>
+
+    <History>
+        <Update release="1">
+            <Date>2011-08-02</Date>
+            <Version>0.9.8r</Version>
+            <Comment>Make a new package from 2009 and 2011 openssl packages for some nice games</Comment>
+            <Name>Anıl Özbek</Name>
+            <Email>ozbekanil@gmail.com</Email>
+        </Update>
+    </History>
+</PISI>

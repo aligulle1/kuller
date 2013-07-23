@@ -1,0 +1,104 @@
+Index: libdrm-poulsbo-2.3.0/libdrm/Makefile.am
+===================================================================
+--- libdrm-poulsbo-2.3.0.orig/libdrm/Makefile.am
++++ libdrm-poulsbo-2.3.0/libdrm/Makefile.am
+@@ -18,14 +18,14 @@
+ #  IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ #  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ 
+-libdrm_la_LTLIBRARIES = libdrm.la
+-libdrm_ladir = $(libdir)
+-libdrm_la_LDFLAGS = -version-number 2:3:0 -no-undefined
++libdrm_la_LTLIBRARIES = libdrm.la
++libdrm_ladir = $(libdir)/psb
++libdrm_la_LDFLAGS = -version-number 2:3:0 -no-undefined
+ 
+ AM_CFLAGS = -I$(top_srcdir)/shared-core
+-libdrm_la_SOURCES = xf86drm.c xf86drmHash.c xf86drmRandom.c xf86drmSL.c xf86drmMode.c
++libdrm_la_SOURCES = xf86drm.c xf86drmHash.c xf86drmRandom.c xf86drmSL.c xf86drmMode.c
+ 
+-libdrmincludedir = ${includedir}
+-libdrminclude_HEADERS = xf86drm.h xf86mm.h xf86drmMode.h
++libdrmincludedir = ${includedir}/psb
++libdrminclude_HEADERS = xf86drm.h xf86mm.h xf86drmMode.h
+ 
+ EXTRA_DIST = ChangeLog TODO
+Index: libdrm-poulsbo-2.3.0/libdrm-psb.pc.in
+===================================================================
+--- /dev/null
++++ libdrm-poulsbo-2.3.0/libdrm-psb.pc.in
+@@ -0,0 +1,10 @@
++prefix=@prefix@
++exec_prefix=@exec_prefix@
++libdir=@libdir@/psb
++includedir=@includedir@/psb
++
++Name: libdrm
++Description: Userspace interface to kernel DRM services
++Version: @PACKAGE_VERSION@
++Libs: -L${libdir} -ldrm
++Cflags: -I${includedir} -I${includedir}/drm
+Index: libdrm-poulsbo-2.3.0/libdrm.pc.in
+===================================================================
+--- libdrm-poulsbo-2.3.0.orig/libdrm.pc.in
++++ /dev/null
+@@ -1,10 +0,0 @@
+-prefix=@prefix@
+-exec_prefix=@exec_prefix@
+-libdir=@libdir@
+-includedir=@includedir@
+-
+-Name: libdrm
+-Description: Userspace interface to kernel DRM services
+-Version: @PACKAGE_VERSION@
+-Libs: -L${libdir} -ldrm
+-Cflags: -I${includedir} -I${includedir}/drm
+Index: libdrm-poulsbo-2.3.0/configure.ac
+===================================================================
+--- libdrm-poulsbo-2.3.0.orig/configure.ac
++++ libdrm-poulsbo-2.3.0/configure.ac
+@@ -35,4 +35,4 @@ AC_SYS_LARGEFILE
+ pkgconfigdir=${libdir}/pkgconfig
+ AC_SUBST(pkgconfigdir)
+ 
+-AC_OUTPUT([Makefile libdrm/Makefile shared-core/Makefile libdrm.pc])
++AC_OUTPUT([Makefile libdrm/Makefile shared-core/Makefile libdrm-psb.pc])
+Index: libdrm-poulsbo-2.3.0/Makefile.am
+===================================================================
+--- libdrm-poulsbo-2.3.0.orig/Makefile.am
++++ libdrm-poulsbo-2.3.0/Makefile.am
+@@ -25,6 +25,6 @@ AUTOMAKE_OPTIONS = foreign
+ SUBDIRS = libdrm shared-core
+ 
+ pkgconfigdir = @pkgconfigdir@
+-pkgconfig_DATA = libdrm.pc
++pkgconfig_DATA = libdrm-psb.pc
+ 
+-EXTRA_DIST = libdrm.pc.in
++EXTRA_DIST = libdrm-psb.pc.in
+Index: libdrm-poulsbo-2.3.0/shared-core/Makefile.am
+===================================================================
+--- libdrm-poulsbo-2.3.0.orig/shared-core/Makefile.am
++++ libdrm-poulsbo-2.3.0/shared-core/Makefile.am
+@@ -22,19 +22,8 @@
+ # however, r300 and via need their reg headers installed in order to build.
+ # better solutions are welcome.
+ 
+-klibdrmincludedir = ${includedir}/drm
++klibdrmincludedir = ${includedir}/psb/drm
+ klibdrminclude_HEADERS = \
+                          drm.h \
+-                         drm_sarea.h \
+-                         i915_drm.h \
+-                         mach64_drm.h \
+-                         mga_drm.h \
+-                         nouveau_drm.h \
+-                         r128_drm.h \
+-                         radeon_drm.h \
+-                         savage_drm.h \
+-                         sis_drm.h \
+-                         via_drm.h \
+-                         r300_reg.h \
+-                         via_3d_reg.h
++                         drm_sarea.h
+ 

@@ -1,0 +1,61 @@
+diff -urp ipw3945-1.1.2/ipw3945.c ipw3945-1.1.2-thermal-2/ipw3945.c
+--- ipw3945-1.1.2/ipw3945.c	2006-12-01 16:18:16.000000000 +0800
++++ ipw3945-1.1.2-thermal-2/ipw3945.c	2006-12-13 13:03:55.000000000 +0800
+@@ -15807,6 +15807,8 @@ static int ipw_card_bss_active_changed_n
+ static void ipw_alive_start(struct ipw_priv *priv)
+ {
+ 	int thermal_spin = 0;
++	int rc;
++	u32 rfkill;
+ 
+ 	if (priv->card_alive.is_valid != 1) {
+ 		/* We had an error bringing up the hardware, so take it
+@@ -15821,16 +15823,29 @@ static void ipw_alive_start(struct ipw_p
+ 
+ 	IPW_DEBUG_INFO("Alive received.\n");
+ 
+-	/* Wait for thermal sensor in adapter to kick in */
+-	while (ipw_read32(priv, CSR_UCODE_DRV_GP2) == 0) {
+-		thermal_spin++;
+-		udelay(10);
+-	}
++	rc = ipw_grab_restricted_access(priv);
++	if (rc)
++		goto out;
+ 
+-	if (thermal_spin)
+-		IPW_DEBUG_INFO("Thermal calibration took %dus\n",
+-			       thermal_spin * 10);
++	rfkill = ipw_read_restricted_reg(priv, ALM_APMG_RFKILL);
++	IPW_DEBUG_INFO("RFKILL status: 0x%x\n", rfkill);
++	ipw_release_restricted_access(priv);
++
++	if (rfkill & 1) {
++		priv->status &= ~STATUS_RF_KILL_HW;
++		/* Wait for thermal sensor in adapter to kick in */
++		while (ipw_read32(priv, CSR_UCODE_DRV_GP2) == 0) {
++			thermal_spin++;
++			udelay(10);
++		}
++
++		if (thermal_spin)
++			IPW_DEBUG_INFO("Thermal calibration took %dus\n",
++					thermal_spin * 10);
++	} else
++		priv->status |= STATUS_RF_KILL_HW;
+ 
++out:
+ 	ipw_clear_stations_table(priv);
+ 
+ 	if (!(priv->status & STATUS_RF_KILL_MASK))
+diff -urp ipw3945-1.1.2/ipw3945.h ipw3945-1.1.2-thermal-2/ipw3945.h
+--- ipw3945-1.1.2/ipw3945.h	2006-12-01 16:18:16.000000000 +0800
++++ ipw3945-1.1.2-thermal-2/ipw3945.h	2006-12-01 16:03:51.000000000 +0800
+@@ -1167,6 +1167,7 @@ struct statistics {
+ #define ALM_APMG_CLK_DIS                         (0x003008)
+ #define ALM_APMG_PS_CTL                          (0x00300c)
+ #define ALM_APMG_PCIDEV_STT                      (0x003010)
++#define ALM_APMG_RFKILL				 (0x003014)
+ #define ALM_APMG_LARC_INT                        (0x00301c)
+ #define ALM_APMG_LARC_INT_MSK                    (0x003020)
+ 

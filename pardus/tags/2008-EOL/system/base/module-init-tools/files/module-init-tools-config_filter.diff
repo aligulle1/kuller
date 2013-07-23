@@ -1,0 +1,107 @@
+diff -Nur module-init-tools-3.3-pre11.orig/config_filter.c module-init-tools-3.3-pre11/config_filter.c
+--- module-init-tools-3.3-pre11.orig/config_filter.c	1970-01-01 02:00:00.000000000 +0200
++++ module-init-tools-3.3-pre11/config_filter.c	2007-12-31 01:43:51.000000000 +0200
+@@ -0,0 +1,36 @@
++#include "config_filter.h"
++
++#include <string.h>
++
++int config_filter(const char *name)
++{
++	const char *const *p;
++
++	static const char *const skip_prefix[] = {
++		".",
++		"~",
++		NULL
++	};
++
++	static const char *const skip_suffix[] = {
++		".newconfig",
++		".bak",
++		".-",
++		"~",
++		NULL
++	};
++
++	for (p = skip_prefix; *p; p++) {
++		if (strncmp(name, *p, strlen(*p)) == 0)
++			return 0;
++	}
++
++	for (p = skip_suffix; *p; p++) {
++		if (strlen(name) >= strlen(*p) &&
++		    strcmp(*p, strchr(name, 0) - strlen(*p)) == 0)
++		    return 0;
++ 	}
++
++	return 1;
++}
++
+diff -Nur module-init-tools-3.3-pre11.orig/config_filter.h module-init-tools-3.3-pre11/config_filter.h
+--- module-init-tools-3.3-pre11.orig/config_filter.h	1970-01-01 02:00:00.000000000 +0200
++++ module-init-tools-3.3-pre11/config_filter.h	2007-12-31 01:43:08.000000000 +0200
+@@ -0,0 +1,7 @@
++#ifndef _MODINITTOOLS_CONFIG_FILTER_H
++#define _MODINITTOOLS_CONFIG_FILTER_H
++
++/* returns 0 if the name matches a well-known backup pattern */
++int config_filter(const char *name);
++
++#endif
+diff -Nur module-init-tools-3.3-pre11.orig/depmod.c module-init-tools-3.3-pre11/depmod.c
+--- module-init-tools-3.3-pre11.orig/depmod.c	2007-12-31 01:42:48.000000000 +0200
++++ module-init-tools-3.3-pre11/depmod.c	2007-12-31 01:43:08.000000000 +0200
+@@ -24,6 +24,7 @@
+ #include "depmod.h"
+ #include "moduleops.h"
+ #include "tables.h"
++#include "config_filter.h"
+ 
+ #include "testing.h"
+ 
+@@ -1005,7 +1006,8 @@
+ 	if (dir) {
+ 		struct dirent *i;
+ 		while ((i = readdir(dir)) != NULL) {
+-			if (!streq(i->d_name,".") && !streq(i->d_name,"..")) {
++			if (!streq(i->d_name,".") && !streq(i->d_name,"..")
++					&& config_filter(i->d_name)) {
+ 				char sub[strlen(filename) + 1
+ 				       + strlen(i->d_name) + 1];
+ 
+diff -Nur module-init-tools-3.3-pre11.orig/Makefile.am module-init-tools-3.3-pre11/Makefile.am
+--- module-init-tools-3.3-pre11.orig/Makefile.am	2007-03-22 09:36:02.000000000 +0200
++++ module-init-tools-3.3-pre11/Makefile.am	2007-12-31 01:43:08.000000000 +0200
+@@ -1,8 +1,8 @@
+ insmod_SOURCES = insmod.c testing.h
+ lsmod_SOURCES = lsmod.c testing.h
+-modprobe_SOURCES = modprobe.c zlibsupport.c testing.h zlibsupport.h
++modprobe_SOURCES = modprobe.c zlibsupport.c config_filter.c testing.h zlibsupport.h config_filter.h
+ rmmod_SOURCES = rmmod.c testing.h
+-depmod_SOURCES = depmod.c moduleops.c tables.c zlibsupport.c depmod.h moduleops.h tables.h list.h testing.h  zlibsupport.h
++depmod_SOURCES = depmod.c moduleops.c tables.c zlibsupport.c config_filter.c depmod.h moduleops.h tables.h list.h testing.h  zlibsupport.h config_filter.h
+ modinfo_SOURCES = modinfo.c zlibsupport.c testing.h zlibsupport.h
+ 
+ insmod_static_SOURCES = insmod.c
+diff -Nur module-init-tools-3.3-pre11.orig/modprobe.c module-init-tools-3.3-pre11/modprobe.c
+--- module-init-tools-3.3-pre11.orig/modprobe.c	2007-12-31 01:42:48.000000000 +0200
++++ module-init-tools-3.3-pre11/modprobe.c	2007-12-31 01:43:08.000000000 +0200
+@@ -45,6 +45,7 @@
+ #include "zlibsupport.h"
+ #include "list.h"
+ #include "backwards_compat.c"
++#include "config_filter.h"
+ 
+ extern long init_module(void *, unsigned long, const char *);
+ extern long delete_module(const char *, unsigned int);
+@@ -1260,7 +1261,8 @@
+ 	if (dir) {
+ 		struct dirent *i;
+ 		while ((i = readdir(dir)) != NULL) {
+-			if (!streq(i->d_name,".") && !streq(i->d_name,"..")) {
++			if (!streq(i->d_name,".") && !streq(i->d_name,"..")
++			    && config_filter(i->d_name)) {
+ 				char sub[strlen(filename) + 1
+ 					 + strlen(i->d_name) + 1];
+ 

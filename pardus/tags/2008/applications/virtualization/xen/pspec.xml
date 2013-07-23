@@ -1,0 +1,228 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>xen</Name>
+        <Homepage>http://xen.sourceforge.net/</Homepage>
+        <Packager>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Packager>
+        <License>GPLv2</License>
+        <IsA>app:console</IsA>
+        <Summary>The Xen virtual machine monitor</Summary>
+        <Description>Xen is a virtual machine monitor for x86 that supports execution of multiple guest operating systems with unprecedented levels of performance and resource isolation.</Description>
+        <Archive sha1sum="753f3d79d7ae2175e78b261765a9935db6255996" type="targz">http://bits.xensource.com/oss-xen/release/3.2.1/xen-3.2.1.tar.gz</Archive>
+        <BuildDependencies>
+            <Dependency releaseFrom="9">gmp</Dependency>
+            <Dependency>libsdl</Dependency>
+            <Dependency>libvncserver</Dependency>
+            <Dependency>dhcp</Dependency>
+            <Dependency>tetex</Dependency>
+            <Dependency>ghostscript</Dependency>
+            <Dependency>dev86</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <Patch level="1">vtpm.patch</Patch>
+
+            <Patch level="1">sb.patch</Patch>
+            <!-- http://lists.xensource.com/archives/html/xense-devel/2007-04/msg00005.html
+                 http://lists.xensource.com/archives/html/xense-devel/2006-12/msg00020.html -->
+            <Patch level="1">infineon.patch</Patch>
+
+            <Patch level="1">xen-3.0.2-config-allow-unix-server.patch</Patch>
+            <Patch level="1">xen-3.0.2-config-disable-reloc.patch</Patch>
+            <Patch level="1">xen-config-dom0-minmem.patch</Patch>
+            <Patch level="1">xen-net-disable-bridge-by-default.patch</Patch>
+            <Patch level="1">xen-net-disable-iptables-on-bridge.patch</Patch>
+            <Patch level="1">xen-qemu-bootmenu.patch</Patch>
+            <Patch level="1">xen-xenstore-cli.patch</Patch>
+
+            <!--
+            changeset:   16898:784805591fa2
+            tag:         tip
+            user:        Keir Fraser <keir.fraser@citrix.com>
+            date:        Tue May 13 15:54:31 2008 +0100
+            summary:     SVM: clean up __get_instruction_length_from_list()
+            -->
+            <Patch level="1">tip.patch</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>xen</Name>
+        <Files>
+            <Path fileType="data">/boot</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>xen-tools</Name>
+        <RuntimeDependencies>
+            <Dependency>bridge-utils</Dependency>
+            <Dependency>screen</Dependency>
+            <Dependency>logrotate</Dependency>
+            <Dependency>iproute2</Dependency>
+            <Dependency>libvncserver</Dependency>
+            <Dependency>dhcp</Dependency>
+            <Dependency>tightvnc</Dependency>
+            <Dependency>dev86</Dependency>
+            <Dependency>xen</Dependency>
+            <Dependency releaseFrom="17">comar-api</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="config">/etc</Path>
+            <Path fileType="executable">/usr/bin</Path>
+            <Path fileType="library">/usr/lib</Path>
+            <Path fileType="executable">/usr/sbin</Path>
+            <Path fileType="header">/usr/include</Path>
+            <Path fileType="doc">/usr/share/doc</Path>
+            <Path fileType="man">/usr/share/man</Path>
+            <Path fileType="data">/usr/share/xen</Path>
+            <Path fileType="data">/var</Path>
+        </Files>
+        <AdditionalFiles>
+            <AdditionalFile owner="root" permission="0644" target="/etc/udev/rules.d/80-xen-backend.rules">80-xen-backend.rules</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/etc/logrotate.d/xen.logrotate">xen.logrotate</AdditionalFile>
+        </AdditionalFiles>
+        <Provides>
+            <COMAR script="service.py">System.Service</COMAR>
+        </Provides>
+    </Package>
+
+    <History>
+        <Update release="19">
+            <Date>2008-04-27</Date>
+            <Version>3.2.1</Version>
+            <Comment>Version bump</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="18">
+            <Date>2008-04-25</Date>
+            <Version>3.1.4</Version>
+            <Comment>Version bump</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="17" type="security">
+            <Date>2008-03-01</Date>
+            <Version>3.1.3</Version>
+            <Comment>Fix unchecked block read/write vulnerability</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="16">
+            <Date>2008-01-31</Date>
+            <Version>3.1.3</Version>
+            <Comment>Version bump</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="15">
+            <Date>2008-01-28</Date>
+            <Version>3.1.3_rc2</Version>
+            <Comment>Version bump</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="14">
+            <Date>2008-01-18</Date>
+            <Version>3.1.3_rc1</Version>
+            <Comment>Version bump</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="13" type="security">
+            <Date>2007-11-25</Date>
+            <Version>3.1.2</Version>
+            <Comment>Stable update to fix CVE-2007-5906 and CVE-2007-5907</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="12" type="security">
+            <Date>2007-10-24</Date>
+            <Version>3.1.0</Version>
+            <Comment>Fix CVE-2007-3919</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="11" type="security">
+            <Date>2007-09-29</Date>
+            <Version>3.1.0</Version>
+            <Comment>Fix CVE-2007-4993</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="10">
+            <Date>2007-05-23</Date>
+            <Version>3.1.0</Version>
+            <Comment>Updated Service script.</Comment>
+            <Name>Bahadır Kandemir</Name>
+            <Email>bahadir@pardus.org.tr</Email>
+        </Update>
+        <Update release="9">
+            <Date>2007-05-18</Date>
+            <Version>3.1.0</Version>
+            <Comment>Version bump</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="8" type="security">
+            <Date>2007-05-01</Date>
+            <Version>3.0.4.1</Version>
+            <Comment>Fix CVE-2007-1321, CVE-2007-1322, CVE-2007-1323 and CVE-2007-1366</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="7" type="security">
+            <Date>2007-03-20</Date>
+            <Version>3.0.4.1</Version>
+            <Comment>Fix CVE-2007-0998</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="6">
+            <Date>2007-01-29</Date>
+            <Version>3.0.4.1</Version>
+            <Comment>Fix device reordering that occurs when the config gets read into dictionaries.</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="5">
+            <Date>2007-01-20</Date>
+            <Version>3.0.4.1</Version>
+            <Comment>Fix order of kernel argument construction to prevent arg repeat bug</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="4">
+            <Date>2007-01-16</Date>
+            <Version>3.0.4.1</Version>
+            <Comment>Added dev86 as a dependency to enable HVM</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="3">
+            <Date>2007-01-10</Date>
+            <Version>3.0.4.1</Version>
+            <Comment>Version bump</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="2">
+            <Date>2006-10-17</Date>
+            <Version>3.0.3.0</Version>
+            <Comment>Version bump</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="1">
+            <Date>2006-08-25</Date>
+            <Version>3.0.2</Version>
+            <Comment>First release.</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+    </History>
+</PISI>

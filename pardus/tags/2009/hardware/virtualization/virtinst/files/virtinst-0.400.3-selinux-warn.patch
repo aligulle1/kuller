@@ -1,0 +1,40 @@
+diff -rup virtinst-0.400.3/virtinst/VirtualDisk.py new/virtinst/VirtualDisk.py
+--- virtinst-0.400.3/virtinst/VirtualDisk.py	2009-04-20 13:09:36.000000000 -0400
++++ new/virtinst/VirtualDisk.py	2009-04-20 13:59:00.000000000 -0400
+@@ -678,8 +678,9 @@ class VirtualDisk(VirtualDevice):
+                 return
+ 
+             if self._is_remote():
+-                raise ValueError, _("Install volume %s has incorrect SELinux label %s, expecting %s" %
+-                                    (self.path, label, wantLabel))
++                logging.warn(_("Install volume %s has incorrect SELinux "
++                               "label %s, expecting %s") %
++                               (self.path, label, wantLabel))
+             else:
+                 changeLabel = True
+         elif self.path:
+@@ -691,8 +692,9 @@ class VirtualDisk(VirtualDevice):
+                     return
+ 
+                 if self._is_remote():
+-                    raise ValueError, _("Install volume %s has incorrect SELinux label %s, expecting %s" %
+-                                        (self.path, label, wantLabel))
++                    logging.warn(_("Install volume %s has incorrect SELinux "
++                                   "label %s, expecting %s") %
++                                   (self.path, label, wantLabel))
+                 else:
+                     if self.path[0:4] == "/dev":
+                         logging.info("Not changing context on physical device")
+@@ -707,8 +709,10 @@ class VirtualDisk(VirtualDevice):
+                 selinux.setfilecon(self.path, wantLabel)
+                 logging.info("Changed SELinux label to %s" % wantLabel)
+             except Exception, e:
+-                raise ValueError, _(("Unable to fix install volume SELinux labelling: %s\n" % str(e)) +
+-                                    ("Please run 'chcon %s %s' manually and retry installation" % (wantLabel, self.path)))
++                logging.warn(_(("Unable to fix install volume SELinux "
++                                "labelling: %s\n") % str(e)+ "Please run "
++                                "'chcon %s %s' manually and retry "
++                                "installation" % (wantLabel, self.path)))
+ 
+ 
+     def get_xml_config(self, disknode=None):

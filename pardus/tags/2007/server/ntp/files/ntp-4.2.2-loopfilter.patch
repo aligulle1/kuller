@@ -1,0 +1,38 @@
+Based on patch from Ian Dowse <iedowse@iedowse.com>, upstream bug #628
+
+--- ntp-4.2.2p1/ntpd/ntp_loopfilter.c.loopfilter	2006-06-06 22:16:41.000000000 +0200
++++ ntp-4.2.2p1/ntpd/ntp_loopfilter.c	2006-08-18 14:51:30.000000000 +0200
+@@ -150,6 +150,7 @@
+ int	pps_stratum;		/* pps stratum */
+ int	allow_panic = FALSE;	/* allow panic correction */
+ int	mode_ntpdate = FALSE;	/* exit on first clock set */
++int	kern_suspended = FALSE;	/* offset too large to use kernel */
+ 
+ /*
+  * Clock state machine variables
+@@ -683,6 +684,7 @@
+ 			clock_jitter = ntv.jitter / 1e6;
+ #endif /* STA_NANO */
+ 		}
++		kern_suspended = FALSE;
+ 	} else {
+ #endif /* KERNEL_PLL */
+  
+@@ -694,6 +696,8 @@
+ 		 */
+ 		clock_frequency = drift_comp + clock_frequency +
+ 		    flladj + plladj;
++		if (pll_control && kern_enable)
++			kern_suspended = TRUE;
+ #ifdef KERNEL_PLL
+ 	}
+ #endif /* KERNEL_PLL */
+@@ -808,7 +812,7 @@
+ 	 * discipline is enabled, we have no business going further.
+ 	 */
+ 	if (!ntp_enable || mode_ntpdate || (pll_control &&
+-	    kern_enable))
++	    kern_enable && !kern_suspended))
+ 		return;
+ 
+ 	/*

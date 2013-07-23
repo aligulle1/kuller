@@ -1,0 +1,318 @@
+Index: PolicyKit-kde/manager/AuthDialog.cpp
+===================================================================
+--- PolicyKit-kde.orig/manager/AuthDialog.cpp
++++ PolicyKit-kde/manager/AuthDialog.cpp
+@@ -155,18 +155,16 @@ void AuthDialog::setOptions(PolicyKitKDE
+ {
+     switch (keep) {
+         case PolicyKitKDE::KeepPasswordNo:
+-            cbRemember->hide();
++            gbRemember->hide();
+             cbSessionOnly->hide();
+             break;
+         case PolicyKitKDE::KeepPasswordSession:
+-            cbRemember->setText(i18n("Remember authorization for this session"));
+-            cbRemember->show();
+-            cbSessionOnly->hide();;
++            gbRemember->hide();
++            cbSessionOnly->show();;
+             break;
+         case PolicyKitKDE::KeepPasswordAlways:
+-            cbRemember->setText(i18n("Remember authorization"));
+-            cbRemember->show();
+-            cbSessionOnly->show();
++            gbRemember->show();
++            cbSessionOnly->hide();
+             break;
+     }
+ 
+@@ -176,15 +174,21 @@ void AuthDialog::setOptions(PolicyKitKDE
+     if (keepPassword != keep) {
+         switch (keepPassword) {
+             case PolicyKitKDE::KeepPasswordNo:
+-                cbRemember->setChecked(false);
++                gbRemember->setChecked(false);
++                rbSession->setChecked(false);
++                rbAlways->setChecked(false);
+                 cbSessionOnly->setChecked(false);
+                 break;
+             case PolicyKitKDE::KeepPasswordSession:
+-                cbRemember->setChecked(true);
++                gbRemember->setChecked(false);
++                rbSession->setChecked(false);
++                rbAlways->setChecked(false);
+                 cbSessionOnly->setChecked(true);
+                 break;
+             case PolicyKitKDE::KeepPasswordAlways:
+-                cbRemember->setChecked(true);
++                gbRemember->setChecked(true);
++                rbSession->setChecked(false);
++                rbAlways->setChecked(true);
+                 cbSessionOnly->setChecked(false);
+                 break;
+         }
+@@ -296,13 +300,13 @@ void AuthDialog::on_userCB_currentIndexC
+     if (userLogin.isNull()) {
+         lePassword->setEnabled(false);
+         lblPassword->setEnabled(false);
+-        cbRemember->setEnabled(false);
++        gbRemember->setEnabled(false);
+         cbSessionOnly->setEnabled(false);
+         enableButtonOk(false);
+     } else {
+         lePassword->setEnabled(true);
+         lblPassword->setEnabled(true);
+-        cbRemember->setEnabled(true);
++        gbRemember->setEnabled(true);
+         cbSessionOnly->setEnabled(true);
+         enableButtonOk(true);
+         // We need this to restart the auth with the new user
+@@ -338,20 +342,25 @@ void AuthDialog::setPasswordShowChars(bo
+ 
+ PolicyKitKDE::KeepPassword AuthDialog::keepPassword() const
+ {
+-    if (cbRemember->isHidden()) {
+-        // cannot make it keep
++    if (gbRemember->isHidden() && cbSessionOnly->isHidden()) // cannot make it keep
+         return PolicyKitKDE::KeepPasswordNo;
+-    }
+-    if (cbSessionOnly->isHidden()) {
+-        // can keep only for session
+-        return cbRemember->isChecked() ? PolicyKitKDE::KeepPasswordSession :
+-                                         PolicyKitKDE::KeepPasswordNo;
++    if (cbSessionOnly->isHidden())
++    {
++        if (gbRemember->isChecked())
++        {
++            if (rbSession->isChecked())
++                return PolicyKitKDE::KeepPasswordSession;
++            else if (rbAlways->isChecked())
++                return PolicyKitKDE::KeepPasswordAlways;
++            else //paranoid android
++                return PolicyKitKDE::KeepPasswordNo;
++        }
++        else
++            return PolicyKitKDE::KeepPasswordNo;
+     }
+     // can keep either way
+-    if (cbRemember->isChecked()) {
+-        return cbSessionOnly->isChecked() ? PolicyKitKDE::KeepPasswordSession :
+-                                            PolicyKitKDE::KeepPasswordAlways;
+-    }
++    if (gbRemember->isHidden())
++        return cbSessionOnly->isChecked() ? PolicyKitKDE::KeepPasswordSession : PolicyKitKDE::KeepPasswordNo;
+     return PolicyKitKDE::KeepPasswordNo;
+ }
+ 
+Index: PolicyKit-kde/manager/AuthDialog.ui
+===================================================================
+--- PolicyKit-kde.orig/manager/AuthDialog.ui
++++ PolicyKit-kde/manager/AuthDialog.ui
+@@ -5,8 +5,8 @@
+    <rect>
+     <x>0</x>
+     <y>0</y>
+-    <width>335</width>
+-    <height>193</height>
++    <width>375</width>
++    <height>226</height>
+    </rect>
+   </property>
+   <property name="sizePolicy" >
+@@ -52,7 +52,7 @@
+      </item>
+     </layout>
+    </item>
+-   <item row="0" column="1" colspan="3" >
++   <item row="0" column="1" colspan="2" >
+     <layout class="QVBoxLayout" name="verticalLayout_2" >
+      <item>
+       <widget class="QLabel" name="lblHeader" >
+@@ -91,10 +91,13 @@
+      </item>
+     </layout>
+    </item>
+-   <item row="2" column="1" colspan="3" >
++   <item row="1" column="1" colspan="2" >
++    <widget class="KComboBox" name="userCB" />
++   </item>
++   <item row="2" column="1" colspan="2" >
+     <widget class="KTitleWidget" name="errorMessageKTW" />
+    </item>
+-   <item row="3" column="1" colspan="2" >
++   <item row="3" column="1" >
+     <widget class="QLabel" name="lblPassword" >
+      <property name="text" >
+       <string>Password:</string>
+@@ -104,7 +107,7 @@
+      </property>
+     </widget>
+    </item>
+-   <item row="3" column="3" >
++   <item row="3" column="2" >
+     <widget class="KLineEdit" name="lePassword" >
+      <property name="echoMode" >
+       <enum>QLineEdit::Password</enum>
+@@ -114,50 +117,104 @@
+      </property>
+     </widget>
+    </item>
+-   <item row="4" column="1" colspan="3" >
+-    <widget class="QCheckBox" name="cbRemember" >
+-     <property name="text" >
++   <item row="4" column="1" colspan="2" >
++    <widget class="QGroupBox" name="gbRemember" >
++     <property name="styleSheet" >
++      <string notr="true" >QGroupBox::title {
++subcontrol-origin: margin;
++subcontrol-position: top left; 
++padding: 9 12px;}</string>
++     </property>
++     <property name="title" >
+       <string>Remember authorization</string>
+      </property>
+-     <property name="checked" >
++     <property name="alignment" >
++      <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
++     </property>
++     <property name="checkable" >
+       <bool>true</bool>
+      </property>
++     <property name="checked" >
++      <bool>false</bool>
++     </property>
++     <layout class="QHBoxLayout" name="horizontalLayout" >
++      <property name="leftMargin" >
++       <number>8</number>
++      </property>
++      <property name="topMargin" >
++       <number>4</number>
++      </property>
++      <property name="rightMargin" >
++       <number>8</number>
++      </property>
++      <property name="bottomMargin" >
++       <number>6</number>
++      </property>
++      <item>
++       <spacer name="horizontalSpacer_2" >
++        <property name="orientation" >
++         <enum>Qt::Horizontal</enum>
++        </property>
++        <property name="sizeType" >
++         <enum>QSizePolicy::Fixed</enum>
++        </property>
++        <property name="sizeHint" stdset="0" >
++         <size>
++          <width>13</width>
++          <height>17</height>
++         </size>
++        </property>
++       </spacer>
++      </item>
++      <item>
++       <widget class="QRadioButton" name="rbSession" >
++        <property name="text" >
++         <string>For this session only</string>
++        </property>
++       </widget>
++      </item>
++      <item>
++       <spacer name="horizontalSpacer" >
++        <property name="orientation" >
++         <enum>Qt::Horizontal</enum>
++        </property>
++        <property name="sizeType" >
++         <enum>QSizePolicy::Fixed</enum>
++        </property>
++        <property name="sizeHint" stdset="0" >
++         <size>
++          <width>30</width>
++          <height>20</height>
++         </size>
++        </property>
++       </spacer>
++      </item>
++      <item>
++       <widget class="QRadioButton" name="rbAlways" >
++        <property name="text" >
++         <string>Always</string>
++        </property>
++       </widget>
++      </item>
++     </layout>
+     </widget>
+    </item>
+-   <item row="5" column="2" colspan="2" >
++   <item row="5" column="1" colspan="2" >
+     <widget class="QCheckBox" name="cbSessionOnly" >
+      <property name="text" >
+-      <string>For this session only</string>
++      <string>Remember authorization for this session</string>
+      </property>
+     </widget>
+    </item>
+-   <item row="5" column="1" >
+-    <spacer name="horizontalSpacer" >
+-     <property name="orientation" >
+-      <enum>Qt::Horizontal</enum>
+-     </property>
+-     <property name="sizeType" >
+-      <enum>QSizePolicy::Fixed</enum>
+-     </property>
+-     <property name="sizeHint" stdset="0" >
+-      <size>
+-       <width>15</width>
+-       <height>10</height>
+-      </size>
+-     </property>
+-    </spacer>
+-   </item>
+-   <item row="1" column="1" colspan="3" >
+-    <widget class="KComboBox" name="userCB" />
+-   </item>
+   </layout>
+   <zorder>errorMessageKTW</zorder>
+   <zorder>lblPassword</zorder>
+   <zorder>lePassword</zorder>
+   <zorder>cbRemember</zorder>
+   <zorder>cbSessionOnly</zorder>
+-  <zorder>horizontalSpacer</zorder>
+   <zorder>userCB</zorder>
++  <zorder>cbSessionOnly</zorder>
++  <zorder>gbRemember</zorder>
+  </widget>
+  <customwidgets>
+   <customwidget>
+@@ -179,24 +236,22 @@
+  <tabstops>
+   <tabstop>userCB</tabstop>
+   <tabstop>lePassword</tabstop>
+-  <tabstop>cbRemember</tabstop>
+-  <tabstop>cbSessionOnly</tabstop>
+  </tabstops>
+  <resources/>
+  <connections>
+   <connection>
+-   <sender>cbRemember</sender>
++   <sender>gbRemember</sender>
+    <signal>toggled(bool)</signal>
+-   <receiver>cbSessionOnly</receiver>
+-   <slot>setEnabled(bool)</slot>
++   <receiver>rbSession</receiver>
++   <slot>setChecked(bool)</slot>
+    <hints>
+     <hint type="sourcelabel" >
+-     <x>259</x>
+-     <y>161</y>
++     <x>204</x>
++     <y>176</y>
+     </hint>
+     <hint type="destinationlabel" >
+-     <x>161</x>
+-     <y>169</y>
++     <x>233</x>
++     <y>182</y>
+     </hint>
+    </hints>
+   </connection>

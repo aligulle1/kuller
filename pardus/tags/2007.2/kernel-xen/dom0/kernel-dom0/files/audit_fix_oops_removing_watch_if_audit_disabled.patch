@@ -1,0 +1,25 @@
+Removing a watched file will oops if audit is disabled (auditctl -e 0).
+
+To reproduce:
+- auditctl -e 1
+- touch /tmp/foo
+- auditctl -w /tmp/foo
+- auditctl -e 0
+- rm /tmp/foo (or mv)
+
+Signed-off-by: Tony Jones <tonyj@suse.de>
+---
+
+Index: linux-2.6.18/kernel/auditfilter.c
+===================================================================
+--- linux-2.6.18.orig/kernel/auditfilter.c
++++ linux-2.6.18/kernel/auditfilter.c
+@@ -899,7 +899,7 @@ static void audit_update_watch(struct au
+ 
+ 		/* If the update involves invalidating rules, do the inode-based
+ 		 * filtering now, so we don't omit records. */
+-		if (invalidating &&
++		if (invalidating && current->audit_context &&
+ 		    audit_filter_inodes(current, current->audit_context) == AUDIT_RECORD_CONTEXT)
+ 			audit_set_auditable(current->audit_context);
+ 

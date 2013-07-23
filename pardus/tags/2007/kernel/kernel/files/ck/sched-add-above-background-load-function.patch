@@ -1,0 +1,43 @@
+
+From: Con Kolivas <kernel@kolivas.org>
+
+Add an above_background_load() function which can be used by other
+subsystems to detect if there is anything besides niced tasks running. 
+Place it in sched.h to allow it to be compiled out if not used.
+
+Signed-off-by: Con Kolivas <kernel@kolivas.org>
+Acked-by: Ingo Molnar <mingo@elte.hu>
+Cc: Peter Williams <pwil3058@bigpond.net.au>
+Signed-off-by: Andrew Morton <akpm@osdl.org>
+---
+
+ include/linux/sched.h |   16 ++++++++++++++++
+ 1 files changed, 16 insertions(+)
+
+Index: linux-2.6.18-ck1/include/linux/sched.h
+===================================================================
+--- linux-2.6.18-ck1.orig/include/linux/sched.h	2006-09-21 20:05:29.000000000 +1000
++++ linux-2.6.18-ck1/include/linux/sched.h	2006-09-21 20:05:32.000000000 +1000
+@@ -719,6 +719,22 @@ extern unsigned int max_cache_size;
+ 
+ #endif	/* CONFIG_SMP */
+ 
++/*
++ * A runqueue laden with a single nice 0 task scores a weighted_cpuload of
++ * SCHED_LOAD_SCALE. This function returns 1 if any cpu is laden with a
++ * task of nice 0 or enough lower priority tasks to bring up the
++ * weighted_cpuload
++ */
++static inline int above_background_load(void)
++{
++	unsigned long cpu;
++
++	for_each_online_cpu(cpu) {
++		if (weighted_cpuload(cpu) >= SCHED_LOAD_SCALE)
++			return 1;
++	}
++	return 0;
++}
+ 
+ struct io_context;			/* See blkdev.h */
+ void exit_io_context(void);

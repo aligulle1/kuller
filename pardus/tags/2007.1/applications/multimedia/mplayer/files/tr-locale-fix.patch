@@ -1,0 +1,81 @@
+diff -Nur mplayer-20070121-old/libmpcodecs/dec_audio.c mplayer-20070121/libmpcodecs/dec_audio.c
+--- mplayer-20070121-old/libmpcodecs/dec_audio.c	2007-01-25 00:03:20.491238473 +0200
++++ mplayer-20070121/libmpcodecs/dec_audio.c	2007-01-25 00:08:43.823084561 +0200
+@@ -1,6 +1,7 @@
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <unistd.h>
++#include <locale.h>
+ 
+ #include "config.h"
+ #include "mp_msg.h"
+@@ -126,11 +127,15 @@
+ int init_audio(sh_audio_t *sh_audio,char* codecname,char* afm,int status){
+     unsigned int orig_fourcc=sh_audio->wf?sh_audio->wf->wFormatTag:0;
+     int force = 0;
++    char *locale_data = setlocale(LC_CTYPE, "");
+     if (codecname && codecname[0] == '+') {
+       codecname = &codecname[1];
+       force = 1;
+     }
+     sh_audio->codec=NULL;
++
++    setlocale(LC_CTYPE, "C");
++
+     while(1){
+ 	ad_functions_t* mpadec;
+ 	int i;
+@@ -197,8 +202,12 @@
+ 	    continue; // try next...
+ 	}
+ 	// Yeah! We got it!
++
++    setlocale(LC_CTYPE, locale_data);
+ 	return 1;
+     }
++
++    setlocale(LC_CTYPE, locale_data);
+     return 0;
+ }
+ 
+diff -Nur mplayer-20070121-old/libmpcodecs/dec_video.c mplayer-20070121/libmpcodecs/dec_video.c
+--- mplayer-20070121-old/libmpcodecs/dec_video.c	2007-01-25 00:03:20.492238321 +0200
++++ mplayer-20070121/libmpcodecs/dec_video.c	2007-01-25 00:08:06.936692143 +0200
+@@ -7,6 +7,7 @@
+ #endif
+ #include <stdlib.h>
+ #include <unistd.h>
++#include <locale.h>
+ 
+ #include "mp_msg.h"
+ #include "help_mp.h"
+@@ -175,6 +176,7 @@
+ 
+ int init_video(sh_video_t *sh_video,char* codecname,char* vfm,int status){
+     int force = 0;
++    char *locale_data = setlocale(LC_CTYPE, "");
+     unsigned int orig_fourcc=sh_video->bih?sh_video->bih->biCompression:0;
+     sh_video->codec=NULL;
+     sh_video->vf_inited=0;
+@@ -183,6 +185,8 @@
+       force = 1;
+     }
+ 
++    setlocale(LC_CTYPE, "C");
++
+     while(1){
+ 	int i;
+ 	// restore original fourcc:
+@@ -258,8 +262,12 @@
+ 	}
+ 	// Yeah! We got it!
+ 	sh_video->inited=1;
++
++    setlocale(LC_CTYPE, locale_data);
+ 	return 1;
+     }
++
++    setlocale(LC_CTYPE, locale_data);
+     return 0;
+ }
+ 

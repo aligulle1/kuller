@@ -1,0 +1,57 @@
+From 2d3fe6e6623e6710c09ad0816f42db0afb642cdc Mon Sep 17 00:00:00 2001
+From: Zhenyu Wang <zhenyu.z.wang@intel.com>
+Date: Mon, 29 Dec 2008 10:05:17 +0800
+Subject: [PATCH 11/20] Bug #19239: Add a quirk for broken ACPI lid state
+
+For broken hardware/bios with incorrect ACPI LID state,
+there's machine that can not be fixed in ACPI way, customed
+DSDT that reprogram _LID method to read EC state. Although
+this is ACPI issue, this quirk can be used to work around that.
+---
+ src/i830.h        |    1 +
+ src/i830_quirks.c |   10 ++++++++++
+ 2 files changed, 11 insertions(+), 0 deletions(-)
+
+diff --git xf86-video-intel-2.4.3/src/i830.h xf86-video-intel-2.4.3/src/i830.h
+index ef9738a..c22288c 100644
+--- xf86-video-intel-2.4.3/src/i830.h
++++ xf86-video-intel-2.4.3/src/i830.h
+@@ -941,6 +941,7 @@ extern const int I830CopyROP[16];
+ #define QUIRK_RESET_MODES		0x00000020
+ #define QUIRK_PFIT_SAFE			0x00000040
+ #define QUIRK_IGNORE_CRT		0x00000080
++#define QUIRK_BROKEN_ACPI_LID		0x00000100
+ extern void i830_fixup_devices(ScrnInfoPtr);
+ 
+ #endif /* _I830_H_ */
+diff --git xf86-video-intel-2.4.3/src/i830_quirks.c xf86-video-intel-2.4.3/src/i830_quirks.c
+index e465f37..ca5a4ea 100644
+--- xf86-video-intel-2.4.3/src/i830_quirks.c
++++ xf86-video-intel-2.4.3/src/i830_quirks.c
+@@ -241,6 +241,13 @@ static void quirk_ivch_dvob (I830Ptr pI830)
+ 	pI830->quirk_flag |= QUIRK_IVCH_NEED_DVOB;
+ }
+ 
++/* For broken hw/bios for incorrect acpi _LID state that
++   can't be fixed with customed DSDT or other way */
++static void quirk_broken_acpi_lid (I830Ptr pI830)
++{
++	pI830->quirk_flag |= QUIRK_BROKEN_ACPI_LID;
++}
++
+ /* keep this list sorted by OEM, then by chip ID */
+ static i830_quirk i830_quirk_list[] = {
+     /* Aopen mini pc */
+@@ -359,6 +366,9 @@ static i830_quirk i830_quirk_list[] = {
+     /* Asus Eee Box has no LVDS */
+     { PCI_CHIP_I945_GME, 0x1043, 0x1252, quirk_ignore_lvds },
+ 
++    /* #19239: Mirrus Centrino laptop */
++    { PCI_CHIP_I915_GM, 0x1584, 0x9800, quirk_broken_acpi_lid },
++
+     { 0, 0, 0, NULL },
+ };
+ 
+-- 
+1.6.2
+

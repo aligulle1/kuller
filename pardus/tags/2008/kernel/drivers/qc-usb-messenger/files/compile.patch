@@ -1,0 +1,31 @@
+--- qc-driver.c	2008-01-24 00:26:35.000000000 +0200
++++ qc-driver.c	2008-01-24 00:26:15.000000000 +0200
+@@ -75,6 +75,7 @@
+ #include <asm/page.h>
+ #include <linux/capability.h>
+ #include <linux/poll.h>
++#include <linux/bitops.h>
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+ #include <linux/moduleparam.h>
+ #endif
+--- qc-driver.c	2008-01-24 00:23:28.000000000 +0200
++++ qc-driver.c	2008-01-24 00:23:50.000000000 +0200
+@@ -3481,7 +3481,6 @@
+ static struct video_device qc_v4l_template = {
+ 	name:		"QuickCam USB",
+ 	type:		VID_TYPE_CAPTURE, // | VID_TYPE_SUBCAPTURE,
+-	hardware:	VID_HARDWARE_QCAM_USB,
+ 	minor:		-1,
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+ 	release:	qc_v4l_release,
+--- qc-driver.c	2008-01-24 00:24:08.000000000 +0200
++++ qc-driver.c	2008-01-24 00:26:15.000000000 +0200
+@@ -3657,7 +3657,7 @@
+ 	qc->input_ptr->name = "Quickcam snapshot button";
+ 	qc->input_ptr->private = qc;
+ 	qc->input_ptr->evbit[0] = BIT(EV_KEY);
+-	qc->input_ptr->keybit[LONG(BTN_0)] = BIT(BTN_0);
++	qc->input_ptr->keybit[BITS_TO_LONGS(BTN_0)] = BIT(BTN_0);
+ 
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+ 	qc->input_ptr->id.bustype = BUS_USB;

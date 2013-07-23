@@ -1,0 +1,276 @@
+From: Oliver Neukum <oneukum@suse.de>
+Subject: update unusual_devs for new storage devices
+
+--- linux-2.6.25-SL110_BRANCH/drivers/usb/storage/unusual_devs.h	2008-12-12 12:38:12.805603000 +0100
++++ linux-2.6.27-SL111_BRANCH/drivers/usb/storage/unusual_devs.h	2008-12-12 13:07:45.998854000 +0100
+@@ -1,8 +1,6 @@
+ /* Driver for USB Mass Storage compliant devices
+  * Unusual Devices File
+  *
+- * $Id: unusual_devs.h,v 1.32 2002/02/25 02:41:24 mdharm Exp $
+- *
+  * Current development and maintenance by:
+  *   (c) 2000-2002 Matthew Dharm (mdharm-usb@one-eyed-alien.net)
+  *
+@@ -44,7 +42,8 @@
+  *	  running with this patch.
+  * Send your submission to either Phil Dibowitz <phil@ipom.com> or
+  * Alan Stern <stern@rowland.harvard.edu>, and don't forget to CC: the
+- * USB development list <linux-usb-devel@lists.sourceforge.net>.
++ * USB development list <linux-usb@vger.kernel.org> and the USB storage list
++ * <usb-storage@lists.one-eyed-alien.net>
+  */
+ 
+ /* patch submitted by Vivian Bregier <Vivian.Bregier@imag.fr>
+@@ -161,6 +160,13 @@ UNUSUAL_DEV(  0x0421, 0x0019, 0x0592, 0x
+ 		US_SC_DEVICE, US_PR_DEVICE, NULL,
+ 		US_FL_MAX_SECTORS_64 ),
+ 
++/* Reported by Filip Joelsson <filip@blueturtle.nu> */
++UNUSUAL_DEV(  0x0421, 0x005d, 0x0001, 0x0600,
++		"Nokia",
++		"Nokia 3110c",
++		US_SC_DEVICE, US_PR_DEVICE, NULL,
++		US_FL_FIX_CAPACITY ),
++
+ /* Reported by Mario Rettig <mariorettig@web.de> */
+ UNUSUAL_DEV(  0x0421, 0x042e, 0x0100, 0x0100,
+ 		"Nokia",
+@@ -226,6 +232,27 @@ UNUSUAL_DEV(  0x0421, 0x0495, 0x0370, 0x
+ 		US_SC_DEVICE, US_PR_DEVICE, NULL,
+ 		US_FL_MAX_SECTORS_64 ),
+ 
++/* Reported by Cedric Godin <cedric@belbone.be> */
++UNUSUAL_DEV(  0x0421, 0x04b9, 0x0551, 0x0551,
++		"Nokia",
++		"5300",
++		US_SC_DEVICE, US_PR_DEVICE, NULL,
++		US_FL_FIX_CAPACITY ),
++
++/* Reported by Richard Nauber <RichardNauber@web.de> */
++UNUSUAL_DEV(  0x0421, 0x04fa, 0x0601, 0x0601,
++		"Nokia",
++		"6300",
++		US_SC_DEVICE, US_PR_DEVICE, NULL,
++		US_FL_FIX_CAPACITY ),
++
++/* Patch for Nokia 5310 capacity */
++UNUSUAL_DEV(  0x0421, 0x006a, 0x0000, 0x0591,
++	"Nokia",
++	"5310",
++	US_SC_DEVICE, US_PR_DEVICE, NULL,
++	US_FL_FIX_CAPACITY ),
++
+ /* Reported by Olaf Hering <olh@suse.de> from novell bug #105878 */
+ UNUSUAL_DEV(  0x0424, 0x0fdc, 0x0210, 0x0210,
+ 		"SMSC",
+@@ -400,6 +427,22 @@ UNUSUAL_DEV(  0x04a5, 0x3010, 0x0100, 0x
+ 		US_SC_DEVICE, US_PR_DEVICE, NULL,
+ 		US_FL_IGNORE_RESIDUE ),
+ 
++#ifdef CONFIG_USB_STORAGE_CYPRESS_ATACB
++/* CY7C68300 : support atacb */
++UNUSUAL_DEV(  0x04b4, 0x6830, 0x0000, 0x9999,
++		"Cypress",
++		"Cypress AT2LP",
++		US_SC_CYP_ATACB, US_PR_DEVICE, NULL,
++		0),
++
++/* CY7C68310 : support atacb and atacb2 */
++UNUSUAL_DEV(  0x04b4, 0x6831, 0x0000, 0x9999,
++		"Cypress",
++		"Cypress ISD-300LP",
++		US_SC_CYP_ATACB, US_PR_DEVICE, NULL,
++		0),
++#endif
++
+ /* Reported by Simon Levitt <simon@whattf.com>
+  * This entry needs Sub and Proto fields */
+ UNUSUAL_DEV(  0x04b8, 0x0601, 0x0100, 0x0100,
+@@ -538,25 +581,31 @@ UNUSUAL_DEV(  0x04e6, 0x0101, 0x0200, 0x
+ 		"CD-RW Device",
+ 		US_SC_8020, US_PR_CB, NULL, 0),
+ 
++#ifdef CONFIG_USB_STORAGE_USBAT
++UNUSUAL_DEV(  0x04e6, 0x1010, 0x0000, 0x9999,
++		"Shuttle/SCM",
++		"USBAT-02",
++		US_SC_SCSI, US_PR_USBAT, init_usbat_flash,
++		US_FL_SINGLE_LUN),
++#endif
++
++/* Reported by Dmitry Khlystov <adminimus@gmail.com> */
++UNUSUAL_DEV(  0x04e8, 0x507c, 0x0220, 0x0220,
++		"Samsung",
++		"YP-U3",
++		US_SC_DEVICE, US_PR_DEVICE, NULL,
++		US_FL_MAX_SECTORS_64),
++
+ /* Entry and supporting patch by Theodore Kilgore <kilgota@auburn.edu>.
+  * Device uses standards-violating 32-byte Bulk Command Block Wrappers and
+  * reports itself as "Proprietary SCSI Bulk." Cf. device entry 0x084d:0x0011.
+  */
+-
+ UNUSUAL_DEV(  0x04fc, 0x80c2, 0x0100, 0x0100,
+ 		"Kobian Mercury",
+ 		"Binocam DCB-132",
+ 		US_SC_DEVICE, US_PR_DEVICE, NULL,
+ 		US_FL_BULK32),
+ 
+-#ifdef CONFIG_USB_STORAGE_USBAT
+-UNUSUAL_DEV(  0x04e6, 0x1010, 0x0000, 0x9999,
+-		"Shuttle/SCM",
+-		"USBAT-02",
+-		US_SC_SCSI, US_PR_USBAT, init_usbat_flash,
+-		US_FL_SINGLE_LUN),
+-#endif
+-
+ /* Reported by Bob Sass <rls@vectordb.com> -- only rev 1.33 tested */
+ UNUSUAL_DEV(  0x050d, 0x0115, 0x0133, 0x0133,
+ 		"Belkin",
+@@ -929,7 +978,7 @@ UNUSUAL_DEV( 0x067b, 0x2507, 0x0100, 0x0
+ 		US_FL_FIX_CAPACITY | US_FL_GO_SLOW ),
+ 
+ /* Reported by Alex Butcher <alex.butcher@assursys.co.uk> */
+-UNUSUAL_DEV( 0x067b, 0x3507, 0x0001, 0x0001,
++UNUSUAL_DEV( 0x067b, 0x3507, 0x0001, 0x0101,
+ 		"Prolific Technology Inc.",
+ 		"ATAPI-6 Bridge Controller",
+ 		US_SC_DEVICE, US_PR_DEVICE, NULL,
+@@ -959,6 +1008,13 @@ UNUSUAL_DEV(  0x069b, 0x3004, 0x0001, 0x
+ 		US_SC_DEVICE, US_PR_DEVICE, NULL,
+ 		US_FL_FIX_CAPACITY ),
+ 
++/* Reported by Adrian Pilchowiec <adi1981@epf.pl> */
++UNUSUAL_DEV(  0x071b, 0x3203, 0x0000, 0x0000,
++		"RockChip",
++		"MP3",
++		US_SC_DEVICE, US_PR_DEVICE, NULL,
++		US_FL_NO_WP_DETECT | US_FL_MAX_SECTORS_64),
++
+ /* Reported by Massimiliano Ghilardi <massimiliano.ghilardi@gmail.com>
+  * This USB MP3/AVI player device fails and disconnects if more than 128
+  * sectors (64kB) are read/written in a single command, and may be present
+@@ -1195,6 +1251,13 @@ UNUSUAL_DEV( 0x0839, 0x000a, 0x0001, 0x0
+ 		US_SC_DEVICE, US_PR_DEVICE, NULL,
+ 		US_FL_FIX_INQUIRY),
+ 
++/* Reported by Luciano Rocha <luciano@eurotux.com> */
++UNUSUAL_DEV( 0x0840, 0x0082, 0x0001, 0x0001,
++		"Argosy",
++		"Storage",
++		US_SC_DEVICE, US_PR_DEVICE, NULL,
++		US_FL_FIX_CAPACITY),
++
+ /* Entry and supporting patch by Theodore Kilgore <kilgota@auburn.edu>.
+  * Flag will support Bulk devices which use a standards-violating 32-byte
+  * Command Block Wrapper. Here, the "DC2MEGA" cameras (several brands) with
+@@ -1207,6 +1270,28 @@ UNUSUAL_DEV(  0x084d, 0x0011, 0x0110, 0x
+ 		US_SC_DEVICE, US_PR_DEVICE, NULL,
+ 		US_FL_BULK32),
+ 
++/* Andrew Lunn <andrew@lunn.ch>
++ * PanDigital Digital Picture Frame. Does not like ALLOW_MEDIUM_REMOVAL
++ * on LUN 4.
++ * Note: Vend:Prod clash with "Ltd Maxell WS30 Slim Digital Camera"
++*/
++UNUSUAL_DEV(  0x0851, 0x1543, 0x0200, 0x0200,
++		"PanDigital",
++		"Photo Frame",
++		US_SC_DEVICE, US_PR_DEVICE, NULL,
++		US_FL_NOT_LOCKABLE),
++
++/* Andrew Lunn <andrew@lunn.ch>
++ * PanDigital Digital Picture Frame. Does not like ALLOW_MEDIUM_REMOVAL
++ * on LUN 4.
++ * Note: Vend:Prod clash with "Ltd Maxell WS30 Slim Digital Camera"
++*/
++UNUSUAL_DEV(  0x0851, 0x1543, 0x0200, 0x0200,
++		"PanDigital",
++		"Photo Frame",
++		US_SC_DEVICE, US_PR_DEVICE, NULL,
++		US_FL_NOT_LOCKABLE),
++
+ /* Submitted by Jan De Luyck <lkml@kcore.org> */
+ UNUSUAL_DEV(  0x08bd, 0x1100, 0x0000, 0x0000,
+ 		"CITIZEN",
+@@ -1503,7 +1588,7 @@ UNUSUAL_DEV(  0x0fce, 0xe031, 0x0000, 0x
+ 		"Sony Ericsson",
+ 		"M600i",
+ 		US_SC_DEVICE, US_PR_DEVICE, NULL,
+-		US_FL_FIX_CAPACITY ),
++		US_FL_IGNORE_RESIDUE | US_FL_FIX_CAPACITY ),
+ 
+ /* Reported by Kevin Cernekee <kpc-usbdev@gelato.uiuc.edu>
+  * Tested on hardware version 1.10.
+@@ -1667,6 +1752,15 @@ UNUSUAL_DEV(  0x14cd, 0x6600, 0x0201, 0x
+ 		US_SC_DEVICE, US_PR_DEVICE, NULL,
+ 		US_FL_IGNORE_RESIDUE ),
+ 
++/* Reported by Alexandre Oliva <oliva@lsd.ic.unicamp.br>
++ * JMicron responds to USN and several other SCSI ioctls with a
++ * residue that causes subsequent I/O requests to fail.  */
++UNUSUAL_DEV(  0x152d, 0x2329, 0x0100, 0x0100,
++	        "JMicron",
++	        "USB to ATA/ATAPI Bridge",
++	        US_SC_DEVICE, US_PR_DEVICE, NULL,
++	        US_FL_IGNORE_RESIDUE ),
++
+ /* Reported by Robert Schedel <r.schedel@yahoo.de>
+  * Note: this is a 'super top' device like the above 14cd/6600 device */
+ UNUSUAL_DEV(  0x1652, 0x6600, 0x0201, 0x0201,
+@@ -1675,6 +1769,16 @@ UNUSUAL_DEV(  0x1652, 0x6600, 0x0201, 0x
+ 		US_SC_DEVICE, US_PR_DEVICE, NULL,
+ 		US_FL_IGNORE_RESIDUE ),
+ 
++/* Reported by Mauro Andreolini <andreoli@weblab.ing.unimo.it>
++ * This entry is needed to bypass the ZeroCD mechanism
++ * and to properly load as a modem device.
++ */
++UNUSUAL_DEV(  0x19d2, 0x2000, 0x0000, 0x0000,
++		"Onda ET502HS",
++		"USB MMC Storage",
++		US_SC_DEVICE, US_PR_DEVICE, NULL,
++		US_FL_IGNORE_DEVICE),
++
+ /* patch submitted by Davide Perini <perini.davide@dpsoftware.org>
+  * and Renato Perini <rperini@email.it>
+  */
+@@ -1687,10 +1791,21 @@ UNUSUAL_DEV(  0x22b8, 0x3010, 0x0001, 0x
+ /*
+  * Patch by Pete Zaitcev <zaitcev@redhat.com>
+  * Report by Mark Patton. Red Hat bz#208928.
++ * Added support for rev 0x0002 (Motorola ROKR W5)
++ * by Javier Smaldone <javier@smaldone.com.ar>
+  */
+-UNUSUAL_DEV(  0x22b8, 0x4810, 0x0001, 0x0001,
++UNUSUAL_DEV(  0x22b8, 0x4810, 0x0001, 0x0002,
+ 		"Motorola",
+-		"RAZR V3i",
++		"RAZR V3i/ROKR W5",
++		US_SC_DEVICE, US_PR_DEVICE, NULL,
++		US_FL_FIX_CAPACITY),
++
++/*
++ * Patch by Jost Diederichs <jost@qdusa.com>
++ */
++UNUSUAL_DEV(0x22b8, 0x6410, 0x0001, 0x9999,
++		"Motorola Inc.",
++		"Motorola Phone (RAZRV3xx)",
+ 		US_SC_DEVICE, US_PR_DEVICE, NULL,
+ 		US_FL_FIX_CAPACITY),
+ 
+@@ -1712,6 +1827,13 @@ UNUSUAL_DEV(  0x2735, 0x100b, 0x0000, 0x
+ 		US_SC_DEVICE, US_PR_DEVICE, NULL,
+ 		US_FL_GO_SLOW ),
+ 
++/* Reported by Rohan Hart <rohan.hart17@gmail.com> */
++UNUSUAL_DEV(  0x2770, 0x915d, 0x0010, 0x0010,
++		"INTOVA",
++		"Pixtreme",
++		US_SC_DEVICE, US_PR_DEVICE, NULL,
++		US_FL_FIX_CAPACITY ),
++
+ /* Reported by Andrey Rahmatullin <wrar@altlinux.org> */
+ UNUSUAL_DEV(  0x4102, 0x1020, 0x0100,  0x0100,
+ 		"iRiver",

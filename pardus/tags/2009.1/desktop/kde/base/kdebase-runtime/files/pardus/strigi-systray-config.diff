@@ -1,0 +1,45 @@
+Index: nepomuk/services/strigi/strigiserviceconfig.cpp
+===================================================================
+--- nepomuk/services/strigi/strigiserviceconfig.cpp.orig
++++ nepomuk/services/strigi/strigiserviceconfig.cpp
+@@ -57,6 +57,10 @@ QStringList Nepomuk::StrigiServiceConfig
+     return m_config.group( "General" ).readPathEntry( "folders", QStringList() << QDir::homePath() );
+ }
+ 
++bool Nepomuk::StrigiServiceConfig::systrayEnabled() const
++{
++    return m_config.group( "General" ).readEntry( "enable systray applet", false );
++}
+ 
+ QStringList Nepomuk::StrigiServiceConfig::excludeFolders() const
+ {
+Index: nepomuk/services/strigi/strigiserviceconfig.h
+===================================================================
+--- nepomuk/services/strigi/strigiserviceconfig.h.orig
++++ nepomuk/services/strigi/strigiserviceconfig.h
+@@ -51,6 +51,7 @@ namespace Nepomuk {
+ 
+         QStringList excludeFilters() const;
+         QStringList includeFilters() const;
++        bool systrayEnabled() const;
+ 
+         bool indexHiddenFolders() const;
+ 
+Index: nepomuk/services/strigi/strigiservice.cpp
+===================================================================
+--- nepomuk/services/strigi/strigiservice.cpp.orig
++++ nepomuk/services/strigi/strigiservice.cpp
+@@ -85,8 +85,11 @@ Nepomuk::StrigiService::StrigiService( Q
+             // create the status widget (hidden)
+             StatusWidget* sw = new StatusWidget( mainModel(), this );
+ 
+-            // create the systray
+-            new SystemTray( this, sw );
++            if (StrigiServiceConfig::self()->systrayEnabled())
++            {
++                // create the systray
++                new SystemTray( this, sw );
++            }
+ 
+             // setup status connections
+             connect( m_indexScheduler, SIGNAL( indexingStarted() ),

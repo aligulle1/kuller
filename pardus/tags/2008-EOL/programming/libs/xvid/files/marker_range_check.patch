@@ -1,0 +1,44 @@
+diff -Nur xvidcore-1.1.3-old/src/decoder.c xvidcore-1.1.3/src/decoder.c
+--- ../../src/decoder.c	2009-06-02 19:26:10.699127295 +0300
++++ ../../src/decoder.c	2009-06-02 19:27:59.082127911 +0300
+@@ -201,8 +201,11 @@
+ 
+   dec->fixed_dimensions = (dec->width > 0 && dec->height > 0);
+ 
+-  if (dec->fixed_dimensions)
+-    return decoder_resize(dec);
++  if (dec->fixed_dimensions) {
++    int ret = decoder_resize(dec);
++    if (ret == XVID_ERR_MEMORY) create->handle = NULL;
++    return ret;
++  }
+   else
+     return 0;
+ }
+@@ -748,7 +751,7 @@
+         bound = read_video_packet_header(bs, dec, 0,
+               &quant, NULL, NULL, &intra_dc_threshold);
+         x = bound % mb_width;
+-        y = bound / mb_width;
++        y = MIN((bound / mb_width), (mb_height-1));
+       }
+       mb = &dec->mbs[y * dec->mb_width + x];
+ 
+@@ -975,7 +978,7 @@
+         bound = read_video_packet_header(bs, dec, fcode - 1,
+           &quant, &fcode, NULL, &intra_dc_threshold);
+         x = bound % mb_width;
+-        y = bound / mb_width;
++        y = MIN((bound / mb_width), (mb_height-1));
+       }
+       mb = &dec->mbs[y * dec->mb_width + x];
+ 
+@@ -1376,7 +1379,7 @@
+         int bound = read_video_packet_header(bs, dec, fcode_max - 1, &quant,
+                            &fcode_forward, &fcode_backward, &intra_dc_threshold);
+         x = bound % dec->mb_width;
+-        y = bound / dec->mb_width;
++        y = MIN((bound / dec->mb_width), (dec->mb_height-1));
+         /* reset predicted macroblocks */
+         dec->p_fmv = dec->p_bmv = zeromv;
+       }

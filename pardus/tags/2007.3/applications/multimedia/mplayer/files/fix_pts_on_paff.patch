@@ -1,0 +1,21 @@
+diff -Nur mplayer-20071025-old/libmpcodecs/vd_ffmpeg.c mplayer-20071025/libmpcodecs/vd_ffmpeg.c
+--- mplayer-20071025-old/libmpcodecs/vd_ffmpeg.c	2007-10-26 05:02:18.000000000 +0300
++++ mplayer-20071025/libmpcodecs/vd_ffmpeg.c	2007-10-26 05:08:32.000000000 +0300
+@@ -736,6 +736,8 @@
+     mp_image_t* mpi=NULL;
+     int dr1= ctx->do_dr1;
+ 
++    sh->frametime=1.0/sh->fps;
++
+     if(len<=0) return NULL; // skipped frame
+ 
+ //ffmpeg interlace (mpeg2) bug have been fixed. no need of -noslices
+@@ -783,6 +785,8 @@
+     ret = avcodec_decode_video(avctx, pic,
+ 	     &got_picture, data, len);
+ 
++    if(!got_picture)sh->frametime=1.0/1000.0;
++
+     dr1= ctx->do_dr1;
+     if(ret<0) mp_msg(MSGT_DECVIDEO,MSGL_WARN, "Error while decoding frame!\n");
+ //printf("repeat: %d\n", pic->repeat_pict);

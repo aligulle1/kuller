@@ -1,0 +1,37 @@
+--- src/FretsOnFire.py
++++ src/FretsOnFire.py
+@@ -96,13 +96,13 @@
+           if os.name == "nt":
+             os.execl("FretsOnFire.exe", "FretsOnFire.exe", *sys.argv[1:])
+           else:
+-            os.execl("./FretsOnFire", "./FretsOnFire", *sys.argv[1:])
++            os.execl("./fretsonfire", "./fretsonfire", *sys.argv[1:])
+         else:
+           if os.name == "nt":
+             bin = "c:/python25/python"
+           else:
+             bin = "/usr/bin/python"
+-          os.execl(bin, bin, "FretsOnFire.py", *sys.argv[1:])
++          os.execl(bin, bin, "/usr/share/FretsOnFire/FretsOnFire.py", *sys.argv[1:])
+       except:
+         Log.warn("Restart failed.")
+         raise
+--- src/Version.py
++++ src/Version.py
+@@ -34,15 +34,4 @@
+   return "%s.%d" % (VERSION, revision())
+ 
+ def dataPath():
+-  # Determine whether were running from an exe or not
+-  if hasattr(sys, "frozen"):
+-    if os.name == "posix":
+-      dataPath = os.path.join(os.path.dirname(sys.argv[0]), "../lib/fretsonfire")
+-      if not os.path.isdir(dataPath):
+-        dataPath = "data"
+-    else:
+-      dataPath = "data"
+-  else:
+-    dataPath = os.path.join("..", "data")
+-  return dataPath
+-  
++  return "/usr/share/FretsOnFire/data"

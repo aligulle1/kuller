@@ -1,0 +1,28 @@
+commit 64beb8f3eb3c724add64ca3272915528e10213c1
+Author: Florian Westphal <fw@strlen.de>
+Date:   Sat Jun 23 22:59:40 2007 -0700
+
+    [TIPC]: Fix infinite loop in netlink handler
+    
+    The tipc netlink config handler uses the nlmsg_pid from the
+    request header as destination for its reply. If the application
+    initialized nlmsg_pid to 0, the reply is looped back to the kernel,
+    causing hangup. Fix: use nlmsg_pid of the skb that triggered the
+    request.
+    
+    Signed-off-by: Florian Westphal <fw@strlen.de>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
+
+diff --git a/net/tipc/netlink.c b/net/tipc/netlink.c
+index 4cdafa2..6a7f7b4 100644
+--- a/net/tipc/netlink.c
++++ b/net/tipc/netlink.c
+@@ -60,7 +60,7 @@ static int handle_cmd(struct sk_buff *skb, struct genl_info *info)
+ 		rep_nlh = nlmsg_hdr(rep_buf);
+ 		memcpy(rep_nlh, req_nlh, hdr_space);
+ 		rep_nlh->nlmsg_len = rep_buf->len;
+-		genlmsg_unicast(rep_buf, req_nlh->nlmsg_pid);
++		genlmsg_unicast(rep_buf, NETLINK_CB(skb).pid);
+ 	}
+ 
+ 	return 0;

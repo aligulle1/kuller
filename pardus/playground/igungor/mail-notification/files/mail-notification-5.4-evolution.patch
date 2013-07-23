@@ -1,0 +1,23 @@
+--- build/src/mn-evolution-server.c.orig	2008-09-30 15:30:07.756216978 +0200
++++ build/src/mn-evolution-server.c	2008-09-30 15:30:49.950220711 +0200
+@@ -27,6 +27,7 @@
+ #include <stdio.h>
+ #include <libintl.h>
+ #include <gobject/gvaluecollector.h>
++#include <libedataserver/eds-version.h>
+ #include <camel/camel-folder.h>
+ #include <mail/em-folder-view.h>
+ #include <mail/em-format.h>
+@@ -595,7 +596,12 @@
+ 
+ 	for (i = 0; i < summary->len; i++)
+ 	  {
++#if EDS_CHECK_VERSION(2,23,5)
++	    char *uid = summary->pdata[i];
++	    CamelMessageInfo *info = camel_folder_get_message_info(folder, uid);
++#else
+ 	    CamelMessageInfo *info = summary->pdata[i];
++#endif
+ 
+ 	    if ((camel_message_info_flags(info) & CAMEL_MESSAGE_SEEN) == 0)
+ 	      g_ptr_array_add(*ret, self_camel_message_info_to_dbus_struct(info));

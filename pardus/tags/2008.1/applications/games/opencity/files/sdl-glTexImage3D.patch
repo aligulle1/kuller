@@ -1,0 +1,31 @@
+--- src/texture.cpp.orig	2007-12-22 23:20:43.000000000 +0200
++++ src/texture.cpp	2008-04-27 23:26:48.000000000 +0300
+@@ -5,7 +5,7 @@
+ 	copyright            : (C) 2004-2006 by Duong-Khang NGUYEN
+ 	email                : neoneurone @ users sourceforge net
+ 	
+-	$Id: texture.cpp 304 2007-12-22 21:08:40Z neoneurone $
++	$Id$
+  ***************************************************************************/
+ 
+ /***************************************************************************
+@@ -355,10 +355,18 @@
+ 	GLint format
+ )
+ {
++/* old code, non portable
+ #ifdef __WIN32__
+-	PFNGLTEXIMAGE3DPROC glTexImage3D;
++	PFNGLTEXIMAGE3DPROC glTexImage3D;
+ 	glTexImage3D = (PFNGLTEXIMAGE3DPROC) wglGetProcAddress("glTexImage3D");
+ #endif
++*/
++
++	PFNGLTEXIMAGE3DEXTPROC glTexImage3D = (PFNGLTEXIMAGE3DEXTPROC) SDL_GL_GetProcAddress("glTexImage3D");
++	if (glTexImage3D == NULL) {
++		OPENCITY_FATAL( "glTexImage3D function not found" );
++		abort();
++	}
+ 
+ // Delete the existing texture
+ 	if (glIsTexture( ruiTexture ) == GL_TRUE)

@@ -1,0 +1,50 @@
+From 4065d5eb01df24d2ce28d7ec9a2c46b6f8205101 Mon Sep 17 00:00:00 2001
+From: Bill Nottingham <notting@redhat.com>
+Date: Sat, 24 Jan 2009 08:36:20 +0800
+Subject: [PATCH 09/20] Quirk MSI IM-945GSE-A LVDS, TV outputs.
+
+The IM-945GSE-A claims to have a TV output, and always claims a connected
+LVDS output. It has neither.
+(cherry picked from commit e20e1cf76fb00ba4f933a1ed6d1a4896be346c91)
+---
+ src/i830_quirks.c |   17 +++++++++++++++++
+ 1 files changed, 17 insertions(+), 0 deletions(-)
+
+diff --git xf86-video-intel-2.4.3/src/i830_quirks.c xf86-video-intel-2.4.3/src/i830_quirks.c
+index 723bd76..7708133 100644
+--- xf86-video-intel-2.4.3/src/i830_quirks.c
++++ xf86-video-intel-2.4.3/src/i830_quirks.c
+@@ -217,6 +217,20 @@ static void quirk_lenovo_tv_dmi (I830Ptr pI830)
+ 	pI830->quirk_flag |= QUIRK_IGNORE_TV;
+ }
+ 
++static void quirk_msi_lvds_dmi (I830Ptr pI830)
++{
++   /* MSI IM-945GSE-A has no TV output, nor a LVDS connection.
++    */
++   if (!i830_dmi_data[board_name]) {
++       ErrorF("Failed to load DMI info, MSI LVDS quirk not applied.\n");
++       return;
++   }
++   if (!strncmp(i830_dmi_data[board_name],"A9830IMS",8)) {
++       pI830->quirk_flag |= QUIRK_IGNORE_LVDS;
++       pI830->quirk_flag |= QUIRK_IGNORE_TV;
++   }
++}
++
+ static void quirk_ivch_dvob (I830Ptr pI830)
+ {
+ 	pI830->quirk_flag |= QUIRK_IVCH_NEED_DVOB;
+@@ -262,6 +276,9 @@ static i830_quirk i830_quirk_list[] = {
+     /* Lenovo 3000 v200 */
+     { PCI_CHIP_I965_GM, 0x17aa, 0x3c18, quirk_ignore_tv },
+ 
++    /* MSI IM-945GSE-A has no LVDS or TV (use dmi) */
++    { PCI_CHIP_I945_GME, 0x8086, 0x27ae, quirk_msi_lvds_dmi },
++
+     /* Panasonic Toughbook CF-Y4 has no TV output */
+     { PCI_CHIP_I915_GM, 0x10f7, 0x8338, quirk_ignore_tv },
+     /* Panasonic Toughbook CF-Y7 has no TV output */
+-- 
+1.6.2
+

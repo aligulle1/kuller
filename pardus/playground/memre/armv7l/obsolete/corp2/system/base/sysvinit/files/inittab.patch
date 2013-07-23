@@ -1,0 +1,29 @@
+--- src/Makefile.orig	2010-02-01 15:01:29.000000000 +0200
++++ src/Makefile	2010-02-01 15:02:25.000000000 +0200
+@@ -55,7 +55,7 @@
+ MANDIR		= /usr/share/man
+ 
+ # Additional libs for GNU libc.
+-ifneq ($(wildcard /usr/lib/libcrypt.a),)
++ifneq ($(wildcard $(ROOT)/usr/lib/libcrypt.a),)
+ LCRYPT		= -lcrypt
+ endif
+ 
+@@ -145,12 +145,12 @@
+ 		for i in $(MAN8); do \
+ 			$(INSTALL) -m 644 ../man/$$i $(ROOT)$(MANDIR)/man8/; \
+ 		done
+-ifeq ($(ROOT),)
++ifeq (,)
+ 		#
+ 		# This part is skipped on Debian systems, the
+ 		# debian.preinst script takes care of it.
+-		@if [ ! -p /dev/initctl ]; then \
+-		 echo "Creating /dev/initctl"; \
+-		 rm -f /dev/initctl; \
+-		 mknod -m 600 /dev/initctl p; fi
++		@if [ ! -p $(ROOT)/dev/initctl ]; then \
++		 echo "Creating $(ROOT)/dev/initctl"; \
++		 rm -f $(ROOT)/dev/initctl; \
++		 mknod $(ROOT)/dev/initctl p; chmod 600 $(ROOT)/dev/initctl ; fi
+ endif

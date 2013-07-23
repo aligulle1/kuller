@@ -1,0 +1,1615 @@
+diff -Naur plasma-orig/framesvg.cpp plasma/framesvg.cpp
+--- plasma-orig/framesvg.cpp	2009-06-03 14:13:11.979685058 +0300
++++ plasma/framesvg.cpp	2009-06-03 14:13:40.596435016 +0300
+@@ -19,107 +19,29 @@
+  */
+ 
+ #include "framesvg.h"
++#include "private/framesvg_p.h"
+ 
+ #include <QPainter>
+ #include <QSize>
+ #include <QBitmap>
+ #include <QRegion>
+ #include <QTimer>
++#include <QCryptographicHash>
+ 
+ #include <kdebug.h>
+ 
+ #include <plasma/theme.h>
++#include <plasma/applet.h>
+ 
+ namespace Plasma
+ {
+ 
+-class FrameData
+-{
+-public:
+-    FrameData()
+-      : enabledBorders(FrameSvg::AllBorders),
+-        frameSize(-1,-1)
+-    {
+-    }
+-
+-    FrameData(const FrameData &other)
+-      : enabledBorders(other.enabledBorders),
+-        frameSize(other.frameSize)
+-    {
+-    }
+-
+-    ~FrameData()
+-    {
+-    }
+-
+-    FrameSvg::EnabledBorders enabledBorders;
+-    QPixmap cachedBackground;
+-    QRegion cachedMask;
+-    QSizeF frameSize;
+-
+-    //measures
+-    int topHeight;
+-    int leftWidth;
+-    int rightWidth;
+-    int bottomHeight;
+-
+-    //margins, are equal to the measures by default
+-    int topMargin;
+-    int leftMargin;
+-    int rightMargin;
+-    int bottomMargin;
+-
+-    //size of the svg where the size of the "center"
+-    //element is contentWidth x contentHeight
+-    bool noBorderPadding : 1;
+-    bool stretchBorders : 1;
+-    bool tileCenter : 1;
+-};
+-
+-class FrameSvgPrivate
+-{
+-public:
+-    FrameSvgPrivate(FrameSvg *psvg)
+-      : q(psvg),
+-        cacheAll(false),
+-        saveTimer(0)
+-    {
+-    }
+-
+-    ~FrameSvgPrivate()
+-    {
+-        qDeleteAll(frames);
+-        frames.clear();
+-    }
+-
+-    void generateBackground(FrameData *frame);
+-    void scheduledCacheUpdate();
+-    void updateSizes();
+-    void updateNeeded();
+-    void updateAndSignalSizes();
+-
+-    Location location;
+-    QString prefix;
+-
+-    FrameSvg *q;
+-
+-    bool cacheAll : 1;
+-    QStringList framesToSave;
+-    QTimer *saveTimer;
+-
+-    QHash<QString, FrameData*> frames;
+-};
+-
+ FrameSvg::FrameSvg(QObject *parent)
+     : Svg(parent),
+       d(new FrameSvgPrivate(this))
+ {
+     connect(this, SIGNAL(repaintNeeded()), this, SLOT(updateNeeded()));
+     d->frames.insert(QString(), new FrameData());
+-
+-    d->saveTimer = new QTimer(this);
+-    d->saveTimer->setSingleShot(true);
+-    connect(d->saveTimer, SIGNAL(timeout()), this, SLOT(scheduledCacheUpdate()));
+ }
+ 
+ FrameSvg::~FrameSvg()
+@@ -180,10 +102,11 @@
+             setElementPrefix(QString());
+             break;
+     }
++
+     d->location = location;
+ }
+ 
+-void FrameSvg::setElementPrefix(const QString & prefix)
++void FrameSvg::setElementPrefix(const QString &prefix)
+ {
+     const QString oldPrefix(d->prefix);
+ 
+@@ -194,21 +117,25 @@
+         if (!d->prefix.isEmpty()) {
+             d->prefix += '-';
+         }
+-
+     }
+ 
+-    if (oldPrefix == d->prefix && d->frames[oldPrefix]) {
++    FrameData *oldFrameData = d->frames.value(oldPrefix);
++    if (oldPrefix == d->prefix && oldFrameData) {
+         return;
+     }
+ 
+     if (!d->frames.contains(d->prefix)) {
+-        d->frames.insert(d->prefix, new FrameData(*(d->frames[oldPrefix])));
++        if (oldFrameData) {
++            d->frames.insert(d->prefix, new FrameData(*oldFrameData));
++        } else {
++            d->frames.insert(d->prefix, new FrameData());
++        }
++
+         d->updateSizes();
+     }
+ 
+     if (!d->cacheAll) {
+         delete d->frames[oldPrefix];
+-        d->framesToSave.removeAll(oldPrefix);
+         d->frames.remove(oldPrefix);
+     }
+ 
+@@ -268,7 +195,7 @@
+     }
+ 
+     d->updateSizes();
+-    d->frames[d->prefix]->frameSize = size;
++    d->frames[d->prefix]->frameSize = size.toSize();
+ }
+ 
+ QSizeF FrameSvg::frameSize() const
+@@ -338,45 +265,50 @@
+     }
+ }
+ 
+-QRegion FrameSvg::mask() const
++QPixmap FrameSvg::alphaMask() const
+ {
+     FrameData *frame = d->frames[d->prefix];
+ 
+-    if (frame->cachedMask.isEmpty()) {
+-        // ivan: we are testing whether we have the mask prefixed
+-        // elements to use for creating the mask.
+-        if (hasElement("mask-" + d->prefix + "center")) {
+-            QString oldPrefix = d->prefix;
+-
+-            // We are setting the prefix only temporary to generate
+-            // the needed mask image
+-            d->prefix = "mask-" + oldPrefix;
+-
+-            if (!d->frames.contains(d->prefix)) {
+-                d->frames.insert(d->prefix, new FrameData(*(d->frames[oldPrefix])));
+-                d->updateSizes();
+-            }
++    if (hasElement("mask-" + d->prefix + "center")) {
++        QString oldPrefix = d->prefix;
++
++        // We are setting the prefix only temporary to generate
++        // the needed mask image
++        d->prefix = "mask-" + oldPrefix;
++
++        if (!d->frames.contains(d->prefix)) {
++            d->frames.insert(d->prefix, new FrameData(*(d->frames[oldPrefix])));
++            d->updateSizes();
++        }
+ 
+-            FrameData *maskFrame = d->frames[d->prefix];
++        FrameData *maskFrame = d->frames[d->prefix];
++        if (maskFrame->cachedBackground.isNull() || maskFrame->frameSize != frame->frameSize ) {
++            maskFrame->frameSize = frame->frameSize;
++            maskFrame->cachedBackground = QPixmap();
++
++            d->generateBackground(maskFrame);
+             if (maskFrame->cachedBackground.isNull()) {
+-                d->generateBackground(maskFrame);
+-                if (maskFrame->cachedBackground.isNull()) {
+-                    return QRegion();
+-                }
++                return QPixmap();
+             }
++        }
+ 
+-            frame->cachedMask = QBitmap(maskFrame->cachedBackground.alphaChannel().createMaskFromColor(Qt::black));
+-            d->prefix = oldPrefix;
+-        } else {
++        d->prefix = oldPrefix;
++        return maskFrame->cachedBackground;
++    } else {
++        if (frame->cachedBackground.isNull()) {
++            d->generateBackground(frame);
+             if (frame->cachedBackground.isNull()) {
+-                d->generateBackground(frame);
+-                if (frame->cachedBackground.isNull()) {
+-                    return QRegion();
+-                }
++                return QPixmap();
+             }
+-            frame->cachedMask = QRegion(QBitmap(frame->cachedBackground.alphaChannel().createMaskFromColor(Qt::black)));
+         }
++        return frame->cachedBackground;
+     }
++}
++
++QRegion FrameSvg::mask() const
++{
++    FrameData *frame = d->frames[d->prefix];
++    frame->cachedMask = QRegion(QBitmap(alphaMask().alphaChannel().createMaskFromColor(Qt::black)));
+     return frame->cachedMask;
+ }
+ 
+@@ -398,15 +330,13 @@
+ {
+     FrameData *frame = d->frames[d->prefix];
+ 
+-    d->saveTimer->stop();
+-    d->framesToSave.clear();
+-
+     // delete all the frames that aren't this one
+     QMutableHashIterator<QString, FrameData*> it(d->frames);
+     while (it.hasNext()) {
+         FrameData *p = it.next().value();
+ 
+         if (frame != p) {
++            //TODO: should we clear from the pixmap cache as well?
+             delete p;
+             it.remove();
+         }
+@@ -423,6 +353,7 @@
+         }
+     }
+ 
++
+     return frame->cachedBackground;
+ }
+ 
+@@ -458,12 +389,15 @@
+         return;
+     }
+ 
++
+     QString id = QString::fromLatin1("%5_%4_%3_%2_%1_").
+                          arg(frame->enabledBorders).arg(frame->frameSize.width()).arg(frame->frameSize.height()).arg(prefix).arg(q->imagePath());
+ 
+-    Theme *theme = Theme::defaultTheme();
+-    if (theme->findInCache(id, frame->cachedBackground) && !frame->cachedBackground.isNull()) {
+-        return;
++    if (q->isUsingRenderingCache()) {
++        Theme *theme = Theme::defaultTheme();
++        if (theme->findInCache(id, frame->cachedBackground) && !frame->cachedBackground.isNull()) {
++            return;
++        }
+     }
+ 
+     //kDebug() << "generating background";
+@@ -492,23 +426,11 @@
+     p.setCompositionMode(QPainter::CompositionMode_Source);
+     p.setRenderHint(QPainter::SmoothPixmapTransform);
+ 
+-    //if we must stretch the center or the borders we compute how much we will have to stretch
+-    //the svg to get the desired element sizes
+-    QSizeF  scaledContentSize(0, 0);
+-    if (q->elementSize(prefix + "center").width() > 0 &&
+-        q->elementSize(prefix + "center").height() > 0 &&
+-        (!frame->tileCenter || frame->stretchBorders)) {
+-        scaledContentSize = QSizeF(contentWidth * ((qreal)q->size().width() / (qreal)q->elementSize(prefix + "center").width()),
+-                                   contentHeight * ((qreal)q->size().height() / (qreal)q->elementSize(prefix + "center").height()));
+-    }
+-
+     //CENTER
+     if (frame->tileCenter) {
+         if (contentHeight > 0 && contentWidth > 0) {
+-            int centerTileHeight;
+-            int centerTileWidth;
+-            centerTileHeight = q->elementSize(prefix + "center").height();
+-            centerTileWidth = q->elementSize(prefix + "center").width();
++            const int centerTileHeight = q->elementSize(prefix + "center").height();
++            const int centerTileWidth = q->elementSize(prefix + "center").width();
+             QPixmap center(centerTileWidth, centerTileHeight);
+             center.fill(Qt::transparent);
+ 
+@@ -529,6 +451,10 @@
+         }
+     }
+ 
++    if (frame->enabledBorders & FrameSvg::LeftBorder && q->hasElement(prefix + "left")) {
++        rightOffset += frame->leftWidth;
++    }
++
+     // Corners
+     if (frame->enabledBorders & FrameSvg::TopBorder && q->hasElement(prefix + "top")) {
+         contentTop = frame->topHeight;
+@@ -538,7 +464,6 @@
+             q->paint(&p, QRect(leftOffset, topOffset, frame->leftWidth, frame->topHeight), prefix + "topleft");
+ 
+             contentLeft = frame->leftWidth;
+-            rightOffset = contentWidth + frame->leftWidth;
+         }
+ 
+         if (q->hasElement(prefix + "topright") && frame->enabledBorders & FrameSvg::RightBorder) {
+@@ -551,7 +476,6 @@
+             q->paint(&p, QRect(leftOffset, bottomOffset, frame->leftWidth, frame->bottomHeight), prefix + "bottomleft");
+ 
+             contentLeft = frame->leftWidth;
+-            rightOffset = contentWidth + frame->leftWidth;
+         }
+ 
+         if (frame->enabledBorders & FrameSvg::RightBorder && q->hasElement(prefix + "bottomright")) {
+@@ -632,26 +556,76 @@
+         }
+     }
+ 
+-    if (!framesToSave.contains(prefix)) {
+-        framesToSave.append(prefix);
++    //Overlays
++    if (!prefix.startsWith("mask-") && q->hasElement(prefix+"overlay")) {
++        QPoint pos = QPoint(0, 0);
++        QSize overlaySize = q->elementSize(prefix+"overlay");
++
++        //Random pos, stretched and tiled are mutually exclusive
++        if (q->hasElement(prefix + "hint-overlay-random-pos")) {
++            pos = overlayPos;
++        //Stretched or Tiled?
++        } else if (q->hasElement(prefix + "hint-overlay-stretch")) {
++            overlaySize = frame->frameSize;
++        } else {
++            if (q->hasElement(prefix + "hint-overlay-tile-horizontal")) {
++                overlaySize.setWidth(frame->frameSize.width());
++            }
++            if (q->hasElement(prefix + "hint-overlay-tile-vertical")) {
++                overlaySize.setHeight(frame->frameSize.height());
++            }
++        }
++
++        QPixmap overlay = q->alphaMask();
++        QPainter overlayPainter(&overlay);
++        overlayPainter.setCompositionMode(QPainter::CompositionMode_SourceIn);
++        //Tiling?
++        if (q->hasElement(prefix+"hint-overlay-tile-horizontal") ||
++            q->hasElement(prefix+"hint-overlay-tile-vertical")) {
++
++            QSize s = q->size();
++            q->resize(q->elementSize(prefix+"overlay"));
++
++            overlayPainter.drawTiledPixmap(QRect(QPoint(0,0), overlaySize), q->pixmap(prefix+"overlay"));
++            q->resize(s);
++        } else {
++            q->paint(&overlayPainter, QRect(overlayPos, overlaySize), prefix+"overlay");
++        }
++        overlayPainter.end();
++
++        p.setCompositionMode(QPainter::CompositionMode_SourceOver);
++        p.drawPixmap(overlayPos, overlay, QRect(overlayPos, overlaySize));
+     }
+ 
+-    saveTimer->start(300);
++    cacheFrame(prefix);
+ }
+ 
+-void FrameSvgPrivate::scheduledCacheUpdate()
+-{
+-    foreach ( QString prefixToSave, framesToSave) {
+-        FrameData *frame = frames[prefix];
+-        framesToSave.removeAll(prefixToSave);
+ 
+-        QString id = QString::fromLatin1("%5_%4_%3_%2_%1_").
+-                            arg(frame->enabledBorders).arg(frame->frameSize.width()).arg(frame->frameSize.height()).arg(prefix).arg(q->imagePath());
++void FrameSvgPrivate::cacheFrame(const QString &prefixToSave)
++{
++    if (!q->isUsingRenderingCache()) {
++        return;
++    }
+ 
+-        //kDebug()<<"Saving to cache frame"<<id;
++    //insert background
++    FrameData *frame = frames.value(prefixToSave);
+ 
+-        Theme::defaultTheme()->insertIntoCache(id, frame->cachedBackground);
++    if (!frame) {
++        return;
+     }
++
++    QString id = QString::fromLatin1("%7_%6_%5_%4_%3_%2_%1_").
++        arg(overlayPos.y()).arg(overlayPos.x()).arg(frame->enabledBorders).arg(frame->frameSize.width()).arg(frame->frameSize.height()).arg(prefixToSave).arg(q->imagePath());
++
++    //kDebug()<<"Saving to cache frame"<<id;
++
++    Theme::defaultTheme()->insertIntoCache(id, frame->cachedBackground);
++
++    //insert overlay
++    id = QString::fromLatin1("overlay_%7_%6_%5_%4_%3_%2_%1_").
++        arg(overlayPos.y()).arg(overlayPos.x()).arg(frame->enabledBorders).arg(frame->frameSize.width()).arg(frame->frameSize.height()).arg(prefixToSave).arg(q->imagePath());
++
++    Theme::defaultTheme()->insertIntoCache(id, frame->cachedBackground);
+ }
+ 
+ void FrameSvgPrivate::updateSizes()
+diff -Naur plasma-orig/framesvg.h plasma/framesvg.h
+--- plasma-orig/framesvg.h	2009-06-03 14:13:11.978685419 +0300
++++ plasma/framesvg.h	2009-06-03 14:13:40.812435763 +0300
+@@ -76,6 +76,9 @@
+ class PLASMA_EXPORT FrameSvg : public Svg
+ {
+     Q_OBJECT
++
++    friend class Applet;
++
+     public:
+         /**
+          * These flags represents what borders should be drawn
+@@ -205,6 +208,11 @@
+          */
+         Q_INVOKABLE QRegion mask() const;
+ 
++        /**
++         * @return a pixmap whose alpha channel is the opacity of the frame. It may be the frame itself or a special frame with the mask- prefix
++         */
++        QPixmap alphaMask() const;
++
+        /**
+         * Sets whether saving all the rendered prefixes in a cache or not
+         * @arg cache if use the cache or not
+@@ -254,7 +262,6 @@
+ 
+         Q_PRIVATE_SLOT(d, void updateSizes())
+         Q_PRIVATE_SLOT(d, void updateNeeded())
+-        Q_PRIVATE_SLOT(d, void scheduledCacheUpdate())
+ };
+ 
+ } // Plasma namespace
+diff -Naur plasma-orig/private/framesvg_p.h plasma/private/framesvg_p.h
+--- plasma-orig/private/framesvg_p.h	1970-01-01 02:00:00.000000000 +0200
++++ plasma/private/framesvg_p.h	2009-06-03 14:13:50.751685965 +0300
+@@ -0,0 +1,128 @@
++/*
++ *   Copyright 2008 by Aaron Seigo <aseigo@kde.org>
++ *   Copyright 2009 Marco Martin <notmart@gmail.com>
++ *
++ *   This program is free software; you can redistribute it and/or modify
++ *   it under the terms of the GNU Library General Public License as
++ *   published by the Free Software Foundation; either version 2, or
++ *   (at your option) any later version.
++ *
++ *   This program is distributed in the hope that it will be useful,
++ *   but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *   GNU General Public License for more details
++ *
++ *   You should have received a copy of the GNU Library General Public
++ *   License along with this program; if not, write to the
++ *   Free Software Foundation, Inc.,
++ *   51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
++ */
++
++#ifndef PLASMA_FRAMESVG_P_H
++#define PLASMA_FRAMESVG_P_H
++
++#include <QHash>
++
++namespace Plasma
++{
++class FrameData
++{
++public:
++    FrameData()
++      : enabledBorders(FrameSvg::AllBorders),
++        frameSize(-1,-1),
++        topHeight(0),
++        leftWidth(0),
++        rightWidth(0),
++        bottomHeight(0),
++        topMargin(0),
++        leftMargin(0),
++        rightMargin(0),
++        bottomMargin(0),
++        noBorderPadding(false),
++        stretchBorders(false),
++        tileCenter(false)
++    {
++    }
++
++    FrameData(const FrameData &other)
++      : enabledBorders(other.enabledBorders),
++        frameSize(other.frameSize),
++        topHeight(0),
++        leftWidth(0),
++        rightWidth(0),
++        bottomHeight(0),
++        topMargin(0),
++        leftMargin(0),
++        rightMargin(0),
++        bottomMargin(0),
++        noBorderPadding(false),
++        stretchBorders(false),
++        tileCenter(false)
++    {
++    }
++
++    ~FrameData()
++    {
++    }
++
++    FrameSvg::EnabledBorders enabledBorders;
++    QPixmap cachedBackground;
++    QRegion cachedMask;
++    QSize frameSize;
++
++    //measures
++    int topHeight;
++    int leftWidth;
++    int rightWidth;
++    int bottomHeight;
++
++    //margins, are equal to the measures by default
++    int topMargin;
++    int leftMargin;
++    int rightMargin;
++    int bottomMargin;
++
++    //size of the svg where the size of the "center"
++    //element is contentWidth x contentHeight
++    bool noBorderPadding : 1;
++    bool stretchBorders : 1;
++    bool tileCenter : 1;
++};
++
++class FrameSvgPrivate
++{
++public:
++    FrameSvgPrivate(FrameSvg *psvg)
++      : q(psvg),
++        cacheAll(false),
++        overlayPos(0,0)
++    {
++    }
++
++    ~FrameSvgPrivate()
++    {
++        qDeleteAll(frames);
++        frames.clear();
++    }
++
++    void generateBackground(FrameData *frame);
++    void cacheFrame(const QString &prefix);
++    void updateSizes();
++    void updateNeeded();
++    void updateAndSignalSizes();
++
++    Location location;
++    QString prefix;
++
++    FrameSvg *q;
++
++    bool cacheAll : 1;
++    QPoint overlayPos;
++
++    QHash<QString, FrameData*> frames;
++};
++
++}
++
++#endif
+diff -Naur plasma-orig/svg.cpp plasma/svg.cpp
+--- plasma-orig/svg.cpp	2009-06-03 14:13:11.870435437 +0300
++++ plasma/svg.cpp	2009-06-03 14:13:35.604434981 +0300
+@@ -23,7 +23,6 @@
+ #include <QMatrix>
+ #include <QPainter>
+ #include <QSharedData>
+-#include <QTimer>
+ 
+ #include <kcolorscheme.h>
+ #include <kconfiggroup.h>
+@@ -68,11 +67,13 @@
+     public:
+         SvgPrivate(Svg *svg)
+             : q(svg),
+-              saveTimer(0),
++              theme(0),
+               renderer(0),
++              lastModified(0),
+               multipleImages(false),
+               themed(false),
+-              applyColors(false)
++              applyColors(false),
++              cacheRendering(true)
+         {
+         }
+ 
+@@ -98,11 +99,11 @@
+         QString cachePath(const QString &path, const QSize &size)
+         {
+              return QString("%3_%2_%1_").arg(int(size.height()))
+-                                       .arg(int(size.width()))
+-                                       .arg(path);
++                                        .arg(int(size.width()))
++                                        .arg(path);
+         }
+ 
+-        bool setImagePath(const QString &imagePath, Svg *q)
++        bool setImagePath(const QString &imagePath)
+         {
+             bool isThemed = !QDir::isAbsolutePath(imagePath);
+ 
+@@ -118,47 +119,69 @@
+             bool updateNeeded = true; //!path.isEmpty() || !themePath.isEmpty();
+ 
+             if (themed) {
+-                QObject::disconnect(Plasma::Theme::defaultTheme(), SIGNAL(themeChanged()),
++                QObject::disconnect(actualTheme(), SIGNAL(themeChanged()),
+                                     q, SLOT(themeChanged()));
+-                QObject::disconnect(KGlobalSettings::self(), SIGNAL(kdisplayPaletteChanged()),
+-                                    q, SLOT(colorsChanged()));
+             }
+ 
+             themed = isThemed;
+             path.clear();
+             themePath.clear();
++            localRectCache.clear();
+ 
+             if (themed) {
+                 themePath = imagePath;
+-                QObject::connect(Plasma::Theme::defaultTheme(), SIGNAL(themeChanged()),
+-                                 q, SLOT(themeChanged()));
++                QObject::connect(actualTheme(), SIGNAL(themeChanged()), q, SLOT(themeChanged()));
++            } else if (QFile::exists(imagePath)) {
++                path = imagePath;
++            } else {
++                kDebug() << "file '" << path << "' does not exist!";
++            }
+ 
+-                // check if svg wants colorscheme applied
+-                checkApplyColorHint();
+-                if (applyColors && !Theme::defaultTheme()->colorScheme()) {
+-                    QObject::connect(KGlobalSettings::self(), SIGNAL(kdisplayPaletteChanged()),
+-                                     q, SLOT(colorsChanged()));
+-                }
++            // check if svg wants colorscheme applied
++            QObject::disconnect(KGlobalSettings::self(), SIGNAL(kdisplayPaletteChanged()),
++                                q, SLOT(colorsChanged()));
++
++            checkApplyColorHint();
++            if (applyColors && !actualTheme()->colorScheme()) {
++                QObject::connect(KGlobalSettings::self(), SIGNAL(kdisplayPaletteChanged()),
++                                 q, SLOT(colorsChanged()));
++            }
+ 
++            // also images with absolute path needs to have a natural size initialized,
++            // even if looks a bit weird using Theme to store non-themed stuff
++            if (themed || QFile::exists(imagePath)) {
+                 QRectF rect;
+-                bool found = Theme::defaultTheme()->findInRectsCache(path, "_Natural", rect);
++                bool found = actualTheme()->findInRectsCache(path, "_Natural", rect);
+ 
+-                if (found && !rect.isValid()) {
++                if (!found) {
+                     createRenderer();
+                     naturalSize = renderer->defaultSize();
+-                    Theme::defaultTheme()->insertIntoRectsCache(path, "_Natural", QRectF(QPointF(0,0), naturalSize));
++                    //kDebug() << "natural size for" << path << "from renderer is" << naturalSize;
++                    actualTheme()->insertIntoRectsCache(path, "_Natural", QRectF(QPointF(0,0), naturalSize));
+                 } else {
+                     naturalSize = rect.size();
++                    //kDebug() << "natural size for" << path << "from cache is" << naturalSize;
+                 }
+-            } else if (QFile::exists(imagePath)) {
+-                path = imagePath;
+-            } else {
+-                kDebug() << "file '" << path << "' does not exist!";
++            }
++
++            if (!themed) {
++                QFile f(imagePath);
++                QFileInfo info(f);
++                lastModified = info.lastModified().toTime_t();
+             }
+ 
+             return updateNeeded;
+         }
+ 
++        Theme *actualTheme()
++        {
++            if (!theme) {
++                theme = Plasma::Theme::defaultTheme();
++            }
++
++            return theme;
++        }
++
+         QPixmap findInCache(const QString &elementId, const QSizeF &s = QSizeF())
+         {
+             QSize size;
+@@ -180,16 +203,16 @@
+ 
+             //kDebug() << "id is " << id;
+ 
+-            Theme *theme = Theme::defaultTheme();
+             QPixmap p;
+-
+-            if (theme->findInCache(id, p)) {
+-                //kDebug() << "found cached version of " << id << p.size();
+-                return p;
+-            } else {
+-                //kDebug() << "didn't find cached version of " << id << ", so re-rendering";
++            if (cacheRendering) {
++                if (actualTheme()->findInCache(id, p, lastModified)) {
++                    //kDebug() << "found cached version of " << id << p.size();
++                    return p;
++                }
+             }
+ 
++            //kDebug() << "didn't find cached version of " << id << ", so re-rendering";
++
+             //kDebug() << "size for " << elementId << " is " << s;
+             // we have to re-render this puppy
+ 
+@@ -210,31 +233,17 @@
+             // Apply current color scheme if the svg asks for it
+             if (applyColors) {
+                 QImage itmp = p.toImage();
+-                KIconEffect::colorize(itmp, theme->color(Theme::BackgroundColor), 1.0);
++                KIconEffect::colorize(itmp, actualTheme()->color(Theme::BackgroundColor), 1.0);
+                 p = p.fromImage(itmp);
+             }
+ 
+-            if (!itemsToSave.contains(id)) {
+-                itemsToSave.insert(id, p);
+-                saveTimer->start(300);
++            if (cacheRendering) {
++                actualTheme()->insertIntoCache(id, p);
+             }
+ 
+             return p;
+         }
+ 
+-        void scheduledCacheUpdate()
+-        {
+-            QHash<QString, QPixmap>::const_iterator i = itemsToSave.constBegin();
+-
+-            while (i != itemsToSave.constEnd()) {
+-                //kDebug()<<"Saving item to cache: "<<i.key();
+-                Theme::defaultTheme()->insertIntoCache(i.key(), i.value());
+-                ++i;
+-            }
+-
+-            itemsToSave.clear();
+-        }
+-
+         void createRenderer()
+         {
+             if (renderer) {
+@@ -253,7 +262,10 @@
+                 }
+ 
+                 if (path.isEmpty()) {
+-                    path = Plasma::Theme::defaultTheme()->imagePath(themePath);
++                    path = actualTheme()->imagePath(themePath);
++                    if (path.isEmpty()) {
++                        kWarning() << "No image path found for" << themePath;
++                    }
+                 }
+             }
+ 
+@@ -267,7 +279,10 @@
+                 //kDebug() << "gots us an existing one!";
+                 renderer = it.value();
+             } else {
+-                renderer = new SharedSvgRenderer(path);
++                if (path.isEmpty())
++                    renderer = new SharedSvgRenderer();
++                else
++                    renderer = new SharedSvgRenderer(path);
+                 s_renderers[path] = renderer;
+             }
+ 
+@@ -281,7 +296,10 @@
+             if (renderer && renderer.count() == 2) {
+                 // this and the cache reference it
+                 s_renderers.erase(s_renderers.find(path));
+-                Plasma::Theme::defaultTheme()->releaseRectsCache(path);
++
++                if (theme) {
++                    theme->releaseRectsCache(path);
++                }
+             }
+ 
+             renderer = 0;
+@@ -291,7 +309,7 @@
+         QRectF elementRect(const QString &elementId)
+         {
+             if (themed && path.isEmpty()) {
+-                path = Plasma::Theme::defaultTheme()->imagePath(themePath);
++                path = actualTheme()->imagePath(themePath);
+             }
+ 
+             QString id = cacheId(elementId);
+@@ -300,7 +318,7 @@
+             }
+ 
+             QRectF rect;
+-            bool found = Theme::defaultTheme()->findInRectsCache(path, id, rect);
++            bool found = actualTheme()->findInRectsCache(path, id, rect);
+ 
+             if (found) {
+                 localRectCache.insert(id, rect);
+@@ -316,13 +334,14 @@
+             QRectF elementRect = renderer->elementExists(elementId) ?
+                                  renderer->boundsOnElement(elementId) : QRectF();
+             naturalSize = renderer->defaultSize();
++            //kDebug() << "natural size for" << path << "is" << naturalSize;
+             qreal dx = size.width() / naturalSize.width();
+             qreal dy = size.height() / naturalSize.height();
+ 
+             elementRect = QRectF(elementRect.x() * dx, elementRect.y() * dy,
+                                  elementRect.width() * dx, elementRect.height() * dy);
+-            Theme::defaultTheme()->insertIntoRectsCache(path, cacheId(elementId), elementRect);
+ 
++            actualTheme()->insertIntoRectsCache(path, cacheId(elementId), elementRect);
+             return elementRect;
+         }
+ 
+@@ -334,37 +353,15 @@
+ 
+         void checkApplyColorHint()
+         {
+-            QRectF elementRect;
+-            bool found = Theme::defaultTheme()->findInRectsCache(themePath, cacheId("hint-apply-color-scheme"), elementRect);
+-
+-            if (found) {
+-                applyColors = elementRect.isValid();
+-            } else {
+-                findAndCacheElementRect("hint-apply-color-scheme");
+-                applyColors = renderer->elementExists("hint-apply-color-scheme");
+-            }
++            applyColors = elementRect("hint-apply-color-scheme").isValid();
+         }
+ 
+         void themeChanged()
+         {
+-            if (!themed) {
+-                return;
+-            }
+-
+-            QString newPath = Theme::defaultTheme()->imagePath(themePath);
+-
+-            if (path == newPath) {
+-                return;
+-            }
+-
+-            path = newPath;
+-            //delete d->renderer; we're a KSharedPtr
+-            eraseRenderer();
+-
+             // check if new theme svg wants colorscheme applied
+             bool wasApplyColors = applyColors;
+             checkApplyColorHint();
+-            if (applyColors && !Theme::defaultTheme()->colorScheme()) {
++            if (applyColors && actualTheme()->colorScheme()) {
+                 if (!wasApplyColors) {
+                     QObject::connect(KGlobalSettings::self(), SIGNAL(kdisplayPaletteChanged()),
+                                      q, SLOT(colorsChanged()));
+@@ -374,9 +371,14 @@
+                                     q, SLOT(colorsChanged()));
+             }
+ 
+-            localRectCache.clear();
+-            itemsToSave.clear();
+-            saveTimer->stop();
++            if (!themed) {
++                return;
++            }
++
++            QString currentPath = themePath;
++            themePath.clear();
++            eraseRenderer();
++            setImagePath(currentPath);
+ 
+             //kDebug() << themePath << ">>>>>>>>>>>>>>>>>> theme changed";
+             emit q->repaintNeeded();
+@@ -389,24 +391,25 @@
+             }
+ 
+             eraseRenderer();
+-            itemsToSave.clear();
+-            saveTimer->stop();
++            //kDebug() << "repaint needed from colorsChanged";
+             emit q->repaintNeeded();
+         }
+ 
+-        Svg *q;
+         static QHash<QString, SharedSvgRenderer::Ptr> s_renderers;
++
++        Svg *q;
++        QPointer<Theme> theme;
+         QHash<QString, QRectF> localRectCache;
+-        QHash<QString, QPixmap> itemsToSave;
+-        QTimer *saveTimer;
+         SharedSvgRenderer::Ptr renderer;
+         QString themePath;
+         QString path;
+         QSizeF size;
+         QSizeF naturalSize;
+-        bool multipleImages;
+-        bool themed;
+-        bool applyColors;
++        unsigned int lastModified;
++        bool multipleImages : 1;
++        bool themed : 1;
++        bool applyColors : 1;
++        bool cacheRendering : 1;
+ };
+ 
+ QHash<QString, SharedSvgRenderer::Ptr> SvgPrivate::s_renderers;
+@@ -415,9 +418,6 @@
+     : QObject(parent),
+       d(new SvgPrivate(this))
+ {
+-    d->saveTimer = new QTimer(this);
+-    d->saveTimer->setSingleShot(true);
+-    connect(d->saveTimer, SIGNAL(timeout()), this, SLOT(scheduledCacheUpdate()));
+ }
+ 
+ Svg::~Svg()
+@@ -515,21 +515,7 @@
+         return false;
+     }
+ 
+-    QString id = d->cacheId(elementId);
+-    if (d->localRectCache.contains(id)) {
+-        return d->localRectCache.value(id).isValid();
+-    }
+-
+-    QRectF elementRect;
+-    bool found = Theme::defaultTheme()->findInRectsCache(d->path, id, elementRect);
+-
+-    if (found) {
+-        d->localRectCache.insert(id, elementRect);
+-        return elementRect.isValid();
+-    } else {
+-//        kDebug() << "** ** *** !!!!!!!! *** ** ** creating renderer due to hasElement miss" << d->path << elementId;
+-        return d->findAndCacheElementRect(elementId).isValid();
+-    }
++    return d->elementRect(elementId).isValid();
+ }
+ 
+ QString Svg::elementAtPoint(const QPoint &point) const
+@@ -572,8 +558,9 @@
+ 
+ void Svg::setImagePath(const QString &svgFilePath)
+ {
+-    d->setImagePath(svgFilePath, this);
+     d->eraseRenderer();
++    d->setImagePath(svgFilePath);
++    //kDebug() << "repaintNeeded";
+     emit repaintNeeded();
+ }
+ 
+@@ -582,6 +569,35 @@
+    return d->themed ? d->themePath : d->path;
+ }
+ 
++void Svg::setUsingRenderingCache(bool useCache)
++{
++    d->cacheRendering = useCache;
++}
++
++bool Svg::isUsingRenderingCache() const
++{
++    return d->cacheRendering;
++}
++
++void Svg::setTheme(Plasma::Theme *theme)
++{
++    if (d->theme) {
++        disconnect(d->theme, 0, this, 0);
++    }
++
++    d->theme = theme;
++    if (!imagePath().isEmpty()) {
++        QString path = imagePath();
++        d->themePath.clear();
++        setImagePath(path);
++    }
++}
++
++Theme *Svg::theme() const
++{
++    return d->theme;
++}
++
+ } // Plasma namespace
+ 
+ #include "svg.moc"
+diff -Naur plasma-orig/svg.h plasma/svg.h
+--- plasma-orig/svg.h	2009-06-03 14:13:11.979685058 +0300
++++ plasma/svg.h	2009-06-03 14:13:36.020685077 +0300
+@@ -37,8 +37,9 @@
+ namespace Plasma
+ {
+ 
+-class SvgPrivate;
+ class FrameSvgPrivate;
++class SvgPrivate;
++class Theme;
+ 
+ /**
+  * @class Svg plasma/svg.h <Plasma/Svg>
+@@ -59,9 +60,9 @@
+     Q_PROPERTY(QSize size READ size)
+     Q_PROPERTY(bool multipleImages READ containsMultipleImages WRITE setContainsMultipleImages)
+     Q_PROPERTY(QString imagePath READ imagePath WRITE setImagePath)
++    Q_PROPERTY(bool usingRenderingCache READ isUsingRenderingCache WRITE setUsingRenderingCache)
+ 
+     public:
+-
+         /**
+          * Constructs an SVG object that implicitly shares and caches rendering
+          * As opposed to QSvgRenderer, which this class uses internally,
+@@ -217,6 +218,41 @@
+          */
+         QString imagePath() const;
+ 
++        /**
++         * Sets whether or not to cache the results of rendering to pixmaps.
++         * If the Svg is resized and re-rendered often without pattern to the resulting
++         * pixmap dimensions, then it may be less efficient to do disk caching. A good
++         * example might be a progress meter that uses an Svg object to paint itself:
++         * the meter will be changing often enoughi, with enough unpredictability and
++         * without re-use of the previous pixmaps to not get a gain from caching.
++         *
++         * Most Svg objects should use the caching feature, however.
++         * Therefore, the default is to use the render cache.
++         *
++         * @param useCache true to cache rendered pixmaps
++         * @since 4.3
++         */
++        void setUsingRenderingCache(bool useCache);
++
++        /**
++         * @return true if the Svg is using caching for rendering results
++         * @since 4.3
++         */
++        bool isUsingRenderingCache() const;
++
++        /**
++         * Sets the Plasma::Theme to use with this Svg object. By default, Svg
++         * objects use Plasma::Theme::default()
++         * @arg theme the theme object to use
++         * @since 4.3
++         */
++        void setTheme(Plasma::Theme *theme);
++
++        /**
++         * @return the theme used by this Svg
++         */
++        Theme *theme() const;
++
+     Q_SIGNALS:
+         void repaintNeeded();
+ 
+@@ -225,7 +261,6 @@
+ 
+         Q_PRIVATE_SLOT(d, void themeChanged())
+         Q_PRIVATE_SLOT(d, void colorsChanged())
+-        Q_PRIVATE_SLOT(d, void scheduledCacheUpdate())
+ 
+         friend class SvgPrivate;
+         friend class FrameSvgPrivate;
+diff -Naur plasma-orig/theme.cpp plasma/theme.cpp
+--- plasma-orig/theme.cpp	2009-06-03 14:13:11.978685419 +0300
++++ plasma/theme.cpp	2009-06-03 14:14:03.692434946 +0300
+@@ -22,6 +22,7 @@
+ #include <QApplication>
+ #include <QFile>
+ #include <QFileInfo>
++#include <QTimer>
+ #ifdef Q_WS_X11
+ #include <QX11Info>
+ #endif
+@@ -30,6 +31,7 @@
+ #include <kcomponentdata.h>
+ #include <kconfiggroup.h>
+ #include <kdebug.h>
++#include <kdirwatch.h>
+ #include <kglobal.h>
+ #include <kglobalsettings.h>
+ #include <kmanagerselection.h>
+@@ -64,11 +66,29 @@
+           compositingActive(KWindowSystem::compositingActive()),
+           isDefault(false),
+           useGlobal(true),
+-          hasWallpapers(false)
++          hasWallpapers(false),
++          useNativeWidgetStyle(false)
+     {
+         generalFont = QApplication::font();
+-        KConfigGroup cg(KGlobal::config(), "CachePolicies");
+-        cacheTheme = cg.readEntry("CacheTheme", true);
++        cacheTheme = cacheConfig().readEntry("CacheTheme", true);
++
++#ifdef Q_WS_X11
++        Display *dpy = QX11Info::display();
++        int screen = DefaultScreen(dpy);
++        locolor = DefaultDepth(dpy, screen) < 16;
++
++        if (!locolor) {
++            char net_wm_cm_name[100];
++            sprintf(net_wm_cm_name, "_NET_WM_CM_S%d", screen);
++            compositeWatch = new KSelectionWatcher(net_wm_cm_name, -1, q);
++            QObject::connect(compositeWatch, SIGNAL(newOwner(Window)), q, SLOT(compositingChanged()));
++            QObject::connect(compositeWatch, SIGNAL(lostOwner()), q, SLOT(compositingChanged()));
++        }
++#endif
++
++        saveTimer = new QTimer(q);
++        saveTimer->setSingleShot(true);
++        QObject::connect(saveTimer, SIGNAL(timeout()), q, SLOT(scheduledCacheUpdate()));
+     }
+ 
+     ~ThemePrivate()
+@@ -76,6 +96,11 @@
+        delete pixmapCache;
+     }
+ 
++    KConfigGroup cacheConfig()
++    {
++        return KConfigGroup(KSharedConfig::openConfig(themeRcFile), "CachePolicies");
++    }
++
+     KConfigGroup &config()
+     {
+         if (!cfg.isValid()) {
+@@ -90,7 +115,7 @@
+                 }
+             }
+ 
+-            cfg = KConfigGroup(KSharedConfig::openConfig("plasmarc"), groupName);
++            cfg = KConfigGroup(KSharedConfig::openConfig(themeRcFile), groupName);
+         }
+ 
+         return cfg;
+@@ -100,10 +125,14 @@
+     void compositingChanged();
+     void discardCache();
+     void discardCache(bool recreateElementsCache);
++    void scheduledCacheUpdate();
+     void colorsChanged();
+     bool useCache();
++    void settingsFileChanged(const QString &);
++    void setThemeName(const QString &themeName, bool writeSettings);
+ 
+     static const char *defaultTheme;
++    static const char *themeRcFile;
+     static PackageStructure::Ptr packageStructure;
+ 
+     Theme *q;
+@@ -120,6 +149,8 @@
+     KPixmapCache *pixmapCache;
+     KSharedConfigPtr svgElementsCache;
+     QHash<QString, QSet<QString> > invalidElements;
++    QHash<QString, QPixmap> pixmapsToCache;
++    QTimer *saveTimer;
+ 
+ #ifdef Q_WS_X11
+     KSelectionWatcher *compositeWatch;
+@@ -130,17 +161,18 @@
+     bool useGlobal : 1;
+     bool hasWallpapers : 1;
+     bool cacheTheme : 1;
++    bool useNativeWidgetStyle :1;
+ };
+ 
+ PackageStructure::Ptr ThemePrivate::packageStructure(0);
+ const char *ThemePrivate::defaultTheme = "default";
++const char *ThemePrivate::themeRcFile = "plasmarc";
+ 
+ bool ThemePrivate::useCache()
+ {
+     if (cacheTheme && !pixmapCache) {
+-        KConfigGroup cg(KGlobal::config(), "CachePolicies");
+         pixmapCache = new KPixmapCache("plasma_theme_" + themeName);
+-        pixmapCache->setCacheLimit(cg.readEntry("ThemeCacheKb", 80 * 1024));
++        pixmapCache->setCacheLimit(cacheConfig().readEntry("ThemeCacheKb", 80 * 1024));
+     }
+ 
+     return cacheTheme;
+@@ -192,9 +224,10 @@
+     delete pixmapCache;
+     pixmapCache = 0;
+     invalidElements.clear();
++    pixmapsToCache.clear();
++    saveTimer->stop();
+ 
+     svgElementsCache = 0;
+-
+     QString svgElementsFile = KStandardDirs::locateLocal("cache", "plasma-svgelements-" + themeName);
+     if (!svgElementsFile.isEmpty()) {
+         QFile f(svgElementsFile);
+@@ -206,6 +239,20 @@
+     }
+ }
+ 
++void ThemePrivate::scheduledCacheUpdate()
++{
++    //kDebug()<< "Saving to cache:";
++    QHash<QString, QPixmap>::const_iterator it = pixmapsToCache.constBegin();
++
++    while (it != pixmapsToCache.constEnd()) {
++        //kDebug()<< "Saving item to cache: " << it.key();
++        pixmapCache->insert(it.key(), it.value());
++        ++it;
++    }
++
++    pixmapsToCache.clear();
++}
++
+ void ThemePrivate::colorsChanged()
+ {
+     discardCache(true);
+@@ -220,6 +267,11 @@
+     ThemeSingleton()
+     {
+         self.d->isDefault = true;
++
++        //FIXME: if/when kconfig gets change notification, this will be unecessary
++        KDirWatch::self()->addFile(KStandardDirs::locateLocal("config", ThemePrivate::themeRcFile));
++        QObject::connect(KDirWatch::self(), SIGNAL(created(QString)), &self, SLOT(settingsFileChanged(QString)));
++        QObject::connect(KDirWatch::self(), SIGNAL(dirty(QString)), &self, SLOT(settingsFileChanged(QString)));
+     }
+ 
+    Theme self;
+@@ -237,20 +289,17 @@
+       d(new ThemePrivate(this))
+ {
+     settingsChanged();
++}
+ 
+-#ifdef Q_WS_X11
+-    Display *dpy = QX11Info::display();
+-    int screen = DefaultScreen(dpy);
+-    d->locolor = DefaultDepth(dpy, screen) < 16;
+-
+-    if (!d->locolor) {
+-        char net_wm_cm_name[100];
+-        sprintf(net_wm_cm_name, "_NET_WM_CM_S%d", screen);
+-        d->compositeWatch = new KSelectionWatcher(net_wm_cm_name, -1, this);
+-        connect(d->compositeWatch, SIGNAL(newOwner(Window)), this, SLOT(compositingChanged()));
+-        connect(d->compositeWatch, SIGNAL(lostOwner()), this, SLOT(compositingChanged()));
+-    }
+-#endif
++Theme::Theme(const QString &themeName, QObject *parent)
++    : QObject(parent),
++      d(new ThemePrivate(this))
++{
++    // turn off caching so we don't accidently trigger unnecessary disk activity at this point
++    bool useCache = d->cacheTheme;
++    d->cacheTheme = false;
++    setThemeName(themeName);
++    d->cacheTheme = useCache;
+ }
+ 
+ Theme::~Theme()
+@@ -274,17 +323,38 @@
+     return ThemePrivate::packageStructure;
+ }
+ 
++KPluginInfo::List Theme::listThemeInfo()
++{
++    QStringList themes = KGlobal::dirs()->findAllResources("data", "desktoptheme/*/metadata.desktop",
++                                                           KStandardDirs::NoDuplicates);
++    return KPluginInfo::fromFiles(themes);
++}
++
++void ThemePrivate::settingsFileChanged(const QString &file)
++{
++    if (file.endsWith(themeRcFile)) {
++        config().config()->reparseConfiguration();
++        q->settingsChanged();
++    }
++}
++
+ void Theme::settingsChanged()
+ {
+-    setThemeName(d->config().readEntry("name", ThemePrivate::defaultTheme));
++    d->setThemeName(d->config().readEntry("name", ThemePrivate::defaultTheme), false);
+ }
+ 
+ void Theme::setThemeName(const QString &themeName)
+ {
+-    QString theme = themeName;
+-    if (theme.isEmpty() || theme == d->themeName) {
++    d->setThemeName(themeName, true);
++}
++
++void ThemePrivate::setThemeName(const QString &tempThemeName, bool writeSettings)
++{
++    //kDebug() << tempThemeName;
++    QString theme = tempThemeName;
++    if (theme.isEmpty() || theme == themeName) {
+         // let's try and get the default theme at least
+-        if (d->themeName.isEmpty()) {
++        if (themeName.isEmpty()) {
+             theme = ThemePrivate::defaultTheme;
+         } else {
+             return;
+@@ -293,7 +363,7 @@
+ 
+     //TODO: should we care about names with relative paths in them?
+     QString themePath = KStandardDirs::locate("data", "desktoptheme/" + theme + '/');
+-    if (themePath.isEmpty() && d->themeName.isEmpty()) {
++    if (themePath.isEmpty() && themeName.isEmpty()) {
+         themePath = KStandardDirs::locate("data", "desktoptheme/default/");
+ 
+         if (themePath.isEmpty()) {
+@@ -303,16 +373,16 @@
+         theme = ThemePrivate::defaultTheme;
+     }
+ 
+-    if (d->themeName == theme) {
++    if (themeName == theme) {
+         return;
+     }
+ 
+     //discard the old theme cache
+-    if (!d->themeName.isEmpty() && d->pixmapCache) {
+-        d->discardCache(false);
++    if (!themeName.isEmpty() && pixmapCache) {
++        discardCache(false);
+     }
+ 
+-    d->themeName = theme;
++    themeName = theme;
+ 
+     // load the color scheme config
+     QString colorsFile = KStandardDirs::locate("data", "desktoptheme/" + theme + "/colors");
+@@ -329,53 +399,56 @@
+     } else {
+         // since we didn't find an entry in the theme, let's look in the main
+         // theme config
+-        cg = d->config();
++        cg = config();
+     }
+ 
+-    d->defaultWallpaperTheme = cg.readEntry("defaultWallpaperTheme", DEFAULT_WALLPAPER_THEME);
+-    d->defaultWallpaperSuffix = cg.readEntry("defaultFileSuffix", DEFAULT_WALLPAPER_SUFFIX);
+-    d->defaultWallpaperWidth = cg.readEntry("defaultWidth", DEFAULT_WALLPAPER_WIDTH);
+-    d->defaultWallpaperHeight = cg.readEntry("defaultHeight", DEFAULT_WALLPAPER_HEIGHT);
++    defaultWallpaperTheme = cg.readEntry("defaultWallpaperTheme", DEFAULT_WALLPAPER_THEME);
++    defaultWallpaperSuffix = cg.readEntry("defaultFileSuffix", DEFAULT_WALLPAPER_SUFFIX);
++    defaultWallpaperWidth = cg.readEntry("defaultWidth", DEFAULT_WALLPAPER_WIDTH);
++    defaultWallpaperHeight = cg.readEntry("defaultHeight", DEFAULT_WALLPAPER_HEIGHT);
++
++    cg = KConfigGroup(&metadata, "Settings");
++    useNativeWidgetStyle = cg.readEntry("UseNativeWidgetStyle", false);
+ 
+-    disconnect(KGlobalSettings::self(), SIGNAL(kdisplayPaletteChanged()),
+-                this, SLOT(colorsChanged()));
++    QObject::disconnect(KGlobalSettings::self(), SIGNAL(kdisplayPaletteChanged()),
++                        q, SLOT(colorsChanged()));
+ 
+     if (colorsFile.isEmpty()) {
+-        d->colors = 0;
+-        connect(KGlobalSettings::self(), SIGNAL(kdisplayPaletteChanged()),
+-                this, SLOT(colorsChanged()));
++        colors = 0;
++        QObject::connect(KGlobalSettings::self(), SIGNAL(kdisplayPaletteChanged()),
++                         q, SLOT(colorsChanged()));
+     } else {
+-        d->colors = KSharedConfig::openConfig(colorsFile);
++        colors = KSharedConfig::openConfig(colorsFile);
+     }
+ 
+-    d->colorScheme = KColorScheme(QPalette::Active, KColorScheme::Window, d->colors);
+-    d->buttonColorScheme = KColorScheme(QPalette::Active, KColorScheme::Button, d->colors);
+-    d->hasWallpapers =
+-        KStandardDirs::exists(KStandardDirs::locateLocal("data", "desktoptheme/" + theme + "/wallpapers/"));
++    colorScheme = KColorScheme(QPalette::Active, KColorScheme::Window, colors);
++    buttonColorScheme = KColorScheme(QPalette::Active, KColorScheme::Button, colors);
++    hasWallpapers = KStandardDirs::exists(KStandardDirs::locateLocal("data", "desktoptheme/" + theme + "/wallpapers/"));
+ 
+-    if (d->isDefault) {
++    if (isDefault && writeSettings) {
+         // we're the default theme, let's save our state
+-        KConfigGroup &cg = d->config();
+-        if (ThemePrivate::defaultTheme == d->themeName) {
++        KConfigGroup &cg = config();
++        if (ThemePrivate::defaultTheme == themeName) {
+             cg.deleteEntry("name");
+         } else {
+-            cg.writeEntry("name", d->themeName);
++            cg.writeEntry("name", themeName);
+         }
++        cg.sync();
+     }
+ 
+     //check for expired cache
+     QFile f(metadataPath);
+     QFileInfo info(f);
+ 
+-    if (d->useCache() && info.lastModified().toTime_t() > d->pixmapCache->timestamp()) {
+-        d->discardCache(false);
++    if (useCache() && info.lastModified().toTime_t() > pixmapCache->timestamp()) {
++        discardCache(false);
+     }
+ 
+-    d->invalidElements.clear();
++    invalidElements.clear();
+     QString svgElementsFile = KStandardDirs::locateLocal("cache", "plasma-svgelements-" + themeName);
+-    d->svgElementsCache = KSharedConfig::openConfig(svgElementsFile);
++    svgElementsCache = KSharedConfig::openConfig(svgElementsFile);
+ 
+-    emit themeChanged();
++    emit q->themeChanged();
+ }
+ 
+ QString Theme::themeName() const
+@@ -386,8 +459,9 @@
+ QString Theme::imagePath(const QString &name) const
+ {
+     // look for a compressed svg file in the theme
+-    if (name.contains("../")) {
++    if (name.contains("../") || name.isEmpty()) {
+         // we don't support relative paths
++        kDebug() << "Theme says: bad image path " << name;
+         return QString();
+     }
+ 
+@@ -560,15 +634,40 @@
+     return d->useGlobal;
+ }
+ 
++bool Theme::useNativeWidgetStyle() const
++{
++    return d->useNativeWidgetStyle;
++}
++
+ bool Theme::findInCache(const QString &key, QPixmap &pix)
+ {
+-    return d->useCache() && d->pixmapCache->find(key, pix);
++    if (d->useCache()) {
++        if (d->pixmapsToCache.contains(key)) {
++            pix = d->pixmapsToCache.value(key);
++            return true;
++        }
++
++        return d->pixmapCache->find(key, pix);
++    }
++
++    return false;
++}
++
++// BIC FIXME: Should be merged with the other findInCache method above when we break BC
++bool Theme::findInCache(const QString &key, QPixmap &pix, unsigned int lastModified)
++{
++    if (d->useCache() && lastModified > d->pixmapCache->timestamp()) {
++        d->discardCache();
++    }
++
++    return findInCache(key, pix);
+ }
+ 
+ void Theme::insertIntoCache(const QString& key, const QPixmap& pix)
+ {
+     if (d->useCache()) {
+-        d->pixmapCache->insert(key, pix);
++        d->pixmapsToCache.insert(key, pix);
++        d->saveTimer->start(500);
+     }
+ }
+ 
+@@ -585,6 +684,12 @@
+         return true;
+     }
+ 
++    //A single _ means the element is empty and we're asked for the size of
++    //the whole image, so the whole image is never invalid
++    if (element.count('_') == 1) {
++        return false;
++    }
++
+     bool invalid = false;
+ 
+     QHash<QString, QSet<QString> >::iterator it = d->invalidElements.find(image);
+diff -Naur plasma-orig/theme.h plasma/theme.h
+--- plasma-orig/theme.h	2009-06-03 14:13:11.978685419 +0300
++++ plasma/theme.h	2009-06-03 14:14:03.980434936 +0300
+@@ -24,6 +24,7 @@
+ #include <QtGui/QFont>
+ #include <QtGui/QFontMetrics>
+ 
++#include <kplugininfo.h>
+ #include <ksharedconfig.h>
+ 
+ #include <plasma/plasma_export.h>
+@@ -79,8 +80,20 @@
+ 
+         /**
+          * Default constructor. Usually you want to use the singleton instead.
++         * @see defaultTheme
++         * @arg parent the parent object
+          */
+         explicit Theme(QObject *parent = 0);
++
++        /**
++         * Construct a theme. Usually you want to use the singleton instead.
++         * @see defaultTheme
++         * @arg themeName the name of the theme to create
++         * @arg parent the parent object
++         * @since 4.3
++         */
++        explicit Theme(const QString &themeName, QObject *parent = 0);
++
+         ~Theme();
+ 
+         /**
+@@ -89,6 +102,12 @@
+         static PackageStructure::Ptr packageStructure();
+ 
+         /**
++         * @return a list of all known themes
++         * @since 4.3
++         */
++        static KPluginInfo::List listThemeInfo();
++
++        /**
+          * Sets the current theme being used.
+          */
+         void setThemeName(const QString &themeName);
+@@ -180,15 +199,42 @@
+         bool useGlobalSettings() const;
+ 
+         /**
++         * @return true if the native widget styles should be used instead of themed
++         * widgets. Defaults is false.
++         */
++        bool useNativeWidgetStyle() const;
++
++        /**
+          * Tries to load pixmap with the specified key from cache.
++         *
++         * @param key the name to use in the cache for this image
++         * @param pix the pixmap object to populate with the resulting data if found
++         *
+          * @return true when pixmap was found and loaded from cache, false otherwise
+          **/
+         bool findInCache(const QString &key, QPixmap &pix);
+ 
+         /**
++         * This is an overloaded member provided to check with file timestamp
++         * where cache is still valid.
++         *
++         * @param key the name to use in the cache for this image
++         * @param pix the pixmap object to populate with the resulting data if found
++         * @param lastModified if non-zero, the time stamp is also checked on the file,
++         *                     and must be newer than the timestamp to be loaded
++         *
++         * @return true when pixmap was found and loaded from cache, false otherwise
++         * @since 4.3
++         **/
++        bool findInCache(const QString &key, QPixmap &pix, unsigned int lastModified);
++
++        /**
+          * Insert specified pixmap into the cache.
+          * If the cache already contains pixmap with the specified key then it is
+-         *  overwritten.
++         * overwritten.
++         *
++         * @param key the name to use in the cache for this pixmap
++         * @param pix the pixmap data to store in the cache
+          **/
+         void insertIntoCache(const QString& key, const QPixmap& pix);
+ 
+@@ -260,6 +306,8 @@
+         Q_PRIVATE_SLOT(d, void compositingChanged())
+         Q_PRIVATE_SLOT(d, void discardCache())
+         Q_PRIVATE_SLOT(d, void colorsChanged())
++        Q_PRIVATE_SLOT(d, void settingsFileChanged(const QString &))
++        Q_PRIVATE_SLOT(d, void scheduledCacheUpdate())
+ };
+ 
+ } // Plasma namespace

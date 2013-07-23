@@ -1,0 +1,40 @@
+diff -up libX11-1.1.4/src/xcb_io.c.xcb-xreply-leak libX11-1.1.4/src/xcb_io.c
+--- libX11-1.1.4/src/xcb_io.c.xcb-xreply-leak	2008-03-06 15:45:06.000000000 -0500
++++ libX11-1.1.4/src/xcb_io.c	2008-09-17 12:58:05.000000000 -0400
+@@ -396,15 +396,19 @@ Status _XReply(Display *dpy, xReply *rep
+ 				{
+ 					case X_LookupColor:
+ 					case X_AllocNamedColor:
++						free(error);
+ 						return 0;
+ 				}
+ 				break;
+ 			case BadFont:
+-				if(err->majorCode == X_QueryFont)
++				if(err->majorCode == X_QueryFont) {
++					free(error);
+ 					return 0;
++				}
+ 				break;
+ 			case BadAlloc:
+ 			case BadAccess:
++				free(error);
+ 				return 0;
+ 		}
+ 
+@@ -413,10 +417,13 @@ Status _XReply(Display *dpy, xReply *rep
+ 		 * want to suppress the error.
+ 		 */
+ 		for(ext = dpy->ext_procs; ext; ext = ext->next)
+-			if(ext->error && ext->error(dpy, err, &ext->codes, &ret_code))
++			if(ext->error && ext->error(dpy, err, &ext->codes, &ret_code)) {
++				free(error);
+ 				return ret_code;
++			}
+ 
+-		_XError(dpy, (xError *) error);
++		_XError(dpy, err);
++		free(error);
+ 		return 0;
+ 	}
+ 

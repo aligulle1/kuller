@@ -1,0 +1,20 @@
+--- build.sh	2007-08-16 04:06:24.824950773 +0300
++++ build.sh	2007-08-16 03:49:14.000000000 +0300
+@@ -0,0 +1,17 @@
++#!/bin/sh
++
++export JAVADIR=/opt/sun-jdk
++export QTDIR=/usr/qt/4
++
++cd generator
++qmake-qt4
++make
++./generator
++cd ..
++
++qmake-qt4 -r
++make
++
++bin/juic -cp .
++/opt/sun-jdk/bin/javac -verbose @java_files
++/opt/sun-jdk/bin/jar cf qtjambi-VERSION.jar com/trolltech/qt com/trolltech/tools

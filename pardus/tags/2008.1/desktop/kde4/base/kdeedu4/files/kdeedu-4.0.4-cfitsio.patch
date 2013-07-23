@@ -1,0 +1,26 @@
+diff -up kdeedu-4.0.4/cmake/modules/FindCFitsio.cmake.cfitsio kdeedu-4.0.4/cmake/modules/FindCFitsio.cmake
+--- kdeedu-4.0.4/cmake/modules/FindCFitsio.cmake.cfitsio	2008-01-04 17:56:03.000000000 -0600
++++ kdeedu-4.0.4/cmake/modules/FindCFitsio.cmake	2008-05-07 14:36:53.000000000 -0500
+@@ -20,13 +20,22 @@ if (CFITSIO_INCLUDE_DIR AND CFITSIO_LIBR
+ 
+ else (CFITSIO_INCLUDE_DIR AND CFITSIO_LIBRARIES)
+ 
++  IF (NOT WIN32)
++    # use pkg-config to get the directories and then use these values
++    # in the FIND_PATH() and FIND_LIBRARY() calls
++    INCLUDE(UsePkgConfig)
++    PKGCONFIG(cfitsio _CFitsioIncDir _CFitsioLinkDir _CFitsioLinkFlags _CFitsioCflags)
++  ENDIF (NOT WIN32)
++
+   find_path(CFITSIO_INCLUDE_DIR fitsio.h
++    ${_CFitsioIncDir} 
+     ${_obIncDir}
+     ${GNUWIN32_DIR}/include
+   )
+ 
+   find_library(CFITSIO_LIBRARIES NAMES cfitsio
+     PATHS
++    ${_CFitsioLinkDir}
+     ${_obLinkDir}
+     ${GNUWIN32_DIR}/lib
+   )

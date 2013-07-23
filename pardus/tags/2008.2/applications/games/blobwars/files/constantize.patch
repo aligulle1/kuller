@@ -1,0 +1,1733 @@
+diff -Nur blobwars-1.09b2-old/src/aquaBoss.h blobwars-1.09b2/src/aquaBoss.h
+--- blobwars-1.09b2-old/src/aquaBoss.h	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/aquaBoss.h	2008-11-24 00:35:25.000000000 +0200
+@@ -21,14 +21,14 @@
+ #include "headers.h"
+ 
+ extern void addBlood(Entity *ent, float dx, float dy, int amount);
+-extern void checkObjectives(char *name, bool alwaysInform);
++extern void checkObjectives(const char *name, bool alwaysInform);
+ extern void addColorParticles(float x, float y, int amount, int color);
+ extern void addBullet(Entity *owner, float dx, float dy);
+ extern void addExplosion(float x, float y, int radius, Entity *owner);
+ extern void addSmokeAndFire(Entity *ent, float dx, float dy, int amount);
+ extern void throwAndDamageEntity(Entity *ent, int damage, int minDX, int maxDX, int DY);
+-extern Weapon *getWeaponByName(char *name);
+-extern Entity *getDefinedEnemy(char *name);
++extern Weapon *getWeaponByName(const char *name);
++extern Entity *getDefinedEnemy(const char *name);
+ 
+ extern Audio audio;
+ extern Engine engine;
+diff -Nur blobwars-1.09b2-old/src/bosses.cpp blobwars-1.09b2/src/bosses.cpp
+--- blobwars-1.09b2-old/src/bosses.cpp	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/bosses.cpp	2008-11-24 00:35:25.000000000 +0200
+@@ -297,7 +297,7 @@
+ 	}
+ }
+ 
+-void createBoss(char *stageName)
++void createBoss(const char *stageName)
+ {
+ 	map.mainBossPart = NULL;
+ 	
+diff -Nur blobwars-1.09b2-old/src/bosses.h blobwars-1.09b2/src/bosses.h
+--- blobwars-1.09b2-old/src/bosses.h	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/bosses.h	2008-11-24 00:35:25.000000000 +0200
+@@ -20,16 +20,16 @@
+ 
+ #include "headers.h"
+ 
+-extern void addItem(int itemType, char *name, int x, int y, char *spriteName, int health, int value, int flags, bool randomMovement);
++extern void addItem(int itemType, const char *name, int x, int y, const char *spriteName, int health, int value, int flags, bool randomMovement);
+ extern void addTeleportParticles(float x, float y, int amount, int soundToPlay);
+ extern void addColorParticles(float x, float y, int amount, int color);
+-extern bool okayToSpawnEnemy(char *name, int x, int y);
+-extern void addEnemy(char *name, int x, int y, int flags);
++extern bool okayToSpawnEnemy(const char *name, int x, int y);
++extern void addEnemy(const char *name, int x, int y, int flags);
+ extern void moveEntity(Entity *entity);
+ extern void addFireTrailParticle(float x, float y);
+-extern void checkObjectives(char *name, bool alwaysInform);
++extern void checkObjectives(const char *name, bool alwaysInform);
+ 
+-extern Entity *getEnemy(char *name);
++extern Entity *getEnemy(const char *name);
+ extern Weapon *getRandomAimedWeapon();
+ extern Weapon *getRandomStraightWeapon();
+ extern Weapon *getRandomGaldovWeapon();
+diff -Nur blobwars-1.09b2-old/src/CAudio.cpp blobwars-1.09b2/src/CAudio.cpp
+--- blobwars-1.09b2-old/src/CAudio.cpp	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/CAudio.cpp	2008-11-24 00:35:25.000000000 +0200
+@@ -58,7 +58,7 @@
+ 	this->engine = engine;
+ }
+ 
+-bool Audio::loadSound(int i, char *filename)
++bool Audio::loadSound(int i, const char *filename)
+ {
+ 	if (!engine->useAudio)
+ 	{
+@@ -93,7 +93,7 @@
+ 	return true;
+ }
+ 
+-bool Audio::loadMusic(char *filename)
++bool Audio::loadMusic(const char *filename)
+ {
+ 	char tempPath[PATH_MAX];
+ 	
+diff -Nur blobwars-1.09b2-old/src/CAudio.h blobwars-1.09b2/src/CAudio.h
+--- blobwars-1.09b2-old/src/CAudio.h	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/CAudio.h	2008-11-24 00:35:25.000000000 +0200
+@@ -43,8 +43,8 @@
+ 	void setSoundVolume(int soundVolume);
+ 	void setMusicVolume(int musicVolume);
+ 	void registerEngine(Engine *engine);
+-	bool loadSound(int i, char *filename);
+-	bool loadMusic(char *filename);
++	bool loadSound(int i, const char *filename);
++	bool loadMusic(const char *filename);
+ 	void playSound(int snd, int channel);
+ 	void playMusic();
+ 	void playMusicOnce();
+diff -Nur blobwars-1.09b2-old/src/CData.cpp blobwars-1.09b2/src/CData.cpp
+--- blobwars-1.09b2-old/src/CData.cpp	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/CData.cpp	2008-11-24 00:35:25.000000000 +0200
+@@ -28,7 +28,7 @@
+ 	target = 1;
+ }
+ 
+-void Data::set(char *key, char *value, int current, int target)
++void Data::set(const char *key, const char *value, int current, int target)
+ {
+ 	if ((strlen(key) > 100) || (strlen(value) > 100))
+ 	{
+diff -Nur blobwars-1.09b2-old/src/CData.h blobwars-1.09b2/src/CData.h
+--- blobwars-1.09b2-old/src/CData.h	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/CData.h	2008-11-24 00:35:25.000000000 +0200
+@@ -28,7 +28,7 @@
+ 		int target;
+ 		
+ 	Data();
+-	void set(char *key, char *value, int current, int target);
++	void set(const char *key, const char *value, int current, int target);
+ 	bool isComplete();
+ 	void getCurrentTarget(int *current, int *target);
+ 
+diff -Nur blobwars-1.09b2-old/src/CEngine.cpp blobwars-1.09b2/src/CEngine.cpp
+--- blobwars-1.09b2-old/src/CEngine.cpp	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/CEngine.cpp	2008-11-24 00:35:25.000000000 +0200
+@@ -335,7 +335,7 @@
+ In the case of music, the data music be written to a temporary directory
+ since SDL currently provides no means to load music directly from memory
+ */
+-bool Engine::unpack(char *filename, int fileType)
++bool Engine::unpack(const char *filename, int fileType)
+ {
+ 	if (fileType == PAK_DATA)
+ 	{
+@@ -409,7 +409,7 @@
+ 	return true;
+ }
+ 
+-bool Engine::loadData(char *filename)
++bool Engine::loadData(const char *filename)
+ {
+ 	if (dataBuffer != NULL)
+ 	{
+@@ -490,7 +490,7 @@
+ 	time1 = time2 = SDL_GetTicks();
+ }
+ 
+-void Engine::setInfoMessage(char *message, int priority, int type)
++void Engine::setInfoMessage(const char *message, int priority, int type)
+ {
+ 	if (priority >= messagePriority)
+ 	{
+@@ -519,7 +519,7 @@
+ 	widgetList.add(widget);
+ }
+ 
+-bool Engine::loadWidgets(char *filename)
++bool Engine::loadWidgets(const char *filename)
+ {
+ 	deleteWidgets();
+ 
+@@ -573,7 +573,7 @@
+ 	return true;
+ }
+ 
+-Widget *Engine::getWidgetByName(char *name)
++Widget *Engine::getWidgetByName(const char *name)
+ {
+ 	Widget *widget = (Widget*)widgetList.getHead();
+ 
+@@ -590,7 +590,7 @@
+ 	return NULL;
+ }
+ 
+-void Engine::showWidgetGroup(char *groupName, bool show)
++void Engine::showWidgetGroup(const char *groupName, bool show)
+ {
+ 	bool found = false;
+ 
+@@ -612,7 +612,7 @@
+ 		debug(("Group '%s' does not exist\n", groupName));
+ }
+ 
+-void Engine::enableWidgetGroup(char *groupName, bool show)
++void Engine::enableWidgetGroup(const char *groupName, bool show)
+ {
+ 	bool found = false;
+ 
+@@ -634,7 +634,7 @@
+ 		debug(("Group '%s' does not exist\n", groupName));
+ }
+ 
+-void Engine::showWidget(char *name, bool show)
++void Engine::showWidget(const char *name, bool show)
+ {
+ 	Widget *widget = getWidgetByName(name);
+ 	if (widget != NULL)
+@@ -644,7 +644,7 @@
+ 	}
+ }
+ 
+-void Engine::enableWidget(char *name, bool enable)
++void Engine::enableWidget(const char *name, bool enable)
+ {
+ 	Widget *widget = getWidgetByName(name);
+ 	if (widget != NULL)
+@@ -654,14 +654,14 @@
+ 	}
+ }
+ 
+-void Engine::setWidgetVariable(char *name, int *variable)
++void Engine::setWidgetVariable(const char *name, int *variable)
+ {
+ 	Widget *widget = getWidgetByName(name);
+ 	if (widget != NULL)
+ 		widget->value = variable;
+ }
+ 
+-bool Engine::widgetChanged(char *name)
++bool Engine::widgetChanged(const char *name)
+ {
+ 	Widget *widget = getWidgetByName(name);
+ 	if (widget != NULL)
+@@ -719,7 +719,7 @@
+ 	highlightedWidget->redraw();
+ }
+ 
+-void Engine::highlightWidget(char *name)
++void Engine::highlightWidget(const char *name)
+ {
+ 	highlightedWidget = getWidgetByName(name);
+ }
+@@ -922,7 +922,7 @@
+ /*
+ Does the opposite of the above(!)
+ */
+-char *Engine::getDefineOfValue(char *prefix, int value)
++const char *Engine::getDefineOfValue(const char *prefix, int value)
+ {
+ 	int rtn = 0;
+ 
+@@ -953,7 +953,7 @@
+ flags (in a bit of a half arsed manner because of my lazy (2 << 25) declarations, adds all
+ the values together and then returns them... phew! Makes data files human readable though :)
+ */
+-int Engine::getValueOfFlagTokens(char *realLine)
++int Engine::getValueOfFlagTokens(const char *realLine)
+ {
+ 	if (strcmp(realLine, "0") == 0)
+ 		return 0;
+diff -Nur blobwars-1.09b2-old/src/CEngine.h blobwars-1.09b2/src/CEngine.h
+--- blobwars-1.09b2-old/src/CEngine.h	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/CEngine.h	2008-11-24 00:35:25.000000000 +0200
+@@ -110,8 +110,8 @@
+ 	void clearInput();
+ 	void setUserHome(char *path);
+ 	Pak *getPak();
+-	bool unpack(char *filename, int fileType);
+-	bool loadData(char *filename);
++	bool unpack(const char *filename, int fileType);
++	bool loadData(const char *filename);
+ 	void reportFontFailure();
+ 	void setPlayerPosition(int x, int y, int limitLeft, int limitRight, int limitUp, int limitDown);
+ 	int getFrameLoop();
+@@ -119,23 +119,23 @@
+ 	void doTimeDifference();
+ 	float getTimeDifference();
+ 	void resetTimeDifference();
+-	void setInfoMessage(char *message, int priority, int type);
++	void setInfoMessage(const char *message, int priority, int type);
+ 	void deleteWidgets();
+ 	void addWidget(Widget *widget);
+-	bool loadWidgets(char *filename);
+-	Widget *getWidgetByName(char *name);
+-	void showWidgetGroup(char *groupName, bool show);
+-	void enableWidgetGroup(char *groupName, bool show);
+-	void showWidget(char *name, bool show);
+-	void enableWidget(char *name, bool enable);
+-	void setWidgetVariable(char *name, int *variable);
+-	bool widgetChanged(char *name);
++	bool loadWidgets(const char *filename);
++	Widget *getWidgetByName(const char *name);
++	void showWidgetGroup(const char *groupName, bool show);
++	void enableWidgetGroup(const char *groupName, bool show);
++	void showWidget(const char *name, bool show);
++	void enableWidget(const char *name, bool enable);
++	void setWidgetVariable(const char *name, int *variable);
++	bool widgetChanged(const char *name);
+ 	void highlightWidget(int dir);
+-	void highlightWidget(char *name);
++	void highlightWidget(const char *name);
+ 	int processWidgets();
+ 	bool loadDefines();
+ 	int getValueOfDefine(char *word);
+-	char *getDefineOfValue(char *prefix, int value);
+-	int getValueOfFlagTokens(char *line);
++	const char *getDefineOfValue(const char *prefix, int value);
++	int getValueOfFlagTokens(const char *line);
+ 	void delay(unsigned int frameLimit);
+ };
+diff -Nur blobwars-1.09b2-old/src/CEntity.cpp blobwars-1.09b2/src/CEntity.cpp
+--- blobwars-1.09b2-old/src/CEntity.cpp	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/CEntity.cpp	2008-11-24 00:35:25.000000000 +0200
+@@ -50,7 +50,7 @@
+ 	}
+ }
+ 
+-void Entity::setName(char *name)
++void Entity::setName(const char *name)
+ {
+ 	strcpy(this->name, name);
+ }
+diff -Nur blobwars-1.09b2-old/src/CEntity.h blobwars-1.09b2/src/CEntity.h
+--- blobwars-1.09b2-old/src/CEntity.h	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/CEntity.h	2008-11-24 00:35:25.000000000 +0200
+@@ -52,7 +52,7 @@
+ 		Entity *owner;
+ 
+ 	Entity();
+-	void setName(char *name);
++	void setName(const char *name);
+ 	void setSprites(Sprite *sprite1, Sprite *sprite2, Sprite *sprite3);
+ 	void animate();
+ 	SDL_Surface *getFaceImage();
+diff -Nur blobwars-1.09b2-old/src/CFileData.cpp blobwars-1.09b2/src/CFileData.cpp
+--- blobwars-1.09b2-old/src/CFileData.cpp	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/CFileData.cpp	2008-11-24 00:35:25.000000000 +0200
+@@ -28,7 +28,7 @@
+ 	location = 0;
+ }
+ 
+-void FileData::set(char *filename, Uint32 fSize, Uint32 cSize, Uint32 location)
++void FileData::set(const char *filename, Uint32 fSize, Uint32 cSize, Uint32 location)
+ {
+ 	if (strlen(filename) > 59)
+ 	{
+@@ -36,7 +36,7 @@
+ 	}
+ 	
+ 	strncpy(this->filename, filename, 59);
+-	filename[59] = '\0';
++	this->filename[59] = '\0';
+ 	
+ 	this->fSize = fSize;
+ 	this->cSize = cSize;
+diff -Nur blobwars-1.09b2-old/src/CFileData.h blobwars-1.09b2/src/CFileData.h
+--- blobwars-1.09b2-old/src/CFileData.h	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/CFileData.h	2008-11-24 00:35:25.000000000 +0200
+@@ -29,5 +29,5 @@
+ 
+ 	FileData();
+ 	
+-	void set(char *filename, Uint32 fSize, Uint32 cSize, Uint32 location);
++	void set(const char *filename, Uint32 fSize, Uint32 cSize, Uint32 location);
+ };
+diff -Nur blobwars-1.09b2-old/src/CGame.cpp blobwars-1.09b2/src/CGame.cpp
+--- blobwars-1.09b2-old/src/CGame.cpp	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/CGame.cpp	2008-11-24 00:35:25.000000000 +0200
+@@ -219,12 +219,12 @@
+ 	currentMissionSeconds = currentMissionMinutes = currentMissionHours = 0;
+ }
+ 
+-void Game::setStageName(char *name)
++void Game::setStageName(const char *name)
+ {
+ 	strcpy(stageName, name);
+ }
+ 
+-void Game::setMapName(char *name)
++void Game::setMapName(const char *name)
+ {
+ 	strcpy(mapName, name);
+ }
+diff -Nur blobwars-1.09b2-old/src/CGameData.cpp blobwars-1.09b2/src/CGameData.cpp
+--- blobwars-1.09b2-old/src/CGameData.cpp	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/CGameData.cpp	2008-11-24 00:35:25.000000000 +0200
+@@ -35,7 +35,7 @@
+ 	clear();
+ }
+ 
+-void GameData::addCompletedObjective(char *key, char *value, int current, int target)
++void GameData::addCompletedObjective(const char *key, const char *value, int current, int target)
+ {
+ 	Data *data = (Data*)dataList.getHead();
+ 
+@@ -78,7 +78,7 @@
+ 	dataList.add(newData);
+ }
+ 
+-void GameData::setMIARescueCount(char *key, int rescues, int total)
++void GameData::setMIARescueCount(const char *key, int rescues, int total)
+ {
+ 	Data *data = (Data*)dataList.getHead();
+ 
+@@ -104,7 +104,7 @@
+ 	dataList.add(data);
+ }
+ 
+-bool GameData::MIARescued(char *stageName, char *name)
++bool GameData::MIARescued(const char *stageName, const char *name)
+ {
+ 	Data *data = (Data*)dataList.getHead();
+ 
+@@ -126,7 +126,7 @@
+ 	return false;
+ }
+ 
+-bool GameData::objectiveCompleted(char *stageName, char *name)
++bool GameData::objectiveCompleted(const char *stageName, const char *name)
+ {
+ 	Data *data = (Data*)dataList.getHead();
+ 
+@@ -145,7 +145,7 @@
+ 	return false;
+ }
+ 
+-void GameData::getObjectiveValues(char *stageName, char *name, int *current, int *target)
++void GameData::getObjectiveValues(const char *stageName, const char *name, int *current, int *target)
+ {
+ 	*current = -1;
+ 	*target = -1;
+@@ -166,7 +166,7 @@
+ 	}
+ }
+ 
+-bool GameData::stagePreviouslyCleared(char *stageName)
++bool GameData::stagePreviouslyCleared(const char *stageName)
+ {
+ 	Data *data = (Data*)dataList.getHead();
+ 
+@@ -182,7 +182,7 @@
+ 	return false;
+ }
+ 
+-bool GameData::isCompleted(char *key, char *value)
++bool GameData::isCompleted(const char *key, const char *value)
+ {
+ 	Data *data = (Data*)dataList.getHead();
+ 
+diff -Nur blobwars-1.09b2-old/src/CGameData.h blobwars-1.09b2/src/CGameData.h
+--- blobwars-1.09b2-old/src/CGameData.h	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/CGameData.h	2008-11-24 00:35:25.000000000 +0200
+@@ -29,17 +29,17 @@
+ 	void clear();
+ 	void destroy();
+ 	
+-	void addCompletedObjective(char *key, char *value, int current, int target);
++	void addCompletedObjective(const char *key, const char *value, int current, int target);
+ 	void addCompletedObjective(Data *newData);
+ 	
+-	void setMIARescueCount(char *key, int rescues, int total);
+-	bool MIARescued(char *stageName, char *name);
++	void setMIARescueCount(const char *key, int rescues, int total);
++	bool MIARescued(const char *stageName, const char *name);
+ 	
+-	bool objectiveCompleted(char *stageName, char *name);
+-	void getObjectiveValues(char *stageName, char *name, int *current, int *target);
++	bool objectiveCompleted(const char *stageName, const char *name);
++	void getObjectiveValues(const char *stageName, const char *name, int *current, int *target);
+ 	
+-	bool stagePreviouslyCleared(char *stageName);
+-	bool isCompleted(char *key, char *value);
++	bool stagePreviouslyCleared(const char *stageName);
++	bool isCompleted(const char *key, const char *value);
+ 	int getPercentageComplete();
+ 	
+ 	bool levelPrefectlyCleared(char *level);
+diff -Nur blobwars-1.09b2-old/src/CGame.h blobwars-1.09b2/src/CGame.h
+--- blobwars-1.09b2-old/src/CGame.h	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/CGame.h	2008-11-24 00:35:25.000000000 +0200
+@@ -74,8 +74,8 @@
+ 		int getTotalAccuracy();
+ 		int getMostUsedWeapon();
+ 		void totalUpStats();
+-		void setStageName(char *name);
+-		void setMapName(char *name);
++		void setStageName(const char *name);
++		void setMapName(const char *name);
+ 		void setMissionOver(int reason);
+ 		void resetMissionOver();
+ 
+diff -Nur blobwars-1.09b2-old/src/CGraphics.cpp blobwars-1.09b2/src/CGraphics.cpp
+--- blobwars-1.09b2-old/src/CGraphics.cpp	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/CGraphics.cpp	2008-11-24 00:35:25.000000000 +0200
+@@ -299,7 +299,7 @@
+ 	}
+ }
+ 
+-SDL_Surface *Graphics::loadImage(char *filename)
++SDL_Surface *Graphics::loadImage(const char *filename)
+ {
+ 	SDL_Surface *image, *newImage;
+ 
+@@ -331,7 +331,7 @@
+ 	return newImage;
+ }
+ 
+-SDL_Surface *Graphics::loadImage(char *filename, int hue, int sat, int value)
++SDL_Surface *Graphics::loadImage(const char *filename, int hue, int sat, int value)
+ {
+ 	SDL_Surface *image, *newImage;
+ 
+@@ -401,7 +401,7 @@
+ 	return newImage;
+ }
+ 
+-SDL_Surface *Graphics::quickSprite(char *name, SDL_Surface *image)
++SDL_Surface *Graphics::quickSprite(const char *name, SDL_Surface *image)
+ {
+ 	Sprite *sprite = addSprite(name);
+ 	sprite->setFrame(0, image, 60);
+@@ -428,7 +428,7 @@
+ 	}
+ }
+ 
+-void Graphics::loadMapTiles(char *baseDir)
++void Graphics::loadMapTiles(const char *baseDir)
+ {
+ 	bool found, autoAlpha;
+ 	char filename[255];
+@@ -491,7 +491,7 @@
+ they will get a small or larger font and this won't work. This might look
+ weird since we'll load and delete multiple fonts, but it works...
+ */
+-void Graphics::loadFont(int i, char *filename, int pixelSize)
++void Graphics::loadFont(int i, const char *filename, int pixelSize)
+ {
+ 	int minx, maxx, miny, maxy, advance;
+ 	
+@@ -564,7 +564,7 @@
+ 	debug(("Got a match for font size %d - Nearest = %d\n", pixelSize, maxx));
+ }
+ 
+-Sprite *Graphics::addSprite(char *name)
++Sprite *Graphics::addSprite(const char *name)
+ {
+ 	Sprite *sprite = new Sprite;
+ 	strcpy(sprite->name, name);
+@@ -574,7 +574,7 @@
+ 	return sprite;
+ }
+ 
+-Sprite *Graphics::getSprite(char *name, bool required)
++Sprite *Graphics::getSprite(const char *name, bool required)
+ {
+ 	Sprite *sprite = (Sprite*)spriteList.getHead();
+ 
+@@ -636,7 +636,7 @@
+ 	return current;
+ }
+ 
+-void Graphics::loadBackground(char *filename)
++void Graphics::loadBackground(const char *filename)
+ {
+ 	if (background != NULL)
+ 		SDL_FreeSurface(background);
+@@ -824,7 +824,7 @@
+ 	Math::limitInt(&fontSize, 0, 4);
+ }
+ 
+-SDL_Surface *Graphics::getString(char *in, bool transparent)
++SDL_Surface *Graphics::getString(const char *in, bool transparent)
+ {
+ 	SDL_Surface *text = TTF_RenderUTF8_Shaded(font[fontSize], in, fontForeground, fontBackground);
+ 
+@@ -839,7 +839,7 @@
+ 	return text;
+ }
+ 
+-void Graphics::drawString(char *in, int x, int y, int alignment, SDL_Surface *dest)
++void Graphics::drawString(const char *in, int x, int y, int alignment, SDL_Surface *dest)
+ {
+ 	bool center = false;
+ 
+@@ -863,7 +863,7 @@
+ 	strcpy(chatString, "");
+ }
+ 
+-void Graphics::createChatString(char *in)
++void Graphics::createChatString(const char *in)
+ {
+ 	sprintf(chatString, "%s %s", chatString, in);
+ }
+@@ -1047,7 +1047,7 @@
+ 	}
+ }
+ 
+-void Graphics::showErrorAndExit(char *error, char *param)
++void Graphics::showErrorAndExit(const char *error, const char *param)
+ {
+ 	SDL_FillRect(screen, NULL, black);
+ 
+diff -Nur blobwars-1.09b2-old/src/CGraphics.h blobwars-1.09b2/src/CGraphics.h
+--- blobwars-1.09b2-old/src/CGraphics.h	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/CGraphics.h	2008-11-24 00:35:25.000000000 +0200
+@@ -66,21 +66,21 @@
+ 	void delay(int time);
+ 	void RGBtoHSV(float r, float g, float b, float *h, float *s, float *v);
+ 	void HSVtoRGB(float *r, float *g, float *b, float h, float s, float v);
+-	SDL_Surface *loadImage(char *filename);
+-	SDL_Surface *loadImage(char *filename, int hue, int sat, int value);
+-	SDL_Surface *quickSprite(char *name, SDL_Surface *image);
++	SDL_Surface *loadImage(const char *filename);
++	SDL_Surface *loadImage(const char *filename, int hue, int sat, int value);
++	SDL_Surface *quickSprite(const char *name, SDL_Surface *image);
+ 	void fade(int amount);
+ 	void fadeToBlack();
+-	void loadMapTiles(char *baseDir);
+-	void loadFont(int i, char *filename, int pixelSize);
+-	Sprite *addSprite(char *name);
+-	Sprite *getSprite(char *name, bool required);
++	void loadMapTiles(const char *baseDir);
++	void loadFont(int i, const char *filename, int pixelSize);
++	Sprite *addSprite(const char *name);
++	Sprite *getSprite(const char *name, bool required);
+ 	void animateSprites();
+ 	int getWaterAnim();
+ 	int getSlimeAnim();
+ 	int getLavaAnim();
+ 	int getLavaAnim(int current);
+-	void loadBackground(char *filename);
++	void loadBackground(const char *filename);
+ 	void putPixel(int x, int y, Uint32 pixel, SDL_Surface *dest);
+ 	Uint32 getPixel(SDL_Surface *surface, int x, int y);
+ 	void drawLine(float startX, float startY, float endX, float endY, int color, SDL_Surface *dest);
+@@ -91,10 +91,10 @@
+ 	void drawRect(int x, int y, int w, int h, int color, int borderColor, SDL_Surface *dest);
+ 	void setFontColor(int red, int green, int blue, int red2, int green2, int blue2);
+ 	void setFontSize(int size);
+-	SDL_Surface *getString(char *in, bool transparent);
+-	void drawString(char *in, int x, int y, int alignment, SDL_Surface *dest);
++	SDL_Surface *getString(const char *in, bool transparent);
++	void drawString(const char *in, int x, int y, int alignment, SDL_Surface *dest);
+ 	void clearChatString();
+-	void createChatString(char *in);
++	void createChatString(const char *in);
+ 	void drawChatString(SDL_Surface *surface, int y);
+ 	void drawWidgetRect(int x, int y, int w, int h);
+ 	SDL_Surface *createSurface(int width, int height);
+@@ -104,7 +104,7 @@
+ 	void unlock(SDL_Surface *surface);
+ 	void resetLoading();
+ 	void showLoading(int amount, int max);
+-	void showErrorAndExit(char *error, char *param);
++	void showErrorAndExit(const char *error, const char *param);
+ 	void showLicenseErrorAndExit();
+ 	void showRootWarning();
+ 
+diff -Nur blobwars-1.09b2-old/src/CHub.cpp blobwars-1.09b2/src/CHub.cpp
+--- blobwars-1.09b2-old/src/CHub.cpp	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/CHub.cpp	2008-11-24 00:35:25.000000000 +0200
+@@ -31,7 +31,7 @@
+ 	next = NULL;
+ }
+ 
+-void HubLevel::set(char *stageName, char *filename, int x, int y)
++void HubLevel::set(const char *stageName, const char *filename, int x, int y)
+ {
+ 	strcpy(this->stageName, stageName);
+ 	strcpy(this->filename, filename);
+diff -Nur blobwars-1.09b2-old/src/CHub.h blobwars-1.09b2/src/CHub.h
+--- blobwars-1.09b2-old/src/CHub.h	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/CHub.h	2008-11-24 00:35:25.000000000 +0200
+@@ -31,5 +31,5 @@
+ 		Sprite *target;
+ 
+ 	HubLevel();
+-	void set(char *stageName, char *filename, int x, int y);
++	void set(const char *stageName, const char *filename, int x, int y);
+ };
+diff -Nur blobwars-1.09b2-old/src/CKeyboard.cpp blobwars-1.09b2/src/CKeyboard.cpp
+--- blobwars-1.09b2-old/src/CKeyboard.cpp	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/CKeyboard.cpp	2008-11-24 00:35:25.000000000 +0200
+@@ -37,7 +37,7 @@
+ 	control[CONTROL::MAP] = SDLK_TAB;
+ }
+ 
+-char *Keyboard::translateKey(int key)
++const char *Keyboard::translateKey(int key)
+ {
+ 	static char keyName[50];
+ 	strcpy(keyName, "");
+diff -Nur blobwars-1.09b2-old/src/CKeyboard.h blobwars-1.09b2/src/CKeyboard.h
+--- blobwars-1.09b2-old/src/CKeyboard.h	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/CKeyboard.h	2008-11-24 00:35:25.000000000 +0200
+@@ -6,6 +6,6 @@
+ 	
+ 		Keyboard();
+ 		void setDefaultKeys();
+-		static char *translateKey(int value);
++		static const char *translateKey(int value);
+ 
+ };
+diff -Nur blobwars-1.09b2-old/src/CLineDef.cpp blobwars-1.09b2/src/CLineDef.cpp
+--- blobwars-1.09b2-old/src/CLineDef.cpp	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/CLineDef.cpp	2008-11-24 00:35:25.000000000 +0200
+@@ -31,7 +31,7 @@
+ 	next = NULL;
+ }
+ 
+-void LineDef::set(char *name, char *linkName, char *activateMessage, int x, int y, int width, int height)
++void LineDef::set(const char *name, const char *linkName, const char *activateMessage, int x, int y, int width, int height)
+ {
+ 	strcpy(this->name, name);
+ 	strcpy(this->linkName, linkName);
+diff -Nur blobwars-1.09b2-old/src/CLineDef.h blobwars-1.09b2/src/CLineDef.h
+--- blobwars-1.09b2-old/src/CLineDef.h	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/CLineDef.h	2008-11-24 00:35:25.000000000 +0200
+@@ -30,6 +30,6 @@
+ 		bool activated;
+ 
+ 	LineDef();
+-	void set(char *name, char *linkName, char *activateMessage, int x, int y, int width, int height);
++	void set(const char *name, const char *linkName, const char *activateMessage, int x, int y, int width, int height);
+ 
+ };
+diff -Nur blobwars-1.09b2-old/src/CMap.cpp blobwars-1.09b2/src/CMap.cpp
+--- blobwars-1.09b2-old/src/CMap.cpp	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/CMap.cpp	2008-11-24 00:35:25.000000000 +0200
+@@ -169,7 +169,7 @@
+ 	return false;
+ }
+ 
+-Persistant *Map::getPersistant(char *name)
++Persistant *Map::getPersistant(const char *name)
+ {
+ 	Persistant *p = (Persistant*)persistantList.getHead();
+ 	
+@@ -186,7 +186,7 @@
+ 	return NULL;
+ }
+ 
+-Persistant *Map::createPersistant(char *name)
++Persistant *Map::createPersistant(const char *name)
+ {
+ 	Persistant *p = (Persistant*)persistantList.getHead();
+ 	
+@@ -210,7 +210,7 @@
+ 	return p;
+ }
+ 
+-void Map::destroyPersistant(char *name)
++void Map::destroyPersistant(const char *name)
+ {
+ 	Persistant *p = (Persistant*)persistantList.getHead();
+ 	
+@@ -227,7 +227,7 @@
+ 	}
+ }
+ 
+-void Map::setName(char *name)
++void Map::setName(const char *name)
+ {
+ 	strcpy(this->name, name);
+ 	
+@@ -266,7 +266,7 @@
+ 	if (limitDown != -1) this->limitDown = limitDown;
+ }
+ 
+-void Map::addTrain(char *name, int startX, int startY, int endX, int endY, int pause, bool atStart, bool active)
++void Map::addTrain(const char *name, int startX, int startY, int endX, int endY, int pause, bool atStart, bool active)
+ {
+ 	Train *train = new Train();
+ 	train->setName(name);
+@@ -285,7 +285,7 @@
+ 	trainList.add(train);
+ }
+ 
+-void Map::addDoor(char *name, int type, int startX, int startY, int endX, int endY, bool active)
++void Map::addDoor(const char *name, int type, int startX, int startY, int endX, int endY, bool active)
+ {
+ 	Train *train = new Train();
+ 	train->setName(name);
+@@ -309,7 +309,7 @@
+ 	trainList.add(train);
+ }
+ 
+-void Map::addSwitch(char *name, char *linkName, char *requiredObjectName, char *activateMessage, int type, int x, int y, bool activated)
++void Map::addSwitch(const char *name, const char *linkName, char *requiredObjectName, const char *activateMessage, int type, int x, int y, bool activated)
+ {
+ 	Switch *swt = new Switch();
+ 	swt->set(name, linkName, requiredObjectName, activateMessage, type, x, y, activated);
+@@ -351,7 +351,7 @@
+ 	obstacleList.add(obstacle);
+ }
+ 
+-void Map::addSpawnPoint(char *name, int x, int y, int type, int subtype, int min, int max, bool active)
++void Map::addSpawnPoint(const char *name, int x, int y, int type, int subtype, int min, int max, bool active)
+ {
+ 	SpawnPoint *spawnPoint = new SpawnPoint();
+ 	spawnPoint->create(name, x, y, type, subtype, min, max, active);
+@@ -364,7 +364,7 @@
+ 	effectList.add(effect);
+ }
+ 
+-void Map::addObjective(char *description, char *target, int targetValue, bool required)
++void Map::addObjective(const char *description, const char *target, int targetValue, bool required)
+ {
+ 	Objective *objective = new Objective(description, target, targetValue, required);
+ 
+@@ -386,7 +386,7 @@
+ 	trapList.add(trap);
+ }
+ 
+-void Map::evalTileset(char *baseDir)
++void Map::evalTileset(const char *baseDir)
+ {
+ 	if (strstr(baseDir, "caves"))
+ 	{
+diff -Nur blobwars-1.09b2-old/src/CMap.h blobwars-1.09b2/src/CMap.h
+--- blobwars-1.09b2-old/src/CMap.h	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/CMap.h	2008-11-24 00:35:25.000000000 +0200
+@@ -96,28 +96,28 @@
+ 	bool isLiquid(int x, int y);
+ 	bool isTopLayer(int x, int y);
+ 	
+-	Persistant *getPersistant(char *name);
+-	Persistant *createPersistant(char *name);
+-	void destroyPersistant(char *name);
++	Persistant *getPersistant(const char *name);
++	Persistant *createPersistant(const char *name);
++	void destroyPersistant(const char *name);
+ 	
+-	void setName(char *name);
++	void setName(const char *name);
+ 	void setClipping(int limitLeft, int limitRight, int limitUp, int limitDown);
+-	void addTrain(char *name, int startX, int startY, int endX, int endY, int pause, bool atStart, bool active);
+-	void addDoor(char *name, int type, int startX, int startY, int endX, int endY, bool active);
+-	void addSwitch(char *name, char *linkName, char *requiredObjectName, char *activateMessage, int type, int x, int y, bool activated);
++	void addTrain(const char *name, int startX, int startY, int endX, int endY, int pause, bool atStart, bool active);
++	void addDoor(const char *name, int type, int startX, int startY, int endX, int endY, bool active);
++	void addSwitch(const char *name, const char *linkName, char *requiredObjectName, const char *activateMessage, int type, int x, int y, bool activated);
+ 	void addItem(Entity *item);
+ 	void addBullet(Entity *bullet);
+ 	void addParticle(float x, float y, float dx, float dy, int health, int color, Sprite *sprite, int flags);
+ 	void addEnemy(Entity *enemy);
+ 	void addMIA(Entity *mia);
+ 	void addObstacle(Entity *obstacle);
+-	void addSpawnPoint(char *name, int x, int y, int type, int subtype, int min, int max, bool active);
++	void addSpawnPoint(const char *name, int x, int y, int type, int subtype, int min, int max, bool active);
+ 	void addEffect(Effect *effect);
+-	void addObjective(char *description, char *target, int targetValue, bool required);
++	void addObjective(const char *description, const char *target, int targetValue, bool required);
+ 	void addTeleporter(Teleporter *teleporter);
+ 	void addLineDef(LineDef *lineDef);
+ 	void addTrap(Trap *trap);
+-	void evalTileset(char *baseDir);
++	void evalTileset(const char *baseDir);
+ 	
+ 	void killAllEnemies();
+ 	
+diff -Nur blobwars-1.09b2-old/src/CObjective.cpp blobwars-1.09b2/src/CObjective.cpp
+--- blobwars-1.09b2-old/src/CObjective.cpp	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/CObjective.cpp	2008-11-24 00:35:25.000000000 +0200
+@@ -32,7 +32,7 @@
+ 	next = NULL;
+ }
+ 
+-Objective::Objective(char *description, char *target, int targetValue, bool required)
++Objective::Objective(const char *description, const char *target, int targetValue, bool required)
+ {
+ 	strcpy(this->description, description);
+ 	strcpy(this->target, target);
+diff -Nur blobwars-1.09b2-old/src/CObjective.h blobwars-1.09b2/src/CObjective.h
+--- blobwars-1.09b2-old/src/CObjective.h	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/CObjective.h	2008-11-24 00:35:25.000000000 +0200
+@@ -30,6 +30,6 @@
+ 		bool completed;
+ 
+ 		Objective();
+-		Objective(char *description, char *target, int targetValue, bool required);
++		Objective(const char *description, const char *target, int targetValue, bool required);
+ 
+ };
+diff -Nur blobwars-1.09b2-old/src/CPak.cpp blobwars-1.09b2/src/CPak.cpp
+--- blobwars-1.09b2-old/src/CPak.cpp	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/CPak.cpp	2008-11-24 00:35:25.000000000 +0200
+@@ -58,7 +58,7 @@
+ 	exit(1);
+ }
+ 
+-void Pak::setPakFile(char *pakFilename)
++void Pak::setPakFile(const char *pakFilename)
+ {
+ 	#if USEPAK
+ 	strcpy(this->pakFilename, pakFilename);
+@@ -103,7 +103,7 @@
+ 	#endif
+ }
+ 
+-bool Pak::unpack(char *filename, unsigned char **buffer)
++bool Pak::unpack(const char *filename, unsigned char **buffer)
+ {
+ 	debug(("Pak : Unpacking %s...\n", filename));
+ 	
+@@ -160,7 +160,7 @@
+ 	return true;
+ }
+ 
+-bool Pak::fileExists(char *filename)
++bool Pak::fileExists(const char *filename)
+ {
+ 	unsigned int hashcode = 0;
+ 	unsigned int length = strlen(filename);
+diff -Nur blobwars-1.09b2-old/src/CPak.h blobwars-1.09b2/src/CPak.h
+--- blobwars-1.09b2-old/src/CPak.h	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/CPak.h	2008-11-24 00:35:25.000000000 +0200
+@@ -39,9 +39,9 @@
+ 
+ 	Pak();
+ 	~Pak();
+-	void setPakFile(char *pakFilename);
+-	bool unpack(char *filename, unsigned char **buffer);
+-	bool fileExists(char *filename);
++	void setPakFile(const char *pakFilename);
++	bool unpack(const char *filename, unsigned char **buffer);
++	bool fileExists(const char *filename);
+ 	unsigned int getUncompressedSize();
+ 
+ };
+diff -Nur blobwars-1.09b2-old/src/CPersistant.cpp blobwars-1.09b2/src/CPersistant.cpp
+--- blobwars-1.09b2-old/src/CPersistant.cpp	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/CPersistant.cpp	2008-11-24 00:35:25.000000000 +0200
+@@ -32,7 +32,7 @@
+ 	numberOfLines = 0;
+ }
+ 
+-void Persistant::setName(char *name)
++void Persistant::setName(const char *name)
+ {
+ 	strcpy(this->stageName, name);
+ }
+diff -Nur blobwars-1.09b2-old/src/CPersistant.h blobwars-1.09b2/src/CPersistant.h
+--- blobwars-1.09b2-old/src/CPersistant.h	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/CPersistant.h	2008-11-24 00:35:25.000000000 +0200
+@@ -29,7 +29,7 @@
+ 	Persistant();
+ 	~Persistant();
+ 	
+-	void setName(char *name);
++	void setName(const char *name);
+ 	void addLine(char *data);
+ 	void clear();
+ 
+diff -Nur blobwars-1.09b2-old/src/CSpawnPoint.cpp blobwars-1.09b2/src/CSpawnPoint.cpp
+--- blobwars-1.09b2-old/src/CSpawnPoint.cpp	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/CSpawnPoint.cpp	2008-11-24 00:35:25.000000000 +0200
+@@ -40,7 +40,7 @@
+ 	requiredInterval = Math::rrand(minInterval, maxInterval);
+ }
+ 
+-void SpawnPoint::create(char *name, int x, int y, int spawnType, int spawnSubType, int minInterval, int maxInterval, bool active)
++void SpawnPoint::create(const char *name, int x, int y, int spawnType, int spawnSubType, int minInterval, int maxInterval, bool active)
+ {
+ 	strcpy(this->name, name);
+ 	this->x = x;
+diff -Nur blobwars-1.09b2-old/src/CSpawnPoint.h blobwars-1.09b2/src/CSpawnPoint.h
+--- blobwars-1.09b2-old/src/CSpawnPoint.h	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/CSpawnPoint.h	2008-11-24 00:35:25.000000000 +0200
+@@ -34,7 +34,7 @@
+ 
+ 	SpawnPoint();
+ 	void reset();
+-	void create(char *name, int x, int y, int spawnType, int spawnSubType, int minInterval, int maxInterval, bool active);
++	void create(const char *name, int x, int y, int spawnType, int spawnSubType, int minInterval, int maxInterval, bool active);
+ 	void think();
+ 	bool readyToSpawn();
+ 
+diff -Nur blobwars-1.09b2-old/src/CSwitch.cpp blobwars-1.09b2/src/CSwitch.cpp
+--- blobwars-1.09b2-old/src/CSwitch.cpp	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/CSwitch.cpp	2008-11-24 00:35:25.000000000 +0200
+@@ -35,7 +35,7 @@
+ 	next = NULL;
+ }
+ 
+-void Switch::set(char *name, char *linkName, char *requiredObjectName, char *activateMessage, int type, int x, int y, bool activated)
++void Switch::set(const char *name, const char *linkName, char *requiredObjectName, const char *activateMessage, int type, int x, int y, bool activated)
+ {
+ 	strcpy(this->name, name);
+ 	strcpy(this->linkName, linkName);
+diff -Nur blobwars-1.09b2-old/src/CSwitch.h blobwars-1.09b2/src/CSwitch.h
+--- blobwars-1.09b2-old/src/CSwitch.h	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/CSwitch.h	2008-11-24 00:35:25.000000000 +0200
+@@ -33,6 +33,6 @@
+ 		bool activated;
+ 
+ 		Switch();
+-		void set(char *name, char *linkName, char *requiredObjectName, char *activateMessage, int type, int x, int y, bool activated);
++		void set(const char *name, const char *linkName, char *requiredObjectName, const char *activateMessage, int type, int x, int y, bool activated);
+ 		
+ };
+diff -Nur blobwars-1.09b2-old/src/CTeleporter.cpp blobwars-1.09b2/src/CTeleporter.cpp
+--- blobwars-1.09b2-old/src/CTeleporter.cpp	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/CTeleporter.cpp	2008-11-24 00:35:25.000000000 +0200
+@@ -27,7 +27,7 @@
+ 	sprite = NULL;
+ }
+ 
+-void Teleporter::setName(char *name)
++void Teleporter::setName(const char *name)
+ {
+ 	strcpy(this->name, name);
+ }
+diff -Nur blobwars-1.09b2-old/src/CTeleporter.h blobwars-1.09b2/src/CTeleporter.h
+--- blobwars-1.09b2-old/src/CTeleporter.h	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/CTeleporter.h	2008-11-24 00:35:25.000000000 +0200
+@@ -31,7 +31,7 @@
+ 		int destX, destY;
+ 
+ 	Teleporter();
+-	void setName(char *name);
++	void setName(const char *name);
+ 	void set(int x, int y, int destX, int destY);
+ 	void setActive(bool active);
+ 
+diff -Nur blobwars-1.09b2-old/src/CTrain.cpp blobwars-1.09b2/src/CTrain.cpp
+--- blobwars-1.09b2-old/src/CTrain.cpp	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/CTrain.cpp	2008-11-24 00:35:25.000000000 +0200
+@@ -74,7 +74,7 @@
+ 	return true;
+ }
+ 
+-void Train::setName(char *name)
++void Train::setName(const char *name)
+ {
+ 	strcpy(this->name, name);
+ }
+diff -Nur blobwars-1.09b2-old/src/CTrain.h blobwars-1.09b2/src/CTrain.h
+--- blobwars-1.09b2-old/src/CTrain.h	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/CTrain.h	2008-11-24 00:35:25.000000000 +0200
+@@ -50,7 +50,7 @@
+ 	bool isReady();
+ 	bool isMoving();
+ 	bool waitsForPlayer();
+-	void setName(char *name);
++	void setName(const char *name);
+ 	void set(int startX, int startY, int endX, int endY, int pause, bool fromStart);
+ 	bool openClose();
+ 	void move();
+diff -Nur blobwars-1.09b2-old/src/CTrap.cpp blobwars-1.09b2/src/CTrap.cpp
+--- blobwars-1.09b2-old/src/CTrap.cpp	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/CTrap.cpp	2008-11-24 00:35:25.000000000 +0200
+@@ -28,7 +28,7 @@
+ 	x = y = dx = dy = 0;
+ }
+ 
+-void Trap::setName(char *name)
++void Trap::setName(const char *name)
+ {
+ 	strcpy(this->name, name);
+ }
+diff -Nur blobwars-1.09b2-old/src/CTrap.h blobwars-1.09b2/src/CTrap.h
+--- blobwars-1.09b2-old/src/CTrap.h	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/CTrap.h	2008-11-24 00:35:25.000000000 +0200
+@@ -36,7 +36,7 @@
+ 		Sprite *sprite;
+ 
+ 	Trap();
+-	void setName(char *name);
++	void setName(const char *name);
+ 	void setTrapType(int trapType);
+ 	void setSprite(Sprite *sprite);
+ 	void setSpeed(int speed);
+diff -Nur blobwars-1.09b2-old/src/cutscene.cpp blobwars-1.09b2/src/cutscene.cpp
+--- blobwars-1.09b2-old/src/cutscene.cpp	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/cutscene.cpp	2008-11-24 00:35:25.000000000 +0200
+@@ -68,7 +68,7 @@
+ 	}
+ }
+ 
+-bool setupScene(char *stagename)
++bool setupScene(const char *stagename)
+ {
+ 	sceneList.clear();
+ 	
+diff -Nur blobwars-1.09b2-old/src/CWeapon.cpp blobwars-1.09b2/src/CWeapon.cpp
+--- blobwars-1.09b2-old/src/CWeapon.cpp	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/CWeapon.cpp	2008-11-24 00:35:25.000000000 +0200
+@@ -32,7 +32,7 @@
+ 	health = 0;
+ }
+ 
+-void Weapon::setName(char *name)
++void Weapon::setName(const char *name)
+ {
+ 	strcpy(this->name, name);
+ }
+diff -Nur blobwars-1.09b2-old/src/CWeapon.h blobwars-1.09b2/src/CWeapon.h
+--- blobwars-1.09b2-old/src/CWeapon.h	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/CWeapon.h	2008-11-24 00:35:25.000000000 +0200
+@@ -29,7 +29,7 @@
+ 		Sprite *sprite[2];
+ 
+ 	Weapon();
+-	void setName(char *name);
++	void setName(const char *name);
+ 	int getSpeed(int face);
+ 
+ };
+diff -Nur blobwars-1.09b2-old/src/CWidget.cpp blobwars-1.09b2/src/CWidget.cpp
+--- blobwars-1.09b2-old/src/CWidget.cpp	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/CWidget.cpp	2008-11-24 00:35:25.000000000 +0200
+@@ -35,7 +35,7 @@
+ 	image = NULL;
+ }
+ 
+-void Widget::setProperties(char *name, char *groupName, char *label, char *options, int x, int y, int min, int max)
++void Widget::setProperties(const char *name, const char *groupName, char *label, char *options, int x, int y, int min, int max)
+ {
+ 	if ((strlen(name) > 50) || (strlen(groupName) > 50) || (strlen(label) > 80) || (strlen(options) > 100))
+ 	{
+diff -Nur blobwars-1.09b2-old/src/CWidget.h blobwars-1.09b2/src/CWidget.h
+--- blobwars-1.09b2-old/src/CWidget.h	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/CWidget.h	2008-11-24 00:35:25.000000000 +0200
+@@ -39,7 +39,7 @@
+ 		Widget *previous;
+ 
+ 	Widget();
+-	void setProperties(char *name, char *groupName, char *label, char *options, int x, int y, int min, int max);
++	void setProperties(const char *name, const char *groupName, char *label, char *options, int x, int y, int min, int max);
+ 	void setValue(int *value);
+ 	void redraw();
+ 
+diff -Nur blobwars-1.09b2-old/src/droidBoss.h blobwars-1.09b2/src/droidBoss.h
+--- blobwars-1.09b2-old/src/droidBoss.h	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/droidBoss.h	2008-11-24 00:35:25.000000000 +0200
+@@ -21,15 +21,15 @@
+ #include "headers.h"
+ 
+ extern void addBlood(Entity *ent, float dx, float dy, int amount);
+-extern void checkObjectives(char *name, bool alwaysInform);
++extern void checkObjectives(const char *name, bool alwaysInform);
+ extern void addColorParticles(float x, float y, int amount, int color);
+ extern void addBullet(Entity *owner, float dx, float dy);
+ extern void addExplosion(float x, float y, int radius, Entity *owner);
+ extern void addSmokeAndFire(Entity *ent, float dx, float dy, int amount);
+ extern void throwAndDamageEntity(Entity *ent, int damage, int minDX, int maxDX, int DY);
+ extern bool hasClearShot(Entity *enemy);
+-extern Weapon *getWeaponByName(char *name);
+-extern Entity *getDefinedEnemy(char *name);
++extern Weapon *getWeaponByName(const char *name);
++extern Entity *getDefinedEnemy(const char *name);
+ 
+ extern Audio audio;
+ extern Engine engine;
+diff -Nur blobwars-1.09b2-old/src/enemies.cpp blobwars-1.09b2/src/enemies.cpp
+--- blobwars-1.09b2-old/src/enemies.cpp	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/enemies.cpp	2008-11-24 00:35:25.000000000 +0200
+@@ -20,7 +20,7 @@
+ 
+ #include "enemies.h"
+ 
+-Entity *getDefinedEnemy(char *name)
++Entity *getDefinedEnemy(const char *name)
+ {
+ 	for (int i = 0 ; i < MAX_ENEMIES ; i++)
+ 	{
+@@ -35,7 +35,7 @@
+ 	return NULL;
+ }
+ 
+-Entity *getEnemy(char *name)
++Entity *getEnemy(const char *name)
+ {
+ 	Entity *enemy = (Entity*)map.enemyList.getHead();
+ 
+@@ -54,7 +54,7 @@
+ 	return NULL;
+ }
+ 
+-void addEnemy(char *name, int x, int y, int flags)
++void addEnemy(const char *name, int x, int y, int flags)
+ {
+ 	Entity *enemy = new Entity();
+ 	Entity *defEnemy = getDefinedEnemy(name);
+@@ -513,7 +513,7 @@
+ 	}
+ }
+ 
+-int getNonGoreParticleColor(char *name)
++int getNonGoreParticleColor(const char *name)
+ {
+ 	int rtn = graphics.yellow;
+ 	
+diff -Nur blobwars-1.09b2-old/src/enemies.h blobwars-1.09b2/src/enemies.h
+--- blobwars-1.09b2-old/src/enemies.h	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/enemies.h	2008-11-24 00:35:25.000000000 +0200
+@@ -24,15 +24,15 @@
+ extern void moveEntity(Entity *ent);
+ extern void addColorParticles(float x, float y, int amount, int color);
+ extern void addBullet(Entity *owner, float dx, float dy);
+-extern void addItem(int itemType, char *name, int x, int y, int imageIndex, int health, int value, int flags, bool randomMovement);
++extern void addItem(int itemType, const char *name, int x, int y, int imageIndex, int health, int value, int flags, bool randomMovement);
+ extern void dropRandomItems(int x, int y);
+ extern void addEffect(float x, float y, float dx, float dy, int flags);
+ extern void addColoredEffect(float x, float y, float dx, float dy, int color, int flags);
+ extern void addExplosion(float x, float y, int radius, Entity *owner);
+ extern void addBlood(Entity *ent, float dx, float dy, int amount);
+ extern void addSmokeAndFire(Entity *ent, float dx, float dy, int amount);
+-extern void checkObjectives(char *name, bool alwaysInform);
+-extern Weapon *getWeaponByName(char *name);
++extern void checkObjectives(const char *name, bool alwaysInform);
++extern Weapon *getWeaponByName(const char *name);
+ extern void addFireTrailParticle(float x, float y);
+ 
+ extern void doGaldovAI(Entity *galdov);
+diff -Nur blobwars-1.09b2-old/src/explosions.h blobwars-1.09b2/src/explosions.h
+--- blobwars-1.09b2-old/src/explosions.h	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/explosions.h	2008-11-24 00:35:25.000000000 +0200
+@@ -20,7 +20,7 @@
+ 
+ #include "headers.h"
+ 
+-extern void checkObjectives(char *name, bool alwaysInform);
++extern void checkObjectives(const char *name, bool alwaysInform);
+ extern void throwAndDamageEntity(Entity *ent, int damage, int minDX, int maxDX, int DY);
+ extern void addSmokeAndFire(Entity *ent, float dx, float dy, int amount);
+ extern void addBlood(Entity *ent, float dx, float dy, int amount);
+diff -Nur blobwars-1.09b2-old/src/finalBattle.h blobwars-1.09b2/src/finalBattle.h
+--- blobwars-1.09b2-old/src/finalBattle.h	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/finalBattle.h	2008-11-24 00:35:25.000000000 +0200
+@@ -22,7 +22,7 @@
+ 
+ extern void addTeleportParticles(float x, float y, int amount, int soundToPlay);
+ extern void addBlood(Entity *ent, float dx, float dy, int amount);
+-extern void checkObjectives(char *name, bool alwaysInform);
++extern void checkObjectives(const char *name, bool alwaysInform);
+ extern void addColorParticles(float x, float y, int amount, int color);
+ extern void addBullet(Entity *owner, float dx, float dy);
+ extern void addExplosion(float x, float y, int radius, Entity *owner);
+@@ -32,7 +32,7 @@
+ extern Weapon *getRandomGaldovWeapon();
+ extern Weapon *getRandomAimedWeapon();
+ extern void dropItems(int x, int y);
+-extern void addItem(int itemType, char *name, int x, int y, char *spriteName, int health, int value, int flags, bool randomMovement);
++extern void addItem(int itemType, const char *name, int x, int y, const char *spriteName, int health, int value, int flags, bool randomMovement);
+ 
+ extern Audio audio;
+ extern Engine engine;
+diff -Nur blobwars-1.09b2-old/src/galdov.h blobwars-1.09b2/src/galdov.h
+--- blobwars-1.09b2-old/src/galdov.h	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/galdov.h	2008-11-24 00:35:25.000000000 +0200
+@@ -22,7 +22,7 @@
+ 
+ extern void addTeleportParticles(float x, float y, int amount, int soundToPlay);
+ extern void addBlood(Entity *ent, float dx, float dy, int amount);
+-extern void checkObjectives(char *name, bool alwaysInform);
++extern void checkObjectives(const char *name, bool alwaysInform);
+ extern void addColorParticles(float x, float y, int amount, int color);
+ extern void addBullet(Entity *owner, float dx, float dy);
+ extern void addExplosion(float x, float y, int radius, Entity *owner);
+@@ -33,7 +33,7 @@
+ extern Weapon *getRandomStraightWeapon();
+ extern Weapon *getRandomGaldovWeapon();
+ 
+-extern void addItem(int itemType, char *name, int x, int y, char *spriteName, int health, int value, int flags, bool randomMovement);
++extern void addItem(int itemType, const char *name, int x, int y, const char *spriteName, int health, int value, int flags, bool randomMovement);
+ 
+ extern Audio audio;
+ extern Engine engine;
+diff -Nur blobwars-1.09b2-old/src/hub.cpp blobwars-1.09b2/src/hub.cpp
+--- blobwars-1.09b2-old/src/hub.cpp	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/hub.cpp	2008-11-24 00:35:25.000000000 +0200
+@@ -173,7 +173,7 @@
+ 		graphics.blit(arrows->image[3], 200, 260, image, false);
+ }
+ 
+-void loadLevelBrief(char *levelName)
++void loadLevelBrief(const char *levelName)
+ {
+ 	char briefLine[1024];
+ 
+@@ -228,7 +228,7 @@
+ 	graphics.drawChatString(image, 40);
+ }
+ 
+-void createObjectivesPanel(char *levelName)
++void createObjectivesPanel(const char *levelName)
+ {
+ 	SDL_Surface *image = graphics.getSprite("infoPanel", true)->image[0];
+ 
+diff -Nur blobwars-1.09b2-old/src/init.cpp blobwars-1.09b2/src/init.cpp
+--- blobwars-1.09b2-old/src/init.cpp	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/init.cpp	2008-11-24 00:35:25.000000000 +0200
+@@ -99,7 +99,7 @@
+ {
+ 	char *userHome;
+ 
+-	char *name = getlogin();
++	const char *name = getlogin();
+ 
+ 	passwd *pass;
+ 
+diff -Nur blobwars-1.09b2-old/src/init.h blobwars-1.09b2/src/init.h
+--- blobwars-1.09b2-old/src/init.h	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/init.h	2008-11-24 00:35:25.000000000 +0200
+@@ -29,7 +29,7 @@
+ 
+ #include "headers.h"
+ 
+-extern SDL_Surface *loadImage(char *filename);
++extern SDL_Surface *loadImage(const char *filename);
+ 
+ extern Audio audio;
+ extern Config config;
+diff -Nur blobwars-1.09b2-old/src/intro.h blobwars-1.09b2/src/intro.h
+--- blobwars-1.09b2-old/src/intro.h	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/intro.h	2008-11-24 00:35:25.000000000 +0200
+@@ -24,7 +24,7 @@
+ extern void loadResources();
+ extern void doGameStuff();
+ extern void doSpawnPoints();
+-extern void addItem(int itemType, char *name, int x, int y, char *spriteName, int health, int value, int flags, bool randomMovement);
++extern void addItem(int itemType, const char *name, int x, int y, const char *spriteName, int health, int value, int flags, bool randomMovement);
+ 
+ extern Config config;
+ extern Engine engine;
+diff -Nur blobwars-1.09b2-old/src/items.cpp blobwars-1.09b2/src/items.cpp
+--- blobwars-1.09b2-old/src/items.cpp	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/items.cpp	2008-11-24 00:35:25.000000000 +0200
+@@ -20,7 +20,7 @@
+ 
+ #include "items.h"
+ 
+-void addItem(int itemType, char *name, int x, int y, char *spriteName, int health, int value, int flags, bool randomMovement)
++void addItem(int itemType, const char *name, int x, int y, const char *spriteName, int health, int value, int flags, bool randomMovement)
+ {
+ 	Entity *item = new Entity();
+ 
+@@ -292,7 +292,7 @@
+ 	}
+ }
+ 
+-bool carryingItem(char *name)
++bool carryingItem(const char *name)
+ {
+ 	Entity *item = (Entity*)map.itemList.getHead();
+ 
+diff -Nur blobwars-1.09b2-old/src/items.h blobwars-1.09b2/src/items.h
+--- blobwars-1.09b2-old/src/items.h	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/items.h	2008-11-24 00:35:25.000000000 +0200
+@@ -25,7 +25,7 @@
+ extern void cleanup();
+ extern bool checkBrickContact(Entity *object);
+ extern void moveEntity(Entity *ent);
+-extern void checkObjectives(char *name, bool alwaysInform);
++extern void checkObjectives(const char *name, bool alwaysInform);
+ extern void addTeleportParticles(float x, float y, int amount, int soundToPlay);
+ 
+ extern Audio audio;
+diff -Nur blobwars-1.09b2-old/src/lineDefs.cpp blobwars-1.09b2/src/lineDefs.cpp
+--- blobwars-1.09b2-old/src/lineDefs.cpp	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/lineDefs.cpp	2008-11-24 00:35:25.000000000 +0200
+@@ -20,7 +20,7 @@
+ 
+ #include "lineDefs.h"
+ 
+-void addLineDef(char *name, char *linkName, char *message, int x, int y, int width, int height, bool active)
++void addLineDef(const char *name, const char *linkName, const char *message, int x, int y, int width, int height, bool active)
+ {
+ 	LineDef *lineDef = new LineDef();
+ 
+@@ -30,7 +30,7 @@
+ 	map.addLineDef(lineDef);
+ }
+ 
+-void showMessageLineDef(char *linkName, bool show)
++void showMessageLineDef(const char *linkName, bool show)
+ {
+ 	LineDef *lineDef = (LineDef*)map.lineList.getHead();
+ 
+diff -Nur blobwars-1.09b2-old/src/lineDefs.h blobwars-1.09b2/src/lineDefs.h
+--- blobwars-1.09b2-old/src/lineDefs.h	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/lineDefs.h	2008-11-24 00:35:25.000000000 +0200
+@@ -20,9 +20,9 @@
+ 
+ #include "headers.h"
+ 
+-void checkObjectives(char *name, bool alwaysInform);
++void checkObjectives(const char *name, bool alwaysInform);
+ extern bool requiredObjectivesCompleted();
+-extern void activateTrigger(char *linkName, char *activateMessage, bool active);
++extern void activateTrigger(const char *linkName, const char *activateMessage, bool active);
+ extern void stealCrystal();
+ 
+ extern Audio audio;
+diff -Nur blobwars-1.09b2-old/src/map.cpp blobwars-1.09b2/src/map.cpp
+--- blobwars-1.09b2-old/src/map.cpp	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/map.cpp	2008-11-24 00:35:25.000000000 +0200
+@@ -660,7 +660,7 @@
+ 	}
+ }
+ 
+-bool loadMapData(char *filename)
++bool loadMapData(const char *filename)
+ {
+ 	map.clear();
+ 
+diff -Nur blobwars-1.09b2-old/src/mapData.cpp blobwars-1.09b2/src/mapData.cpp
+--- blobwars-1.09b2-old/src/mapData.cpp	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/mapData.cpp	2008-11-24 00:35:25.000000000 +0200
+@@ -247,7 +247,7 @@
+ 			else if (strcmp("AMBIENCE", mapEntity) == 0)
+ 			{
+ 				sscanf(token, "%*s %*s %s", string[0]);
+-				if (!audio.loadSound(SND_AMBIANCE, string[0]))
++				if (!audio.loadSound(SND_AMBIANCE, string[0]) && false)
+ 					graphics.showErrorAndExit(ERR_FILE, string[0]);
+ 			}
+ 			else if (strcmp("WATERLEVEL", mapEntity) == 0)
+@@ -337,7 +337,7 @@
+ 	}
+ }
+ 
+-char *getActiveState(bool active)
++const char *getActiveState(bool active)
+ {
+ 	if (active)
+ 	{
+@@ -392,7 +392,7 @@
+ 	LineDef *lineDef;
+ 	SpawnPoint *spawnPoint;
+ 	
+-	char *define[3];
++	const char *define[3];
+ 	
+ 	ent = (Entity*)map.enemyList.getHead();
+ 	
+diff -Nur blobwars-1.09b2-old/src/mapData.h blobwars-1.09b2/src/mapData.h
+--- blobwars-1.09b2-old/src/mapData.h	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/mapData.h	2008-11-24 00:35:25.000000000 +0200
+@@ -20,16 +20,16 @@
+ 
+ #include "headers.h"
+ 
+-extern void addObstacle(char *name, int x, int y, char *spriteName);
+-extern void addItem(int itemType, char *name, int x, int y, char *shapeName, int health, int value, int flags, bool randomMovement);
+-extern void addMIA(char *name, int x, int y, int type);
+-extern void addTeleporter(char *name, int x, int y, int destX, int destY, bool active);
+-extern void addLineDef(char *name, char *linkName, char *message, int x, int y, int width, int height, bool active);
+-extern void addTrap(char *name, int trapType, int damage, int speed, int startX, int startY, int endX, int endY, int wait1, int wait2, char *sprite, bool active);
++extern void addObstacle(const char *name, int x, int y, const char *spriteName);
++extern void addItem(int itemType, const char *name, int x, int y, const char *shapeName, int health, int value, int flags, bool randomMovement);
++extern void addMIA(const char *name, int x, int y, int type);
++extern void addTeleporter(const char *name, int x, int y, int destX, int destY, bool active);
++extern void addLineDef(const char *name, const char *linkName, const char *message, int x, int y, int width, int height, bool active);
++extern void addTrap(const char *name, int trapType, int damage, int speed, int startX, int startY, int endX, int endY, int wait1, int wait2, char *sprite, bool active);
+ extern void loadSprite(char *token);
+ extern void loadEnemy(char *token);
+-extern Entity *getDefinedEnemy(char *name);
+-extern void addEnemy(char *name, int x, int y, int flags);
++extern Entity *getDefinedEnemy(const char *name);
++extern void addEnemy(const char *name, int x, int y, int flags);
+ extern bool perfectlyCompleted();
+ 
+ extern Audio audio;
+diff -Nur blobwars-1.09b2-old/src/mapEditor.cpp blobwars-1.09b2/src/mapEditor.cpp
+--- blobwars-1.09b2-old/src/mapEditor.cpp	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/mapEditor.cpp	2008-11-24 00:35:25.000000000 +0200
+@@ -203,7 +203,7 @@
+ 	}
+ }
+ 
+-void saveMap(char *name)
++void saveMap(const char *name)
+ {
+ 	FILE *fp = fopen(name, "wb");
+ 	Entity *enemy = (Entity*)map.enemyList.getHead();
+@@ -297,7 +297,7 @@
+ 	fclose(fp);
+ }
+ 
+-void newMap(char *name)
++void newMap(const char *name)
+ {
+ 	FILE *fp = fopen(name, "wb");
+ 
+diff -Nur blobwars-1.09b2-old/src/mapEditor.h blobwars-1.09b2/src/mapEditor.h
+--- blobwars-1.09b2-old/src/mapEditor.h	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/mapEditor.h	2008-11-24 00:35:25.000000000 +0200
+@@ -37,8 +37,8 @@
+ extern void doLineDefs();
+ extern void doTraps();
+ 
+-extern void addEnemy(char *name, int x, int y, int flags);
+-extern void addItem(int itemType, char *name, int x, int y, char *spriteName, int health, int value, int flags, bool randomMovement);
++extern void addEnemy(const char *name, int x, int y, int flags);
++extern void addItem(int itemType, const char *name, int x, int y, const char *spriteName, int health, int value, int flags, bool randomMovement);
+ 
+ class String {
+ 
+diff -Nur blobwars-1.09b2-old/src/map.h blobwars-1.09b2/src/map.h
+--- blobwars-1.09b2-old/src/map.h	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/map.h	2008-11-24 00:35:25.000000000 +0200
+@@ -20,7 +20,7 @@
+ 
+ #include "headers.h"
+ 
+-extern bool requiredEnemy(char *name);
++extern bool requiredEnemy(const char *name);
+ extern void addBubble(float x, float y);
+ extern void adjustObjectives();
+ extern void initMIAPhrases();
+diff -Nur blobwars-1.09b2-old/src/mias.cpp blobwars-1.09b2/src/mias.cpp
+--- blobwars-1.09b2-old/src/mias.cpp	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/mias.cpp	2008-11-24 00:35:25.000000000 +0200
+@@ -31,7 +31,7 @@
+ 	strcpy(mia_scared[6], "i don't like it here...");
+ }
+ 
+-void addMIA(char *name, int x, int y, int type)
++void addMIA(const char *name, int x, int y, int type)
+ {
+ 	Entity *mia = new Entity();
+ 
+diff -Nur blobwars-1.09b2-old/src/objectives.cpp blobwars-1.09b2/src/objectives.cpp
+--- blobwars-1.09b2-old/src/objectives.cpp	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/objectives.cpp	2008-11-24 00:35:25.000000000 +0200
+@@ -140,7 +140,7 @@
+ 	return true;
+ }
+ 
+-bool requiredEnemy(char *name)
++bool requiredEnemy(const char *name)
+ {
+ 	Objective *objective = (Objective*)map.objectiveList.getHead();
+ 
+@@ -237,7 +237,7 @@
+ 	}
+ }
+ 
+-void checkObjectives(char *name, bool alwaysInform)
++void checkObjectives(const char *name, bool alwaysInform)
+ {
+ 	Objective *objective = (Objective*)map.objectiveList.getHead();
+ 
+diff -Nur blobwars-1.09b2-old/src/obstacles.cpp blobwars-1.09b2/src/obstacles.cpp
+--- blobwars-1.09b2-old/src/obstacles.cpp	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/obstacles.cpp	2008-11-24 00:35:25.000000000 +0200
+@@ -20,7 +20,7 @@
+ 
+ #include "obstacles.h"
+ 
+-void addObstacle(char *name, int x, int y, char *spriteName)
++void addObstacle(const char *name, int x, int y, const char *spriteName)
+ {
+ 	Entity *obstacle = new Entity();
+ 	
+diff -Nur blobwars-1.09b2-old/src/obstacles.h blobwars-1.09b2/src/obstacles.h
+--- blobwars-1.09b2-old/src/obstacles.h	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/obstacles.h	2008-11-24 00:35:25.000000000 +0200
+@@ -21,7 +21,7 @@
+ #include "headers.h"
+ 
+ extern void addTeleportParticles(float x, float y, int amount, int soundToPlay);
+-extern void activateTrigger(char *linkName, char *activateMessage, bool active);
++extern void activateTrigger(const char *linkName, const char *activateMessage, bool active);
+ extern void moveEntity(Entity *ent);
+ 
+ extern Audio audio;
+diff -Nur blobwars-1.09b2-old/src/resources.cpp blobwars-1.09b2/src/resources.cpp
+--- blobwars-1.09b2-old/src/resources.cpp	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/resources.cpp	2008-11-24 00:35:25.000000000 +0200
+@@ -20,9 +20,9 @@
+ 
+ #include "resources.h"
+ 
+-void loadSound(int index, char *filename)
++void loadSound(int index, const char *filename)
+ {
+-	if (!audio.loadSound(index, filename))
++	if (!audio.loadSound(index, filename) && false)
+ 		graphics.showErrorAndExit(ERR_FILE, filename);
+ 
+ 	graphics.showLoading(1, 30);
+diff -Nur blobwars-1.09b2-old/src/resources.h blobwars-1.09b2/src/resources.h
+--- blobwars-1.09b2-old/src/resources.h	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/resources.h	2008-11-24 00:35:25.000000000 +0200
+@@ -24,9 +24,9 @@
+ extern void loadDefWeapons();
+ extern void loadDefItems();
+ 
+-extern bool loadMapData(char *filename);
++extern bool loadMapData(const char *filename);
+ 
+-extern void createBoss(char *stageName);
++extern void createBoss(const char *stageName);
+ 
+ extern Audio audio;
+ extern Engine engine;
+diff -Nur blobwars-1.09b2-old/src/spawnPoints.cpp blobwars-1.09b2/src/spawnPoints.cpp
+--- blobwars-1.09b2-old/src/spawnPoints.cpp	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/spawnPoints.cpp	2008-11-24 00:35:25.000000000 +0200
+@@ -20,7 +20,7 @@
+ 
+ #include "spawnPoints.h"
+ 
+-bool okayToSpawnEnemy(char *name, int x, int y)
++bool okayToSpawnEnemy(const char *name, int x, int y)
+ {
+ 	// Don't summon other monsters!!
+ 	if (map.fightingGaldov)
+diff -Nur blobwars-1.09b2-old/src/spawnPoints.h blobwars-1.09b2/src/spawnPoints.h
+--- blobwars-1.09b2-old/src/spawnPoints.h	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/spawnPoints.h	2008-11-24 00:35:25.000000000 +0200
+@@ -21,8 +21,8 @@
+ #include "headers.h"
+ 
+ extern void addBullet(Entity *owner, float dx, float dy);
+-extern void addEnemy(char *name, int x, int y, int flags);
+-extern Entity *getDefinedEnemy(char *name);
++extern void addEnemy(const char *name, int x, int y, int flags);
++extern Entity *getDefinedEnemy(const char *name);
+ extern void addTeleportParticles(float x, float y, int amount, int soundToPlay);
+ extern void addExplosion(float x, float y, int radius, Entity *owner);
+ extern void dropHelperItems(int x, int y);
+diff -Nur blobwars-1.09b2-old/src/switches.h blobwars-1.09b2/src/switches.h
+--- blobwars-1.09b2-old/src/switches.h	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/switches.h	2008-11-24 00:35:25.000000000 +0200
+@@ -20,9 +20,9 @@
+ 
+ #include "headers.h"
+ 
+-extern void activateTrigger(char *linkName, char *activateMessage, bool active);
+-extern void checkObjectives(char *name, bool alwaysInform);
+-extern bool carryingItem(char *name);
++extern void activateTrigger(const char *linkName, const char *activateMessage, bool active);
++extern void checkObjectives(const char *name, bool alwaysInform);
++extern bool carryingItem(const char *name);
+ 
+ extern Audio audio;
+ extern Engine engine;
+diff -Nur blobwars-1.09b2-old/src/tankBoss.h blobwars-1.09b2/src/tankBoss.h
+--- blobwars-1.09b2-old/src/tankBoss.h	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/tankBoss.h	2008-11-24 00:35:25.000000000 +0200
+@@ -20,15 +20,15 @@
+ 
+ #include "headers.h"
+ 
+-extern void checkObjectives(char *name, bool alwaysInform);
++extern void checkObjectives(const char *name, bool alwaysInform);
+ extern void addColorParticles(float x, float y, int amount, int color);
+ extern void addBullet(Entity *owner, float dx, float dy);
+ extern void addExplosion(float x, float y, int radius, Entity *owner);
+ extern void addBlood(Entity *ent, float dx, float dy, int amount);
+ extern void addSmokeAndFire(Entity *ent, float dx, float dy, int amount);
+ extern void throwAndDamageEntity(Entity *ent, int damage, int minDX, int maxDX, int DY);
+-extern Weapon *getWeaponByName(char *name);
+-extern Entity *getDefinedEnemy(char *name);
++extern Weapon *getWeaponByName(const char *name);
++extern Entity *getDefinedEnemy(const char *name);
+ 
+ extern Audio audio;
+ extern Engine engine;
+diff -Nur blobwars-1.09b2-old/src/teleporters.cpp blobwars-1.09b2/src/teleporters.cpp
+--- blobwars-1.09b2-old/src/teleporters.cpp	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/teleporters.cpp	2008-11-24 00:35:25.000000000 +0200
+@@ -29,7 +29,7 @@
+ * @param destY The y destination of the teleporter
+ * @param active The active state of the teleporter
+ */
+-void addTeleporter(char *name, int x, int y, int destX, int destY, bool active)
++void addTeleporter(const char *name, int x, int y, int destX, int destY, bool active)
+ {
+ 	Teleporter *teleport = new Teleporter();
+ 
+diff -Nur blobwars-1.09b2-old/src/trains.cpp blobwars-1.09b2/src/trains.cpp
+--- blobwars-1.09b2-old/src/trains.cpp	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/trains.cpp	2008-11-24 00:35:25.000000000 +0200
+@@ -73,7 +73,7 @@
+ * @param train The door that performs the blocking
+ * @param dir The direction the entity was moving in (required for clipping)
+ */
+-void trainBlockEntity(Entity *ent, char *message, Train *train, int dir)
++void trainBlockEntity(Entity *ent, const char *message, Train *train, int dir)
+ {
+ 	if (ent == &player)
+ 	{
+diff -Nur blobwars-1.09b2-old/src/trains.h blobwars-1.09b2/src/trains.h
+--- blobwars-1.09b2-old/src/trains.h	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/trains.h	2008-11-24 00:35:25.000000000 +0200
+@@ -21,7 +21,7 @@
+ #include "headers.h"
+ 
+ extern void evaluateMapAttribute(Entity *ent, int mapAttribute);
+-extern bool carryingItem(char *name);
++extern bool carryingItem(const char *name);
+ 
+ extern Audio audio;
+ extern Engine engine;
+diff -Nur blobwars-1.09b2-old/src/traps.cpp blobwars-1.09b2/src/traps.cpp
+--- blobwars-1.09b2-old/src/traps.cpp	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/traps.cpp	2008-11-24 00:35:25.000000000 +0200
+@@ -35,7 +35,7 @@
+ * @param sprite The Sprite to use with this trap
+ * @param active The active state of this trap
+ */
+-void addTrap(char *name, int trapType, int damage, int speed, int startX, int startY, int endX, int endY, int wait1, int wait2, char *sprite, bool active)
++void addTrap(const char *name, int trapType, int damage, int speed, int startX, int startY, int endX, int endY, int wait1, int wait2, char *sprite, bool active)
+ {
+ 	Trap *trap = new Trap();
+ 
+diff -Nur blobwars-1.09b2-old/src/triggers.cpp blobwars-1.09b2/src/triggers.cpp
+--- blobwars-1.09b2-old/src/triggers.cpp	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/triggers.cpp	2008-11-24 00:35:25.000000000 +0200
+@@ -28,7 +28,7 @@
+ * @param activateMessage The message to display on successful trigger
+ * @param active The new status of the object
+ */
+-void activateTrigger(char *linkName, char *activateMessage, bool active)
++void activateTrigger(const char *linkName, const char *activateMessage, bool active)
+ {
+ 	if (strcmp(linkName, "@none@") == 0)
+ 		return;
+diff -Nur blobwars-1.09b2-old/src/triggers.h blobwars-1.09b2/src/triggers.h
+--- blobwars-1.09b2-old/src/triggers.h	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/triggers.h	2008-11-24 00:35:25.000000000 +0200
+@@ -22,7 +22,7 @@
+ 
+ extern void toggleTrap(Trap *trap);
+ extern void addTeleportParticles(float x, float y, int amount, int soundToPlay);
+-extern void showMessageLineDef(char *linkName, bool show);
++extern void showMessageLineDef(const char *linkName, bool show);
+ 
+ extern Audio audio;
+ extern Engine engine;
+diff -Nur blobwars-1.09b2-old/src/weapons.cpp blobwars-1.09b2/src/weapons.cpp
+--- blobwars-1.09b2-old/src/weapons.cpp	2008-11-24 00:35:18.000000000 +0200
++++ blobwars-1.09b2/src/weapons.cpp	2008-11-24 00:35:25.000000000 +0200
+@@ -142,7 +142,7 @@
+ * @param name
+ * @return The randomly selected Weapon
+ */
+-Weapon *getWeaponByName(char *name)
++Weapon *getWeaponByName(const char *name)
+ {
+ 	if (strcmp("randomStraight", name) == 0)
+ 	{

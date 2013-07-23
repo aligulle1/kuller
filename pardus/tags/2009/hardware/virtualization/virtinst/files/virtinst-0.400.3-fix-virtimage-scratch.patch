@@ -1,0 +1,37 @@
+# HG changeset patch
+# User Cole Robinson <crobinso@redhat.com>
+# Date 1237821788 14400
+# Node ID 8fdb20af39f965aa1ff20ea34ba294db08a7f3e2
+# Parent  d5f630ee97ea16c91ff3a9db50caff350b72df90
+Fix virt-image with scratch + user disks.
+
+diff -r d5f630ee97ea -r 8fdb20af39f9 virtinst/ImageParser.py
+--- a/virtinst/ImageParser.py	Mon Mar 23 11:14:38 2009 -0400
++++ b/virtinst/ImageParser.py	Mon Mar 23 11:23:08 2009 -0400
+@@ -240,13 +240,7 @@
+             import sha
+             has_hashlib = False
+ 
+-        meter_ct = 0
+         m = None
+-        disk_size = os.path.getsize(self.file)
+-        if meter:
+-            meter.start(size=disk_size,
+-                        text=_("Checking disk signature for %s" % self.file))
+-
+         if has_hashlib is True:
+             if self.csum.has_key("sha256"):
+                 csumvalue = self.csum["sha256"]
+@@ -262,6 +256,12 @@
+         if not m:
+             return
+ 
++        meter_ct = 0
++        disk_size = os.path.getsize(self.file)
++        if meter:
++            meter.start(size=disk_size,
++                        text=_("Checking disk signature for %s" % self.file))
++
+         f = open(self.file,"r")
+         while 1:
+             chunk = f.read(65536)

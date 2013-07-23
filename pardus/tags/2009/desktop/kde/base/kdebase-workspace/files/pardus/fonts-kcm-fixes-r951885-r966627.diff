@@ -1,0 +1,109 @@
+Index: kcontrol/fonts/fonts.cpp
+===================================================================
+--- kcontrol/fonts/fonts.cpp.orig
++++ kcontrol/fonts/fonts.cpp
+@@ -22,6 +22,7 @@
+ #include <QGridLayout>
+ #include <QHBoxLayout>
+ #include <QVBoxLayout>
++#include <QFormLayout>
+ 
+ 
+ #include <kacceleratormanager.h>
+@@ -203,7 +204,7 @@ void FontUseItem::applyFontDiff( const Q
+     _font.setPointSize( fnt.pointSize() );
+   }
+   if (fontDiffFlags & KFontChooser::FontDiffFamily) {
+-    if (!isFixedOnly()) _font.setFamily( fnt.family() );
++    if (!isFixedOnly() || QFontInfo(fnt).fixedPitch()) _font.setFamily( fnt.family() );
+   }
+   if (fontDiffFlags & KFontChooser::FontDiffStyle) {
+     _font.setBold( fnt.bold() );
+@@ -227,20 +228,20 @@ FontAASettings::FontAASettings(QWidget *
+   showButtonSeparator( true );
+ 
+   QWidget     *mw=new QWidget(this);
+-  QGridLayout *layout=new QGridLayout(mw);
+-  layout->setSpacing(KDialog::spacingHint());
++  QFormLayout *layout=new QFormLayout(mw);
+   layout->setMargin(0);
+ 
+-  excludeRange=new QCheckBox(i18n("E&xclude range:"), mw),
+-  layout->addWidget(excludeRange, 0, 0);
+-  excludeFrom=new KDoubleNumInput(0, 72, 8.0, mw,1, 1),
++  excludeRange=new QCheckBox(i18n("E&xclude range:"), mw);
++  QHBoxLayout *rangeLayout = new QHBoxLayout();
++  excludeFrom=new KDoubleNumInput(0, 72, 8.0, mw, 1, 1);
+   excludeFrom->setSuffix(i18n(" pt"));
+-  layout->addWidget(excludeFrom, 0, 1);
++  rangeLayout->addWidget(excludeFrom);
+   excludeToLabel=new QLabel(i18n(" to "), mw);
+-  layout->addWidget(excludeToLabel, 0, 2);
++  rangeLayout->addWidget(excludeToLabel);
+   excludeTo=new KDoubleNumInput(0, 72, 15.0, mw, 1, 1);
+   excludeTo->setSuffix(i18n(" pt"));
+-  layout->addWidget(excludeTo, 0, 3);
++  rangeLayout->addWidget(excludeTo);
++  layout->addRow(excludeRange, rangeLayout);
+ 
+   QString subPixelWhatsThis = i18n("<p>If you have a TFT or LCD screen you"
+        " can further improve the quality of displayed fonts by selecting"
+@@ -254,11 +255,10 @@ FontAASettings::FontAASettings(QWidget *
+        " This feature does not work with CRT monitors.</p>" );
+ 
+   useSubPixel=new QCheckBox(i18n("&Use sub-pixel rendering:"), mw);
+-  layout->addWidget(useSubPixel, 1, 0);
+   useSubPixel->setWhatsThis( subPixelWhatsThis );
+ 
+   subPixelType=new QComboBox(mw);
+-  layout->addWidget(subPixelType, 1, 1, 1, 3);
++  layout->addRow(useSubPixel, subPixelType);
+ 
+   subPixelType->setEditable(false);
+   subPixelType->setWhatsThis( subPixelWhatsThis );
+@@ -267,10 +267,9 @@ FontAASettings::FontAASettings(QWidget *
+     subPixelType->addItem(QPixmap(aaPixmaps[t-1]), i18n(KXftConfig::description((KXftConfig::SubPixel::Type)t).toUtf8()));
+ 
+   QLabel *hintingLabel=new QLabel(i18n("Hinting style: "), mw);
+-  layout->addWidget(hintingLabel, 2, 0);
+   hintingStyle=new QComboBox(mw);
+   hintingStyle->setEditable(false);
+-  layout->addWidget(hintingStyle, 2, 1, 1, 3);
++  layout->addRow(hintingLabel, hintingStyle);
+   for(int s=KXftConfig::Hint::NotSet+1; s<=KXftConfig::Hint::Full; ++s)
+     hintingStyle->addItem(i18n(KXftConfig::description((KXftConfig::Hint::Style)s).toUtf8()));
+ 
+@@ -547,11 +546,10 @@ KFonts::KFonts(QWidget *parent, const QV
+     << i18n("Used for desktop icons.");
+ 
+   QVBoxLayout * layout = new QVBoxLayout(this );
+-  layout->setSpacing( KDialog::spacingHint() );
+   layout->setMargin(0);
+ 
+   QGridLayout * fontUseLayout = new QGridLayout( );
+-  layout->addItem( fontUseLayout );
++  layout->addLayout( fontUseLayout );
+   fontUseLayout->setColumnStretch(0, 0);
+   fontUseLayout->setColumnStretch(1, 1);
+   fontUseLayout->setColumnStretch(2, 0);
+@@ -595,8 +593,7 @@ KFonts::KFonts(QWidget *parent, const QV
+   }
+ 
+    QHBoxLayout *hblay = new QHBoxLayout();
+-   layout->addItem(hblay);
+-   hblay->setSpacing(KDialog::spacingHint());
++   layout->addLayout(hblay);
+    hblay->addStretch();
+    QPushButton * fontAdjustButton = new QPushButton(i18n("Ad&just All Fonts..."), this);
+    fontAdjustButton->setWhatsThis( i18n("Click to change all fonts"));
+@@ -606,9 +603,8 @@ KFonts::KFonts(QWidget *parent, const QV
+    layout->addSpacing(KDialog::spacingHint());
+ 
+    QGridLayout* lay = new QGridLayout();
+-   layout->addItem(lay);
++   layout->addLayout(lay);
+    lay->setColumnStretch( 3, 10 );
+-   lay->setSpacing(KDialog::spacingHint());
+    QLabel* label=0L;
+ #ifdef HAVE_FONTCONFIG
+    label = new QLabel( i18n( "Use a&nti-aliasing:" ), this );

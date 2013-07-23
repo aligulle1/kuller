@@ -1,0 +1,107 @@
+diff -u -r -N original/xmlrpc-epi-0.51/Makefile.in dump_expat/xmlrpc-epi-0.51/Makefile.in
+--- original/xmlrpc-epi-0.51/Makefile.in	2002-06-23 18:48:29.000000000 -0500
++++ dump_expat/xmlrpc-epi-0.51/Makefile.in	2007-02-01 23:12:50.000000000 -0600
+@@ -77,7 +77,7 @@
+ STRIP = @STRIP@
+ VERSION = @VERSION@
+ 
+-SUBDIRS = expat src sample
++SUBDIRS = src sample
+ 
+ CHANGE_LOG_GEN_BIN = scripts/cvs2cl.pl
+ CHANGE_LOG_GEN_FLAGS = -t -r -b --accum -I ChangeLog --gmt --prune
+diff -u -r -N original/xmlrpc-epi-0.51/configure dump_expat/xmlrpc-epi-0.51/configure
+--- original/xmlrpc-epi-0.51/configure	2002-06-23 18:48:29.000000000 -0500
++++ dump_expat/xmlrpc-epi-0.51/configure	2007-02-01 22:43:31.000000000 -0600
+@@ -8541,7 +8541,7 @@
+ fi
+ done
+ 
+-ac_config_files="$ac_config_files src/Makefile Makefile sample/Makefile expat/Makefile expat/xmltok/Makefile expat/xmlparse/Makefile"
++ac_config_files="$ac_config_files src/Makefile Makefile sample/Makefile"
+ cat >confcache <<\_ACEOF
+ # This file is a shell script that caches the results of configure
+ # tests run on this system so they can be shared between configure
+@@ -8876,9 +8876,6 @@
+   "src/Makefile" ) CONFIG_FILES="$CONFIG_FILES src/Makefile" ;;
+   "Makefile" ) CONFIG_FILES="$CONFIG_FILES Makefile" ;;
+   "sample/Makefile" ) CONFIG_FILES="$CONFIG_FILES sample/Makefile" ;;
+-  "expat/Makefile" ) CONFIG_FILES="$CONFIG_FILES expat/Makefile" ;;
+-  "expat/xmltok/Makefile" ) CONFIG_FILES="$CONFIG_FILES expat/xmltok/Makefile" ;;
+-  "expat/xmlparse/Makefile" ) CONFIG_FILES="$CONFIG_FILES expat/xmlparse/Makefile" ;;
+   *) { { echo "$as_me:8882: error: invalid argument: $ac_config_target" >&5
+ echo "$as_me: error: invalid argument: $ac_config_target" >&2;}
+    { (exit 1); exit 1; }; };;
+diff -u -r -N original/xmlrpc-epi-0.51/sample/Makefile.in dump_expat/xmlrpc-epi-0.51/sample/Makefile.in
+--- original/xmlrpc-epi-0.51/sample/Makefile.in	2002-06-23 18:48:29.000000000 -0500
++++ dump_expat/xmlrpc-epi-0.51/sample/Makefile.in	2007-02-01 23:13:11.000000000 -0600
+@@ -77,7 +77,7 @@
+ STRIP = @STRIP@
+ VERSION = @VERSION@
+ 
+-INCLUDES = -I../src -I../expat/xmltok -I../expat/xmlparse
++INCLUDES = -I../src
+ 
+ bin_PROGRAMS = sample client server server_compliance_test memtest hello_client hello_server
+ 
+@@ -112,7 +112,7 @@
+ DEFS = @DEFS@ -I. -I$(srcdir) 
+ CPPFLAGS = @CPPFLAGS@
+ LDFLAGS = @LDFLAGS@
+-LIBS = @LIBS@
++LIBS = @LIBS@ -lexpat
+ sample_OBJECTS =  sample.$(OBJEXT)
+ sample_DEPENDENCIES =  ../src/libxmlrpc.la
+ sample_LDFLAGS = 
+diff -u -r -N original/xmlrpc-epi-0.51/src/Makefile.in dump_expat/xmlrpc-epi-0.51/src/Makefile.in
+--- original/xmlrpc-epi-0.51/src/Makefile.in	2002-06-23 18:48:29.000000000 -0500
++++ dump_expat/xmlrpc-epi-0.51/src/Makefile.in	2007-02-01 23:13:36.000000000 -0600
+@@ -75,11 +75,11 @@
+ STRIP = @STRIP@
+ VERSION = @VERSION@
+ 
+-INCLUDES = -I../liblm -I../expat/xmltok -I../expat/xmlparse -I/usr/local/ssl/include 
++INCLUDES = -I../liblm -I/usr/local/ssl/include 
+ 
+ lib_LTLIBRARIES = libxmlrpc.la
+ 
+-libxmlrpc_la_LIBADD = ../expat/xmltok/libexpat_tok.la ../expat/xmlparse/libexpat_parse.la
++libxmlrpc_la_LIBADD = 
+ 
+ libxmlrpc_la_SOURCES =  	base64.c 	encodings.c 	queue.c 	simplestring.c 	xml_element.c 	xml_to_dandarpc.c 	xml_to_xmlrpc.c         xml_to_soap.c 	xmlrpc.c 	xmlrpc_introspection.c         system_methods.c
+ 
+@@ -130,8 +130,7 @@
+ CPPFLAGS = @CPPFLAGS@
+ LDFLAGS = @LDFLAGS@
+ LIBS = @LIBS@
+-libxmlrpc_la_DEPENDENCIES =  ../expat/xmltok/libexpat_tok.la \
+-../expat/xmlparse/libexpat_parse.la
++libxmlrpc_la_DEPENDENCIES =  
+ libxmlrpc_la_OBJECTS =  base64.lo encodings.lo queue.lo simplestring.lo \
+ xml_element.lo xml_to_dandarpc.lo xml_to_xmlrpc.lo xml_to_soap.lo \
+ xmlrpc.lo xmlrpc_introspection.lo system_methods.lo
+diff -u -r -N original/xmlrpc-epi-0.51/src/xml_element.c dump_expat/xmlrpc-epi-0.51/src/xml_element.c
+--- original/xmlrpc-epi-0.51/src/xml_element.c	2002-05-23 12:46:51.000000000 -0500
++++ dump_expat/xmlrpc-epi-0.51/src/xml_element.c	2007-02-01 22:47:58.000000000 -0600
+@@ -91,7 +91,7 @@
+ 
+ #include "xml_element.h"
+ #include "queue.h"
+-#include "xmlparse.h"
++#include "expat.h"
+ #include "encodings.h"
+ 
+ #define my_free(thing)  if(thing) {free(thing); thing = 0;}
+diff -u -r -N original/xmlrpc-epi-0.51/src/xmlrpc.c dump_expat/xmlrpc-epi-0.51/src/xmlrpc.c
+--- original/xmlrpc-epi-0.51/src/xmlrpc.c	2002-03-09 17:15:44.000000000 -0600
++++ dump_expat/xmlrpc-epi-0.51/src/xmlrpc.c	2007-02-01 22:48:11.000000000 -0600
+@@ -120,7 +120,8 @@
+ 
+ #include "queue.h"
+ #include "xmlrpc.h"
+-#include "xmlparse.h"
++//#include "xmlparse.h"
++#include "expat.h"
+ #include "base64.h"
+ 
+ #include "xml_to_xmlrpc.h"

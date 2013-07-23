@@ -1,0 +1,37 @@
+--- ext/standard/var_unserializer.c	2007/03/27 09:29:10	1.70.2.4.2.5
++++ ext/standard/var_unserializer.c	2007/07/09 14:31:56	1.70.2.4.2.6
+@@ -140,18 +140,22 @@
+ 
+ /* }}} */
+ 
+-static char *unserialize_str(const unsigned char **p, size_t *len)
++static char *unserialize_str(const unsigned char **p, size_t *len, size_t maxlen)
+ {
+ 	size_t i, j;
+ 	char *str = safe_emalloc(*len, 1, 1);
+-	unsigned char *end = *(unsigned char **)p+*len;
++	unsigned char *end = *(unsigned char **)p+maxlen;
+ 
+ 	if(end < *p) {
+ 		efree(str);
+ 		return NULL;
+ 	}
+ 
+-	for (i = 0; i < *len && *p < end; i++) {
++	for (i = 0; i < *len; i++) {
++		if (*p >= end) {
++			efree(str);
++			return NULL;
++		}
+ 		if (**p != '\\') {
+ 			str[i] = (char)**p;
+ 		} else {
+@@ -757,7 +761,7 @@
+ 		return 0;
+ 	}
+ 
+-	if ((str = unserialize_str(&YYCURSOR, &len)) == NULL) {
++	if ((str = unserialize_str(&YYCURSOR, &len, maxlen)) == NULL) {
+ 		return 0;
+ 	}
+ 

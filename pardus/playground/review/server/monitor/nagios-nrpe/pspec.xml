@@ -1,0 +1,68 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>nagios-nrpe</Name>
+        <Homepage>http://www.nagios.org/</Homepage>
+        <Packager>
+            <Name>Kaan Özdinçer</Name>
+            <Email>kozdincer@pardus.org.tr</Email>
+        </Packager>
+        <License>as-is</License>
+        <Summary>Monitoring agent for Nagios</Summary>
+        <Description>Nrpe is a system daemon that will execute various Nagios plugins locally on behalf of a remote (monitoring) host that uses the check_nrpe plugin.</Description>
+        <Archive sha1sum="208595c175d726e8e377d565b21897f4de1648cc" type="targz">mirrors://sourceforge/nagios/nrpe-2.x/nrpe-2.12/nrpe-2.12.tar.gz</Archive>
+        <Patches>
+            <Patch level="1">nrpe-0001-Add-reload-target-to-the-init-script.patch</Patch>
+            <Patch level="1">nrpe-0002-Read-extra-configuration-from-etc-sysconfig-nrpe.patch</Patch>
+            <Patch level="1">nrpe-0003-Include-etc-npre.d-config-directory.patch</Patch>
+            <Patch level="1">nrpe-0004-Fix-initscript-return-codes.patch</Patch>
+            <Patch level="1">nrpe-0005-Do-not-start-by-default.patch</Patch>
+            <Patch level="1">nrpe-0006-Relocate-pid-file.patch</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>nagios-nrpe</Name>
+        <Description>Nrpe is a system daemon that will execute various Nagios plugins locally on behalf of a remote (monitoring) host that uses the check_nrpe plugin. This package provides the core agent.</Description>
+        <RuntimeDependencies>
+            <Dependency release="current">nagios-plugins-nrpe</Dependency>
+            <Dependency>nagios-plugins</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="config">/etc/nagios/nrpe.cfg</Path>
+            <Path fileType="config">/etc/conf.d/nrpe</Path>
+            <Path fileType="executable">/usr/sbin/nrpe</Path>
+            <Path fileType="data">/var/run/nrpe</Path>
+            <Path fileType="doc">/usr/share/doc</Path>
+        </Files>
+        <AdditionalFiles>
+            <AdditionalFile target="/etc/conf.d/nrpe" owner="root" group="root" permission="0644">nrpe</AdditionalFile>
+        </AdditionalFiles>
+        <Provides>
+            <COMAR name="nrpe" script="service.py">System.Service</COMAR>
+            <COMAR script="package.py">System.Package</COMAR>
+        </Provides>
+    </Package>
+
+    <Package>
+        <Name>nagios-plugins-nrpe</Name>
+        <Summary>Nrpe plugin for Nagios</Summary>
+        <Description>Nrpe is a system daemon that will execute various Nagios plugins locally on behalf of a remote (monitoring) host that uses the check_nrpe plugin. This package provides the nrpe plugin for Nagios-related applications.</Description>
+        <Files>
+            <Path fileType="library">/usr/lib/nagios/plugins/check_nrpe</Path>
+            <Path fileType="library">/usr/lib/nagios/plugins/nrpe_check_control</Path>
+            <Path fileType="doc">/usr/share/doc/nagios-nrpe/README.nrpe_check_control</Path>
+        </Files>
+    </Package>
+
+    <History>
+        <Update release="1">
+            <Date>2011-01-30</Date>
+            <Version>2.12</Version>
+            <Comment>First Release</Comment>
+            <Name>Erdem Bayer</Name>
+            <Email>ebayer@bayer.gen.tr</Email>
+        </Update>
+    </History>
+</PISI>

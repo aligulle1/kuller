@@ -1,0 +1,52 @@
+Index: etc/model.xml
+===================================================================
+--- etc/model.xml	(revision 25937)
++++ etc/model.xml	(revision 25952)
+@@ -604,6 +604,23 @@
+         <signal name="takingBack"/>
+     </interface>
+ 
++    <!-- System.Upgrader -->
++    <interface name="System.Upgrader">
++        <method name="prepare" access_label="run"/>
++        <method name="setRepositories" access_label="run"/>
++        <method name="download" access_label="run"/>
++        <method name="upgrade" access_label="run"/>
++        <method name="cleanup" access_label="run"/>
++
++        <signal name="started"/>
++        <signal name="finished"/>
++        <signal name="cancelled"/>
++        <signal name="progress"/>
++        <signal name="error"/>
++        <signal name="warning"/>
++        <signal name="status"/>
++    </interface>
++
+     <!-- Disk.Manager -->
+     <interface name="Disk.Manager">
+         <method name="getDevices" access_label="get">
+Index: etc/policy/tr.org.pardus.comar.system.upgrader.policy
+===================================================================
+--- etc/policy/tr.org.pardus.comar.system.upgrader.policy	(revision 0)
++++ etc/policy/tr.org.pardus.comar.system.upgrader.policy	(revision 25952)
+@@ -0,0 +1,19 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN" "http://www.freedesktop.org/standards/PolicyKit/1.0/policyconfig.dtd">
++
++<policyconfig>
++    <vendor>Pardus</vendor>
++    <vendor_url>http://www.pardus.org.tr</vendor_url>
++    <icon_name>preferences-desktop-default-applications</icon_name>
++    <action id="tr.org.pardus.comar.system.upgrader.run">
++        <description>Distribution upgrade operation</description>
++        <description xml:lang="tr">Dağıtım güncelleme işlemi</description>
++        <message>System policy prevents distribution upgrade operation</message>
++        <message xml:lang="tr">Sistem politikası dağıtım güncelleme işlemini engelliyor</message>
++        <defaults>
++            <allow_any>auth_admin_keep_always</allow_any>
++            <allow_active>auth_admin_keep_always</allow_active>
++            <allow_inactive>auth_admin_keep_always</allow_inactive>
++        </defaults>
++    </action>
++</policyconfig>

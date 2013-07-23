@@ -1,0 +1,54 @@
+Index: brother-mfc7320-2.0.2/usr/local/Brother/cupswrapper/cupswrapperMFC7320-2.0.2
+===================================================================
+--- brother-mfc7320-2.0.2.orig/usr/local/Brother/cupswrapper/cupswrapperMFC7320-2.0.2
++++ brother-mfc7320-2.0.2/usr/local/Brother/cupswrapper/cupswrapperMFC7320-2.0.2
+@@ -21,18 +21,6 @@
+ if [ "$1" = '-e' ]; then
+   lpadmin -x MFC7320
+   rm -f /usr/share/cups/model/MFC7320.ppd
+-  rm -f /usr/lib/cups/filter/brlpdwrapperMFC7320
+-  rm -f /usr/lib64/cups/filter/brlpdwrapperMFC7320
+-  rm -f /usr/local/Brother/cupswrapper/brcupsconfig3
+-  if [ -f /usr/share/ppd/MFC7320.ppd ];then
+-  rm -f /usr/share/ppd/MFC7320.ppd
+-  fi
+-  if [ -e /etc/init.d/cups ]; then
+-    /etc/init.d/cups restart
+-  fi
+-  if [ -e /etc/init.d/cupsys ]; then
+-    /etc/init.d/cupsys restart
+-  fi
+   exit 0 
+ fi
+ if [ "$1" = "-r" ]; then
+@@ -334,7 +322,7 @@ restore
+ 
+ ENDOFPPDFILE
+ 
+-chmod 755  $ppd_file_name
++chmod 644 $ppd_file_name
+ if [ -e '/usr/share/ppd' ];then
+   cp  $ppd_file_name  /usr/share/ppd
+ fi
+@@ -513,21 +501,6 @@ if [ -e /usr/lib64/cups/filter ]; then
+    cp $brotherlpdwrapper  $brotherlpdwrapper64
+ fi
+ 
+-chmod a+w /usr/local/Brother/inf/brMFC7320rc
+-chmod a+w /usr/local/Brother/inf
+-if [ -e /etc/init.d/lpd ]; then
+-   /etc/init.d/lpd stop
+-fi
+-if [  -e /etc/init.d/lprng ]; then
+-   /etc/init.d/lprng stop
+-fi
+-  if [ -e /etc/init.d/cups ]; then
+-    /etc/init.d/cups restart
+-  fi
+-  if [ -e /etc/init.d/cupsys ]; then
+-    /etc/init.d/cupsys restart
+-  fi
+-sleep 2s
+ port2=`lpinfo -v | grep -i 'usb://Brother/MFC-7320' | head -1`
+ if [ "$port2" = '' ];then
+ 	port2=`lpinfo -v | grep 'usb://' | head -1`

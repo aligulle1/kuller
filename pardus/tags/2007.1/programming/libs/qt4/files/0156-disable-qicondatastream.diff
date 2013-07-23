@@ -1,0 +1,38 @@
+qt-bugs@ issue: #146150
+Trolltech task ID: none
+applied: no
+author: Matthias Kretz
+
+operator<<(QDataStream&, QIcon const&) casts QIcon::d->engine to 
+QPixmapIconEngine without checking whether the object is really a 
+QPixmapIconEngine.
+
+This just disables the code so that we don't get crashes.
+
+Index: qicon.cpp
+===================================================================
+--- src/gui/image/qicon.cpp	(revision 621734)
++++ src/gui/image/qicon.cpp	(working copy)
+@@ -664,9 +664,11 @@
+ QDataStream &operator<<(QDataStream &s, const QIcon &icon)
+ {
+     if (s.version() >= QDataStream::Qt_4_2) {
+-        if (icon.isNull()) {
++        if (!icon.isNull()) {
++            qWarning("operator<<(QDataStream, QIcon): code disabled because it crashes with KIcon(Engine)");
++        }
+             s << 0;
+-        } else {
++        /*} else {
+             QPixmapIconEngine *engine = static_cast<QPixmapIconEngine *>(icon.d->engine);
+             int num_entries = engine->pixmaps.size();
+             s << num_entries;
+@@ -677,7 +679,7 @@
+                 s << (uint) engine->pixmaps.at(i).mode;
+                 s << (uint) engine->pixmaps.at(i).state;
+             }
+-        }
++        }*/
+     } else {
+         s << QPixmap(icon.pixmap(22,22));
+     }

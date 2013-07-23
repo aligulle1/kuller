@@ -1,0 +1,111 @@
+--- /dev/null	2006-10-22 13:04:44.415765607 +0300
++++ Filters/FilterPisi.cs	2006-10-22 10:27:01.000000000 +0300
+@@ -0,0 +1,108 @@
++//
++// FilterPisi.cs
++//
++// Copyright (C) 2006 Furkan Duman <coderlord-at-gmail.com>
++//
++//
++// Permission is hereby granted, free of charge, to any person obtaining a
++// copy of this software and associated documentation files (the "Software"),
++// to deal in the Software without restriction, including without limitation
++// the rights to use, copy, modify, merge, publish, distribute, sublicense,
++// and/or sell copies of the Software, and to permit persons to whom the
++// Software is furnished to do so, subject to the following conditions:
++//
++// The above copyright notice and this permission notice shall be included in
++// all copies or substantial portions of the Software.
++//
++// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
++// DEALINGS IN THE SOFTWARE.
++
++using System;
++using System.IO;
++using System.Xml;
++
++using ICSharpCode.SharpZipLib.Zip;
++
++using Beagle.Daemon;
++using Beagle.Util;
++
++namespace Beagle.Filters {
++
++    public class FilterPisi : Beagle.Daemon.Filter {
++
++        public FilterPisi()
++        {
++            AddSupportedFlavor(FilterFlavor.NewFromExtension(".pisi")); 
++            AddSupportedFlavor(FilterFlavor.NewFromMimeType("application/x-pisi"));
++            // Filter version 1
++            SetVersion(1);
++        }
++
++        private ZipInputStream zStream;
++
++        // Finds and locates zip entry by file name
++        private ZipEntry GetEntry(string name) {
++            ZipEntry zEntry;
++            while ((zEntry = zStream.GetNextEntry()) != null)
++                if (zEntry.Name == name)
++                    return zEntry;
++            return null;
++        }
++
++        override protected void DoOpen(FileInfo info)
++        {
++            try {
++                zStream = new ZipInputStream(Stream);
++            }
++            catch (Exception E) {
++                Logger.Log.Error("Unable to open pisi stream {0}: {1}!", info.FullName, E.Message);
++                Error();
++                return;
++            }
++            // Go to metadata.xml in zip if avail.
++            ZipEntry zEntry = this.GetEntry("metadata.xml");
++            if (zEntry == null) {
++                Logger.Log.Error("metadata.xml not found in pisi file {0}!", info.FullName);
++                Error();
++                return;
++            }
++        }
++
++        override protected void DoPullProperties()
++        {
++            try {
++                // Load decompressed zip stream into XML
++                XmlDocument xml = new XmlDocument();
++                xml.Load(zStream);
++                zStream.Close();
++
++                // Pull package metadatas
++                XmlNode packageNode = xml.DocumentElement["Package"];
++                AddProperty(Beagle.Property.New("dc:title", packageNode["Name"].InnerText));
++                foreach (XmlNode summary in packageNode.SelectNodes("License"))
++                    AddProperty(Beagle.Property.New("fixme:license", summary.InnerText));
++                foreach (XmlNode summary in packageNode.SelectNodes("Summary"))
++                    AddProperty(Beagle.Property.New("fixme:summary", summary.InnerText));
++                foreach (XmlNode description in packageNode.SelectNodes("Description"))
++                    AddProperty(Beagle.Property.New("fixme:description", description.InnerText));
++
++                // Pull source metadatas
++                XmlNode sourceNode = xml.DocumentElement["Source"];
++                AddProperty(Beagle.Property.New("fixme:homepage", sourceNode["Homepage"].InnerText));
++                AddProperty(Beagle.Property.NewKeyword("dc:author", sourceNode["Packager"]["Name"].InnerText));
++                AddProperty(Beagle.Property.NewKeyword("dc:mailto", sourceNode["Packager"]["Email"].InnerText));
++
++                Finished();
++            }
++            catch (Exception E) {
++                Logger.Log.Error("Unable to parse metadata.xml of pisi package!");
++                Error();
++            }
++        }
++    }
++}

@@ -1,0 +1,44 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+#
+# Copyright (C) 2007-2011 TUBITAK/UEKAE
+# Licensed under the GNU General Public License, version 2.
+# See the file http://www.gnu.org/licenses/old-licenses/gpl-2.0.txt
+
+from pisi.actionsapi import shelltools
+from pisi.actionsapi import autotools
+from pisi.actionsapi import pisitools
+from pisi.actionsapi import get
+
+#NoStrip = ["/"]
+
+def setup():
+    shelltools.export("CFLAGS", "%s -DLDAP_DEPRECATED -fno-strict-aliasing" % get.CFLAGS())
+    autotools.autoreconf("-fi")
+    autotools.configure("--disable-dependency-tracking \
+                         --without-nss \
+                         --with-ldap \
+                         --with-docbook \
+                         --enable-debug \
+                         --disable-rpath")
+
+def build():
+    autotools.make()
+    autotools.make("-C po tr.gmo")
+
+def install():
+    autotools.rawInstall("STRIP=/bin/true DESTDIR=%s" % get.installDIR())
+
+    # Move pam module to /lib
+    pisitools.domove("/usr/lib/security/pam_pkcs11.so", "/lib/security")
+
+    # Create necessary directories
+    pisitools.dodir("/etc/pam_pkcs11/cacerts")
+    pisitools.dodir("/etc/pam_pkcs11/crls")
+
+    # Create symlink to /etc/ssl/nssdb
+    pisitools.dosym("/etc/ssl/nssdb", "/etc/pam_pkcs11/nssdb")
+
+    pisitools.dodoc("NEWS", "README", "doc/README*")
+    pisitools.dohtml("doc/api/*")
+    pisitools.doman("doc/*.[18]")

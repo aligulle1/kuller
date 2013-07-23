@@ -1,0 +1,108 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>udisks</Name>
+        <Homepage>http://udisks.freedesktop.org</Homepage>
+        <Packager>
+            <Name>Pardus</Name>
+            <Email>admins@pardus.org.tr</Email>
+        </Packager>
+        <License>GPLv2+</License>
+        <IsA>library</IsA>
+        <IsA>app:console</IsA>
+        <Summary>Disk Management Service</Summary>
+        <Description>udisks provides a daemon, API and command line tools for managing disk devices attached to the system.</Description>
+        <Archive sha1sum="a8307d726b7f1255e7008ff708c793a1301d1309" type="targz">http://hal.freedesktop.org/releases/udisks-1.0.2.tar.gz</Archive>
+        <BuildDependencies>
+            <Dependency>lvm2</Dependency>
+            <Dependency>parted</Dependency>
+            <Dependency>sg3_utils</Dependency>
+            <Dependency>device-mapper</Dependency>
+            <Dependency>libatasmart-devel</Dependency>
+            <Dependency>gobject-introspection-devel</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <!-- CVE-2010-4661: Arbitrary kernel module load (pb#18024) -->
+            <Patch level="1">c933a929f07421ec747cebb24d5e620fc2b97037.patch</Patch>
+
+            <Patch level="1">add-ntfs_3g-to-whitelist.patch</Patch>
+            <Patch level="1">fix-configure.ac-typo.patch</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>udisks</Name>
+        <RuntimeDependencies>
+            <Dependency>lvm2</Dependency>
+            <Dependency>mdadm</Dependency>
+            <Dependency>parted</Dependency>
+            <Dependency>mtools</Dependency>         <!-- For mlabel -->
+            <Dependency>pm-utils</Dependency>
+            <Dependency>xfsprogs</Dependency>       <!-- For mkfs.xfs, xfs_admin -->
+            <Dependency>sg3_utils</Dependency>
+            <Dependency>ntfsprogs</Dependency>      <!-- For mkntfs -->
+            <Dependency>smp_utils</Dependency>      <!-- For smp_rep_manufacturer -->
+            <Dependency>dosfstools</Dependency>     <!-- For mkfs.vfat -->
+            <Dependency>libatasmart</Dependency>
+            <Dependency>device-mapper</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="localedata">/usr/share/locale</Path>
+            <Path fileType="executable">/sbin</Path>
+            <Path fileType="executable">/usr/bin</Path>
+            <Path fileType="executable">/usr/libexec</Path>
+            <Path fileType="executable">/lib/udev</Path>
+            <Path fileType="library">/usr/lib</Path>
+            <Path fileType="data">/lib/udev/rules.d</Path>
+            <Path fileType="data">/etc/dbus-1</Path>
+            <Path fileType="data">/usr/share/dbus-1</Path>
+            <Path fileType="data">/usr/share/polkit-1</Path>
+            <Path fileType="data">/var/lib/udisks</Path>
+            <Path fileType="data">/var/run/udisks</Path>
+            <Path fileType="data">/etc/avahi/services</Path>
+            <Path fileType="man">/usr/share/man</Path>
+            <Path fileType="doc">/usr/share/doc</Path>
+            <Path fileType="data">/etc/profile.d</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>udisks-devel</Name>
+        <Summary>Development files for udisks</Summary>
+        <RuntimeDependencies>
+            <Dependency release="current">udisks</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="header">/usr/include</Path>
+            <Path fileType="man">/usr/share/man/man3</Path>
+            <Path fileType="data">/usr/share/dbus-1/interfaces/*.xml</Path>
+            <Path fileType="data">/usr/share/pkgconfig</Path>
+        </Files>
+    </Package>
+
+    <History>
+        <Update release="3">
+            <Date>2011-05-10</Date>
+            <Version>1.0.2</Version>
+            <Comment>Fix ntfs-3g mounting issue (pb#18034)</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="2">
+            <Date>2011-05-06</Date>
+            <Version>1.0.2</Version>
+            <Comment>CVE-2010-4661: Arbitrary kernel module load (pb#18024)</Comment>
+            <Type package="udisks">security</Type>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="1">
+            <Date>2010-12-02</Date>
+            <Version>1.0.2</Version>
+            <Comment>Version bump</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+    </History>
+</PISI>

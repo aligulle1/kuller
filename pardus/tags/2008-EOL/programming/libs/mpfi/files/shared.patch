@@ -1,0 +1,37 @@
+--- configure.ac	2006-01-03 11:03:52.000000000 +0200
++++ configure.ac	2007-12-27 21:19:11.000000000 +0200
+@@ -12,6 +12,8 @@
+ MPFI_SUBDIRS="src tests doc"
+ AC_SUBST(MPFI_SUBDIRS)
+ 
++AC_PROG_LIBTOOL
++
+ # ajout des options sur la ligne de commande du configure
+ # Initialisation des repertoires GMP
+ AC_ARG_WITH(gmp-dir,
+--- src/Makefile.am	2006-01-03 11:04:02.000000000 +0200
++++ src/Makefile.am	2007-12-27 21:18:34.000000000 +0200
+@@ -1,6 +1,6 @@
+-lib_LIBRARIES = libmpfi.a 
+-include_HEADERS = mpfi.h mpfi_io.h
+-libmpfi_a_SOURCES = mpfi.h mpfi-impl.h mpfi_io.h mpfi.c mpfi_io.c mpfi_trigo.c
+-#test_mpfi_LADD = @LIBS@ ../src/libmpfi.a
++lib_LTLIBRARIES = libmpfi.la
++libmpfi_la_SOURCES = mpfi.h mpfi-impl.h mpfi_io.h mpfi.c mpfi_io.c mpfi_trigo.c
++libmpfi_la_LDFLAGS = -no-undefined
+ 
++include_HEADERS = mpfi.h mpfi_io.h
+ INCLUDES =-I$(top_srcdir) @INCLUDES@
+--- tests/Makefile.am	2006-01-03 11:04:06.000000000 +0200
++++ tests/Makefile.am	2007-12-27 21:23:21.000000000 +0200
+@@ -1,8 +1,8 @@
+ noinst_PROGRAMS = test_mpfi test_trigo
+ test_mpfi_SOURCES = test_mpfi.c
+ test_trigo_SOURCES = test_trigo.c
+-test_mpfi_LDADD = ${top_srcdir}/src/libmpfi.a @LDADD@
+-test_trigo_LDADD = ${top_srcdir}/src/libmpfi.a @LDADD@
++test_mpfi_LDADD = ${top_srcdir}/src/.libs/libmpfi.so @LDADD@
++test_trigo_LDADD = ${top_srcdir}/src/.libs/libmpfi.so @LDADD@
+ 
+ # ici on utilise la variable GMP_INC_PATH declaree par le configure
+ 

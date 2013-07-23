@@ -1,0 +1,37 @@
+From 29e413c850e18f43dbd011689973399c5d7d340d Mon Sep 17 00:00:00 2001
+From: Paulo Cesar Pereira de Andrade <pcpa@mandriva.com.br>
+Date: Mon, 21 Jul 2008 19:02:52 -0300
+Subject: [PATCH] Correct calls to find_bios_string
+
+  It was changed to receive a S3VPtr instead of a PCITAG in commit
+44aca1d9fe5c51e591aa5a33a3f46d3ad46dc0b9, for PCIACCESS conversion.
+  But the callers were not updated, so, it is assumed that without
+this patch, the driver will just crash when calling find_bios_string.
+
+Signed-off-by: Paulo Cesar Pereira de Andrade <pcpa@mandriva.com.br>
+---
+ src/s3v_driver.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/s3v_driver.c b/src/s3v_driver.c
+index d0fd463..499d2cf 100644
+--- xf86-video-s3virge-1.10.1/src/s3v_driver.c
++++ xf86-video-s3virge-1.10.1/src/s3v_driver.c
+@@ -1232,12 +1232,12 @@ S3VPreInit(ScrnInfoPtr pScrn, int flags)
+        * Toshiba Tecra 5x0/7x0 seems to use 28.636 MHz
+        * Compaq Armada 7x00 uses 14.318 MHz
+        */
+-      if (find_bios_string(ps3v->PciTag, BIOS_BASE, "COMPAQ M5 BIOS", NULL) != NULL) {
++      if (find_bios_string(ps3v, BIOS_BASE, "COMPAQ M5 BIOS", NULL) != NULL) {
+ 	 if (xf86GetVerbosity())
+ 	    xf86DrvMsg(pScrn->scrnIndex, X_PROBED, "COMPAQ M5 BIOS found\n");
+ 	 /* ps3v->refclk_fact = 1.0; */
+       }
+-      else if (find_bios_string(ps3v->PciTag, BIOS_BASE, "TOSHIBA Video BIOS", NULL) != NULL) {
++      else if (find_bios_string(ps3v, BIOS_BASE, "TOSHIBA Video BIOS", NULL) != NULL) {
+ 	 if (xf86GetVerbosity())
+ 	    xf86DrvMsg(pScrn->scrnIndex, X_PROBED, "TOSHIBA Video BIOS found\n");
+ 	 /* ps3v->refclk_fact = 2.0; */
+-- 
+1.5.6.5
+

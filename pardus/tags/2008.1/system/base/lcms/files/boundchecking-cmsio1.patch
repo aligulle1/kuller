@@ -1,0 +1,40 @@
+--- src/cmsio1.c	6 Aug 2007 20:01:21 -0000	1.2
++++ src/cmsio1.c	3 Jan 2008 11:15:18 -0000
+@@ -919,17 +919,17 @@ LPGAMMATABLE ReadCurve(LPLCMSICCPROFILE 
+            icUInt32Number Reserved;
+            icUInt16Number   Type;
+            int i;
+            
+            if (Icc -> Read(&Type, sizeof(icUInt16Number), 1, Icc) != 1) return NULL;
+            if (Icc -> Read(&Reserved, sizeof(icUInt16Number), 1, Icc) != 1) return NULL;
+            
+            AdjustEndianess16((LPBYTE) &Type);
+-           if (Type > 5) {
++           if (Type > 4) {
+ 
+                 cmsSignalError(LCMS_ERRC_ABORTED, "Unknown parametric curve type '%d' found.", Type);
+                 return NULL;
+            }
+         
+           ZeroMemory(Params, 10* sizeof(double));
+           n = ParamsByType[Type];
+ 
+@@ -1028,17 +1028,17 @@ LPGAMMATABLE ReadCurveReversed(LPLCMSICC
+            icUInt16Number   Type;
+            int i;
+ 
+ 
+            if (Icc -> Read(&Type, sizeof(icUInt16Number), 1, Icc) != 1) return NULL;
+            if (Icc -> Read(&Reserved, sizeof(icUInt16Number), 1, Icc) != 1) return NULL;
+            
+            AdjustEndianess16((LPBYTE) &Type);
+-           if (Type > 5) {
++           if (Type > 4) {
+ 
+                 cmsSignalError(LCMS_ERRC_ABORTED, "Unknown parametric curve type '%d' found.", Type);
+                 return NULL;
+            }
+         
+           ZeroMemory(Params, 10* sizeof(double));
+           n = ParamsByType[Type];
+ 

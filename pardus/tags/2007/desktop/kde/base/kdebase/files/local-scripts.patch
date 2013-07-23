@@ -1,0 +1,21 @@
+Index: konqueror/shellcmdplugin/kshellcmdplugin.cpp
+===================================================================
+--- konqueror/shellcmdplugin/kshellcmdplugin.cpp	(revision 600625)
++++ konqueror/shellcmdplugin/kshellcmdplugin.cpp	(working copy)
+@@ -24,6 +24,7 @@
+ #include <kapplication.h>
+ #include "kshellcmddialog.h"
+ #include <kgenericfactory.h>
++#include <kio/netaccess.h>
+ 
+ KShellCmdPlugin::KShellCmdPlugin( QObject* parent, const char* name,
+ 	                          const QStringList & )
+@@ -44,7 +45,7 @@
+       KMessageBox::sorry(0L, "KShellCmdPlugin::slotExecuteShellCommand: Program error, please report a bug.");
+       return;
+    }
+-   KURL url = part->url();
++   KURL url = KIO::NetAccess::mostLocalURL(part->url(),NULL);
+    if ( !url.isLocalFile() )
+    {
+       KMessageBox::sorry(part->widget(),i18n("Executing shell commands works only on local directories."));

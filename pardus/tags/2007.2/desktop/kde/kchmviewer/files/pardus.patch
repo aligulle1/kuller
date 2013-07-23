@@ -1,0 +1,470 @@
+diff -Naur src/kchmconfig.cpp new/kchmconfig.cpp
+--- src/kchmconfig.cpp	2005-11-23 08:26:29.000000000 +0200
++++ new/kchmconfig.cpp	2006-02-09 14:19:49.000000000 +0200
+@@ -40,7 +40,7 @@
+ 	if ( !dir.exists() && !dir.mkdir(m_datapath) )
+ 		qWarning ("Could not create directory %s", m_datapath.ascii());
+ 
+-	m_LoadLatestFileOnStartup = false;
++	m_LoadLatestFileOnStartup = true;
+ 	m_onNewChmClick = ACTION_ASK_USER;
+ 	m_onExternalLinkClick = ACTION_ASK_USER;
+ 	m_HistorySize = 10;
+diff -Naur src/kchmmainwindow.cpp new/kchmmainwindow.cpp
+--- src/kchmmainwindow.cpp	2006-02-04 06:02:06.000000000 +0200
++++ new/kchmmainwindow.cpp	2006-02-09 14:49:38.000000000 +0200
+@@ -43,6 +43,7 @@
+ #include "kchmviewwindow_qtextbrowser.h"
+ 
+ #if defined (USE_KDE)
++	#include <kiconloader.h>
+ 	#include "kchmviewwindow_khtmlpart.h"
+ #else
+ 	#include "kqrunprocess.h"
+@@ -127,12 +128,12 @@
+     if ( !fn.isEmpty() )
+ 		loadChmFile( fn );
+     else
+-	{
+-		if ( !m_chmFile )
+-			exit (1);
++	//{
++		//if ( !m_chmFile )
++		//	exit (1);
+ 			
+ 		statusBar()->message( i18n("Loading aborted"), 2000 );
+-	}
++	//}
+ }
+ 
+ 
+@@ -218,7 +219,7 @@
+ 				openPage (m_chmFile->HomePage(), true);
+ 		}
+ 
+-		m_searchToolbar->setEnabled (true);
++		showComponents(true);
+ 		appConfig.addFileToHistory( m_chmFilename );
+ 		updateHistoryMenu();
+ 		return true;
+@@ -235,7 +236,7 @@
+ 					QMessageBox::NoButton, 
+ 					QMessageBox::NoButton);
+ 			mbox.exec();
+-			exit (1);
++			//exit (1);
+ 		}
+ 		
+ 		statusBar()->message( 
+@@ -410,10 +411,12 @@
+ 	
+ 	if ( !parseCmdLineArgs( ) )
+ 	{
+-		if ( appConfig.m_LoadLatestFileOnStartup && appConfig.m_History.size() > 0 )
++		showComponents(false);
++		if ( appConfig.m_LoadLatestFileOnStartup )
+ 		{
+-			if ( loadChmFile ( appConfig.m_History[0] ) )
+-				return;
++ 			if ( appConfig.m_History.size() > 0 )			
++				loadChmFile ( appConfig.m_History[0] );
++			return;
+ 		}
+ 		
+ 		emit slotOpenMenuItemActivated();
+@@ -427,8 +430,12 @@
+ 	
+ 	toolbar->setLabel( i18n( "File Operations") );
+ 
+-    QPixmap iconFileOpen (*gIconStorage.getToolbarPixmap(KCHMIconStorage::fileopen));
+-    QToolButton * fileOpen = new QToolButton (iconFileOpen, 
++#if not defined (USE_KDE)
++	QPixmap iconFileOpen (*gIconStorage.getToolbarPixmap(KCHMIconStorage::fileopen));
++    	QToolButton * fileOpen = new QToolButton (iconFileOpen,
++#else
++	QToolButton * fileOpen = new QToolButton (SmallIconSet("fileopen"),
++#endif
+ 				i18n( "Open File" ), 
+ 				QString::null,
+ 				this, 
+@@ -438,8 +445,12 @@
+ 	QString fileOpenText = i18n( "Click this button to open an existing chm file." );
+ 	QWhatsThis::add( fileOpen, fileOpenText );
+ 
+-    QPixmap iconFilePrint (*gIconStorage.getToolbarPixmap(KCHMIconStorage::print));
+-    QToolButton * filePrint	= new QToolButton (iconFilePrint,
++#if not defined (USE_KDE)
++    	QPixmap iconFilePrint (*gIconStorage.getToolbarPixmap(KCHMIconStorage::print));
++	m_filePrint	= new QToolButton (iconFilePrint,
++#else
++    m_filePrint	= new QToolButton (SmallIconSet("fileprint"),
++#endif
+ 				i18n( "Print File" ),
+ 				QString::null,
+ 				this,
+@@ -447,66 +458,91 @@
+ 				toolbar);
+ 
+ 	QString filePrintText = i18n( "Click this button to print the current page");
+-	QWhatsThis::add( filePrint, filePrintText );
++	QWhatsThis::add( m_filePrint, filePrintText );
+ 
+-    QToolBar * navtoolbar = new QToolBar(this);
+-	navtoolbar->setLabel( i18n( "Navigation") );
++    	m_navtoolbar = new QToolBar(this);
++	m_navtoolbar->setLabel( i18n( "Navigation") );
+ 	
+-    QPixmap iconBackward (*gIconStorage.getToolbarPixmap(KCHMIconStorage::back));
+-    m_toolbarIconBackward = new QToolButton (iconBackward,
++#if not defined (USE_KDE)
++    	QPixmap iconBackward (*gIconStorage.getToolbarPixmap(KCHMIconStorage::back));
++	m_toolbarIconBackward = new QToolButton (iconBackward,
++#else
++	m_toolbarIconBackward = new QToolButton (SmallIconSet("back"),
++#endif
+ 				i18n( "Move backward in history"),
+ 				QString::null,
+ 				this,
+ 				SLOT( slotBackwardMenuItemActivated() ),
+-				navtoolbar);
++				m_navtoolbar);
+ 	QWhatsThis::add( m_toolbarIconBackward, i18n( "Click this button to move backward in browser history") );	
+ 
+-    QPixmap iconForward (*gIconStorage.getToolbarPixmap(KCHMIconStorage::forward));
+-    m_toolbarIconForward = new QToolButton (iconForward,
++#if not defined (USE_KDE)
++    	QPixmap iconForward (*gIconStorage.getToolbarPixmap(KCHMIconStorage::forward));
++	m_toolbarIconForward = new QToolButton (iconForward,
++#else
++    m_toolbarIconForward = new QToolButton (SmallIconSet("forward"),
++#endif
+ 				i18n( "Move forward in history"),
+ 				QString::null,
+ 				this,
+ 				SLOT( slotForwardMenuItemActivated() ),
+-				navtoolbar);
++				m_navtoolbar);
+ 	QWhatsThis::add( m_toolbarIconBackward, i18n( "Click this button to move forward in browser history") );	
+ 	
+-    QPixmap iconHome = (*gIconStorage.getToolbarPixmap(KCHMIconStorage::gohome));
+-    new QToolButton (iconHome,
++#if not defined (USE_KDE)
++    	QPixmap iconHome = (*gIconStorage.getToolbarPixmap(KCHMIconStorage::gohome));
++	new QToolButton (iconHome,
++#else
++    new QToolButton (SmallIconSet("gohome"),
++#endif
+ 				i18n( "Go to the home page"),
+ 				QString::null,
+ 				this,
+ 				SLOT( slotHomeMenuItemActivated() ),
+-				navtoolbar);
++				m_navtoolbar);
+ 	QWhatsThis::add( m_toolbarIconBackward, i18n( "Click this button to move to the home page") );	
+ 
+ 	// Setup the menu
+-	KQPopupMenu * file = new KQPopupMenu( this );
+-	menuBar()->insertItem( i18n( "&File"), file );
++	m_menu_file = new KQPopupMenu( this );
++	menuBar()->insertItem( i18n( "&File"), m_menu_file );
+ 
+     int id;
+-	id = file->insertItem ( iconFileOpen, i18n( "&Open..."), this, SLOT( slotOpenMenuItemActivated() ), CTRL+Key_O );
+-    file->setWhatsThis( id, fileOpenText );
++	id = m_menu_file->insertItem ( 
++#if defined (USE_KDE)
++		SmallIconSet("fileopen"),
++#else
++		iconFileOpen,
++#endif
++		i18n( "&Open..."), this, SLOT( slotOpenMenuItemActivated() ), CTRL+Key_O );
++    m_menu_file->setWhatsThis( id, fileOpenText );
+ 
+-	id = file->insertItem( iconFilePrint, i18n( "&Print..."), this, SLOT( slotPrintMenuItemActivated() ), CTRL+Key_P );
+-    file->setWhatsThis( id, filePrintText );
++	id = m_menu_file->insertItem( 
++#if defined (USE_KDE)
++		SmallIconSet("fileprint"),
++#else
++		iconFilePrint,
++#endif
++		i18n( "&Print..."), this, SLOT( slotPrintMenuItemActivated() ), CTRL+Key_P );
++	m_item_print = id;
++    m_menu_file->setWhatsThis( id, filePrintText );
+ 
+-    file->insertSeparator();
++    m_menu_file->insertSeparator();
+ 
+-	m_menuHistory = new KQPopupMenu( file );
++	m_menuHistory = new KQPopupMenu( m_menu_file );
+ 	connect ( m_menuHistory, SIGNAL( activated(int) ), this, SLOT ( slotHistoryMenuItemActivated(int) ));
+ 	
+-	file->insertItem( i18n( "&Recent files"), m_menuHistory );
++	m_menu_file->insertItem( i18n( "&Recent files"), m_menuHistory );
+ 	
+-	file->insertSeparator();
+-	file->insertItem( i18n( "&Quit"), qApp, SLOT( closeAllWindows() ), CTRL+Key_Q );
++	m_menu_file->insertSeparator();
++	m_menu_file->insertItem( i18n( "&Quit"), qApp, SLOT( closeAllWindows() ), CTRL+Key_Q );
+ 
+-	KQPopupMenu * menu_edit = new KQPopupMenu( this );
+-	menuBar()->insertItem( i18n( "&Edit"), menu_edit );
++	m_menu_edit = new KQPopupMenu( this );
++	menuBar()->insertItem( i18n( "&Edit"), m_menu_edit );
+ 
+-	id = menu_edit->insertItem ( i18n( "&Copy"), this, SLOT( slotBrowserCopy()), CTRL+Key_C );
+-	id = menu_edit->insertItem ( i18n( "&Select all"), this, SLOT( slotBrowserSelectAll()), CTRL+Key_A );
++	id = m_menu_edit->insertItem ( i18n( "&Copy"), this, SLOT( slotBrowserCopy()), CTRL+Key_C );
++	id = m_menu_edit->insertItem ( i18n( "&Select all"), this, SLOT( slotBrowserSelectAll()), CTRL+Key_A );
+ 
+-    menu_edit->insertSeparator();
++    m_menu_edit->insertSeparator();
+ 	
+ 	// KCHMSearchToolbar also adds 'view' menu
+ 	m_searchToolbar = new KCHMSearchAndViewToolbar (this);
+@@ -897,6 +933,17 @@
+ 	}
+ }
+ 
++void KCHMMainWindow::showComponents(bool state)
++{
++  	m_searchToolbar->setEnabled(state);
++	m_navtoolbar->setEnabled(state);
++	m_filePrint->setEnabled(state);
++	m_searchToolbar->showContentsWindow(state);
++	m_menu_edit->setEnabled(state);
++	m_searchToolbar->m_MenuView->setEnabled(state);
++	m_menu_file->setItemEnabled(m_item_print, state);
++}
++
+ void KCHMMainWindow::showOrHideSearchWindow( int tabindex )
+ {
+ 	if ( tabindex == -1 )
+diff -Naur src/kchmmainwindow.h new/kchmmainwindow.h
+--- src/kchmmainwindow.h	2006-02-02 12:24:01.000000000 +0200
++++ new/kchmmainwindow.h	2006-02-09 12:23:36.000000000 +0200
+@@ -61,7 +61,7 @@
+ 	void slotLinkClicked ( const QString & link, bool& follow_link );
+ 	void slotHistoryAvailabilityChanged (bool enable_backward, bool enable_forward);
+ 
+-    void slotOpenMenuItemActivated();
++        void slotOpenMenuItemActivated();
+ 	void slotPrintMenuItemActivated();
+ 	void slotBackwardMenuItemActivated();
+ 	void slotForwardMenuItemActivated();
+@@ -100,8 +100,15 @@
+ 	void	showOrHideIndexWindow( int tabindex );
+ 	void	showOrHideSearchWindow( int tabindex );
+ 	
++	void    showComponents(bool state);
++
+     QString 				m_chmFilename;
+-	
++
++	QToolBar 		* 	m_navtoolbar;
++	QToolButton 		* 	m_filePrint;
++	KQPopupMenu 		* 	m_menu_file;
++	int				m_item_print; 
++	KQPopupMenu 		* 	m_menu_edit;
+ 	KCHMViewWindow		*	m_viewWindow;
+ 	KCHMIndexWindow		*	m_indexWindow;
+ 	KCHMSearchWindow	*	m_searchWindow;
+diff -Naur src/kchmsearchtoolbar.cpp new/kchmsearchtoolbar.cpp
+--- src/kchmsearchtoolbar.cpp	2006-02-03 08:17:48.000000000 +0200
++++ new/kchmsearchtoolbar.cpp	2006-02-09 14:10:01.000000000 +0200
+@@ -36,6 +36,10 @@
+ 
+ #include "iconstorage.h"
+ 
++#if defined (USE_KDE)
++	#include <kiconloader.h>
++#endif
++
+ static KQPopupMenu *menu_langlist, *menu_enclist;
+ 
+ KCHMSearchAndViewToolbar::KCHMSearchAndViewToolbar( KCHMMainWindow * parent )
+@@ -44,17 +48,18 @@
+ 	// Toolbar label
+ 	setLabel( i18n( "Find in page") );
+ 
++#if not defined (USE_KDE)
+ 	// Load the pixmaps
+-    QPixmap iconPrev (*gIconStorage.getToolbarPixmap(KCHMIconStorage::findprev));
+-    QPixmap iconNext (*gIconStorage.getToolbarPixmap(KCHMIconStorage::findnext));
+-    QPixmap iconFontInc (*gIconStorage.getToolbarPixmap(KCHMIconStorage::view_increase));
+-    QPixmap iconFontDec (*gIconStorage.getToolbarPixmap(KCHMIconStorage::view_decrease));
+-    QPixmap iconViewSource (*gIconStorage.getToolbarPixmap(KCHMIconStorage::viewsource));
+-    QPixmap iconAddBookmark (*gIconStorage.getToolbarPixmap(KCHMIconStorage::bookmark_add));
++    	QPixmap iconPrev (*gIconStorage.getToolbarPixmap(KCHMIconStorage::findprev));
++    	QPixmap iconNext (*gIconStorage.getToolbarPixmap(KCHMIconStorage::findnext));
++    	QPixmap iconFontInc (*gIconStorage.getToolbarPixmap(KCHMIconStorage::view_increase));
++    	QPixmap iconFontDec (*gIconStorage.getToolbarPixmap(KCHMIconStorage::view_decrease));
++	QPixmap iconViewSource (*gIconStorage.getToolbarPixmap(KCHMIconStorage::viewsource));
++    	QPixmap iconAddBookmark (*gIconStorage.getToolbarPixmap(KCHMIconStorage::bookmark_add));
+ 	QPixmap iconNextPage (*gIconStorage.getToolbarPixmap(KCHMIconStorage::next_page));
+ 	QPixmap iconPrevPage (*gIconStorage.getToolbarPixmap(KCHMIconStorage::prev_page));
+ 	QPixmap iconLocateInContent (*gIconStorage.getToolbarPixmap(KCHMIconStorage::locate_in_content));
+-
++#endif
+ 	// Create the combobox to enter the find text
+ 	m_findBox = new QComboBox (TRUE, this);
+ 	m_findBox->setMinimumWidth (200);
+@@ -65,7 +70,12 @@
+ 	acc->connectItem( acc->insertItem(Key_F+CTRL), this, SLOT( onAccelFocusSearchField() ) );
+ 	
+ 	// Button 'prevous search result'
+-	m_buttonPrev = new QToolButton (iconPrev,
++	m_buttonPrev = new QToolButton (
++#if defined (USE_KDE)
++				SmallIconSet("back"),
++#else
++				iconPrev,
++#endif
+ 				i18n( "Previous search result"),
+ 				QString::null,
+ 				this,
+@@ -74,7 +84,12 @@
+ 	QWhatsThis::add( m_buttonPrev, i18n( "Click this button to find previous search result.") );
+ 
+ 	// Button 'next search result'
+-	m_buttonNext = new QToolButton (iconNext,
++	m_buttonNext = new QToolButton (
++#if defined (USE_KDE)
++				SmallIconSet("forward"),
++#else
++				iconNext,
++#endif
+ 				i18n( "Next search result"),
+ 				QString::null,
+ 				this,
+@@ -83,7 +98,12 @@
+ 	QWhatsThis::add( m_buttonNext, i18n( "Click this button to find next search result.") );
+ 
+ 	// Button 'locate in content'
+-	m_buttonLocateInContent = new QToolButton( iconLocateInContent,
++	m_buttonLocateInContent = new QToolButton( 
++#if defined (USE_KDE)
++				SmallIconSet("view_choose"),
++#else
++				iconLocateInContent,
++#endif
+ 				i18n( "Locate this topic in content window"),
+ 				QString::null,
+ 				this,
+@@ -92,7 +112,12 @@
+ 	QWhatsThis::add( m_buttonLocateInContent, i18n( "Click this button to find current topic in the content window, and open it.") );
+ 	
+ 	// Button 'increase font size'
+-	m_buttonFontInc = new QToolButton (iconFontInc,
++	m_buttonFontInc = new QToolButton (
++#if defined (USE_KDE)
++				SmallIconSet("viewmag+"),
++#else
++				iconFontInc,
++#endif
+ 				i18n( "Increase font size"),
+ 				QString::null,
+ 				this,
+@@ -101,7 +126,12 @@
+ 	QWhatsThis::add( m_buttonFontInc, i18n( "Click this button to increase the font size.") );
+ 
+ 	// Button 'decrease font size'
+-	m_buttonFontDec = new QToolButton (iconFontDec,
++	m_buttonFontDec = new QToolButton (
++#if defined (USE_KDE)
++				SmallIconSet("viewmag-"),
++#else
++				iconFontDec,
++#endif
+ 				i18n( "Decrease font size"),
+ 				QString::null,
+ 				this,
+@@ -110,7 +140,12 @@
+ 	QWhatsThis::add( m_buttonFontDec, i18n( "Click this button to decrease the font size.") );
+ 	
+ 	// Button 'view HTML source'
+-	m_buttonViewSource = new QToolButton (iconViewSource,
++	m_buttonViewSource = new QToolButton (
++#if defined (USE_KDE)
++				SmallIconSet("view_text"),
++#else
++				iconViewSource,
++#endif
+ 				i18n( "View HTML source"),
+ 				QString::null,
+ 				this,
+@@ -119,7 +154,12 @@
+ 	QWhatsThis::add( m_buttonViewSource, i18n( "Click this button to open a separate window with the page HTML source.") );
+ 	
+ 	// Button 'add a bookmark'
+-	m_buttonAddBookmark = new QToolButton (iconAddBookmark,
++	m_buttonAddBookmark = new QToolButton (
++#if defined (USE_KDE)
++				SmallIconSet("bookmark_add"),
++#else
++				iconAddBookmark,
++#endif
+ 				i18n( "Add to bookmarks"),
+ 				QString::null,
+ 				this,
+@@ -127,7 +167,12 @@
+ 				this);
+ 	QWhatsThis::add( m_buttonAddBookmark, i18n( "Click this button to add the current page to the bookmarks list.") );
+ 	
+-	m_buttonPrevPageInTOC = new QToolButton( iconPrevPage,
++	m_buttonPrevPageInTOC = new QToolButton( 
++#if defined (USE_KDE)
++				SmallIconSet("2leftarrow"),
++#else
++				iconPrevPage,
++#endif
+ 				i18n( "Prev page in TOC"),
+ 				QString::null,
+ 				this,
+@@ -135,7 +180,12 @@
+ 				this);
+ 	QWhatsThis::add( m_buttonAddBookmark, i18n( "Click this button to go to previous page in Table Of Content.") );
+ 	
+-	m_buttonNextPageInTOC = new QToolButton (iconNextPage,
++	m_buttonNextPageInTOC = new QToolButton (
++#if defined (USE_KDE)
++				SmallIconSet("2rightarrow"),
++#else
++				iconPrevPage,
++#endif
+ 				i18n( "Next page in TOC"),
+ 				QString::null,
+ 				this,
+@@ -249,6 +299,7 @@
+ 	m_buttonFontDec->setEnabled (enable);
+ 	m_buttonViewSource->setEnabled (enable);
+ 	m_buttonAddBookmark->setEnabled (enable);
++	m_buttonLocateInContent->setEnabled (enable);
+ 
+ 	bool enable_toc_nav_buttons = ::mainWindow->getContentsWindow() && enable;
+ 	m_buttonNextPageInTOC->setEnabled( enable_toc_nav_buttons );
+diff -Naur src/kchmsearchtoolbar.h new/kchmsearchtoolbar.h
+--- src/kchmsearchtoolbar.h	2006-02-02 09:48:18.000000000 +0200
++++ new/kchmsearchtoolbar.h	2006-02-09 12:03:52.000000000 +0200
+@@ -39,6 +39,8 @@
+ 
+ 	void	setEnabled (bool enable);
+ 	void	setChosenEncodingInMenu( const KCHMTextEncoding::text_encoding_t * enc );
++	void	showContentsWindow( bool enable );
++	KQPopupMenu 		*	m_MenuView;
+ 
+ private slots:
+ 	void	onReturnPressed();
+@@ -58,12 +60,10 @@
+ 	void	onBtnToggleContentWindow();
+ 	
+ 	void	setFullScreen( bool enable );
+-	void	showContentsWindow( bool enable );
+ 	
+ private:
+ 	void	search (bool forward);
+ 	
+-	KQPopupMenu 		*	m_MenuView;
+ 	QComboBox			*	m_findBox;
+ 	QToolButton			*	m_buttonPrev;
+ 	QToolButton			*	m_buttonNext;

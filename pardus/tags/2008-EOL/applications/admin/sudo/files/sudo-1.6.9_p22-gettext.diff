@@ -1,0 +1,48 @@
+Index: sudo-1.6.9p22/check.c
+===================================================================
+--- sudo-1.6.9p22.orig/check.c
++++ sudo-1.6.9p22/check.c
+@@ -62,6 +62,11 @@
+ 
+ #include "sudo.h"
+ 
++/* gettext support */
++#include <locale.h>
++#include <libintl.h>
++#define _(STRING) gettext(STRING)
++
+ /* Status codes for timestamp_status() */
+ #define TS_CURRENT		0
+ #define TS_OLD			1
+@@ -140,13 +145,13 @@ lecture(status)
+ 	    fwrite(buf, nread, 1, stderr);
+ 	fclose(fp);
+     } else {
+-	(void) fputs("\n\
++	(void) fputs(_("\n\
+ We trust you have received the usual lecture from the local System\n\
+ Administrator. It usually boils down to these three things:\n\
+ \n\
+     #1) Respect the privacy of others.\n\
+     #2) Think before you type.\n\
+-    #3) With great power comes great responsibility.\n\n",
++    #3) With great power comes great responsibility.\n\n"),
+     stderr);
+     }
+ }
+Index: sudo-1.6.9p22/sudo.c
+===================================================================
+--- sudo-1.6.9p22.orig/sudo.c
++++ sudo-1.6.9p22/sudo.c
+@@ -178,6 +178,11 @@ main(argc, argv, envp)
+     if ((Argc = argc) < 1)
+ 	usage(1);
+ 
++    /* gettext support */
++    setlocale(LC_ALL, "");
++    bindtextdomain("sudo", "/usr/share/locale");
++    textdomain("sudo");
++
+     /* Must be done as the first thing... */
+ #if defined(HAVE_GETPRPWNAM) && defined(HAVE_SET_AUTH_PARAMETERS)
+     (void) set_auth_parameters(Argc, Argv);

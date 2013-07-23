@@ -1,0 +1,69 @@
+diff -Nur mplayer-20060414-old/libmpcodecs/dec_audio.c mplayer-20060414/libmpcodecs/dec_audio.c
+--- mplayer-20060414-old/libmpcodecs/dec_audio.c	2006-04-14 21:46:29.000000000 +0300
++++ mplayer-20060414/libmpcodecs/dec_audio.c	2006-04-14 21:52:38.000000000 +0300
+@@ -1,6 +1,7 @@
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <unistd.h>
++#include <locale.h>
+ 
+ #include "config.h"
+ #include "mp_msg.h"
+@@ -129,6 +130,10 @@
+       force = 1;
+     }
+     sh_audio->codec=NULL;
++
++    char *locale_data = setlocale(LC_CTYPE,"");
++    setlocale(LC_CTYPE,"C");
++
+     while(1){
+ 	ad_functions_t* mpadec;
+ 	int i;
+@@ -195,8 +200,12 @@
+ 	    continue; // try next...
+ 	}
+ 	// Yeah! We got it!
++
++    setlocale(LC_CTYPE,locale_data);
+ 	return 1;
+     }
++
++    setlocale(LC_CTYPE,locale_data);
+     return 0;
+ }
+ 
+diff -Nur mplayer-20060414-old/libmpcodecs/dec_video.c mplayer-20060414/libmpcodecs/dec_video.c
+--- mplayer-20060414-old/libmpcodecs/dec_video.c	2006-04-14 21:46:29.000000000 +0300
++++ mplayer-20060414/libmpcodecs/dec_video.c	2006-04-14 21:52:59.000000000 +0300
+@@ -7,6 +7,7 @@
+ #endif
+ #include <stdlib.h>
+ #include <unistd.h>
++#include <locale.h>
+ 
+ #include "mp_msg.h"
+ #include "help_mp.h"
+@@ -172,6 +173,9 @@
+       force = 1;
+     }
+ 
++    char *locale_data = setlocale(LC_ALL,"");
++    setlocale(LC_CTYPE,"C");
++
+     while(1){
+ 	int i;
+ 	// restore original fourcc:
+@@ -247,8 +251,12 @@
+ 	}
+ 	// Yeah! We got it!
+ 	sh_video->inited=1;
++
++    setlocale(LC_CTYPE,locale_data);
+ 	return 1;
+     }
++
++    setlocale(LC_CTYPE,locale_data);
+     return 0;
+ }
+ 

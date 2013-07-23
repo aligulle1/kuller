@@ -1,0 +1,33 @@
+diff -Naur konversation-1.2.3/src/irc/inputfilter.cpp konversation-1.2.3.orig/src/irc/inputfilter.cpp
+--- konversation-1.2.3/src/irc/inputfilter.cpp	2010-02-12 07:17:52.000000000 +0200
++++ konversation-1.2.3.orig/src/irc/inputfilter.cpp	2010-02-23 01:18:26.593099872 +0200
+@@ -26,6 +26,9 @@
+ #include <QStringList>
+ #include <QDateTime>
+ #include <QRegExp>
++#include <QFile>
++#include <QString>
++#include <QTextStream>
+ 
+ #include <KLocale>
+ 
+@@ -308,9 +311,17 @@
+                     }
+                     else
+                     {
++                       // Patch for Pardus Release Information
++                        QString release;
++                        QFile file("/etc/pardus-release");
++                        file.open(QIODevice::ReadOnly);
++                        QTextStream stream( &file );
++                        release = stream.readLine();
++                        file.close();
+                         // Do not internationalize the below version string
+-                        reply = QString("Konversation %1 (C) 2002-2010 by the Konversation team")
+-                            .arg(QString(KONVI_VERSION));
++                        reply = QString("Konversation %1 (C) 2002-2009 by the Konversation team | %3")
++                            .arg(QString(KONVI_VERSION))
++                            .arg(release);
+ 
+                     }
+                     server->ctcpReply(sourceNick,"VERSION "+reply);

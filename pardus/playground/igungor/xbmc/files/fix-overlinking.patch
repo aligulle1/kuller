@@ -1,0 +1,25 @@
+Index: xbmc-10.0/xbmc/lib/libPython/linux/Makefile.in
+===================================================================
+--- xbmc-10.0.orig/xbmc/lib/libPython/linux/Makefile.in
++++ xbmc-10.0/xbmc/lib/libPython/linux/Makefile.in
+@@ -99,16 +99,16 @@ endif
+ 
+ ifneq (@USE_EXTERNAL_PYTHON@,1)
+ $(SLIB): $(WRAPPER) $(WRAPPERDEF) $(PYWRAP) $(PYWRAPDEF) ../Python/libpython2.4.a
+-	$(CC) $(LDFLAGS) -shared -o $@ -Wl,--whole-archive ../Python/libpython2.4.a \
++	$(CC) $(LDFLAGS) -shared -Wl,--whole-archive ../Python/libpython2.4.a \
+ 		-Wl,--no-whole-archive `cat wrapper_python.def` wrapper_python.o \
+ 		`cat ../../../cores/DllLoader/exports/wrapper.def` \
+-		../../../cores/DllLoader/exports/wrapper.o
++		../../../cores/DllLoader/exports/wrapper.o -o $@
+ else
+ $(SLIB): $(WRAPPER) $(WRAPPERDEF) $(PYWRAP) $(PYWRAPDEF)
+-	$(CC) $(LDFLAGS) -shared -o $@ -Wl,--no-as-needed -l$(PYVERSION) \
++	$(CC) $(CFLAGS) $(LDFLAGS) -shared \
+ 		`cat wrapper_python.def` wrapper_python.o \
+ 		`cat ../../../cores/DllLoader/exports/wrapper.def` \
+-		../../../cores/DllLoader/exports/wrapper.o
++		../../../cores/DllLoader/exports/wrapper.o -l$(PYVERSION) -o $@
+ endif
+ 
+ $(ZIP): $(PYC) $(PYO)

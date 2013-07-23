@@ -1,0 +1,39 @@
+Index: libs/plasma/corona.cpp
+===================================================================
+--- libs/plasma/corona.cpp	(revision 763694)
++++ libs/plasma/corona.cpp	(working copy)
+@@ -324,18 +324,32 @@
+     Containment* panel = addContainment("panel");
+     panel->setScreen(topLeftScreen);
+     panel->setLocation(Plasma::BottomEdge);
++    panel->flushUpdatedConstraints();
+ 
+     // some default applets to get a usable UI
+     panel->addApplet("launcher");
++    panel->addApplet("showdesktop");
++
++    QVariantList args;
++    args << "/usr/kde/4/share/applications/kde4/dolphin.desktop";
++    QRectF rect(100, 0, 40, panel->contentSize().height());
++    panel->addApplet("icon", args, 0, rect);
++
++    args.clear();
++    args << "/usr/kde/4/share/applications/kde4/konqbrowser.desktop";
++    rect.setRect(104, 0, 40, panel->contentSize().height());
++    panel->addApplet("icon", args, 0, rect);
++
++    panel->addApplet("pager");
+     panel->addApplet("tasks");
+-    panel->addApplet("pager");
+     panel->addApplet("systemtray");
+     panel->addApplet("notifier");
+     panel->addApplet("digital-clock");
++    panel->addApplet("lockout");
+ 
+     // trigger an instant layout so we immediately have a proper geometry rather than waiting around
+     // for the event loop
+-    panel->flushUpdatedConstraints();
++//    panel->flushUpdatedConstraints();
+     if (panel->layout()) {
+         panel->layout()->invalidate();
+     }

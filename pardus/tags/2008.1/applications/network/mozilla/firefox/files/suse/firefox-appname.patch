@@ -1,0 +1,26 @@
+--- browser/app/profile/firefox.js
++++ browser/app/profile/firefox.js
+@@ -173,7 +173,7 @@
+ 
+ // Whether or not the application should check at startup each time if it 
+ // is the default browser.
+-pref("browser.shell.checkDefaultBrowser", true);
++pref("browser.shell.checkDefaultBrowser", false);
+ 
+ // 0 = blank, 1 = home (browser.startup.homepage), 2 = last visited page, 3 = resume previous browser session
+ // The behavior of option 3 is detailed at: http://wiki.mozilla.org/Session_Restore
+--- browser/components/shell/src/nsGNOMEShellService.cpp
++++ browser/components/shell/src/nsGNOMEShellService.cpp
+@@ -133,7 +133,11 @@
+   rv = appPath->AppendNative(NS_LITERAL_CSTRING(MOZ_APP_NAME));
+   NS_ENSURE_SUCCESS(rv, rv);
+ 
+-  return appPath->GetNativePath(mAppPath);
++  /* This path to firefox is hardcoded for the default path setting */
++  mAppPath.Assign ("/usr/bin/firefox");
++  
++  //return appPath->GetNativePath(mAppPath);
++  return NS_OK;
+ }
+ 
+ NS_IMPL_ISUPPORTS2(nsGNOMEShellService, nsIShellService, nsIShellService_MOZILLA_1_8_BRANCH)

@@ -1,0 +1,144 @@
+Index: kcm_gtk/kcmgtk.desktop
+===================================================================
+--- kcm_gtk/kcmgtk.desktop	(revision 25)
++++ kcm_gtk/kcmgtk.desktop	(working copy)
+@@ -3,7 +3,7 @@
+ Comment=Control the style and fonts used by GTK applications
+ Exec=kcmshell kcmgtk
+ Terminal=false
+-Icon=gnome_apps.png
++Icon=gnome_apps
+ OnlyShowIn=KDE;
+ 
+ Encoding=UTF-8
+Index: src/qt_theme_draw.c
+===================================================================
+--- src/qt_theme_draw.c	(revision 25)
++++ src/qt_theme_draw.c	(working copy)
+@@ -1859,9 +1859,9 @@
+   GdkPixmap* pix_test;
+   
+   /* What kind of horrible person would store a pointer to a widget here... */
+-  GtkWidget* parent = 0;
+-  gdk_window_get_user_data(window, (void **) &parent);
+-  if (GTK_IS_MENU(parent))
++  void* parent = 0;
++  gdk_window_get_user_data(window, &parent);
++  if (GTK_IS_MENU((GtkWidget*) parent))
+   {
+     pix_test = QTENGINE_STYLE(style)->menuBackground;
+   }
+Index: src/qt_qt_wrapper.cpp
+===================================================================
+--- src/qt_qt_wrapper.cpp	(revision 25)
++++ src/qt_qt_wrapper.cpp	(working copy)
+@@ -52,7 +52,7 @@
+ 
+ QStringList kdeSearchPaths;
+ QString iconTheme;
+-QString iconThemeDir;
++QStringList iconThemeDirs;
+ QColor alternateBackgroundColour;
+ int showIconsOnButtons;
+ 
+@@ -501,7 +501,7 @@
+ 		kdeSearchPaths.append(kdeDir);
+ 	kdeSearchPaths.append(runCommand("kde-config --prefix"));
+ 	
+-	iconTheme = kdeConfigValue("Icons", "Theme", "crystal");
++	iconTheme = kdeConfigValue("Icons", "Theme", "crystalsvg");
+ 	QStringList back = QStringList::split(',', kdeConfigValue("General", "alternateBackground", "238,246,255"));
+ 	alternateBackgroundColour.setRgb(back[0].toInt(), back[1].toInt(), back[2].toInt());
+ 
+@@ -1590,14 +1590,22 @@
+ QString doIconMapping(const QString& stockName, const QString& path, int sizes)
+ {
+ 	QString fullPath;
+-	bool has16, has22, has32;
++	bool has16 = false, has22 = false, has32 = false;
+ 
+-	fullPath = iconThemeDir + "16x16/" + path;
+-	has16 = (access(fullPath.latin1(), R_OK) == 0);
+-	fullPath = iconThemeDir + "22x22/" + path;
+-	has22 = (access(fullPath.latin1(), R_OK) == 0);
+-	fullPath = iconThemeDir + "32x32/" + path;
+-	has32 =  (access(fullPath.latin1(), R_OK) == 0);
++	for( QStringList::ConstIterator it = iconThemeDirs.begin();
++			it != iconThemeDirs.end();
++			++it )
++	{
++		fullPath = *it + "16x16/" + path;
++		if (access(fullPath.latin1(), R_OK) == 0)
++			has16 = true;
++		fullPath = *it + "22x22/" + path;
++		if (access(fullPath.latin1(), R_OK) == 0)
++			has22 = true;
++		fullPath = *it + "32x32/" + path;
++		if (access(fullPath.latin1(), R_OK) == 0)
++			has32 = true;
++	}
+ 
+ 	if (!has16 && !has22 && !has32) return "";
+ 	
+@@ -1646,6 +1654,28 @@
+ 	gtk_rc_parse_string(parse_rc_string(name + " = " + colorString(color), "*").latin1());
+ }
+ 
++static QString iconInheritsDir( const QString& icondir )
++{
++    QFile index;
++    index.setName( icondir + "index.theme" );
++    if( !index.open( IO_ReadOnly ))
++    {
++        index.setName( icondir + "index.desktop" );
++        if( !index.open( IO_ReadOnly ))
++            return QString::null;
++    }
++    char buf[ 1024 ];
++    QRegExp reg( "^\\s*Inherits=([^\\n]*)" );
++    for(;;)
++        {
++        if( index.readLine( buf, 1023 ) <= 0 )
++            break;
++        if( reg.search( buf, 0 ) >= 0 )
++            return reg.cap( 1 );
++        }    
++    return QString::null;
++}
++
+ void setRcProperties(GtkRcStyle* rc_style, int forceRecreate)
+ {
+ 	if (!gtkQtEnable)
+@@ -1787,17 +1817,27 @@
+ 	//insertIntProperty(rc_style, "GtkCheckButton", "indicator-size", qApp->style().pixelMetric(QStyle::PM_IndicatorHeight) );
+ 	
+ 	// For icons
+-	
+-	iconThemeDir = kdeFindDir("/share/icons/" + iconTheme + "/", "index.theme", "index.desktop");
+-	if (iconThemeDir.isEmpty())
++
++        QString theme = iconTheme;
++        for(;;)
++        {
++            QString icondir = kdeFindDir("/share/icons/" + theme + "/", "index.theme", "index.desktop");
++            if( icondir.isEmpty())
++                break;
++            iconThemeDirs.append( icondir );
++            theme = iconInheritsDir( icondir );
++            if( theme.isEmpty())
++                break;
++            }
++	if (iconThemeDirs.isEmpty())
+ 	{
+ 		cacheFile.close();
+ 		gtk_rc_add_default_file(cacheFilePath.latin1());
+ 		return;
+ 	}
++
++	stream << "\npixmap_path \"" + iconThemeDirs.join( ":" ) + "\"\n\n";
+ 	
+-	stream << "\npixmap_path \"" + iconThemeDir + "\"\n\n";
+-	
+ 	stream << "style \"KDE-icons\" {\n";
+ 	stream << doIconMapping("gtk-bold", "actions/text_bold.png");
+ 	stream << doIconMapping("gtk-cancel", "actions/button_cancel.png");

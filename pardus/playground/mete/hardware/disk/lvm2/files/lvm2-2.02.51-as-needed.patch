@@ -1,0 +1,181 @@
+Compile-fix with --as-needed.
+
+To ensure correct output when --as-needed are in the linker flags, the order of
+flags to the linker (directly or via the compiler) must explictly only include
+libraries and objects AFTER all compiler flags, linker flags and linker
+directory arguments.
+
+X-Gentoo-Bug: #217644
+Signed-off-by: Robin H. Johnson <robbat2@gentoo.org>
+Ported-from: lvm2-2.02.48-as-needed.patch
+
+Index: LVM2.2.02.53/daemons/clvmd/Makefile.in
+===================================================================
+--- LVM2.2.02.53.orig/daemons/clvmd/Makefile.in
++++ LVM2.2.02.53/daemons/clvmd/Makefile.in
+@@ -91,7 +91,7 @@ INSTALL_TARGETS = \
+ 	install_clvmd
+ 
+ clvmd: $(OBJECTS) $(top_srcdir)/lib/liblvm-internal.a
+-	$(CC) -o clvmd $(OBJECTS) $(CFLAGS) $(LDFLAGS) \
++	$(CC) $(CFLAGS) $(LDFLAGS) -o clvmd $(OBJECTS) \
+ 		$(LVMLIBS) $(LMLIBS) $(LIBS)
+ 
+ .PHONY: install_clvmd
+Index: LVM2.2.02.53/daemons/dmeventd/Makefile.in
+===================================================================
+--- LVM2.2.02.53.orig/daemons/dmeventd/Makefile.in
++++ LVM2.2.02.53/daemons/dmeventd/Makefile.in
+@@ -41,12 +41,12 @@ include $(top_srcdir)/make.tmpl
+ all: dmeventd
+ device-mapper: dmeventd $(LIB_STATIC)
+ 
+-LDFLAGS += -ldl -ldevmapper -lpthread
+-CLDFLAGS += -ldl -ldevmapper -lpthread
++LIBS += -ldl -ldevmapper -lpthread
+ 
+ dmeventd: $(LIB_SHARED) $(LIB_STATIC) $(VERSIONED_SHLIB) dmeventd.o
+-	$(CC) -o $@ dmeventd.o $(CFLAGS) $(LDFLAGS) \
+-	-L. -ldevmapper-event $(LIBS) -rdynamic
++	$(CC) $(CFLAGS) $(LDFLAGS) -L. \
++	-o $@ dmeventd.o \
++	-ldevmapper-event $(LIBS) -rdynamic
+ 
+ .PHONY: install_dynamic install_static install_include \
+ 	install_pkgconfig install_dmeventd
+Index: LVM2.2.02.53/daemons/dmeventd/plugins/mirror/Makefile.in
+===================================================================
+--- LVM2.2.02.53.orig/daemons/dmeventd/plugins/mirror/Makefile.in
++++ LVM2.2.02.53/daemons/dmeventd/plugins/mirror/Makefile.in
+@@ -17,7 +17,8 @@ top_srcdir = @top_srcdir@
+ VPATH = @srcdir@
+ 
+ INCLUDES += -I${top_srcdir}/tools
+-CLDFLAGS += -L${top_srcdir}/tools -ldevmapper @LVM2CMD_LIB@
++CLDFLAGS += -L${top_srcdir}/tools
++LIBS += -ldevmapper -lpthread @LVM2CMD_LIB@
+ 
+ SOURCES = dmeventd_mirror.c
+ 
+Index: LVM2.2.02.53/daemons/dmeventd/plugins/snapshot/Makefile.in
+===================================================================
+--- LVM2.2.02.53.orig/daemons/dmeventd/plugins/snapshot/Makefile.in
++++ LVM2.2.02.53/daemons/dmeventd/plugins/snapshot/Makefile.in
+@@ -17,7 +17,8 @@ top_srcdir = @top_srcdir@
+ VPATH = @srcdir@
+ 
+ INCLUDES += -I${top_srcdir}/tools
+-CLDFLAGS += -L${top_srcdir}/tools -ldevmapper @LVM2CMD_LIB@
++CLDFLAGS += -L${top_srcdir}/tools
++LIBS += -lpthread -ldevmapper @LVM2CMD_LIB@
+ 
+ SOURCES = dmeventd_snapshot.c
+ 
+Index: LVM2.2.02.53/lib/Makefile.in
+===================================================================
+--- LVM2.2.02.53.orig/lib/Makefile.in
++++ LVM2.2.02.53/lib/Makefile.in
+@@ -137,7 +137,8 @@ ifeq ("@HAVE_LIBDL@", "yes")
+ endif
+ 
+ ifeq ("@DMEVENTD@", "yes")
+-  CLDFLAGS += -ldevmapper-event
++  CLDFLAGS += -L../daemons/dmeventd
++  LIBS += -ldevmapper-event
+ endif
+ 
+ LIB_NAME = liblvm-internal
+Index: LVM2.2.02.53/make.tmpl.in
+===================================================================
+--- LVM2.2.02.53.orig/make.tmpl.in
++++ LVM2.2.02.53/make.tmpl.in
+@@ -28,7 +28,7 @@ GENHTML = @GENHTML@
+ LN_S = @LN_S@
+ SED = @SED@
+ 
+-LIBS = @LIBS@
++LIBS += @LIBS@ $(LVMLIBS) $(LMLIBS)
+ DEFS += @DEFS@
+ CFLAGS += @CFLAGS@
+ CLDFLAGS += @CLDFLAGS@
+@@ -208,19 +208,19 @@ $(TARGETS): $(OBJECTS)
+ ifeq ("@LIB_SUFFIX@","so")
+ $(LIB_SHARED): $(OBJECTS) $(LDDEPS)
+ 	$(CC) -shared -Wl,-soname,$(notdir $@).$(LIB_VERSION) \
+-	$(CFLAGS) $(CLDFLAGS) $(OBJECTS) $(LIBS) -o $@
++	$(CFLAGS) $(CLDFLAGS) $(LDFLAGS) $(OBJECTS) $(LIBS) -o $@
+ endif
+ 
+ ifeq ("@LIB_SUFFIX@","dylib")
+ $(LIB_SHARED): $(OBJECTS) $(LDDEPS)
+ 	$(CC) -dynamiclib -dylib_current_version,$(LIB_VERSION) \
+-	$(CFLAGS) $(CLDFLAGS) $(OBJECTS) $(LIBS) -o $@
++	$(CFLAGS) $(CLDFLAGS) $(LDFLAGS) $(OBJECTS) $(LIBS) -o $@
+ endif
+ 
+ %.so: %.a
+ 	$(CC) -shared -Wl,-soname,$(notdir $@).$(LIB_VERSION) \
+-	$(CFLAGS) $(CLDFLAGS) $(LIBS) -o $@ \
+-	@CLDWHOLEARCHIVE@ $< @CLDNOWHOLEARCHIVE@
++	$(CFLAGS) $(CLDFLAGS) $(LDFLAGS) -o $@ \
++	@CLDWHOLEARCHIVE@ $< @CLDNOWHOLEARCHIVE@ $(LIBS)
+ 
+ $(LIB_STATIC): $(OBJECTS)
+ 	$(RM) $@
+Index: LVM2.2.02.53/test/api/Makefile.in
+===================================================================
+--- LVM2.2.02.53.orig/test/api/Makefile.in
++++ LVM2.2.02.53/test/api/Makefile.in
+@@ -43,7 +43,7 @@ vgtest_OBJECTS = $(vgtest_SOURCES:.c=.o)
+ OBJECTS = $(test_OBJECTS) $(vgtest_OBJECTS)
+ 
+ test: $(test_OBJECTS) $(DEPLIBS)
+-	$(CC) -o test $(test_OBJECTS) $(CFLAGS) $(LDFLAGS) $(LVMLIBS) $(LIBS)
++	$(CC) $(CFLAGS) $(LDFLAGS) -o test $(test_OBJECTS) $(LVMLIBS) $(LIBS)
+ 
+ vgtest: $(vgtest_OBJECTS) $(DEPLIBS)
+-	$(CC) -o vgtest $(vgtest_OBJECTS) $(CFLAGS) $(LDFLAGS) $(LVMLIBS) $(LIBS)
++	$(CC) $(CFLAGS) $(LDFLAGS) -o vgtest $(vgtest_OBJECTS) $(LVMLIBS) $(LIBS)
+Index: LVM2.2.02.53/tools/Makefile.in
+===================================================================
+--- LVM2.2.02.53.orig/tools/Makefile.in
++++ LVM2.2.02.53/tools/Makefile.in
+@@ -109,24 +109,29 @@ include $(top_srcdir)/make.tmpl
+ device-mapper: $(TARGETS_DM)
+ 
+ dmsetup: dmsetup.o $(top_srcdir)/libdm/libdevmapper.$(LIB_SUFFIX)
+-	$(CC) -o $@ dmsetup.o $(CFLAGS) $(LDFLAGS) \
+-	      -L$(interfacedir) -L$(top_srcdir)/libdm -ldevmapper $(LIBS)
++	$(CC) $(CFLAGS) $(LDFLAGS) \
++	      -L$(top_srcdir)/libdm \
++		  -o $@ dmsetup.o \
++		  -ldevmapper $(LIB_PTHREAD)
+ 
+ dmsetup.static: dmsetup.o $(interfacedir)/libdevmapper.a
+-	$(CC) -o $@ dmsetup.o $(CFLAGS) $(LDFLAGS) -static \
+-	      -L$(interfacedir) -ldevmapper $(LIBS) \
+-	      $(LIB_PTHREAD)
++	$(CC) $(CFLAGS) $(LDFLAGS) -static \
++	      -L$(interfacedir) \
++		  -o $@ dmsetup.o \
++		  -ldevmapper $(LIB_PTHREAD)
+ 
+ all: device-mapper
+ 
+ lvm: $(OBJECTS) lvm.o $(top_srcdir)/lib/liblvm-internal.a
+-	$(CC) -o $@ $(CFLAGS) $(OBJECTS) lvm.o \
+-		-L$(interfacedir) $(LDFLAGS) $(LVMLIBS) $(LIBS) -rdynamic
++	$(CC) $(CFLAGS) $(LDFLAGS) \
++		-o $@ $(OBJECTS) lvm.o \
++		$(LVMLIBS) $(LIBS) -rdynamic
+ 
+ LIB_PTHREAD = @LIB_PTHREAD@
+ lvm.static: $(OBJECTS) lvm-static.o $(top_srcdir)/lib/liblvm-internal.a  $(interfacedir)/libdevmapper.a
+-	$(CC) -o $@ $(CFLAGS) $(OBJECTS) lvm-static.o -static \
+-		-L$(interfacedir) $(LDFLAGS) $(LVMLIBS) $(LIBS) $(LIB_PTHREAD) -rdynamic
++	$(CC) $(CFLAGS) $(LDFLAGS) -static -L$(interfacedir) \
++		-o $@ $(OBJECTS) lvm-static.o \
++		$(LVMLIBS) $(LIBS) $(LIB_PTHREAD) -rdynamic
+ 
+ liblvm2cmd.a: $(top_srcdir)/lib/liblvm-internal.a $(OBJECTS) lvmcmdlib.o lvm2cmd.o
+ 	cat $(top_srcdir)/lib/liblvm-internal.a > $@

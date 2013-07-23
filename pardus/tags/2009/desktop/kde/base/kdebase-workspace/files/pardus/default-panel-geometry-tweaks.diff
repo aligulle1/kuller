@@ -1,0 +1,30 @@
+diff -Naur plasma-orig/shells/desktop/desktopcorona.cpp plasma/shells/desktop/desktopcorona.cpp
+--- plasma-orig/shells/desktop/desktopcorona.cpp	2009-06-23 22:10:46.433965232 +0300
++++ plasma/shells/desktop/desktopcorona.cpp	2009-06-23 22:56:31.440095551 +0300
+@@ -200,9 +200,15 @@
+     panel->init();
+     panel->setScreen(topLeftScreen);
+     panel->setLocation(Plasma::BottomEdge);
++
++    // Increase height by 15px, and decrease width by 20px, since we use Center alignment in panel this means 10px in each side
++    panel->resize(QSize(((int)panel->size().width()) - 20, 50));
++    panel->setMinimumSize(QSize(((int)panel->minimumSize().width()) - 20, 50));
++    panel->setMaximumSize(QSize(((int)panel->maximumSize().width()) - 20, 50));
++
+     panel->updateConstraints(Plasma::StartupCompletedConstraint);
+     panel->flushPendingConstraintsEvents();
+
+     // some default applets to get a usable UI
+     Plasma::Applet *applet = loadDefaultApplet("launcher", panel);
+     if (applet) {
+--- plasma-orig/shells/desktop/panelview.cpp	2009-06-23 22:10:46.435340685 +0300
++++ plasma/shells/desktop/panelview.cpp	2009-06-23 22:55:01.075065396 +0300
+@@ -242,7 +242,7 @@
+     KConfigGroup sizes = KConfigGroup(&viewConfig, "Sizes");
+     QRect screenRect = Kephal::ScreenUtils::screenGeometry(containment()->screen());
+     m_lastSeenSize = sizes.readEntry("lastsize", m_lastHorizontal ? screenRect.width() : screenRect.height());
+-    m_alignment = alignmentFilter((Qt::Alignment)viewConfig.readEntry("Alignment", (int)Qt::AlignLeft));
++    m_alignment = alignmentFilter((Qt::Alignment)viewConfig.readEntry("Alignment", (int)Qt::AlignCenter));
+     m_offset = viewConfig.readEntry("Offset", 0);
+     m_lastHorizontal = isHorizontal();
+ 

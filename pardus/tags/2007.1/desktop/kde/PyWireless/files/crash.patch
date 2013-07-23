@@ -1,0 +1,18 @@
+diff -ur PyWireless-3.1.orig/PyWireless.py PyWireless-3.1/PyWireless.py
+--- PyWireless-3.1.orig/PyWireless.py	2005-12-30 03:31:20.000000000 +0200
++++ PyWireless-3.1/PyWireless.py	2006-11-25 21:13:47.000000000 +0200
+@@ -268,8 +268,14 @@
+         self.connect(self.time, SIGNAL('timeout()'), self.timeoutSlot)
+         self.time.start(3000)
+     
++        self.connect(app, SIGNAL("shutDown()"), self.slotQuit)
++
+         self.show()
+ 
++    def slotQuit(self):
++        self.deleteLater()
++        kapp.quit()
++
+     def timeoutSlot(self):
+         interfaceName = self.wirelessStatus.returnInterfaceName()
+         interfaceESSID = self.wirelessStatus.returnESSID()

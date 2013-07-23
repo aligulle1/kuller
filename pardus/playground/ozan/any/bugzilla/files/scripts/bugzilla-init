@@ -1,0 +1,60 @@
+#!/bin/bash
+
+init_bugzilla() {
+    pushd /usr/share/bugzilla
+    ./checksetup.pl
+    popd
+}
+
+tmpfile=`mktemp --suffix=mysql`
+db_pass=$(grep db_pass /etc/bugzilla/localconfig|sed -e "s:^\$db_pass.*=.*'\(.*\)';$:\1:")
+
+if [ -z $db_pass ]; then
+    echo "You have to set your db_pass in /etc/bugzilla/localconfig"
+    exit 1
+fi
+
+if [ ! -S /var/run/mysqld/mysqld.sock ]; then
+    echo "It seems that MySQL is not running, exiting."
+    exit 1
+fi
+
+echo -n "Root password for mySQL: "
+read -s db_root_passwd
+echo
+
+mysql_cmd="mysql -u 'root' -p$db_root_passwd"
+
+# Check password
+$mysql_cmd -e 'quit' &> /dev/null
+if [ $? -ne "0" ]; then
+    echo "Password is wrong, please try again."
+    exit 1
+fi
+
+echo "Password is correct."
+echo "Checking whether bugzilla user is already created.."
+bugs_user=`echo "SELECT user FROM mysql.user WHERE User='bugs';" | $mysql_cmd`
+
+if [ -z "$bugs_user" ]; then
+    echo "GRANT SELECT, INSERT, UPDATE, DELETE, INDEX, ALTER, CREATE, LOCK TABLES, CREATE TEMPORARY TABLES, DROP, REFERENCES ON bugs.* TO bugs@localhost IDENTIFIED BY '$db_pass'; FLUSH PRIVILEGES;" > $tmpfile
+
+    #$mysql_cmd < $tmpfile
+    echo "MySQL user 'bugs' added successfully."
+else
+    echo "MySQL user 'bugs' already created, skipping.."
+fi
+
+unset db_root_passwd
+unset mysql_cmd
+rm -rf $tmpfile
+
+echo
+
+echo -n "Do you want to run checksetup.pl to initalize the bugzilla database? [Y/n] "
+read reply
+if [ "$reply" = "n" ]; then
+    echo "skipping.."
+else
+    init_bugzilla
+fi

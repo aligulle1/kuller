@@ -1,0 +1,243 @@
+diff -Naur fusion-icon.orig/FusionIcon/data.py fusion-icon/FusionIcon/data.py
+--- fusion-icon.orig/FusionIcon/data.py	2007-09-17 16:55:21.000000000 +0300
++++ fusion-icon/FusionIcon/data.py	2007-09-25 22:43:39.000000000 +0300
+@@ -18,6 +18,10 @@
+ # Copyright 2007 Christopher Williams <christopherw@verizon.net> 
+ 
+ import os
++import gettext
++
++__trans = gettext.translation('fusion-icon', fallback=True)
++_=__trans.ugettext
+ 
+ mesa_libgl_locations = (
+ 	# ubuntu
+@@ -56,10 +60,10 @@
+ apps = {
+ 	'ccsm':
+ 		('ccsm', ['ccsm'],
+-		'Settings Manager'),
++		_('Settings Manager')),
+ 	'emerald theme manager':
+ 		('emerald-theme-manager', ['emerald-theme-manager'],
+-		'Emerald Theme Manager'),
++		_('Emerald Theme Manager')),
+ }
+ 
+ wms = {
+@@ -96,22 +100,22 @@
+ decorators = {
+ 	'emerald':
+ 		('emerald', 'emerald --replace', 
+-		 'Emerald', None),
++		 _('Emerald'), None),
+ 
+ 	'gwd': 
+ 		('gtk-window-decorator', 'gtk-window-decorator --replace', 
+-		 'GTK Window Decorator', 'gnome'),
++		 _('GTK Window Decorator'), 'gnome'),
+ 
+ 	'kwd':
+ 		('kde-window-decorator', 'kde-window-decorator --replace',
+-		 'KDE Window Decorator', 'kde'),
++		 _('KDE Window Decorator'), 'kde'),
+ }
+ 
+ options = {
+ 	'indirect rendering':
+-		(None, '--indirect-rendering', 'Indirect Rendering'),
++		(None, '--indirect-rendering', _('Indirect Rendering')),
+ 
+ 	'loose binding': 
+-		(None, '--loose-binding', 'Loose Binding'),
++		(None, '--loose-binding', _('Loose Binding')),
+ }
+ 
+diff -Naur fusion-icon.orig/FusionIcon/interface_gtk/main.py fusion-icon/FusionIcon/interface_gtk/main.py
+--- fusion-icon.orig/FusionIcon/interface_gtk/main.py	2007-09-17 16:55:21.000000000 +0300
++++ fusion-icon/FusionIcon/interface_gtk/main.py	2007-09-25 22:28:35.000000000 +0300
+@@ -21,6 +21,7 @@
+ 
+ import os
+ import gtk
++import gettext
+ if gtk.pygtk_version < (2,10,0):
+ 	# raise an ImportError here to trigger the Except statement in interface.py
+     raise ImportError, 'PyGtk 2.10.0 or later required'
+@@ -28,6 +29,9 @@
+ import time
+ from FusionIcon.start import wms, apps, options, decorators, init
+ 
++__trans = gettext.translation('fusion-icon', fallback=True)
++_=__trans.ugettext
++
+ class TrayMenu(gtk.Menu):
+ 	
+ 	def __init__(self):
+@@ -50,7 +54,7 @@
+ 			self.append(item)
+ 
+ 		#Reload
+-		item = gtk.ImageMenuItem('Reload Window Manager')
++		item = gtk.ImageMenuItem(_('Reload Window Manager'))
+ 		item.connect('activate', self.reload_activate)
+ 		item.set_image(gtk.image_new_from_stock('gtk-refresh', gtk.ICON_SIZE_MENU))
+ 		if not wms:
+@@ -58,7 +62,7 @@
+ 		self.append(item)
+ 
+ 		#Window Manager
+-		item = gtk.ImageMenuItem('Select Window Manager')
++		item = gtk.ImageMenuItem(_('Select Window Manager'))
+ 		item.set_image(gtk.image_new_from_stock('gtk-index', gtk.ICON_SIZE_MENU))
+ 		submenu = WindowManagerMenu()
+ 		item.set_submenu(submenu)
+@@ -67,7 +71,7 @@
+ 		self.append(item)
+ 
+ 		#Compiz Options
+-		item = gtk.ImageMenuItem('Compiz Options')
++		item = gtk.ImageMenuItem(_('Compiz Options'))
+ 		item.set_image(gtk.image_new_from_stock('gtk-properties', gtk.ICON_SIZE_MENU))
+ 		submenu = CompizOptionMenu()
+ 		item.set_submenu(submenu)
+@@ -76,7 +80,7 @@
+ 		self.append(item)
+ 
+ 		#Window Decorator
+-		item = gtk.ImageMenuItem('Select Window Decorator')
++		item = gtk.ImageMenuItem(_('Select Window Decorator'))
+ 		item.set_image(gtk.image_new_from_stock('gtk-select-color', gtk.ICON_SIZE_MENU))
+ 		submenu = CompizDecoratorMenu()
+ 		item.set_submenu(submenu)
+@@ -205,7 +209,7 @@
+ 				self.append(item)
+ 
+ icon = gtk.status_icon_new_from_icon_name('fusion-icon')
+-icon.set_tooltip('Compiz Fusion Icon')
++icon.set_tooltip(_('Compiz Fusion Icon'))
+ menu = TrayMenu()
+ icon.connect('popup-menu', menu.show_menu)
+ 
+diff -Naur fusion-icon.orig/FusionIcon/interface.py fusion-icon/FusionIcon/interface.py
+--- fusion-icon.orig/FusionIcon/interface.py	2007-09-09 01:08:39.000000000 +0300
++++ fusion-icon/FusionIcon/interface.py	2007-09-25 22:30:35.000000000 +0300
+@@ -21,6 +21,10 @@
+ import sys
+ from util import env
+ import start
++import gettext
++
++__trans = gettext.translation('fusion-icon', fallback=True)
++_=__trans.ugettext
+ 
+ interfaces={
+ 	'gtk': 'GTK',
+@@ -31,26 +35,26 @@
+ def import_interface(interface):	
+ 	try:
+ 		if interface in interfaces:
+-			print ' * Using the', interfaces[interface], 'Interface'
++			print _(' * Using the'), interfaces[interface], 'Interface'
+ 			__import__('FusionIcon.interface_%s' %interface)
+ 		
+ 		else:
+-			print ' *** Error: "%s" interface is invalid, this should not happen' %interface
++			print _(' *** Error: "%s" interface is invalid, this should not happen') %interface
+ 			raise SystemExit
+ 
+ 	except ImportError, e:
+ 		if [i for i in interfaces if 'interface_%s' %i in str(e)]:
+-			print ' * Interface not installed'
++			print _(' * Interface not installed')
+ 		else:
+ 			print ' *', e
+ 
+ 		#doesn't work so remove it from the dict
+ 		del interfaces[interface]
+ 		if interfaces:
+-			print ' ... Trying another interface'
++			print _(' ... Trying another interface')
+ 			choose_interface()
+ 		else:
+-			print ' *** Error: All interfaces failed, aborting!'
++			print _(' *** Error: All interfaces failed, aborting!')
+ 			raise SystemExit
+ 
+ def choose_interface(try_first=None):
+@@ -62,7 +66,7 @@
+ 		if try_first in interfaces:
+ 			chosen_interface = try_first
+ 		else:
+-			raise SystemExit, ' *** Error: No such interface: %s' %try_first
++			raise SystemExit, _(' *** Error: No such interface: %s') %try_first
+ 	else:
+ 
+ # gtk for everybody for now
+@@ -84,7 +88,7 @@
+ 
+ 		# interfaces is empty
+ 		else:
+-			raise SystemExit, ' *** no available interfaces, this should not happen'
++			raise SystemExit, _(' *** no available interfaces, this should not happen')
+ 
+ 	import_interface(chosen_interface)
+ 
+diff -Naur fusion-icon.orig/FusionIcon/interface_qt4/main.py fusion-icon/FusionIcon/interface_qt4/main.py
+--- fusion-icon.orig/FusionIcon/interface_qt4/main.py	2007-09-17 16:55:21.000000000 +0300
++++ fusion-icon/FusionIcon/interface_qt4/main.py	2007-09-25 22:42:22.000000000 +0300
+@@ -17,9 +17,13 @@
+ # Author(s): xsacha
+ 
+ import sys, os, time
++import gettext
+ from PyQt4 import QtGui, QtCore
+ from FusionIcon.start import wms, apps, options, decorators, init
+ 
++__trans = gettext.translation('fusion-icon', fallback=True)
++_=__trans.ugettext
++
+ class Build(QtGui.QApplication):
+ 	def reload_wm(self):
+ 		wms.restart()
+@@ -39,7 +43,7 @@
+ 		QtCore.QObject.__init__(self, parent)
+ 		# Qt sucks (I'm aware this breaks if prefix != /usr...)
+ 		self.Tray = QtGui.QSystemTrayIcon(QtGui.QIcon('/usr/share/icons/hicolor/22x22/apps/fusion-icon.png'))
+-		self.Tray.setToolTip('Compiz Fusion Icon')
++		self.Tray.setToolTip(_('Compiz Fusion Icon'))
+ 		self.Tray.managerMenu = QtGui.QMenu()
+ 		self.Tray.optionsMenu = QtGui.QMenu()
+ 		self.Tray.decoratorMenu = QtGui.QMenu()
+@@ -68,12 +72,12 @@
+ 			self.Tray.menu.addAction(apps['emerald theme manager'].label, lambda: run(apps['emerald theme manager'].command))
+ 		if 'ccsm' in apps or 'emerald theme manager' in apps:
+ 			self.Tray.menu.addSeparator()
+-		self.Tray.menu.addAction("Reload Window Manager", self.reload_wm)
+-		self.Tray.menu.addAction("Select Window Manager").setMenu(self.Tray.managerMenu)
+-		self.Tray.menu.addAction("Compiz Options").setMenu(self.Tray.optionsMenu)
+-		self.Tray.menu.addAction("Select Window Decorator").setMenu(self.Tray.decoratorMenu)
++		self.Tray.menu.addAction(_("Reload Window Manager"), self.reload_wm)
++		self.Tray.menu.addAction(_("Select Window Manager")).setMenu(self.Tray.managerMenu)
++		self.Tray.menu.addAction(_("Compiz Options")).setMenu(self.Tray.optionsMenu)
++		self.Tray.menu.addAction(_("Select Window Decorator")).setMenu(self.Tray.decoratorMenu)
+ 		self.Tray.menu.addSeparator()
+-		self.Tray.menu.addAction("Quit", self.quit)
++		self.Tray.menu.addAction(_("Quit"), self.quit)
+ 		self.Tray.setContextMenu(self.Tray.menu)
+ 		self.Tray.show()
+ 		init()
+diff -Naur fusion-icon.orig/fusion-icon fusion-icon/fusion-icon
+--- fusion-icon.orig/fusion-icon	2007-09-09 01:08:39.000000000 +0300
++++ fusion-icon/fusion-icon	2007-09-25 22:44:54.000000000 +0300
+@@ -14,7 +14,9 @@
+ # You should have received a copy of the GNU General Public License
+ # along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ 
+-import os, sys, time
++import os, sys, time,locale
++
++locale.setlocale(locale.LC_ALL, '')
+ 
+ try:
+ 	import FusionIcon

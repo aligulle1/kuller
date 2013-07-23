@@ -1,0 +1,50 @@
+--- klogic-1.63/po/Makefile.in.er	2006-05-25 23:57:28.000000000 +0300
++++ klogic-1.63/po/Makefile.in	    2006-09-26 14:37:03.000000000 +0300
+@@ -280,8 +280,8 @@
+ ####### kdevelop will overwrite this part!!! (end)############
+ #>- POFILES = AUTO
+ #>+ 2
+-POFILES = de.po es.po fr.po it.po sv.po
+-GMOFILES = de.gmo es.gmo fr.gmo it.gmo sv.gmo
++POFILES = de.po es.po fr.po it.po sv.po tr.po
++GMOFILES = de.gmo es.gmo fr.gmo it.gmo sv.gmo tr.gmo
+ #>- all: all-am
+ #>+ 1
+ all: all-nls docs-am  all-am
+@@ -474,7 +474,7 @@
+ .NOEXPORT:
+ 
+ #>+ 2
+-KDE_DIST=de.po fr.po klogic.pot es.po it.po Makefile.in sv.po Makefile.am 
++KDE_DIST=de.po fr.po klogic.pot es.po it.po Makefile.in sv.po tr.po Makefile.am 
+ 
+ #>+ 16
+ de.gmo: de.po
+@@ -492,14 +492,17 @@
+ sv.gmo: sv.po
+ 	rm -f sv.gmo; $(GMSGFMT) -o sv.gmo $(srcdir)/sv.po
+ 	test ! -f sv.gmo || touch sv.gmo
++tr.gmo: tr.po
++	rm -f tr.gmo; $(GMSGFMT) -o tr.gmo $(srcdir)/tr.po
++	test ! -f tr.gmo || touch tr.gmo
+ 
+ #>+ 3
+ clean-nls:
+-	-rm -f  de.gmo es.gmo fr.gmo it.gmo sv.gmo
++	-rm -f  de.gmo es.gmo fr.gmo it.gmo sv.gmo tr.gmo
+ 
+ #>+ 10
+ install-nls:
+-	@for base in de es fr it sv ; do \
++	@for base in de es fr it sv tr ; do \
+ 	  echo $(INSTALL_DATA) $$base.gmo $(DESTDIR)$(kde_locale)/$$base/LC_MESSAGES/$(PACKAGE).mo ;\
+ 	  $(mkinstalldirs) $(DESTDIR)$(kde_locale)/$$base/LC_MESSAGES ; \
+ 	  if test -f $$base.gmo; then $(INSTALL_DATA) $$base.gmo $(DESTDIR)$(kde_locale)/$$base/LC_MESSAGES/$(PACKAGE).mo ;\
+@@ -515,6 +518,7 @@
+ 	rm -f $(DESTDIR)$(kde_locale)/fr/LC_MESSAGES/$(PACKAGE).mo
+ 	rm -f $(DESTDIR)$(kde_locale)/it/LC_MESSAGES/$(PACKAGE).mo
+ 	rm -f $(DESTDIR)$(kde_locale)/sv/LC_MESSAGES/$(PACKAGE).mo
++	rm -f $(DESTDIR)$(kde_locale)/tr/LC_MESSAGES/$(PACKAGE).mo
+ 
+ #>+ 2
+ all-nls: $(GMOFILES)

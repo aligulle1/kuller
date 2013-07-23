@@ -1,0 +1,29 @@
+--- src/DeviceHandler.cpp.orig	2011-01-28 09:55:45.958000030 +0200
++++ src/DeviceHandler.cpp	2011-01-28 09:59:35.434000032 +0200
+@@ -177,9 +177,12 @@
+         delete usb_p;
+     }
+     attachedUSBDevices=NULL;
+-    
++
++    printf("*************before find usb************");    
+     if(findAttachedUSBDevices()>0){
++        printf("*************after find usb ************");    
+         if(discoveredFpDevices!=NULL)
++            printf("************* find  fp  ************");    
+             fp_dscv_devs_free(discoveredFpDevices);
+ 
+ // discover devices handled by proprietary driver libraries
+@@ -293,8 +296,11 @@
+     USBDevice* lastDevice=NULL;
+ 
+     //libusb_init was called by libfprint already
+-//    libusb_init(NULL);
++    printf("*************before usb initialization************");
++    libusb_init(NULL);
++    printf("*************after usb ************");
+     libusb_get_device_list(NULL,&devs);
++    printf("***********************************");
+     if(devs==NULL){
+         syslog(LOG_ERR,"failed to get usb device list");
+         return false;

@@ -1,0 +1,64 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>broadcom-wl</Name>
+        <Homepage>http://www.broadcom.com/support/802.11/linux_sta.php</Homepage>
+        <Packager>
+            <Name>Fatih Aşıcı</Name>
+            <Email>fatih@pardus.org.tr</Email>
+        </Packager>
+        <License>freedist</License>
+        <IsA>driver</IsA>
+        <Summary>Broadcom's IEEE 802.11a/b/g/n hybrid Linux device driver for use with Broadcom's BCM4311, BCM4312, BCM4321, and BCM4322 based hardware</Summary>
+        <Description>This package contains Broadcom's IEEE 802.11a/b/g/n hybrid Linux device driver for use with Broadcom's BCM4311, BCM4312, BCM4321, and BCM4322 based hardware. You must read the LICENSE.txt file in the docs directory before using this software.</Description>
+        <Archive sha1sum="96518ad3cc075bcc08c7574fcb0ac5ae8564f8be" type="targz">http://www.broadcom.com/docs/linux_sta/hybrid-portsrc-x86_32-v5_10_27_14.tar.gz</Archive>
+        <BuildDependencies>
+            <Dependency release="114">kernel-source</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <Patch level="1">iwe_stream_api.patch</Patch>
+            <Patch level="1">linux-2.6.29.patch</Patch>
+            <Patch level="1">remove-module-aliases.patch</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>broadcom-wl</Name>
+        <RuntimeDependencies>
+            <Dependency release="114">kernel</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="config">/etc/modprobe.d</Path>
+            <Path fileType="library" permanent="true">/lib/modules</Path>
+            <Path fileType="doc">/usr/share/doc</Path>
+        </Files>
+        <AdditionalFiles>
+            <AdditionalFile owner="root" permission="0644" target="/etc/modprobe.d/broadcom-wl">broadcom-wl</AdditionalFile>
+        </AdditionalFiles>
+    </Package>
+
+    <History>
+        <Update release="3">
+            <Date>2009-02-23</Date>
+            <Version>5.10.27.14</Version>
+            <Comment>Remove module aliases since the driver might conflict with ethernet drivers and cause problems</Comment>
+            <Name>Fatih Aşıcı</Name>
+            <Email>fatih@pardus.org.tr</Email>
+        </Update>
+        <Update release="2">
+            <Date>2009-01-31</Date>
+            <Version>5.10.27.14</Version>
+            <Comment>Bump to latest stable release and add a patch to compile with kernel 2.6.29</Comment>
+            <Name>Fatih Aşıcı</Name>
+            <Email>fatih@pardus.org.tr</Email>
+        </Update>
+        <Update release="1">
+            <Date>2009-01-14</Date>
+            <Version>5.10.27.12</Version>
+            <Comment>First release</Comment>
+            <Name>Fatih Aşıcı</Name>
+            <Email>fatih@pardus.org.tr</Email>
+        </Update>
+    </History>
+</PISI>

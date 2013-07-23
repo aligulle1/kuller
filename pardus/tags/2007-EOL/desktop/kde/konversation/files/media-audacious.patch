@@ -1,0 +1,39 @@
+--- konversation/scripts/media	2007-06-24 18:23:06.000000000 +0300
++++ konversation/scripts/media	2007-06-24 18:24:57.000000000 +0300
+@@ -48,7 +48,7 @@
+ ## If you add a new player, you must add it here or it won't get checked when in audio-only or video-only modes.
+ playerRankings= {
+     'video' :['kaffeine', 'noatun', 'kdetv'],
+-    'audio' :['Amarok', 'JuK', 'Noatun', 'Kaffeine', 'kscd', 'XMMS', 'Yammi', 'LastFM']
++    'audio' :['Amarok', 'JuK', 'Noatun', 'Kaffeine', 'kscd', 'XMMS', 'Yammi', 'LastFM', 'Audacious']
+ }
+ 
+ ## Title, album and artist fields to be quoted depending on contents
+@@ -279,6 +279,19 @@
+         album = subprocess.Popen(["qdbus","com.lastfm.DBusInterface","/","currentAlbum"], stdout=subprocess.PIPE).communicate()[0].rstrip()
+         return (title,artist,album)
+ 
++class AudaciousPlayer(Player):
++    def __init__(self, display_name):
++        Player.__init__(self, display_name)
++
++    def isRunning(self):
++        self.running = not os.system('audtool current-song')
++        return self.running
++
++    def getData(self):
++        if self.isRunning() and not os.system('audtool playback-playing'):
++            # get the title of the currently playing track
++            return (self.reEncodeString(os.popen('audtool current-song').read().strip()),'','')
++
+ def playing(playerList, mode=None):
+     for i in playerList:
+         s=i.get(mode)
+@@ -342,6 +355,7 @@
+ DCOPPlayer("Yammi","yammi","YammiPlayer songTitle","YammiPlayer songArtist","YammiPlayer songAlbum"),
+ DCOPPlayer("kdetv","kdetv","KdetvIface channelName",playerType='video'),
+ LastFMPlayer(),
++AudaciousPlayer('Audacious'),
+ ]
+ 
+ # Get rid of players that didn't get subclassed so they don't appear in the available players list

@@ -1,0 +1,104 @@
+Index: libop/op_config.h
+===================================================================
+RCS file: /cvsroot/oprofile/oprofile/libop/op_config.h,v
+retrieving revision 1.21
+retrieving revision 1.22
+diff -U2 -u -r1.21 -r1.22
+--- libop/op_config.h	18 Nov 2006 01:18:59 -0000	1.21
++++ libop/op_config.h	24 Oct 2007 19:00:58 -0000	1.22
+@@ -44,5 +44,5 @@
+ 
+ #define OPD_MAGIC "DAE\n"
+-#define OPD_VERSION 0x10
++#define OPD_VERSION 0x11
+ 
+ #define OP_MIN_CPU_BUF_SIZE 2048
+Index: libpp/op_header.cpp
+===================================================================
+RCS file: /cvsroot/oprofile/oprofile/libpp/op_header.cpp,v
+retrieving revision 1.24
+retrieving revision 1.25
+diff -U2 -u -r1.24 -r1.25
+--- libpp/op_header.cpp	17 Nov 2006 23:47:29 -0000	1.24
++++ libpp/op_header.cpp	24 Oct 2007 19:00:58 -0000	1.25
+@@ -16,4 +16,9 @@
+ #include <sstream>
+ 
++#include <sys/types.h>
++#include <sys/stat.h>
++#include <fcntl.h>
++
++#include "op_config.h"
+ #include "op_exception.h"
+ #include "odb.h"
+@@ -100,17 +105,26 @@
+ opd_header const read_header(string const & sample_filename)
+ {
+-	odb_t samples_db;
+-
+-	int rc = odb_open(&samples_db, sample_filename.c_str(), ODB_RDONLY,
+-		sizeof(struct opd_header));
++	int fd = open(sample_filename.c_str(), O_RDONLY);
++	if (fd < 0)
++		throw op_fatal_error("Can't open sample file:" +
++				     sample_filename);
+ 
+-	if (rc)
+-		throw op_fatal_error(sample_filename + ": " + strerror(rc));
++	opd_header header;
++	if (read(fd, &header, sizeof(header)) != sizeof(header)) {
++		close(fd);
++		throw op_fatal_error("Can't read sample file header:" +
++				     sample_filename);
++	}
+ 
+-	opd_header head = *static_cast<opd_header *>(samples_db.data->base_memory);
++	if (memcmp(header.magic, OPD_MAGIC, sizeof(header.magic))) {
++		throw op_fatal_error("Invalid sample file, "
++				     "bad magic number: " +
++				     sample_filename);
++		close(fd);
++	}
+ 
+-	odb_close(&samples_db);
++	close(fd);
+ 
+-	return head;
++	return header;
+ }
+ 
+Index: libpp/profile.cpp
+===================================================================
+RCS file: /cvsroot/oprofile/oprofile/libpp/profile.cpp,v
+retrieving revision 1.26
+retrieving revision 1.27
+diff -U2 -u -r1.26 -r1.27
+--- libpp/profile.cpp	10 May 2007 23:54:35 -0000	1.26
++++ libpp/profile.cpp	24 Oct 2007 19:00:58 -0000	1.27
+@@ -71,12 +71,7 @@
+ void profile_t::open_sample_file(string const & filename, odb_t & db)
+ {
+-	int rc = odb_open(&db, filename.c_str(), ODB_RDONLY,
+-		sizeof(struct opd_header));
+-
+-	if (rc)
+-		throw op_fatal_error(filename + ": " + strerror(rc));
+-
+-	opd_header const & head =
+-		*static_cast<opd_header *>(odb_get_data(&db));
++	// Check first if the sample file version is ok else odb_open() can
++	// fail and the error message will be obscure.
++	opd_header head = read_header(filename);
+ 
+ 	if (head.version != OPD_VERSION) {
+@@ -87,4 +82,10 @@
+ 		throw op_fatal_error(os.str());
+ 	}
++
++	int rc = odb_open(&db, filename.c_str(), ODB_RDONLY,
++		sizeof(struct opd_header));
++
++	if (rc)
++		throw op_fatal_error(filename + ": " + strerror(rc));
+ }
+ 

@@ -1,0 +1,73 @@
+diff -Nur mplayer-20080322-old/libavcodec/alac.c mplayer-20080322/libavcodec/alac.c
+--- mplayer-20080322-old/libavcodec/alac.c	2008-05-07 21:08:10.000000000 +0300
++++ mplayer-20080322/libavcodec/alac.c	2008-05-07 21:10:06.000000000 +0300
+@@ -222,7 +222,7 @@
+ 
+         /* special case: there may be compressed blocks of 0 */
+         if ((history < 128) && (output_count+1 < output_size)) {
+-            int block_size;
++            unsigned int block_size;
+ 
+             sign_modifier = 1;
+ 
+@@ -252,6 +252,10 @@
+             }
+ 
+             if (block_size > 0) {
++                if(block_size >= output_size - output_count){
++                    av_log(alac->avctx, AV_LOG_ERROR, "invalid zero block size of %d %d %d\n", block_size, output_size, output_count);
++                    block_size= output_size - output_count - 1;
++                }
+                 memset(&output_buffer[output_count+1], 0, block_size * 4);
+                 output_count += block_size;
+             }
+@@ -444,7 +448,7 @@
+     ALACContext *alac = avctx->priv_data;
+ 
+     int channels;
+-    int32_t outputsamples;
++    unsigned int outputsamples;
+     int hassize;
+     int readsamplesize;
+     int wasted_bytes;
+@@ -497,9 +501,18 @@
+     if (hassize) {
+         /* now read the number of samples as a 32bit integer */
+         outputsamples = get_bits(&alac->gb, 32);
++        if(outputsamples > alac->setinfo_max_samples_per_frame){
++            av_log(avctx, AV_LOG_ERROR, "outputsamples %d > %d\n", outputsamples, alac->setinfo_max_samples_per_frame);
++            return -1;
++        }
+     } else
+         outputsamples = alac->setinfo_max_samples_per_frame;
+ 
++    if(outputsamples > *outputsize / alac->bytespersample){
++        av_log(avctx, AV_LOG_ERROR, "sample buffer too small\n");
++        return -1;
++    }
++
+     *outputsize = outputsamples * alac->bytespersample;
+     readsamplesize = alac->setinfo_sample_size - (wasted_bytes * 8) + channels - 1;
+ 
+diff -Nur mplayer-20080322-old/libavcodec/flac.c mplayer-20080322/libavcodec/flac.c
+--- mplayer-20080322-old/libavcodec/flac.c	2008-05-07 21:08:10.000000000 +0300
++++ mplayer-20080322/libavcodec/flac.c	2008-05-07 21:08:31.000000000 +0300
+@@ -277,10 +277,14 @@
+     if (decode_residuals(s, channel, pred_order) < 0)
+         return -1;
+ 
+-    a = decoded[pred_order-1];
+-    b = a - decoded[pred_order-2];
+-    c = b - decoded[pred_order-2] + decoded[pred_order-3];
+-    d = c - decoded[pred_order-2] + 2*decoded[pred_order-3] - decoded[pred_order-4];
++    if(pred_order > 0)
++        a = decoded[pred_order-1];
++    if(pred_order > 1)
++        b = a - decoded[pred_order-2];
++    if(pred_order > 2)
++        c = b - decoded[pred_order-2] + decoded[pred_order-3];
++    if(pred_order > 3)
++        d = c - decoded[pred_order-2] + 2*decoded[pred_order-3] - decoded[pred_order-4];
+ 
+     switch(pred_order)
+     {

@@ -1,0 +1,113 @@
+Index: work/Mesa-7.0.4/src/mesa/drivers/dri/i915/i915_context.h
+===================================================================
+--- work.orig/Mesa-7.0.4/src/mesa/drivers/dri/i915/i915_context.h
++++ work/Mesa-7.0.4/src/mesa/drivers/dri/i915/i915_context.h
+@@ -176,7 +176,7 @@ struct i915_fragment_program {
+ 
+    /* Helpers for i915_texprog.c:
+     */
+-   GLuint src_texture;		/* Reg containing sampled texture color,
++   GLuint src_texture[8];	/* Reg containing sampled texture color,
+ 				 * else UREG_BAD.
+ 				 */
+ 
+Index: work/Mesa-7.0.4/src/mesa/drivers/dri/i915/i915_program.c
+===================================================================
+--- work.orig/Mesa-7.0.4/src/mesa/drivers/dri/i915/i915_program.c
++++ work/Mesa-7.0.4/src/mesa/drivers/dri/i915/i915_program.c
+@@ -418,7 +418,7 @@ void i915_init_program( i915ContextPtr i
+    p->depth_written = 0;
+    p->nr_params = 0;
+ 
+-   p->src_texture = UREG_BAD;
++   for (int u = 0; u < 8; u++) p->src_texture[u] = UREG_BAD;
+    p->src_previous = UREG(REG_TYPE_T, T_DIFFUSE);
+    p->last_tex_stage = 0;
+    p->VB = &tnl->vb;
+Index: work/Mesa-7.0.4/src/mesa/drivers/dri/i915/i915_texprog.c
+===================================================================
+--- work.orig/Mesa-7.0.4/src/mesa/drivers/dri/i915/i915_texprog.c
++++ work/Mesa-7.0.4/src/mesa/drivers/dri/i915/i915_texprog.c
+@@ -55,8 +55,18 @@ static GLuint get_source( struct i915_fr
+ 			  GLenum src, GLuint unit )
+ {
+    switch (src) {
++      /* Crossbar: */
++   case GL_TEXTURE0:
++   case GL_TEXTURE1:
++   case GL_TEXTURE2:
++   case GL_TEXTURE3:
++   case GL_TEXTURE4:
++   case GL_TEXTURE5:
++   case GL_TEXTURE6:
++   case GL_TEXTURE7:
++      unit = src - GL_TEXTURE0;
+    case GL_TEXTURE: 
+-      if (p->src_texture == UREG_BAD) {
++      if (p->src_texture[unit] == UREG_BAD) {
+ 
+ 	 /* TODO: Use D0_CHANNEL_XY where possible.
+ 	  */
+@@ -69,23 +79,11 @@ static GLuint get_source( struct i915_fr
+ 	 if (p->VB->TexCoordPtr[unit]->size == 4)
+ 	    op = T0_TEXLDP;
+ 
+-	 p->src_texture = i915_emit_texld( p, 0, tmp, A0_DEST_CHANNEL_ALL, 
++	 p->src_texture[unit] = i915_emit_texld( p, 0, tmp, A0_DEST_CHANNEL_ALL, 
+ 					  sampler, texcoord, op );
+       }
+ 
+-      return p->src_texture;
+-
+-      /* Crossbar: */
+-   case GL_TEXTURE0:
+-   case GL_TEXTURE1:
+-   case GL_TEXTURE2:
+-   case GL_TEXTURE3:
+-   case GL_TEXTURE4:
+-   case GL_TEXTURE5:
+-   case GL_TEXTURE6:
+-   case GL_TEXTURE7: {
+-      return UREG_BAD;
+-   }
++      return p->src_texture[unit];
+ 
+    case GL_CONSTANT:
+       return i915_emit_const4fv( p, p->ctx->Texture.Unit[unit].EnvColor );
+@@ -555,9 +553,12 @@ static void i915EmitTextureProgram( i915
+       for (unit = 0 ; unit < ctx->Const.MaxTextureUnits; unit++)
+ 	 if (ctx->Texture.Unit[unit]._ReallyEnabled) {
+ 	    p->src_previous = emit_texenv( p, unit );
+-	    p->src_texture = UREG_BAD;
+ 	    p->temp_flag = 0xffff000;
+ 	    p->temp_flag |= 1 << GET_UREG_NR(p->src_previous);
++	    /* FIXME: This could be cleverer. */
++            for (int u = 0; u < 8; u++) 
++              if (p->src_texture[u] != UREG_BAD)
++                p->temp_flag |= 1 << GET_UREG_NR(p->src_texture[u]);
+ 	 }
+    }
+ 
+Index: work/Mesa-7.0.4/src/mesa/drivers/dri/i915/intel_context.c
+===================================================================
+--- work.orig/Mesa-7.0.4/src/mesa/drivers/dri/i915/intel_context.c
++++ work/Mesa-7.0.4/src/mesa/drivers/dri/i915/intel_context.c
+@@ -148,10 +148,6 @@ const GLubyte *intelGetString( GLcontext
+ 
+ /**
+  * Extension strings exported by the intel driver.
+- *
+- * \note
+- * It appears that ARB_texture_env_crossbar has "disappeared" compared to the
+- * old i830-specific driver.
+  */
+ const struct dri_extension card_extensions[] =
+ {
+@@ -163,6 +159,7 @@ const struct dri_extension card_extensio
+     { "GL_ARB_texture_cube_map",           NULL },
+     { "GL_ARB_texture_env_add",            NULL },
+     { "GL_ARB_texture_env_combine",        NULL },
++    { "GL_ARB_texture_env_crossbar",       NULL },
+     { "GL_ARB_texture_env_dot3",           NULL },
+     { "GL_ARB_texture_mirrored_repeat",    NULL },
+     { "GL_ARB_texture_rectangle",          NULL },

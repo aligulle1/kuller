@@ -1,0 +1,49 @@
+From cad66a7d25abdb6aa15f3aa94a35737b119b2659 Mon Sep 17 00:00:00 2001
+From: Albert Astals Cid <aacid@kde.org>
+Date: Tue, 02 Nov 2010 19:14:34 +0000
+Subject: Fix crash in broken documents
+
+mapLen = (code + 256) & ~255; can wrap and you end up with mapLen < code
+that is not what you wanted
+---
+Index: poppler-0.10.7/poppler/CharCodeToUnicode.cc
+===================================================================
+--- poppler-0.10.7.orig/poppler/CharCodeToUnicode.cc
++++ poppler-0.10.7/poppler/CharCodeToUnicode.cc
+@@ -13,7 +13,7 @@
+ // All changes made under the Poppler project to this file are licensed
+ // under GPL version 2 or later
+ //
+-// Copyright (C) 2006, 2008 Albert Astals Cid <aacid@kde.org>
++// Copyright (C) 2006, 2008-2010 Albert Astals Cid <aacid@kde.org>
+ // Copyright (C) 2007 Julien Rebetez <julienr@svn.gnome.org>
+ // Copyright (C) 2007 Koji Otani <sho@bbr.jp>
+ // Copyright (C) 2008 Michael Vrable <mvrable@cs.ucsd.edu>
+@@ -34,6 +34,7 @@
+ #include <string.h>
+ #include "goo/gmem.h"
+ #include "goo/gfile.h"
++#include "Object.h"
+ #include "goo/GooString.h"
+ #include "Error.h"
+ #include "GlobalParams.h"
+@@ -358,10 +359,15 @@ void CharCodeToUnicode::addMapping(CharC
+   if (code >= mapLen) {
+     oldLen = mapLen;
+     mapLen = (code + 256) & ~255;
+-    map = (Unicode *)greallocn(map, mapLen, sizeof(Unicode));
+-    for (i = oldLen; i < mapLen; ++i) {
+-      map[i] = 0;
+-    }
++    if (unlikely(code >= mapLen)) {
++      error(-1, "Illegal code value in CharCodeToUnicode::addMapping");
++      return;
++    } else {
++      map = (Unicode *)greallocn(map, mapLen, sizeof(Unicode));
++      for (i = oldLen; i < mapLen; ++i) {
++        map[i] = 0;
++      }
++	}
+   }
+   if (n <= 4) {
+     if (sscanf(uStr, "%x", &u) != 1) {

@@ -1,0 +1,180 @@
+Index: code/ufo/include/ufo/util/urectangle.hpp
+===================================================================
+--- code.orig/ufo/include/ufo/util/urectangle.hpp
++++ code/ufo/include/ufo/util/urectangle.hpp
+@@ -34,6 +34,9 @@
+ #include "udimension.hpp"
+ #include "uinsets.hpp"
+ 
++#include <cstdlib>
++#include <memory>
++
+ namespace ufo {
+ 
+ /** @short An abstraction of a rectangle (x, y, width and height).
+Index: code/ufo/src/uabstractcontext.cpp
+===================================================================
+--- code.orig/ufo/src/uabstractcontext.cpp
++++ code/ufo/src/uabstractcontext.cpp
+@@ -50,6 +50,7 @@
+ #include "ufo/ukeystroke.hpp"
+ #include "ufo/events/uactionevent.hpp"
+ 
++#include <cstdlib>
+ 
+ using namespace ufo;
+ 
+Index: code/ufo/src/uabstractdisplay.cpp
+===================================================================
+--- code.orig/ufo/src/uabstractdisplay.cpp
++++ code/ufo/src/uabstractdisplay.cpp
+@@ -45,6 +45,7 @@
+ #include "ufo/uvolatiledata.hpp"
+ 
+ #include <bitset>
++#include <algorithm>
+ 
+ namespace ufo {
+ 
+Index: code/ufo/src/uabstracttoolkit.cpp
+===================================================================
+--- code.orig/ufo/src/uabstracttoolkit.cpp
++++ code/ufo/src/uabstracttoolkit.cpp
+@@ -62,6 +62,9 @@
+ 
+ #include "ufo/uvideodriver.hpp"
+ 
++#include <climits>
++#include <cstring>
++
+ namespace ufo {
+ bool operator<(const UPluginInfo & p1, const UPluginInfo & p2) {
+ 	return ((p1.category < p2.category) || (p1.feature < p2.feature));
+Index: code/ufo/src/ubuttongroup.cpp
+===================================================================
+--- code.orig/ufo/src/ubuttongroup.cpp
++++ code/ufo/src/ubuttongroup.cpp
+@@ -31,6 +31,8 @@
+ // special case for radio buttons
+ #include "ufo/widgets/uradiobutton.hpp"
+ 
++#include <algorithm>
++
+ using namespace ufo;
+ 
+ UFO_IMPLEMENT_DYNAMIC_CLASS(UButtonGroup, UObject)
+Index: code/ufo/src/ucontextgroup.cpp
+===================================================================
+--- code.orig/ufo/src/ucontextgroup.cpp
++++ code/ufo/src/ucontextgroup.cpp
+@@ -31,6 +31,8 @@
+ #include "ufo/utoolkit.hpp"
+ #include "ufo/uvolatiledata.hpp"
+ 
++#include <algorithm>
++
+ using namespace ufo;
+ 
+ UFO_IMPLEMENT_DYNAMIC_CLASS(UContextGroup, UObject)
+Index: code/ufo/src/ukeystroke.cpp
+===================================================================
+--- code.orig/ufo/src/ukeystroke.cpp
++++ code/ufo/src/ukeystroke.cpp
+@@ -30,6 +30,7 @@
+ #include "ufo/events/ukeyevent.hpp"
+ #include "ufo/util/ustring.hpp"
+ 
++#include <algorithm>
+ 
+ using namespace ufo;
+ 
+Index: code/ufo/src/umenumanager.cpp
+===================================================================
+--- code.orig/ufo/src/umenumanager.cpp
++++ code/ufo/src/umenumanager.cpp
+@@ -38,6 +38,8 @@
+ #include "ufo/widgets/upopupmenu.hpp"
+ #include "ufo/widgets/urootpane.hpp"
+ 
++#include <algorithm>
++
+ using namespace ufo;
+ 
+ UFO_IMPLEMENT_DYNAMIC_CLASS(UMenuManager, UObject)
+Index: code/ufo/src/uobject.cpp
+===================================================================
+--- code.orig/ufo/src/uobject.cpp
++++ code/ufo/src/uobject.cpp
+@@ -30,6 +30,8 @@
+ #include "ufo/signals/ufo_signals.hpp"
+ #include "ufo/ufo_types.hpp"
+ 
++#include <algorithm>
++
+ using namespace ufo;
+ 
+ #ifdef UFO_RTTI
+Index: code/ufo/src/ufo_debug.cpp
+===================================================================
+--- code.orig/ufo/src/ufo_debug.cpp
++++ code/ufo/src/ufo_debug.cpp
+@@ -27,6 +27,7 @@
+ 
+ #include "ufo/ufo_global.hpp"
+ 
++#include <cstdlib>
+ #include <cstring>
+ #include <cstdarg>
+ #include <cstdio> // for vsnprintf
+Index: code/ufo/src/gl/ugl_driver.cpp
+===================================================================
+--- code.orig/ufo/src/gl/ugl_driver.cpp
++++ code/ufo/src/gl/ugl_driver.cpp
+@@ -29,6 +29,8 @@
+ 
+ #include "ufo/usharedlib.hpp"
+ 
++#include <cstdlib>
++
+ #ifdef UFO_OS_WIN32
+ #define UFO_GL_LIB "OPENGL32.DLL"
+ #else
+Index: code/ufo/src/ux/uxdisplay.cpp
+===================================================================
+--- code.orig/ufo/src/ux/uxdisplay.cpp
++++ code/ufo/src/ux/uxdisplay.cpp
+@@ -43,6 +43,8 @@
+ 
+ #include "ufo/gl/ugl_driver.hpp"
+ 
++#include <algorithm>
++
+ using namespace ufo;
+ 
+ UFO_IMPLEMENT_DYNAMIC_CLASS(UXDisplay, UAbstractDisplay)
+Index: code/ufo/src/widgets/uwidget.cpp
+===================================================================
+--- code.orig/ufo/src/widgets/uwidget.cpp
++++ code/ufo/src/widgets/uwidget.cpp
+@@ -69,6 +69,8 @@
+ 
+ #include "ufo/umodel.hpp"
+ 
++#include <algorithm>
++
+ using namespace ufo;
+ 
+ class PaintNotifier
+Index: code/boson/programs/mainnoguimain.cpp
+===================================================================
+--- code.orig/boson/programs/mainnoguimain.cpp
++++ code/boson/programs/mainnoguimain.cpp
+@@ -57,7 +57,7 @@
+ 
+ static bool parseArgs(MainNoGUIStartOptions* options, KCmdLineArgs* args);
+ static bool parseAddComputerArgs(MainNoGUIStartOptions* options, KCmdLineArgs* args);
+-static bool parsePlayFieldArgs(MainNoGUIStartOptions* args, KCmdLineArgs* args);
++static bool parsePlayFieldArgs(MainNoGUIStartOptions* options, KCmdLineArgs* args);
+ 
+ static void postBosonConfigInit();
+ 

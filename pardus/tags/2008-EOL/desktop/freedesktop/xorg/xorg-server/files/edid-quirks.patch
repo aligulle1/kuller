@@ -1,0 +1,1953 @@
+commit 4b74efc212d637a8c2e35acd9182375bf54d244a
+Author: Fatih Aşıcı <fatih@pardus.org.tr>
+Date:   Sun Jun 21 00:26:42 2009 +0300
+
+    edid quirks
+
+diff --git xorg-server-1.4.2/hw/xfree86/common/xf86Config.c xorg-server-1.4.2/hw/xfree86/common/xf86Config.c
+index 3c29497..12486e9 100644
+--- xorg-server-1.4.2/hw/xfree86/common/xf86Config.c
++++ xorg-server-1.4.2/hw/xfree86/common/xf86Config.c
+@@ -2065,8 +2065,7 @@ configMonitor(MonPtr monitorp, XF86ConfMonitorPtr conf_monitor)
+      */
+     cmodep = conf_monitor->mon_modeline_lst;
+     while( cmodep ) {
+-        mode = xnfalloc(sizeof(DisplayModeRec));
+-        memset(mode,'\0',sizeof(DisplayModeRec));
++        mode = xnfcalloc(1, sizeof(DisplayModeRec));
+ 	mode->type       = 0;
+         mode->Clock      = cmodep->ml_clock;
+         mode->HDisplay   = cmodep->ml_hdisplay;
+@@ -2399,10 +2398,7 @@ addDefaultModes(MonPtr monitorp)
+ 	if ( ! modeIsPresent(xf86DefaultModes[i].name,monitorp) )
+ 	    do
+ 	    {
+-		mode = xnfalloc(sizeof(DisplayModeRec));
+-		memcpy(mode,&xf86DefaultModes[i],sizeof(DisplayModeRec));
+-		if (xf86DefaultModes[i].name)
+-		    mode->name = xnfstrdup(xf86DefaultModes[i].name);
++		mode = xf86DuplicateMode(&xf86DefaultModes[i]);
+ 		if( last ) {
+ 		    mode->prev = last;
+ 		    last->next = mode;
+diff --git xorg-server-1.4.2/hw/xfree86/common/xf86cvt.c xorg-server-1.4.2/hw/xfree86/common/xf86cvt.c
+index dfb6e71..f8185a3 100644
+--- xorg-server-1.4.2/hw/xfree86/common/xf86cvt.c
++++ xorg-server-1.4.2/hw/xfree86/common/xf86cvt.c
+@@ -56,7 +56,7 @@ _X_EXPORT DisplayModePtr
+ xf86CVTMode(int HDisplay, int VDisplay, float VRefresh, Bool Reduced,
+             Bool Interlaced)
+ {
+-    DisplayModeRec  *Mode = xnfalloc(sizeof(DisplayModeRec));
++    DisplayModeRec  *Mode = xnfcalloc(1, sizeof(DisplayModeRec));
+ 
+     /* 1) top/bottom margin size (% of height) - default: 1.8 */
+ #define CVT_MARGIN_PERCENTAGE 1.8    
+@@ -79,8 +79,6 @@ xf86CVTMode(int HDisplay, int VDisplay, float VRefresh, Bool Reduced,
+     int  VDisplayRnd, VMargin, VSync;
+     float  Interlace; /* Please rename this */
+ 
+-    memset(Mode, 0, sizeof(DisplayModeRec));
+-
+     /* CVT default is 60.0Hz */
+     if (!VRefresh)
+         VRefresh = 60.0;
+diff --git xorg-server-1.4.2/hw/xfree86/ddc/edid.h xorg-server-1.4.2/hw/xfree86/ddc/edid.h
+index 0b6a15a..411288a 100644
+--- xorg-server-1.4.2/hw/xfree86/ddc/edid.h
++++ xorg-server-1.4.2/hw/xfree86/ddc/edid.h
+@@ -275,6 +275,9 @@
+ #define _WHITE_GAMMA2(x) _GAMMA(x[14])
+ #define WHITE_GAMMA2 _WHITE_GAMMA2(c)
+ #define ADD_STD_TIMINGS 0xFA
++#define COLOR_MANAGEMENT_DATA 0xF9
++#define CVT_3BYTE_DATA 0xF8
++#define ADD_EST_TIMINGS 0xF7
+ #define ADD_DUMMY 0x10
+ 
+ #define _NEXT_DT_MD_SECTION(x) (x = (x + DET_TIMING_INFO_LEN))
+@@ -317,6 +320,8 @@
+ #define STD_COLOR_SPACE(x) (x & 0x4)
+ #define PREFERRED_TIMING_MODE(x) (x & 0x2)
+ #define GFT_SUPPORTED(x) (x & 0x1)
++#define GTF_SUPPORTED(x) (x & 0x1)
++#define CVT_SUPPORTED(x) (x & 0x1)
+ 
+ /* detailed timing misc */
+ #define IS_INTERLACED(x)  (x) 
+@@ -407,8 +412,13 @@ struct detailed_timings {
+ #define DS_RANGES 0xFD
+ #define DS_WHITE_P 0xFB
+ #define DS_STD_TIMINGS 0xFA
++#define DS_CMD 0xF9
++#define DS_CVT 0xF8
++#define DS_EST_III 0xF7
+ #define DS_DUMMY 0x10
+ #define DS_UNKOWN 0x100 /* type is an int */
++#define DS_VENDOR 0x101
++#define DS_VENDOR_MAX 0x110
+ 
+ struct monitor_ranges {
+   int min_v;
+@@ -430,17 +440,33 @@ struct whitePoints{
+   float white_gamma;
+ };
+ 
++struct cvt_timings {
++    int width;
++    int height;
++    int rate;
++    int rates;
++};
++
++/*
++ * Be careful when adding new sections; this structure can't grow, it's
++ * embedded in the middle of xf86Monitor which is ABI.  Sizes below are
++ * in bytes, for ILP32 systems.  If all else fails just copy the section
++ * literally like serial and friends.
++ */
+ struct detailed_monitor_section {
+   int type;
+   union {
+-    struct detailed_timings d_timings;
++    struct detailed_timings d_timings;	/* 56 */
+     Uchar serial[13];
+     Uchar ascii_data[13];
+     Uchar name[13];
+-    struct monitor_ranges ranges;
+-    struct std_timings std_t[5];
+-    struct whitePoints wp[2];
+-  } section;
++    struct monitor_ranges ranges;	/* 40 */
++    struct std_timings std_t[5];	/* 80 */
++    struct whitePoints wp[2];		/* 32 */
++    /* color management data */
++    struct cvt_timings cvt[4];		/* 64 */
++    /* established timings III */
++  } section;				/* max: 80 */
+ };
+ 
+ typedef struct {
+diff --git xorg-server-1.4.2/hw/xfree86/ddc/interpret_edid.c xorg-server-1.4.2/hw/xfree86/ddc/interpret_edid.c
+index 7b4b2b9..982a502 100644
+--- xorg-server-1.4.2/hw/xfree86/ddc/interpret_edid.c
++++ xorg-server-1.4.2/hw/xfree86/ddc/interpret_edid.c
+@@ -1,8 +1,28 @@
+-
+-/* interpret_edid.c: interpret a primary EDID block
+- * 
++/*
+  * Copyright 1998 by Egbert Eich <Egbert.Eich@Physik.TU-Darmstadt.DE>
++ * Copyright 2007 Red Hat, Inc.
++ *
++ * Permission is hereby granted, free of charge, to any person obtaining a
++ * copy of this software and associated documentation files (the "Software")
++ * to deal in the software without restriction, including without limitation
++ * on the rights to use, copy, modify, merge, publish, distribute, sub
++ * license, and/or sell copies of the Software, and to permit persons to whom
++ * them Software is furnished to do so, subject to the following conditions:
++ *
++ * The above copyright notice and this permission notice (including the next
++ * paragraph) shall be included in all copies or substantial portions of the
++ * Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTIBILITY,
++ * FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT.  IN NO EVENT SHALL
++ * THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER
++ * IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF OR IN
++ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
++ *
++ * interpret_edid.c: interpret a primary EDID block
+  */
++
+ #ifdef HAVE_XORG_CONFIG_H
+ #include <xorg-config.h>
+ #endif
+@@ -155,6 +175,34 @@ get_established_timing_section(Uchar *c, struct established_timings *r)
+ }
+ 
+ static void
++get_cvt_timing_section(Uchar *c, struct cvt_timings *r)
++{
++    int i;
++
++    for (i = 0; i < 4; i++) {
++	if (c[0] && c[1] && c[2]) {
++	    r[i].height = (c[0] + ((c[1] & 0xF0) << 8) + 1) * 2;
++	    switch (c[1] & 0xc0) {
++		case 0x00: r[i].width = r[i].height * 4 / 3; break;
++		case 0x40: r[i].width = r[i].height * 16 / 9; break;
++		case 0x80: r[i].width = r[i].height * 16 / 10; break;
++		case 0xc0: r[i].width = r[i].height * 15 / 9; break;
++	    }
++	    switch (c[2] & 0x60) {
++		case 0x00: r[i].rate = 50; break;
++		case 0x20: r[i].rate = 60; break;
++		case 0x40: r[i].rate = 75; break;
++		case 0x60: r[i].rate = 85; break;
++	    }
++	    r[i].rates = c[2] & 0x1f;
++	} else {
++	    return;
++	}
++	c += 3;
++    }
++}
++
++static void
+ get_std_timing_section(Uchar *c, struct std_timings *r,
+ 		       struct edid_version *v)
+ {
+@@ -207,6 +255,16 @@ get_dt_md_section(Uchar *c, struct edid_version *ver,
+ 	det_mon[i].type = DS_STD_TIMINGS;
+ 	get_dst_timing_section(c,det_mon[i].section.std_t, ver);
+ 	break;
++      case COLOR_MANAGEMENT_DATA:
++	det_mon[i].type = DS_CMD;
++	break;
++      case CVT_3BYTE_DATA:
++	det_mon[i].type = DS_CVT;
++	get_cvt_timing_section(c, det_mon[i].section.cvt);
++	break;
++      case ADD_EST_TIMINGS:
++	det_mon[i].type = DS_EST_III;
++	break;
+       case ADD_DUMMY:
+ 	det_mon[i].type = DS_DUMMY;
+         break;
+@@ -214,6 +272,9 @@ get_dt_md_section(Uchar *c, struct edid_version *ver,
+         det_mon[i].type = DS_UNKOWN;
+         break;
+       }
++      if (c[3] <= 0x0F) {
++	det_mon[i].type = DS_VENDOR + c[3];
++      }
+     } else { 
+       det_mon[i].type = DT;
+       get_detailed_timing_section(c,&det_mon[i].section.d_timings);
+diff --git xorg-server-1.4.2/hw/xfree86/ddc/print_edid.c xorg-server-1.4.2/hw/xfree86/ddc/print_edid.c
+index 30b607d..5aebc6e 100644
+--- xorg-server-1.4.2/hw/xfree86/ddc/print_edid.c
++++ xorg-server-1.4.2/hw/xfree86/ddc/print_edid.c
+@@ -235,6 +235,24 @@ print_std_timings(int scrnIndex, struct std_timings *t)
+ 	}
+     }
+ }
++
++static void
++print_cvt_timings(int si, struct cvt_timings *t)
++{
++    int i;
++
++    for (i = 0; i < 4; i++) {
++	if (t[i].height) {
++	    xf86DrvMsg(si, X_INFO, "%dx%d @ %s%s%s%s%s Hz\n",
++		    t[i].width, t[i].height,
++		    t[i].rates & 0x10 ? "50," : "",
++		    t[i].rates & 0x08 ? "60," : "",
++		    t[i].rates & 0x04 ? "75," : "",
++		    t[i].rates & 0x02 ? "85," : "",
++		    t[i].rates & 0x01 ? "60RB" : "");
++	} else break;
++    }
++}
+   
+ static void
+ print_detailed_monitor_section(int scrnIndex,
+@@ -290,10 +308,28 @@ print_detailed_monitor_section(int scrnIndex,
+ 			       m[i].section.wp[j].white_y,
+ 			       m[i].section.wp[j].white_gamma);
+ 	    break;
++	case DS_CMD:
++	    xf86DrvMsg(scrnIndex, X_INFO,
++		       "Color management data: (not decoded)\n");
++	    break;
++	case DS_CVT:
++	    xf86DrvMsg(scrnIndex, X_INFO,
++		       "CVT 3-byte-code modes:\n");
++	    print_cvt_timings(scrnIndex, m[i].section.cvt);
++	    break;
++	case DS_EST_III:
++	    xf86DrvMsg(scrnIndex, X_INFO,
++		       "Established timings III: (not decoded)\n");
++	    break;
+ 	case DS_DUMMY:
+ 	default:
+ 	    break;
+ 	}
++	if (m[i].type >= DS_VENDOR && m[i].type <= DS_VENDOR_MAX) {
++	    xf86DrvMsg(scrnIndex, X_WARNING,
++		       "Unknown vendor-specific block %hx\n",
++		       m[i].type - DS_VENDOR);
++	}
+     }
+ }
+   
+diff --git xorg-server-1.4.2/hw/xfree86/fbdevhw/fbdevhw.c xorg-server-1.4.2/hw/xfree86/fbdevhw/fbdevhw.c
+index b7eabb2..c8a1864 100644
+--- xorg-server-1.4.2/hw/xfree86/fbdevhw/fbdevhw.c
++++ xorg-server-1.4.2/hw/xfree86/fbdevhw/fbdevhw.c
+@@ -579,14 +579,11 @@ fbdevHWSetVideoModes(ScrnInfoPtr pScrn)
+ 			pScrn->virtualY = mode->VDisplay;
+ 
+ 		if (NULL == pScrn->modes) {
+-			pScrn->modes = xnfalloc(sizeof(DisplayModeRec));
+-			this = pScrn->modes;
+-			memcpy(this,mode,sizeof(DisplayModeRec));
++			this = pScrn->modes = xf86DuplicateMode(mode);
+ 			this->next = this;
+ 			this->prev = this;
+ 		} else {
+-			this = xnfalloc(sizeof(DisplayModeRec));
+-			memcpy(this,mode,sizeof(DisplayModeRec));
++			this = xf86DuplicateMode(mode);
+ 			this->next = pScrn->modes;
+ 			this->prev = last;
+ 			last->next = this;
+diff --git xorg-server-1.4.2/hw/xfree86/loader/xf86sym.c xorg-server-1.4.2/hw/xfree86/loader/xf86sym.c
+index 23f8208..bb084e0 100644
+--- xorg-server-1.4.2/hw/xfree86/loader/xf86sym.c
++++ xorg-server-1.4.2/hw/xfree86/loader/xf86sym.c
+@@ -1160,6 +1160,7 @@ _X_HIDDEN void *xfree86LookupTab[] = {
+     SYMFUNC(xf86CrtcSetSizeRange)
+     SYMFUNC(xf86CrtcScreenInit)
+     SYMFUNC(xf86CVTMode)
++    SYMFUNC(xf86GTFMode)
+     SYMFUNC(xf86DisableUnusedFunctions)
+     SYMFUNC(xf86DPMSSet)
+     SYMFUNC(xf86DuplicateMode)
+diff --git xorg-server-1.4.2/hw/xfree86/modes/Makefile.am xorg-server-1.4.2/hw/xfree86/modes/Makefile.am
+index 1f82068..c137a2c 100644
+--- xorg-server-1.4.2/hw/xfree86/modes/Makefile.am
++++ xorg-server-1.4.2/hw/xfree86/modes/Makefile.am
+@@ -5,6 +5,7 @@ libxf86modes_a_SOURCES = \
+ 	xf86Crtc.h \
+ 	xf86Cursors.c \
+ 	xf86cvt.c \
++	xf86gtf.c \
+ 	xf86DiDGA.c \
+ 	xf86EdidModes.c \
+ 	xf86Modes.c \
+diff --git xorg-server-1.4.2/hw/xfree86/modes/xf86Crtc.c xorg-server-1.4.2/hw/xfree86/modes/xf86Crtc.c
+index d375da8..af919da 100644
+--- xorg-server-1.4.2/hw/xfree86/modes/xf86Crtc.c
++++ xorg-server-1.4.2/hw/xfree86/modes/xf86Crtc.c
+@@ -2134,8 +2134,13 @@ _X_EXPORT xf86MonPtr
+ xf86OutputGetEDID (xf86OutputPtr output, I2CBusPtr pDDCBus)
+ {
+     ScrnInfoPtr	scrn = output->scrn;
++    xf86MonPtr mon;
+ 
+-    return xf86DoEDID_DDC2 (scrn->scrnIndex, pDDCBus);
++    mon = xf86DoEDID_DDC2 (scrn->scrnIndex, pDDCBus);
++    if (mon)
++        xf86DDCApplyQuirks (scrn->scrnIndex, mon);
++
++    return mon;
+ }
+ 
+ static char *_xf86ConnectorNames[] = { "None", "VGA", "DVI-I", "DVI-D",
+diff --git xorg-server-1.4.2/hw/xfree86/modes/xf86Cursors.c xorg-server-1.4.2/hw/xfree86/modes/xf86Cursors.c
+index a7616e0..ff47731 100644
+--- xorg-server-1.4.2/hw/xfree86/modes/xf86Cursors.c
++++ xorg-server-1.4.2/hw/xfree86/modes/xf86Cursors.c
+@@ -137,8 +137,7 @@ cursor_bitpos (int flags, int x, Bool mask)
+ 	mask = !mask;
+     if (flags & HARDWARE_CURSOR_NIBBLE_SWAPPED)
+ 	x = (x & ~3) | (3 - (x & 3));
+-    if (((flags & HARDWARE_CURSOR_BIT_ORDER_MSBFIRST) == 0) ==
+-	(X_BYTE_ORDER == X_BIG_ENDIAN))
++    if (flags & HARDWARE_CURSOR_BIT_ORDER_MSBFIRST)
+ 	x = (x & ~7) | (7 - (x & 7));
+     if (flags & HARDWARE_CURSOR_SOURCE_MASK_INTERLEAVE_1)
+ 	x = (x << 1) + mask;
+@@ -400,7 +399,7 @@ xf86_crtc_load_cursor_image (xf86CrtcPtr crtc, CARD8 *src)
+ 	int flags = cursor_info->Flags;
+ 	
+ 	cursor_image = xf86_config->cursor_image;
+-	memset(cursor_image, 0, cursor_info->MaxWidth * stride);
++	memset(cursor_image, 0, cursor_info->MaxHeight * stride);
+ 	
+         for (y = 0; y < cursor_info->MaxHeight; y++)
+ 	    for (x = 0; x < cursor_info->MaxWidth; x++) 
+@@ -612,8 +611,7 @@ xf86_reload_cursors (ScreenPtr screen)
+ 	    (*cursor_info->LoadCursorARGB) (scrn, cursor);
+ 	else
+ #endif
+-	    (*cursor_info->LoadCursorImage)(cursor_info->pScrn,
+-					    cursor->devPriv[screen->myNum]);
++	    (*cursor_info->LoadCursorImage)(cursor_info->pScrn, cursor->devPriv[screen->myNum]);
+ 
+ 	(*cursor_info->SetCursorPosition)(cursor_info->pScrn, x, y);
+ 	(*cursor_info->ShowCursor)(cursor_info->pScrn);
+diff --git xorg-server-1.4.2/hw/xfree86/modes/xf86EdidModes.c xorg-server-1.4.2/hw/xfree86/modes/xf86EdidModes.c
+index e2ae665..df3fd6f 100644
+--- xorg-server-1.4.2/hw/xfree86/modes/xf86EdidModes.c
++++ xorg-server-1.4.2/hw/xfree86/modes/xf86EdidModes.c
+@@ -54,13 +54,28 @@ typedef enum {
+     DDC_QUIRK_PREFER_LARGE_60 = 1 << 0,
+     /* 135MHz clock is too high, drop a bit */
+     DDC_QUIRK_135_CLOCK_TOO_HIGH = 1 << 1,
++    /* Prefer the largest mode at 75 Hz */
++    DDC_QUIRK_PREFER_LARGE_75 = 1 << 2,
++    /* Convert detailed timing's horizontal from units of cm to mm */
++    DDC_QUIRK_DETAILED_H_IN_CM = 1 << 3,
++    /* Convert detailed timing's vertical from units of cm to mm */
++    DDC_QUIRK_DETAILED_V_IN_CM = 1 << 4,
++    /* Detailed timing descriptors have bogus size values, so just take the
++     * maximum size and use that.
++     */
++    DDC_QUIRK_DETAILED_USE_MAXIMUM_SIZE = 1 << 5,
++    /* Monitor forgot to set the first detailed is preferred bit. */
++    DDC_QUIRK_FIRST_DETAILED_PREFERRED = 1 << 6,
++    /* use +hsync +vsync for detailed mode */
++    DDC_QUIRK_DETAILED_SYNC_PP = 1 << 7,
+ } ddc_quirk_t;
+ 
+ static Bool quirk_prefer_large_60 (int scrnIndex, xf86MonPtr DDC)
+ {
+     /* Belinea 10 15 55 */
+     if (memcmp (DDC->vendor.name, "MAX", 4) == 0 &&
+-	DDC->vendor.prod_id == 1516)
++	((DDC->vendor.prod_id == 1516) ||
++	(DDC->vendor.prod_id == 0x77e)))
+ 	return TRUE;
+     
+     /* Acer AL1706 */
+@@ -78,6 +93,52 @@ static Bool quirk_prefer_large_60 (int scrnIndex, xf86MonPtr DDC)
+ 	DDC->vendor.prod_id == 638)
+ 	return TRUE;
+ 
++    /* Acer F51 */
++    if (memcmp (DDC->vendor.name, "API", 4) == 0 &&
++	DDC->vendor.prod_id == 0x7602)
++	return TRUE;
++
++
++    return FALSE;
++}
++
++static Bool quirk_prefer_large_75 (int scrnIndex, xf86MonPtr DDC)
++{
++    /* Bug #11603: Funai Electronics PM36B */
++    if (memcmp (DDC->vendor.name, "FCM", 4) == 0 &&
++	DDC->vendor.prod_id == 13600)
++	return TRUE;
++
++    return FALSE;
++}
++
++static Bool quirk_detailed_h_in_cm (int scrnIndex, xf86MonPtr DDC)
++{
++    /* Bug #11603: Funai Electronics PM36B */
++    if (memcmp (DDC->vendor.name, "FCM", 4) == 0 &&
++	DDC->vendor.prod_id == 13600)
++	return TRUE;
++
++    return FALSE;
++}
++
++static Bool quirk_detailed_v_in_cm (int scrnIndex, xf86MonPtr DDC)
++{
++    /* Bug #11603: Funai Electronics PM36B */
++    if (memcmp (DDC->vendor.name, "FCM", 4) == 0 &&
++	DDC->vendor.prod_id == 13600)
++	return TRUE;
++
++    return FALSE;
++}
++
++static Bool quirk_detailed_use_maximum_size (int scrnIndex, xf86MonPtr DDC)
++{
++    /* Bug #10304: LGPhilipsLCD LP154W01-A5 */
++    if (memcmp (DDC->vendor.name, "LPL", 4) == 0 &&
++	(DDC->vendor.prod_id == 0 || DDC->vendor.prod_id == 0x2a00))
++	return TRUE;
++
+     return FALSE;
+ }
+ 
+@@ -91,6 +152,35 @@ static Bool quirk_135_clock_too_high (int scrnIndex, xf86MonPtr DDC)
+     return FALSE;
+ }
+ 
++static Bool quirk_first_detailed_preferred (int scrnIndex, xf86MonPtr DDC)
++{
++    /* Philips 107p5 CRT. Reported on xorg@ with pastebin. */
++    if (memcmp (DDC->vendor.name, "PHL", 4) == 0 &&
++	DDC->vendor.prod_id == 57364)
++	return TRUE;
++
++    /* Proview AY765C 17" LCD. See bug #15160*/
++    if (memcmp (DDC->vendor.name, "PTS", 4) == 0 &&
++	DDC->vendor.prod_id == 765)
++	return TRUE;
++
++    /* ACR of some sort RH #284231 */
++    if (memcmp (DDC->vendor.name, "ACR", 4) == 0 &&
++	DDC->vendor.prod_id == 2423)
++	return TRUE;
++
++    return FALSE;
++}
++
++static Bool quirk_detailed_sync_pp(int scrnIndex, xf86MonPtr DDC)
++{
++    /* Bug #12439: Samsung SyncMaster 205BW */
++    if (memcmp (DDC->vendor.name, "SAM", 4) == 0 &&
++	DDC->vendor.prod_id == 541)
++	return TRUE;
++    return FALSE;
++}
++
+ typedef struct {
+     Bool	(*detect) (int scrnIndex, xf86MonPtr DDC);
+     ddc_quirk_t	quirk;
+@@ -106,6 +196,30 @@ static const ddc_quirk_map_t ddc_quirks[] = {
+ 	quirk_135_clock_too_high,   DDC_QUIRK_135_CLOCK_TOO_HIGH,
+ 	"Recommended 135MHz pixel clock is too high"
+     },
++    {
++	quirk_prefer_large_75,   DDC_QUIRK_PREFER_LARGE_75,
++	"Detailed timing is not preferred, use largest mode at 75Hz"
++    },
++    {
++	quirk_detailed_h_in_cm,   DDC_QUIRK_DETAILED_H_IN_CM,
++	"Detailed timings give horizontal size in cm."
++    },
++    {
++	quirk_detailed_v_in_cm,   DDC_QUIRK_DETAILED_V_IN_CM,
++	"Detailed timings give vertical size in cm."
++    },
++    {
++	quirk_detailed_use_maximum_size,   DDC_QUIRK_DETAILED_USE_MAXIMUM_SIZE,
++	"Detailed timings give sizes in cm."
++    },
++    {
++	quirk_first_detailed_preferred, DDC_QUIRK_FIRST_DETAILED_PREFERRED,
++	"First detailed timing was not marked as preferred."
++    },
++    {
++	quirk_detailed_sync_pp, DDC_QUIRK_DETAILED_SYNC_PP,
++	"Use +hsync +vsync for detailed timing."
++    },
+     { 
+ 	NULL,		DDC_QUIRK_NONE,
+ 	"No known quirks"
+@@ -158,20 +272,57 @@ DDCModesFromEstablished(int scrnIndex, struct established_timings *timing,
+     return Modes;
+ }
+ 
++#define LEVEL_DMT 0
++#define LEVEL_GTF 1
++#define LEVEL_CVT 2
++
++static int
++MonitorStandardTimingLevel(xf86MonPtr DDC)
++{
++    if (DDC->ver.revision >= 2) {
++	if (DDC->ver.revision >= 4 && CVT_SUPPORTED(DDC->features.msc)) {
++	    return LEVEL_CVT;
++	}
++	return LEVEL_GTF;
++    }
++    return LEVEL_DMT;
++}
++
+ /*
++ * This is not really correct.  Appendix B of the EDID 1.4 spec defines
++ * the right thing to do here.  If the timing given here matches a mode
++ * defined in the VESA DMT standard, we _must_ use that.  If the device
++ * supports CVT modes, then we should generate a CVT timing.  If both
++ * of the above fail, use GTF.
++ *
++ * There are some wrinkles here.  EDID 1.1 and 1.0 sinks can't really
++ * "support" GTF, since it wasn't a standard yet; so if they ask for a
++ * timing in this section that isn't defined in DMT, returning a GTF mode
++ * may not actually be valid.  EDID 1.3 sinks often report support for
++ * some CVT modes, but they are not required to support CVT timings for
++ * modes in the standard timing descriptor, so we should _not_ treat them
++ * as CVT-compliant (unless specified in an extension block I suppose).
+  *
++ * EDID 1.4 requires that all sink devices support both GTF and CVT timings
++ * for modes in this section, but does say that CVT is preferred.
+  */
+ static DisplayModePtr
+-DDCModesFromStandardTiming(int scrnIndex, struct std_timings *timing,
+-			   ddc_quirk_t quirks)
++DDCModesFromStandardTiming(struct std_timings *timing, ddc_quirk_t quirks,
++			   int timing_level)
+ {
+     DisplayModePtr Modes = NULL, Mode = NULL;
+     int i;
+ 
+     for (i = 0; i < STD_TIMINGS; i++) {
+         if (timing[i].hsize && timing[i].vsize && timing[i].refresh) {
+-            Mode =  xf86CVTMode(timing[i].hsize, timing[i].vsize,
+-                                timing[i].refresh, FALSE, FALSE);
++	    /* XXX check for DMT first, else... */
++	    if (timing_level == LEVEL_CVT)
++		Mode = xf86CVTMode(timing[i].hsize, timing[i].vsize,
++				   timing[i].refresh, FALSE, FALSE);
++	    else
++		Mode = xf86GTFMode(timing[i].hsize, timing[i].vsize,
++				   timing[i].refresh, FALSE, FALSE);
++
+ 	    Mode->type = M_T_DRIVER;
+             Modes = xf86ModesAdd(Modes, Mode);
+         }
+@@ -185,7 +336,7 @@ DDCModesFromStandardTiming(int scrnIndex, struct std_timings *timing,
+  */
+ static DisplayModePtr
+ DDCModeFromDetailedTiming(int scrnIndex, struct detailed_timings *timing,
+-			  int preferred, ddc_quirk_t quirks)
++			  Bool preferred, ddc_quirk_t quirks)
+ {
+     DisplayModePtr Mode;
+ 
+@@ -212,12 +363,11 @@ DDCModeFromDetailedTiming(int scrnIndex, struct detailed_timings *timing,
+     /* We only do seperate sync currently */
+     if (timing->sync != 0x03) {
+          xf86DrvMsg(scrnIndex, X_INFO,
+-		    "%s: %dx%d Warning: We only handle seperate"
++		    "%s: %dx%d Warning: We only handle separate"
+                     " sync.\n", __func__, timing->h_active, timing->v_active);
+     }
+ 
+-    Mode = xnfalloc(sizeof(DisplayModeRec));
+-    memset(Mode, 0, sizeof(DisplayModeRec));
++    Mode = xnfcalloc(1, sizeof(DisplayModeRec));
+ 
+     Mode->type = M_T_DRIVER;
+     if (preferred)
+@@ -252,21 +402,61 @@ DDCModeFromDetailedTiming(int scrnIndex, struct detailed_timings *timing,
+     if (timing->interlaced)
+         Mode->Flags |= V_INTERLACE;
+ 
+-    if (timing->misc & 0x02)
+-	Mode->Flags |= V_PVSYNC;
+-    else
+-	Mode->Flags |= V_NVSYNC;
+-
+-    if (timing->misc & 0x01)
+-	Mode->Flags |= V_PHSYNC;
+-    else
+-	Mode->Flags |= V_NHSYNC;
++    if (quirks & DDC_QUIRK_DETAILED_SYNC_PP)
++	Mode->Flags |= V_PVSYNC | V_PHSYNC;
++    else {
++	if (timing->misc & 0x02)
++	    Mode->Flags |= V_PVSYNC;
++	else
++	    Mode->Flags |= V_NVSYNC;
++
++	if (timing->misc & 0x01)
++	    Mode->Flags |= V_PHSYNC;
++	else
++	    Mode->Flags |= V_NHSYNC;
++    }
+ 
+     return Mode;
+ }
+ 
++#if XORG_VERSION_CURRENT < XORG_VERSION_NUMERIC(7,0,0,0,0)
++static DisplayModePtr
++DDCModesFromCVT(int scrnIndex, struct cvt_timings *t)
++{
++    DisplayModePtr modes = NULL;
++    int i;
++
++    for (i = 0; i < 4; i++) {
++	if (t[i].height) {
++	    if (t[i].rates & 0x10)
++		modes = xf86ModesAdd(modes,
++			xf86CVTMode(t[i].width, t[i].height, 50, 0, 0));
++	    if (t[i].rates & 0x08)
++		modes = xf86ModesAdd(modes,
++			xf86CVTMode(t[i].width, t[i].height, 60, 0, 0));
++	    if (t[i].rates & 0x04)
++		modes = xf86ModesAdd(modes,
++			xf86CVTMode(t[i].width, t[i].height, 75, 0, 0));
++	    if (t[i].rates & 0x02)
++		modes = xf86ModesAdd(modes,
++			xf86CVTMode(t[i].width, t[i].height, 85, 0, 0));
++	    if (t[i].rates & 0x01)
++		modes = xf86ModesAdd(modes,
++			xf86CVTMode(t[i].width, t[i].height, 60, 1, 0));
++	} else break;
++    }
++
++    return modes;
++}
++#endif
++
++
+ /*
+- *
++ * This is only valid when the sink claims to be continuous-frequency
++ * but does not supply a detailed range descriptor.  Such sinks are
++ * arguably broken.  Currently the mode validation code isn't aware of
++ * this; the non-RANDR code even punts the decision of optional sync
++ * range checking to the driver.  Loss.
+  */
+ static void
+ DDCGuessRangesFromModes(int scrnIndex, MonPtr Monitor, DisplayModePtr Modes)
+@@ -309,27 +499,121 @@ DDCGuessRangesFromModes(int scrnIndex, MonPtr Monitor, DisplayModePtr Modes)
+     }
+ }
+ 
++static ddc_quirk_t
++xf86DDCDetectQuirks(int scrnIndex, xf86MonPtr DDC, Bool verbose)
++{
++    ddc_quirk_t	quirks;
++    int i;
++
++    quirks = DDC_QUIRK_NONE;
++    for (i = 0; ddc_quirks[i].detect; i++) {
++	if (ddc_quirks[i].detect (scrnIndex, DDC)) {
++	    if (verbose) {
++		xf86DrvMsg (scrnIndex, X_INFO, "    EDID quirk: %s\n",
++			    ddc_quirks[i].description);
++	    }
++	    quirks |= ddc_quirks[i].quirk;
++	}
++    }
++
++    return quirks;
++}
++
++/**
++ * Applies monitor-specific quirks to the decoded EDID information.
++ *
++ * Note that some quirks applying to the mode list are still implemented in
++ * xf86DDCGetModes.
++ */
++void
++xf86DDCApplyQuirks(int scrnIndex, xf86MonPtr DDC)
++{
++    ddc_quirk_t quirks = xf86DDCDetectQuirks (scrnIndex, DDC, FALSE);
++    int i;
++
++    for (i = 0; i < DET_TIMINGS; i++) {
++	struct detailed_monitor_section *det_mon = &DDC->det_mon[i];
++
++	if (det_mon->type != DT)
++	    continue;
++
++	if (quirks & DDC_QUIRK_DETAILED_H_IN_CM)
++	    det_mon->section.d_timings.h_size *= 10;
++
++	if (quirks & DDC_QUIRK_DETAILED_V_IN_CM)
++	    det_mon->section.d_timings.v_size *= 10;
++
++	if (quirks & DDC_QUIRK_DETAILED_USE_MAXIMUM_SIZE) {
++	    det_mon->section.d_timings.h_size = 10 * DDC->features.hsize;
++	    det_mon->section.d_timings.v_size = 10 * DDC->features.vsize;
++	}
++    }
++}
++
++/**
++ * Walks the modes list, finding the mode with the largest area which is
++ * closest to the target refresh rate, and marks it as the only preferred mode.
++*/
++static void
++xf86DDCSetPreferredRefresh(int scrnIndex, DisplayModePtr modes,
++			   float target_refresh)
++{
++	DisplayModePtr	mode, best = modes;
++
++	for (mode = modes; mode; mode = mode->next)
++	{
++	    mode->type &= ~M_T_PREFERRED;
++
++	    if (mode == best) continue;
++
++	    if (mode->HDisplay * mode->VDisplay >
++		best->HDisplay * best->VDisplay)
++	    {
++		best = mode;
++		continue;
++	    }
++	    if (mode->HDisplay * mode->VDisplay ==
++		best->HDisplay * best->VDisplay)
++	    {
++		double	mode_refresh = xf86ModeVRefresh (mode);
++		double	best_refresh = xf86ModeVRefresh (best);
++		double	mode_dist = fabs(mode_refresh - target_refresh);
++		double	best_dist = fabs(best_refresh - target_refresh);
++
++		if (mode_dist < best_dist)
++		{
++		    best = mode;
++		    continue;
++		}
++	    }
++	}
++	if (best)
++	    best->type |= M_T_PREFERRED;
++}
++
+ _X_EXPORT DisplayModePtr
+ xf86DDCGetModes(int scrnIndex, xf86MonPtr DDC)
+ {
+-    int preferred, i;
++    int		    i;
+     DisplayModePtr  Modes = NULL, Mode;
+     ddc_quirk_t	    quirks;
++    Bool	    preferred;
++    int		    timing_level;
+ 
+     xf86DrvMsg (scrnIndex, X_INFO, "EDID vendor \"%s\", prod id %d\n",
+ 		DDC->vendor.name, DDC->vendor.prod_id);
+-    quirks = DDC_QUIRK_NONE;
+-    for (i = 0; ddc_quirks[i].detect; i++)
+-	if (ddc_quirks[i].detect (scrnIndex, DDC))
+-	{
+-	    xf86DrvMsg (scrnIndex, X_INFO, "    EDID quirk: %s\n",
+-			ddc_quirks[i].description);
+-	    quirks |= ddc_quirks[i].quirk;
+-	}
+-    
++
++    quirks = xf86DDCDetectQuirks(scrnIndex, DDC, TRUE);
++
+     preferred = PREFERRED_TIMING_MODE(DDC->features.msc);
+-    if (quirks & DDC_QUIRK_PREFER_LARGE_60)
+-	preferred = 0;
++    if (DDC->ver.revision >= 4)
++	preferred = TRUE;
++    if (quirks & DDC_QUIRK_FIRST_DETAILED_PREFERRED)
++	preferred = TRUE;
++    if (quirks & (DDC_QUIRK_PREFER_LARGE_60 | DDC_QUIRK_PREFER_LARGE_75))
++	preferred = FALSE;
++
++    timing_level = MonitorStandardTimingLevel(DDC);
+ 
+     for (i = 0; i < DET_TIMINGS; i++) {
+ 	struct detailed_monitor_section *det_mon = &DDC->det_mon[i];
+@@ -340,15 +624,20 @@ xf86DDCGetModes(int scrnIndex, xf86MonPtr DDC)
+                                              &det_mon->section.d_timings,
+ 					     preferred,
+ 					     quirks);
+-	    preferred = 0;
++	    preferred = FALSE;
+             Modes = xf86ModesAdd(Modes, Mode);
+             break;
+         case DS_STD_TIMINGS:
+-            Mode = DDCModesFromStandardTiming(scrnIndex,
+-					      det_mon->section.std_t,
+-					      quirks);
++            Mode = DDCModesFromStandardTiming(det_mon->section.std_t,
++					      quirks, timing_level);
+             Modes = xf86ModesAdd(Modes, Mode);
+             break;
++#if XORG_VERSION_CURRENT < XORG_VERSION_NUMERIC(7,0,0,0,0)
++	case DS_CVT:
++	    Mode = DDCModesFromCVT(scrnIndex, det_mon->section.cvt);
++	    Modes = xf86ModesAdd(Modes, Mode);
++	    break;
++#endif
+         default:
+             break;
+         }
+@@ -359,36 +648,15 @@ xf86DDCGetModes(int scrnIndex, xf86MonPtr DDC)
+     Modes = xf86ModesAdd(Modes, Mode);
+ 
+     /* Add standard timings */
+-    Mode = DDCModesFromStandardTiming(scrnIndex, DDC->timings2, quirks);
++    Mode = DDCModesFromStandardTiming(DDC->timings2, quirks, timing_level);
+     Modes = xf86ModesAdd(Modes, Mode);
+ 
+     if (quirks & DDC_QUIRK_PREFER_LARGE_60)
+-    {
+-	DisplayModePtr	best = Modes;
+-	for (Mode = Modes; Mode; Mode = Mode->next)
+-	{
+-	    if (Mode == best) continue;
+-	    if (Mode->HDisplay * Mode->VDisplay > best->HDisplay * best->VDisplay)
+-	    {
+-		best = Mode;
+-		continue;
+-	    }
+-	    if (Mode->HDisplay * Mode->VDisplay == best->HDisplay * best->VDisplay)
+-	    {
+-		double	mode_refresh = xf86ModeVRefresh (Mode);
+-		double	best_refresh = xf86ModeVRefresh (best);
+-		double	mode_dist = fabs(mode_refresh - 60.0);
+-		double	best_dist = fabs(best_refresh - 60.0);
+-		if (mode_dist < best_dist)
+-		{
+-		    best = Mode;
+-		    continue;
+-		}
+-	    }
+-	}
+-	if (best)
+-	    best->type |= M_T_PREFERRED;
+-    }
++	xf86DDCSetPreferredRefresh(scrnIndex, Modes, 60);
++
++    if (quirks & DDC_QUIRK_PREFER_LARGE_75)
++	xf86DDCSetPreferredRefresh(scrnIndex, Modes, 75);
++
+     return Modes;
+ }
+ 
+@@ -407,13 +675,17 @@ xf86DDCMonitorSet(int scrnIndex, MonPtr Monitor, xf86MonPtr DDC)
+ 
+     Monitor->DDC = DDC;
+ 
+-    Monitor->widthmm = 10 * DDC->features.hsize;
+-    Monitor->heightmm = 10 * DDC->features.vsize;
++    if (Monitor->widthmm <= 0 && Monitor->heightmm <= 0) {
++	Monitor->widthmm = 10 * DDC->features.hsize;
++	Monitor->heightmm = 10 * DDC->features.vsize;
++    }
+ 
+-    /* If this is a digital display, then we can use reduced blanking */
++    /*
++     * If this is a digital display, then we can use reduced blanking.
++     * XXX This is a 1.3 heuristic.  1.4 explicitly defines rb support.
++     */
+     if (DDC->features.input_type)
+         Monitor->reducedblanking = TRUE;
+-    /* Allow the user to also enable this through config */
+ 
+     Modes = xf86DDCGetModes(scrnIndex, DDC);
+ 
+diff --git xorg-server-1.4.2/hw/xfree86/modes/xf86Modes.c xorg-server-1.4.2/hw/xfree86/modes/xf86Modes.c
+index f49c292..63377fa 100644
+--- xorg-server-1.4.2/hw/xfree86/modes/xf86Modes.c
++++ xorg-server-1.4.2/hw/xfree86/modes/xf86Modes.c
+@@ -39,8 +39,10 @@
+ extern XF86ConfigPtr xf86configptr;
+ 
+ /**
+- * @file this file contains symbols from xf86Mode.c and friends that are static
+- * there but we still want to use.  We need to come up with better API here.
++ * This is the version number where we epoched.  These files get copied
++ * into drivers that want to use this setup infrastructure on pre-1.3
++ * servers, so when that happens they need to define these symbols
++ * themselves.  However, _in_ the server, we basically always define them now.
+  */
+ 
+ #if XORG_VERSION_CURRENT <= XORG_VERSION_NUMERIC(7,2,99,2,0)
+@@ -116,6 +118,24 @@ xf86ModeHeight (DisplayModePtr mode, Rotation rotation)
+     }
+ }
+ 
++/** Calculates the memory bandwidth (in MiB/sec) of a mode. */
++_X_EXPORT unsigned int
++xf86ModeBandwidth(DisplayModePtr mode, int depth)
++{
++    float a_active, a_total, active_percent, pixels_per_second;
++    int bytes_per_pixel = (depth + 7) / 8;
++
++    if (!mode->HTotal || !mode->VTotal || !mode->Clock)
++	return 0;
++
++    a_active = mode->HDisplay * mode->VDisplay;
++    a_total = mode->HTotal * mode->VTotal;
++    active_percent = a_active / a_total;
++    pixels_per_second = active_percent * mode->Clock * 1000.0;
++
++    return (unsigned int)(pixels_per_second * bytes_per_pixel / (1024 * 1024));
++}
++
+ /** Sets a default mode name of <width>x<height> on a mode. */
+ _X_EXPORT void
+ xf86SetModeDefaultName(DisplayModePtr mode)
+@@ -194,11 +214,15 @@ xf86DuplicateMode(DisplayModePtr pMode)
+     *pNew = *pMode;
+     pNew->next = NULL;
+     pNew->prev = NULL;
+-    if (pNew->name == NULL) {
+-	xf86SetModeDefaultName(pMode);
+-    } else {
++    /*
++     * It is important to copy the name explicitly.
++     * Otherwise a mode could reference an invalid piece of memory, after one of them runs free().
++     * This will lead to obscure problems, that you really don't want.
++     */
++    if (pMode->name == NULL)
++	xf86SetModeDefaultName(pNew);
++    else
+ 	pNew->name = xnfstrdup(pMode->name);
+-    }
+ 
+     return pNew;
+ }
+@@ -320,12 +344,10 @@ xf86PrintModeline(int scrnIndex,DisplayModePtr mode)
+ /**
+  * Marks as bad any modes with unsupported flags.
+  *
+- * \param modeList doubly-linked or circular list of modes.
++ * \param modeList doubly-linked list of modes.
+  * \param flags flags supported by the driver.
+  *
+  * \bug only V_INTERLACE and V_DBLSCAN are supported.  Is that enough?
+- *
+- * This is not in xf86Modes.c, but would be part of the proposed new API.
+  */
+ _X_EXPORT void
+ xf86ValidateModesFlags(ScrnInfoPtr pScrn, DisplayModePtr modeList,
+@@ -344,9 +366,7 @@ xf86ValidateModesFlags(ScrnInfoPtr pScrn, DisplayModePtr modeList,
+ /**
+  * Marks as bad any modes extending beyond the given max X, Y, or pitch.
+  *
+- * \param modeList doubly-linked or circular list of modes.
+- *
+- * This is not in xf86Modes.c, but would be part of the proposed new API.
++ * \param modeList doubly-linked list of modes.
+  */
+ _X_EXPORT void
+ xf86ValidateModesSize(ScrnInfoPtr pScrn, DisplayModePtr modeList,
+@@ -373,9 +393,7 @@ xf86ValidateModesSize(ScrnInfoPtr pScrn, DisplayModePtr modeList,
+  * Marks as bad any modes that aren't supported by the given monitor's
+  * hsync and vrefresh ranges.
+  *
+- * \param modeList doubly-linked or circular list of modes.
+- *
+- * This is not in xf86Modes.c, but would be part of the proposed new API.
++ * \param modeList doubly-linked list of modes.
+  */
+ _X_EXPORT void
+ xf86ValidateModesSync(ScrnInfoPtr pScrn, DisplayModePtr modeList,
+@@ -389,8 +407,8 @@ xf86ValidateModesSync(ScrnInfoPtr pScrn, DisplayModePtr modeList,
+ 
+ 	bad = TRUE;
+ 	for (i = 0; i < mon->nHsync; i++) {
+-	    if (xf86ModeHSync(mode) >= mon->hsync[i].lo &&
+-		xf86ModeHSync(mode) <= mon->hsync[i].hi)
++	    if (xf86ModeHSync(mode) >= mon->hsync[i].lo * (1-SYNC_TOLERANCE) &&
++		xf86ModeHSync(mode) <= mon->hsync[i].hi * (1+SYNC_TOLERANCE))
+ 	    {
+ 		bad = FALSE;
+ 	    }
+@@ -400,8 +418,8 @@ xf86ValidateModesSync(ScrnInfoPtr pScrn, DisplayModePtr modeList,
+ 
+ 	bad = TRUE;
+ 	for (i = 0; i < mon->nVrefresh; i++) {
+-	    if (xf86ModeVRefresh(mode) >= mon->vrefresh[i].lo &&
+-		xf86ModeVRefresh(mode) <= mon->vrefresh[i].hi)
++	    if (xf86ModeVRefresh(mode) >= mon->vrefresh[i].lo * (1-SYNC_TOLERANCE) &&
++		xf86ModeVRefresh(mode) <= mon->vrefresh[i].hi * (1+SYNC_TOLERANCE))
+ 	    {
+ 		bad = FALSE;
+ 	    }
+@@ -417,12 +435,10 @@ xf86ValidateModesSync(ScrnInfoPtr pScrn, DisplayModePtr modeList,
+ /**
+  * Marks as bad any modes extending beyond outside of the given clock ranges.
+  *
+- * \param modeList doubly-linked or circular list of modes.
++ * \param modeList doubly-linked list of modes.
+  * \param min pointer to minimums of clock ranges
+  * \param max pointer to maximums of clock ranges
+  * \param n_ranges number of ranges.
+- *
+- * This is not in xf86Modes.c, but would be part of the proposed new API.
+  */
+ _X_EXPORT void
+ xf86ValidateModesClocks(ScrnInfoPtr pScrn, DisplayModePtr modeList,
+@@ -434,7 +450,8 @@ xf86ValidateModesClocks(ScrnInfoPtr pScrn, DisplayModePtr modeList,
+     for (mode = modeList; mode != NULL; mode = mode->next) {
+ 	Bool good = FALSE;
+ 	for (i = 0; i < n_ranges; i++) {
+-	    if (mode->Clock >= min[i] && mode->Clock <= max[i]) {
++	    if (mode->Clock >= min[i] * (1-SYNC_TOLERANCE) &&
++		mode->Clock <= max[i] * (1+SYNC_TOLERANCE)) {
+ 		good = TRUE;
+ 		break;
+ 	    }
+@@ -454,9 +471,7 @@ xf86ValidateModesClocks(ScrnInfoPtr pScrn, DisplayModePtr modeList,
+  *
+  * MODE_BAD is used as the rejection flag, for lack of a better flag.
+  *
+- * \param modeList doubly-linked or circular list of modes.
+- *
+- * This is not in xf86Modes.c, but would be part of the proposed new API.
++ * \param modeList doubly-linked list of modes.
+  */
+ _X_EXPORT void
+ xf86ValidateModesUserConfig(ScrnInfoPtr pScrn, DisplayModePtr modeList)
+@@ -484,13 +499,30 @@ xf86ValidateModesUserConfig(ScrnInfoPtr pScrn, DisplayModePtr modeList)
+ 
+ 
+ /**
++ * Marks as bad any modes exceeding the given bandwidth.
++ *
++ * \param modeList doubly-linked list of modes.
++ * \param bandwidth bandwidth in MHz.
++ * \param depth color depth.
++ */
++_X_EXPORT void
++xf86ValidateModesBandwidth(ScrnInfoPtr pScrn, DisplayModePtr modeList,
++			   unsigned int bandwidth, int depth)
++{
++    DisplayModePtr mode;
++
++    for (mode = modeList; mode != NULL; mode = mode->next) {
++	if (xf86ModeBandwidth(mode, depth) > bandwidth)
++	    mode->status = MODE_BAD;
++    }
++}
++
++/**
+  * Frees any modes from the list with a status other than MODE_OK.
+  *
+  * \param modeList pointer to a doubly-linked or circular list of modes.
+  * \param verbose determines whether the reason for mode invalidation is
+  *	  printed.
+- *
+- * This is not in xf86Modes.c, but would be part of the proposed new API.
+  */
+ _X_EXPORT void
+ xf86PruneInvalidModes(ScrnInfoPtr pScrn, DisplayModePtr *modeList,
+diff --git xorg-server-1.4.2/hw/xfree86/modes/xf86Modes.h xorg-server-1.4.2/hw/xfree86/modes/xf86Modes.h
+index 2bd4ede..bd5a45d 100644
+--- xorg-server-1.4.2/hw/xfree86/modes/xf86Modes.h
++++ xorg-server-1.4.2/hw/xfree86/modes/xf86Modes.h
+@@ -61,6 +61,7 @@ DisplayModePtr xf86ModesAdd(DisplayModePtr modes, DisplayModePtr new);
+ DisplayModePtr xf86DDCGetModes(int scrnIndex, xf86MonPtr DDC);
+ DisplayModePtr xf86CVTMode(int HDisplay, int VDisplay, float VRefresh,
+ 			   Bool Reduced, Bool Interlaced);
++DisplayModePtr xf86GTFMode(int h_pixels, int v_lines, float freq, int interlaced, int margins);
+ 
+ void
+ xf86ValidateModesFlags(ScrnInfoPtr pScrn, DisplayModePtr modeList,
+@@ -95,4 +96,7 @@ xf86GetMonitorModes (ScrnInfoPtr pScrn, XF86ConfMonitorPtr conf_monitor);
+ DisplayModePtr
+ xf86GetDefaultModes (Bool interlaceAllowed, Bool doubleScanAllowed);
+ 
++void
++xf86DDCApplyQuirks(int scrnIndex, xf86MonPtr DDC);
++
+ #endif /* _XF86MODES_H_ */
+diff --git xorg-server-1.4.2/hw/xfree86/modes/xf86RandR12.c xorg-server-1.4.2/hw/xfree86/modes/xf86RandR12.c
+index 7169f74..f52c9e3 100644
+--- xorg-server-1.4.2/hw/xfree86/modes/xf86RandR12.c
++++ xorg-server-1.4.2/hw/xfree86/modes/xf86RandR12.c
+@@ -59,11 +59,11 @@ static Bool xf86RandR12Init12 (ScreenPtr pScreen);
+ static Bool xf86RandR12CreateScreenResources12 (ScreenPtr pScreen);
+ #endif
+ 
+-static int	    xf86RandR12Index;
+-static int	    xf86RandR12Generation;
+-
++static int xf86RandR12Generation;
++static int xf86RandR12Index;
+ #define XF86RANDRINFO(p) \
+-	((XF86RandRInfoPtr)(p)->devPrivates[xf86RandR12Index].ptr)
++    ((XF86RandRInfoPtr)(p)->devPrivates[xf86RandR12Index].ptr)
++
+ 
+ static int
+ xf86RandR12ModeRefresh (DisplayModePtr mode)
+@@ -340,11 +340,11 @@ xf86RandR12ScreenSetSize (ScreenPtr	pScreen,
+     PixmapPtr		pScrnPix = (*pScreen->GetScreenPixmap)(pScreen);
+     Bool		ret = FALSE;
+ 
+-    if (randrp->virtualX == -1 || randrp->virtualY == -1)
+-    {
+-	randrp->virtualX = pScrn->virtualX;
+-	randrp->virtualY = pScrn->virtualY;
+-    }
++        if (randrp->virtualX == -1 || randrp->virtualY == -1)
++        {
++	    randrp->virtualX = pScrn->virtualX;
++	    randrp->virtualY = pScrn->virtualY;
++        }
+     if (pRoot && pScrn->vtSema)
+ 	(*pScrn->EnableDisableFBAccess) (pScreen->myNum, FALSE);
+ 
+@@ -450,10 +450,10 @@ xf86RandR12CreateScreenResources (ScreenPtr pScreen)
+ 	    else
+ 	    {
+ 		/*
+-		 * Otherwise, just set the screen to 96dpi
++		 * Otherwise, just set the screen to DEFAULT_DPI
+ 		 */
+-		mmWidth = width * 25.4 / 96;
+-		mmHeight = height * 25.4 / 96;
++		mmWidth = width * 25.4 / DEFAULT_DPI;
++		mmHeight = height * 25.4 / DEFAULT_DPI;
+ 	    }
+ 	}
+ 	xf86DrvMsg(pScrn->scrnIndex, X_INFO,
+@@ -492,10 +492,9 @@ xf86RandR12Init (ScreenPtr pScreen)
+ 	return TRUE;
+ #endif
+     if (xf86RandR12Generation != serverGeneration)
+-    {
+-	xf86RandR12Index = AllocateScreenPrivateIndex();
+ 	xf86RandR12Generation = serverGeneration;
+-    }
++
++    xf86RandR12Index = AllocateScreenPrivateIndex();
+ 
+     randrp = xalloc (sizeof (XF86RandRInfoRec));
+     if (!randrp)
+@@ -636,7 +635,7 @@ xf86RandR12CrtcNotify (RRCrtcPtr	randr_crtc)
+     DisplayModePtr	mode = &crtc->mode;
+     Bool		ret;
+ 
+-    randr_outputs = ALLOCATE_LOCAL(config->num_output * sizeof (RROutputPtr));
++    randr_outputs = xalloc(config->num_output * sizeof (RROutputPtr));
+     if (!randr_outputs)
+ 	return FALSE;
+     x = crtc->x;
+@@ -671,7 +670,7 @@ xf86RandR12CrtcNotify (RRCrtcPtr	randr_crtc)
+     }
+     ret = RRCrtcNotify (randr_crtc, randr_mode, x, y,
+ 			rotation, numOutputs, randr_outputs);
+-    DEALLOCATE_LOCAL(randr_outputs);
++    xfree(randr_outputs);
+     return ret;
+ }
+ 
+@@ -683,11 +682,8 @@ xf86RandRModeConvert (ScrnInfoPtr	scrn,
+ 		      RRModePtr		randr_mode,
+ 		      DisplayModePtr	mode)
+ {
+-    mode->prev = NULL;
+-    mode->next = NULL;
+-    mode->name = NULL;
++    memset(mode, 0, sizeof(DisplayModeRec));
+     mode->status = MODE_OK;
+-    mode->type = 0;
+ 
+     mode->Clock = randr_mode->mode.dotClock / 1000;
+     
+@@ -726,7 +722,7 @@ xf86RandR12CrtcSet (ScreenPtr	pScreen,
+     xf86CrtcPtr		*save_crtcs;
+     Bool		save_enabled = crtc->enabled;
+ 
+-    save_crtcs = ALLOCATE_LOCAL(config->num_output * sizeof (xf86CrtcPtr));
++    save_crtcs = xalloc(config->num_output * sizeof (xf86CrtcPtr));
+     if ((randr_mode != NULL) != crtc->enabled)
+ 	changed = TRUE;
+     else if (randr_mode && !xf86RandRModeMatches (randr_mode, &crtc->mode))
+@@ -782,7 +778,7 @@ xf86RandR12CrtcSet (ScreenPtr	pScreen,
+ 		    xf86OutputPtr	output = config->output[o];
+ 		    output->crtc = save_crtcs[o];
+ 		}
+-		DEALLOCATE_LOCAL(save_crtcs);
++		xfree(save_crtcs);
+ 		return FALSE;
+ 	    }
+ 	    /*
+@@ -795,7 +791,7 @@ xf86RandR12CrtcSet (ScreenPtr	pScreen,
+ 	}
+ 	xf86DisableUnusedFunctions (pScrn);
+     }
+-    DEALLOCATE_LOCAL(save_crtcs);
++    xfree(save_crtcs);
+     return xf86RandR12CrtcNotify (randr_crtc);
+ }
+ 
+@@ -839,6 +835,22 @@ xf86RandR12OutputSetProperty (ScreenPtr pScreen,
+     return output->funcs->set_property(output, property, value);
+ }
+ 
++#if RANDR_13_INTERFACE
++static Bool
++xf86RandR13OutputGetProperty (ScreenPtr pScreen,
++			      RROutputPtr randr_output,
++			      Atom property)
++{
++    xf86OutputPtr output = randr_output->devPrivate;
++
++    if (output->funcs->get_property == NULL)
++	return TRUE;
++
++    /* Should be safe even w/o vtSema */
++    return output->funcs->get_property(output, property);
++}
++#endif
++
+ static Bool
+ xf86RandR12OutputValidateMode (ScreenPtr    pScreen,
+ 			       RROutputPtr  randr_output,
+@@ -938,8 +950,8 @@ xf86RandR12SetInfo12 (ScreenPtr pScreen)
+     RRCrtcPtr		randr_crtc;
+     int			nclone;
+     
+-    clones = ALLOCATE_LOCAL(config->num_output * sizeof (RROutputPtr));
+-    crtcs = ALLOCATE_LOCAL (config->num_crtc * sizeof (RRCrtcPtr));
++    clones = xalloc(config->num_output * sizeof (RROutputPtr));
++    crtcs = xalloc (config->num_crtc * sizeof (RRCrtcPtr));
+     for (o = 0; o < config->num_output; o++)
+     {
+ 	xf86OutputPtr	output = config->output[o];
+@@ -956,8 +968,8 @@ xf86RandR12SetInfo12 (ScreenPtr pScreen)
+ 
+ 	if (!RROutputSetCrtcs (output->randr_output, crtcs, ncrtc))
+ 	{
+-	    DEALLOCATE_LOCAL (crtcs);
+-	    DEALLOCATE_LOCAL (clones);
++	    xfree (crtcs);
++	    xfree (clones);
+ 	    return FALSE;
+ 	}
+ 
+@@ -993,13 +1005,13 @@ xf86RandR12SetInfo12 (ScreenPtr pScreen)
+ 	}
+ 	if (!RROutputSetClones (output->randr_output, clones, nclone))
+ 	{
+-	    DEALLOCATE_LOCAL (crtcs);
+-	    DEALLOCATE_LOCAL (clones);
++	    xfree (crtcs);
++	    xfree (clones);
+ 	    return FALSE;
+ 	}
+     }
+-    DEALLOCATE_LOCAL (crtcs);
+-    DEALLOCATE_LOCAL (clones);
++    xfree (crtcs);
++    xfree (clones);
+     return TRUE;
+ }
+ 
+@@ -1069,8 +1081,7 @@ xf86RandR12CreateScreenResources12 (ScreenPtr pScreen)
+     xf86CrtcConfigPtr   config = XF86_CRTC_CONFIG_PTR(pScrn);
+ 
+     for (c = 0; c < config->num_crtc; c++)
+-	xf86RandR12CrtcNotify (config->crtc[c]->randr_crtc);
+-    
++        xf86RandR12CrtcNotify (config->crtc[c]->randr_crtc);
+     
+     RRScreenSetSizeRange (pScreen, config->minWidth, config->minHeight,
+ 			  config->maxWidth, config->maxHeight);
+@@ -1087,11 +1098,11 @@ xf86RandR12TellChanged (ScreenPtr pScreen)
+ {
+     ScrnInfoPtr		pScrn = xf86Screens[pScreen->myNum];
+     xf86CrtcConfigPtr   config = XF86_CRTC_CONFIG_PTR(pScrn);
+-    XF86RandRInfoPtr	randrp = XF86RANDRINFO(pScreen);
+     int			c;
+ 
+-    if (!randrp)
++    if (!XF86RANDRINFO(pScreen))
+ 	return;
++
+     xf86RandR12SetInfo12 (pScreen);
+     for (c = 0; c < config->num_crtc; c++)
+ 	xf86RandR12CrtcNotify (config->crtc[c]->randr_crtc);
+@@ -1116,6 +1127,9 @@ xf86RandR12Init12 (ScreenPtr pScreen)
+     rp->rrCrtcSetGamma = xf86RandR12CrtcSetGamma;
+     rp->rrOutputSetProperty = xf86RandR12OutputSetProperty;
+     rp->rrOutputValidateMode = xf86RandR12OutputValidateMode;
++#if RANDR_13_INTERFACE
++    rp->rrOutputGetProperty = xf86RandR13OutputGetProperty;
++#endif
+     rp->rrModeDestroy = xf86RandR12ModeDestroy;
+     rp->rrSetConfig = NULL;
+     pScrn->PointerMoved = xf86RandR12PointerMoved;
+diff --git xorg-server-1.4.2/hw/xfree86/modes/xf86cvt.c xorg-server-1.4.2/hw/xfree86/modes/xf86cvt.c
+index 69ccc42..68a9462 100644
+--- xorg-server-1.4.2/hw/xfree86/modes/xf86cvt.c
++++ xorg-server-1.4.2/hw/xfree86/modes/xf86cvt.c
+@@ -72,7 +72,7 @@ _X_EXPORT DisplayModePtr
+ xf86CVTMode(int HDisplay, int VDisplay, float VRefresh, Bool Reduced,
+ 	    Bool Interlaced)
+ {
+-    DisplayModeRec  *Mode = xnfalloc(sizeof(DisplayModeRec));
++    DisplayModeRec  *Mode = xnfcalloc(1, sizeof(DisplayModeRec));
+ 
+     /* 1) top/bottom margin size (% of height) - default: 1.8 */
+ #define CVT_MARGIN_PERCENTAGE 1.8    
+@@ -95,8 +95,6 @@ xf86CVTMode(int HDisplay, int VDisplay, float VRefresh, Bool Reduced,
+     int  VDisplayRnd, VMargin, VSync;
+     float  Interlace; /* Please rename this */
+ 
+-    memset(Mode, 0, sizeof(DisplayModeRec));
+-
+     /* CVT default is 60.0Hz */
+     if (!VRefresh)
+         VRefresh = 60.0;
+diff --git xorg-server-1.4.2/hw/xfree86/modes/xf86gtf.c xorg-server-1.4.2/hw/xfree86/modes/xf86gtf.c
+new file mode 100644
+index 0000000..fed56bd
+--- /dev/null
++++ xorg-server-1.4.2/hw/xfree86/modes/xf86gtf.c
+@@ -0,0 +1,388 @@
++/*
++ * gtf.c  Generate mode timings using the GTF Timing Standard
++ *
++ * gcc gtf.c -o gtf -lm -Wall
++ *
++ * Copyright (c) 2001, Andy Ritger  aritger@nvidia.com
++ * All rights reserved.
++ * 
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 
++ * o Redistributions of source code must retain the above copyright
++ *   notice, this list of conditions and the following disclaimer.
++ * o Redistributions in binary form must reproduce the above copyright
++ *   notice, this list of conditions and the following disclaimer
++ *   in the documentation and/or other materials provided with the
++ *   distribution.
++ * o Neither the name of NVIDIA nor the names of its contributors
++ *   may be used to endorse or promote products derived from this
++ *   software without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT
++ * NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND
++ * FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
++ * THE REGENTS OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
++ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
++ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
++ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
++ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
++ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
++ * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
++ * POSSIBILITY OF SUCH DAMAGE.
++ *
++ * This program is based on the Generalized Timing Formula(GTF TM)
++ * Standard Version: 1.0, Revision: 1.0
++ *
++ * The GTF Document contains the following Copyright information:
++ *
++ * Copyright (c) 1994, 1995, 1996 - Video Electronics Standards
++ * Association. Duplication of this document within VESA member
++ * companies for review purposes is permitted. All other rights
++ * reserved.
++ *
++ * While every precaution has been taken in the preparation
++ * of this standard, the Video Electronics Standards Association and
++ * its contributors assume no responsibility for errors or omissions,
++ * and make no warranties, expressed or implied, of functionality
++ * of suitability for any purpose. The sample code contained within
++ * this standard may be used without restriction.
++ *
++ * 
++ *
++ * The GTF EXCEL(TM) SPREADSHEET, a sample (and the definitive)
++ * implementation of the GTF Timing Standard, is available at:
++ *
++ * ftp://ftp.vesa.org/pub/GTF/GTF_V1R1.xls
++ */
++
++/* Ruthlessly converted to server code by Adam Jackson <ajax@redhat.com> */
++
++#ifdef HAVE_XORG_CONFIG_H
++# include <xorg-config.h>
++#else
++#ifdef HAVE_CONFIG_H
++#include <config.h>
++#endif
++#endif
++
++#include "xf86.h"
++#include "xf86Modes.h"
++#include <string.h>
++
++#define MARGIN_PERCENT    1.8   /* % of active vertical image                */
++#define CELL_GRAN         8.0   /* assumed character cell granularity        */
++#define MIN_PORCH         1     /* minimum front porch                       */
++#define V_SYNC_RQD        3     /* width of vsync in lines                   */
++#define H_SYNC_PERCENT    8.0   /* width of hsync as % of total line         */
++#define MIN_VSYNC_PLUS_BP 550.0 /* min time of vsync + back porch (microsec) */
++#define M                 600.0 /* blanking formula gradient                 */
++#define C                 40.0  /* blanking formula offset                   */
++#define K                 128.0 /* blanking formula scaling factor           */
++#define J                 20.0  /* blanking formula scaling factor           */
++
++/* C' and M' are part of the Blanking Duty Cycle computation */
++
++#define C_PRIME           (((C - J) * K/256.0) + J)
++#define M_PRIME           (K/256.0 * M)
++
++
++/*
++ * xf86GTFMode() - as defined by the GTF Timing Standard, compute the
++ * Stage 1 Parameters using the vertical refresh frequency.  In other
++ * words: input a desired resolution and desired refresh rate, and
++ * output the GTF mode timings.
++ *
++ * XXX All the code is in place to compute interlaced modes, but I don't
++ * feel like testing it right now.
++ *
++ * XXX margin computations are implemented but not tested (nor used by
++ * XServer of fbset mode descriptions, from what I can tell).
++ */
++
++_X_EXPORT DisplayModePtr
++xf86GTFMode(int h_pixels, int v_lines, float freq, int interlaced, int margins)
++{
++    DisplayModeRec *mode = xnfcalloc(1, sizeof(DisplayModeRec));
++
++    float h_pixels_rnd;
++    float v_lines_rnd;
++    float v_field_rate_rqd;
++    float top_margin;
++    float bottom_margin;
++    float interlace;
++    float h_period_est;
++    float vsync_plus_bp;
++    float v_back_porch;
++    float total_v_lines;
++    float v_field_rate_est;
++    float h_period;
++    float v_field_rate;
++    float v_frame_rate;
++    float left_margin;
++    float right_margin;
++    float total_active_pixels;
++    float ideal_duty_cycle;
++    float h_blank;
++    float total_pixels;
++    float pixel_freq;
++    float h_freq;
++
++    float h_sync;
++    float h_front_porch;
++    float v_odd_front_porch_lines;
++
++    /*  1. In order to give correct results, the number of horizontal
++     *  pixels requested is first processed to ensure that it is divisible
++     *  by the character size, by rounding it to the nearest character
++     *  cell boundary:
++     *
++     *  [H PIXELS RND] = ((ROUND([H PIXELS]/[CELL GRAN RND],0))*[CELLGRAN RND])
++     */
++    
++    h_pixels_rnd = rint((float) h_pixels / CELL_GRAN) * CELL_GRAN;
++    
++    /*  2. If interlace is requested, the number of vertical lines assumed
++     *  by the calculation must be halved, as the computation calculates
++     *  the number of vertical lines per field. In either case, the
++     *  number of lines is rounded to the nearest integer.
++     *   
++     *  [V LINES RND] = IF([INT RQD?]="y", ROUND([V LINES]/2,0),
++     *                                     ROUND([V LINES],0))
++     */
++
++    v_lines_rnd = interlaced ?
++            rint((float) v_lines) / 2.0 :
++            rint((float) v_lines);
++    
++    /*  3. Find the frame rate required:
++     *
++     *  [V FIELD RATE RQD] = IF([INT RQD?]="y", [I/P FREQ RQD]*2,
++     *                                          [I/P FREQ RQD])
++     */
++
++    v_field_rate_rqd = interlaced ? (freq * 2.0) : (freq);
++
++    /*  4. Find number of lines in Top margin:
++     *
++     *  [TOP MARGIN (LINES)] = IF([MARGINS RQD?]="Y",
++     *          ROUND(([MARGIN%]/100*[V LINES RND]),0),
++     *          0)
++     */
++
++    top_margin = margins ? rint(MARGIN_PERCENT / 100.0 * v_lines_rnd) : (0.0);
++
++    /*  5. Find number of lines in Bottom margin:
++     *
++     *  [BOT MARGIN (LINES)] = IF([MARGINS RQD?]="Y",
++     *          ROUND(([MARGIN%]/100*[V LINES RND]),0),
++     *          0)
++     */
++
++    bottom_margin = margins ? rint(MARGIN_PERCENT/100.0 * v_lines_rnd) : (0.0);
++
++    /*  6. If interlace is required, then set variable [INTERLACE]=0.5:
++     *   
++     *  [INTERLACE]=(IF([INT RQD?]="y",0.5,0))
++     */
++
++    interlace = interlaced ? 0.5 : 0.0;
++
++    /*  7. Estimate the Horizontal period
++     *
++     *  [H PERIOD EST] = ((1/[V FIELD RATE RQD]) - [MIN VSYNC+BP]/1000000) /
++     *                    ([V LINES RND] + (2*[TOP MARGIN (LINES)]) +
++     *                     [MIN PORCH RND]+[INTERLACE]) * 1000000
++     */
++
++    h_period_est = (((1.0/v_field_rate_rqd) - (MIN_VSYNC_PLUS_BP/1000000.0))
++                    / (v_lines_rnd + (2*top_margin) + MIN_PORCH + interlace)
++                    * 1000000.0);
++
++    /*  8. Find the number of lines in V sync + back porch:
++     *
++     *  [V SYNC+BP] = ROUND(([MIN VSYNC+BP]/[H PERIOD EST]),0)
++     */
++
++    vsync_plus_bp = rint(MIN_VSYNC_PLUS_BP/h_period_est);
++
++    /*  9. Find the number of lines in V back porch alone:
++     *
++     *  [V BACK PORCH] = [V SYNC+BP] - [V SYNC RND]
++     *
++     *  XXX is "[V SYNC RND]" a typo? should be [V SYNC RQD]?
++     */
++    
++    v_back_porch = vsync_plus_bp - V_SYNC_RQD;
++    
++    /*  10. Find the total number of lines in Vertical field period:
++     *
++     *  [TOTAL V LINES] = [V LINES RND] + [TOP MARGIN (LINES)] +
++     *                    [BOT MARGIN (LINES)] + [V SYNC+BP] + [INTERLACE] +
++     *                    [MIN PORCH RND]
++     */
++
++    total_v_lines = v_lines_rnd + top_margin + bottom_margin + vsync_plus_bp +
++        interlace + MIN_PORCH;
++    
++    /*  11. Estimate the Vertical field frequency:
++     *
++     *  [V FIELD RATE EST] = 1 / [H PERIOD EST] / [TOTAL V LINES] * 1000000
++     */
++
++    v_field_rate_est = 1.0 / h_period_est / total_v_lines * 1000000.0;
++    
++    /*  12. Find the actual horizontal period:
++     *
++     *  [H PERIOD] = [H PERIOD EST] / ([V FIELD RATE RQD] / [V FIELD RATE EST])
++     */
++
++    h_period = h_period_est / (v_field_rate_rqd / v_field_rate_est);
++    
++    /*  13. Find the actual Vertical field frequency:
++     *
++     *  [V FIELD RATE] = 1 / [H PERIOD] / [TOTAL V LINES] * 1000000
++     */
++
++    v_field_rate = 1.0 / h_period / total_v_lines * 1000000.0;
++
++    /*  14. Find the Vertical frame frequency:
++     *
++     *  [V FRAME RATE] = (IF([INT RQD?]="y", [V FIELD RATE]/2, [V FIELD RATE]))
++     */
++
++    v_frame_rate = interlaced ? v_field_rate / 2.0 : v_field_rate;
++
++    /*  15. Find number of pixels in left margin:
++     *
++     *  [LEFT MARGIN (PIXELS)] = (IF( [MARGINS RQD?]="Y",
++     *          (ROUND( ([H PIXELS RND] * [MARGIN%] / 100 /
++     *                   [CELL GRAN RND]),0)) * [CELL GRAN RND],
++     *          0))
++     */
++
++    left_margin = margins ?
++        rint(h_pixels_rnd * MARGIN_PERCENT / 100.0 / CELL_GRAN) * CELL_GRAN :
++        0.0;
++    
++    /*  16. Find number of pixels in right margin:
++     *
++     *  [RIGHT MARGIN (PIXELS)] = (IF( [MARGINS RQD?]="Y",
++     *          (ROUND( ([H PIXELS RND] * [MARGIN%] / 100 /
++     *                   [CELL GRAN RND]),0)) * [CELL GRAN RND],
++     *          0))
++     */
++    
++    right_margin = margins ?
++        rint(h_pixels_rnd * MARGIN_PERCENT / 100.0 / CELL_GRAN) * CELL_GRAN :
++        0.0;
++    
++    /*  17. Find total number of active pixels in image and left and right
++     *  margins:
++     *
++     *  [TOTAL ACTIVE PIXELS] = [H PIXELS RND] + [LEFT MARGIN (PIXELS)] +
++     *                          [RIGHT MARGIN (PIXELS)]
++     */
++
++    total_active_pixels = h_pixels_rnd + left_margin + right_margin;
++    
++    /*  18. Find the ideal blanking duty cycle from the blanking duty cycle
++     *  equation:
++     *
++     *  [IDEAL DUTY CYCLE] = [C'] - ([M']*[H PERIOD]/1000)
++     */
++
++    ideal_duty_cycle = C_PRIME - (M_PRIME * h_period / 1000.0);
++    
++    /*  19. Find the number of pixels in the blanking time to the nearest
++     *  double character cell:
++     *
++     *  [H BLANK (PIXELS)] = (ROUND(([TOTAL ACTIVE PIXELS] *
++     *                               [IDEAL DUTY CYCLE] /
++     *                               (100-[IDEAL DUTY CYCLE]) /
++     *                               (2*[CELL GRAN RND])), 0))
++     *                       * (2*[CELL GRAN RND])
++     */
++
++    h_blank = rint(total_active_pixels *
++                   ideal_duty_cycle /
++                   (100.0 - ideal_duty_cycle) /
++                   (2.0 * CELL_GRAN)) * (2.0 * CELL_GRAN);
++    
++    /*  20. Find total number of pixels:
++     *
++     *  [TOTAL PIXELS] = [TOTAL ACTIVE PIXELS] + [H BLANK (PIXELS)]
++     */
++
++    total_pixels = total_active_pixels + h_blank;
++    
++    /*  21. Find pixel clock frequency:
++     *
++     *  [PIXEL FREQ] = [TOTAL PIXELS] / [H PERIOD]
++     */
++    
++    pixel_freq = total_pixels / h_period;
++    
++    /*  22. Find horizontal frequency:
++     *
++     *  [H FREQ] = 1000 / [H PERIOD]
++     */
++
++    h_freq = 1000.0 / h_period;
++    
++
++    /* Stage 1 computations are now complete; I should really pass
++       the results to another function and do the Stage 2
++       computations, but I only need a few more values so I'll just
++       append the computations here for now */
++    
++
++    /*  17. Find the number of pixels in the horizontal sync period:
++     *
++     *  [H SYNC (PIXELS)] =(ROUND(([H SYNC%] / 100 * [TOTAL PIXELS] /
++     *                             [CELL GRAN RND]),0))*[CELL GRAN RND]
++     */
++
++    h_sync = rint(H_SYNC_PERCENT/100.0 * total_pixels / CELL_GRAN) * CELL_GRAN;
++
++    /*  18. Find the number of pixels in the horizontal front porch period:
++     *
++     *  [H FRONT PORCH (PIXELS)] = ([H BLANK (PIXELS)]/2)-[H SYNC (PIXELS)]
++     */
++
++    h_front_porch = (h_blank / 2.0) - h_sync;
++
++    /*  36. Find the number of lines in the odd front porch period:
++     *
++     *  [V ODD FRONT PORCH(LINES)]=([MIN PORCH RND]+[INTERLACE])
++     */
++    
++    v_odd_front_porch_lines = MIN_PORCH + interlace;
++    
++    /* finally, pack the results in the mode struct */
++
++    mode->HDisplay	= (int) (h_pixels_rnd);
++    mode->HSyncStart	= (int) (h_pixels_rnd + h_front_porch);
++    mode->HSyncEnd	= (int) (h_pixels_rnd + h_front_porch + h_sync);
++    mode->HTotal	= (int) (total_pixels);
++    mode->VDisplay	= (int) (v_lines_rnd);
++    mode->VSyncStart	= (int) (v_lines_rnd + v_odd_front_porch_lines);
++    mode->VSyncEnd	= (int) (v_lines_rnd + v_odd_front_porch_lines + V_SYNC_RQD);
++    mode->VTotal	= (int) (total_v_lines);
++
++    mode->Clock	    = (int) (pixel_freq * 1000.0);
++    mode->HSync	    = h_freq;
++    mode->VRefresh  = freq;
++
++    xf86SetModeDefaultName(mode);
++
++    mode->Flags = V_NHSYNC | V_PVSYNC;
++    if (interlaced) {
++	mode->VTotal *= 2;
++	mode->Flags |= V_INTERLACE;
++    }
++
++    return mode;
++}
+
+commit b9775e33da17ce3a5a05d0a74828233ff7533082
+Author: Adam Jackson <ajax@redhat.com>
+Date:   Mon Jul 21 15:10:20 2008 -0400
+
+    EDID: Add quirk to clamp max pixel clock to single DVI link speed.
+    
+    On some panels you end up with all of:
+    - No range descriptor
+    - No description of physical connectivity
+    - Native panel size mode in standard timings list
+    
+    In principle you're supposed to use the timings for that mode from the DMT
+    spec, but in practice the DMT spec has timings for both 1920x1200 normal
+    and 1920x1200RB, and the standard timing field gives you no way to
+    distinguish.  And, of course, the non-RB timings don't fit in a single
+    DVI link.
+
+diff --git xorg-server-1.4.2/hw/xfree86/modes/xf86EdidModes.c xorg-server-1.4.2/hw/xfree86/modes/xf86EdidModes.c
+index df3fd6f..6b71df6 100644
+--- xorg-server-1.4.2/hw/xfree86/modes/xf86EdidModes.c
++++ xorg-server-1.4.2/hw/xfree86/modes/xf86EdidModes.c
+@@ -68,6 +68,8 @@ typedef enum {
+     DDC_QUIRK_FIRST_DETAILED_PREFERRED = 1 << 6,
+     /* use +hsync +vsync for detailed mode */
+     DDC_QUIRK_DETAILED_SYNC_PP = 1 << 7,
++    /* Force single-link DVI bandwidth limit */
++    DDC_QUIRK_DVI_SINGLE_LINK = 1 << 8,
+ } ddc_quirk_t;
+ 
+ static Bool quirk_prefer_large_60 (int scrnIndex, xf86MonPtr DDC)
+@@ -181,6 +183,16 @@ static Bool quirk_detailed_sync_pp(int scrnIndex, xf86MonPtr DDC)
+     return FALSE;
+ }
+ 
++/* This should probably be made more generic */
++static Bool quirk_dvi_single_link(int scrnIndex, xf86MonPtr DDC)
++{
++    /* Red Hat bug #453106: Apple 23" Cinema Display */
++    if (memcmp (DDC->vendor.name, "APL", 4) == 0 &&
++	DDC->vendor.prod_id == 0x921c)
++	return TRUE;
++    return FALSE;
++}
++
+ typedef struct {
+     Bool	(*detect) (int scrnIndex, xf86MonPtr DDC);
+     ddc_quirk_t	quirk;
+@@ -220,6 +232,10 @@ static const ddc_quirk_map_t ddc_quirks[] = {
+ 	quirk_detailed_sync_pp, DDC_QUIRK_DETAILED_SYNC_PP,
+ 	"Use +hsync +vsync for detailed timing."
+     },
++    {
++	quirk_dvi_single_link, DDC_QUIRK_DVI_SINGLE_LINK,
++	"Forcing maximum pixel clock to single DVI link."
++    },
+     { 
+ 	NULL,		DDC_QUIRK_NONE,
+ 	"No known quirks"
+@@ -669,12 +685,15 @@ xf86DDCMonitorSet(int scrnIndex, MonPtr Monitor, xf86MonPtr DDC)
+     DisplayModePtr Modes = NULL, Mode;
+     int i, clock;
+     Bool have_hsync = FALSE, have_vrefresh = FALSE, have_maxpixclock = FALSE;
++    ddc_quirk_t quirks;
+ 
+     if (!Monitor || !DDC)
+         return;
+ 
+     Monitor->DDC = DDC;
+ 
++    quirks = xf86DDCDetectQuirks(scrnIndex, DDC, FALSE);
++
+     if (Monitor->widthmm <= 0 && Monitor->heightmm <= 0) {
+ 	Monitor->widthmm = 10 * DDC->features.hsize;
+ 	Monitor->heightmm = 10 * DDC->features.vsize;
+@@ -727,6 +746,8 @@ xf86DDCMonitorSet(int scrnIndex, MonPtr Monitor, xf86MonPtr DDC)
+ 	    }
+ 
+ 	    clock = DDC->det_mon[i].section.ranges.max_clock * 1000;
++	    if (quirks & DDC_QUIRK_DVI_SINGLE_LINK)
++		clock = min(clock, 165000);
+ 	    if (!have_maxpixclock && clock > Monitor->maxPixClock)
+ 		Monitor->maxPixClock = clock;
+ 
+
+commit 79902452522c233d288affbbdc8a19ecd12e236f
+Author: Tormod Volden <debian.tormod@gmail.com>
+Date:   Wed Apr 1 19:32:21 2009 +0200
+
+    xfree86: edid quirk for Philips LCD LP154W01-TLAJ
+    
+    This panel reports its vertical size in cm.
+    
+    X.Org bug#21000 <http://bugs.freedesktop.org/show_bug.cgi?id=21000>
+    
+    Signed-off-by: Tormod Volden <debian.tormod@gmail.com>
+    Signed-off-by: Julien Cristau <jcristau@debian.org>
+
+diff --git xorg-server-1.4.2/hw/xfree86/modes/xf86EdidModes.c xorg-server-1.4.2/hw/xfree86/modes/xf86EdidModes.c
+index 6b71df6..eea51ec 100644
+--- xorg-server-1.4.2/hw/xfree86/modes/xf86EdidModes.c
++++ xorg-server-1.4.2/hw/xfree86/modes/xf86EdidModes.c
+@@ -131,6 +131,11 @@ static Bool quirk_detailed_v_in_cm (int scrnIndex, xf86MonPtr DDC)
+ 	DDC->vendor.prod_id == 13600)
+ 	return TRUE;
+ 
++    /* Bug #21000: LGPhilipsLCD LP154W01-TLAJ */
++    if (memcmp (DDC->vendor.name, "LPL", 4) == 0 &&
++	DDC->vendor.prod_id == 47360)
++	return TRUE;
++
+     return FALSE;
+ }
+ 
+
+commit 7e05d69b8e1bc9546125ef624c7016fd7e21abc2
+Author: Julien Cristau <jcristau@debian.org>
+Date:   Wed Apr 22 20:01:49 2009 +0200
+
+    Bug#21324: Add quirk for Iiyama Vision Master 450
+    
+    Reported-by: Jeremy Henty <onepoint@starurchin.org>
+    Signed-off-by: Julien Cristau <jcristau@debian.org>
+
+diff --git xorg-server-1.4.2/hw/xfree86/modes/xf86EdidModes.c xorg-server-1.4.2/hw/xfree86/modes/xf86EdidModes.c
+index eea51ec..e8aad2b 100644
+--- xorg-server-1.4.2/hw/xfree86/modes/xf86EdidModes.c
++++ xorg-server-1.4.2/hw/xfree86/modes/xf86EdidModes.c
+@@ -146,6 +146,11 @@ static Bool quirk_detailed_use_maximum_size (int scrnIndex, xf86MonPtr DDC)
+ 	(DDC->vendor.prod_id == 0 || DDC->vendor.prod_id == 0x2a00))
+ 	return TRUE;
+ 
++    /* Bug #21324: Iiyama Vision Master 450 */
++    if (memcmp (DDC->vendor.name, "IVM", 4) == 0 &&
++	DDC->vendor.prod_id == 6400)
++	return TRUE;
++
+     return FALSE;
+ }
+ 
+
+commit d7be6443241e60dc07d79bba1e1ecf8c4b7818b0
+Author: Julien Cristau <jcristau@debian.org>
+Date:   Fri May 15 17:29:32 2009 +0200
+
+    xfree86: add edid quirk for Samsung Syncmaster 2333HD
+    
+    It reports vertical size in cm in the detailed mode.
+    X.Org bug#21750 <http://bugs.freedesktop.org/show_bug.cgi?id=21750>
+    
+    Reported-by: Peter Poklop <Peter.Poklop@gmx.at>
+    Signed-off-by: Julien Cristau <jcristau@debian.org>
+
+diff --git xorg-server-1.4.2/hw/xfree86/modes/xf86EdidModes.c xorg-server-1.4.2/hw/xfree86/modes/xf86EdidModes.c
+index e8aad2b..6e2604f 100644
+--- xorg-server-1.4.2/hw/xfree86/modes/xf86EdidModes.c
++++ xorg-server-1.4.2/hw/xfree86/modes/xf86EdidModes.c
+@@ -136,6 +136,11 @@ static Bool quirk_detailed_v_in_cm (int scrnIndex, xf86MonPtr DDC)
+ 	DDC->vendor.prod_id == 47360)
+ 	return TRUE;
+ 
++    /* Bug #21750: Samsung Syncmaster 2333HD */
++    if (memcmp (DDC->vendor.name, "SAM", 4) == 0 &&
++	DDC->vendor.prod_id == 1157)
++	return TRUE;
++
+     return FALSE;
+ }
+ 
+
+commit ac6cdede5910ad99a397e0958419197d23ca1c4a
+Author: Fatih Aşıcı <fatih@pardus.org.tr>
+Date:   Sun Jun 21 00:46:29 2009 +0300
+
+    Add quirk for Apple LCD
+
+diff --git xorg-server-1.4.2/hw/xfree86/modes/xf86EdidModes.c xorg-server-1.4.2/hw/xfree86/modes/xf86EdidModes.c
+index 6e2604f..ba20ffb 100644
+--- xorg-server-1.4.2/hw/xfree86/modes/xf86EdidModes.c
++++ xorg-server-1.4.2/hw/xfree86/modes/xf86EdidModes.c
+@@ -156,6 +156,10 @@ static Bool quirk_detailed_use_maximum_size (int scrnIndex, xf86MonPtr DDC)
+ 	DDC->vendor.prod_id == 6400)
+ 	return TRUE;
+ 
++    if (memcmp (DDC->vendor.name, "APP", 4) == 0 &&
++	DDC->vendor.prod_id == 40069)
++	return TRUE;
++
+     return FALSE;
+ }
+ 

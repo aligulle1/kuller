@@ -1,0 +1,105 @@
+--- contacts/googledataresource.cpp.orig
++++ contacts/googledataresource.cpp
+@@ -204,9 +204,9 @@
+ 	if (!authenticated)
+ 		configure(0);
+ 	if (!authenticated) {
+-		ResourceBase::cancelTask(QString("Failed retrieving contacts!"));
++		ResourceBase::cancelTask(i18n("Failed retrieving contacts!"));
+ 		ResourceBase::doSetOnline(false);
+-		emit error(QString("retrieveItems: not authenticated!"));
++		emit error(i18n("retrieveItems: not authenticated!"));
+ 		return;
+ 	}
+ 
+@@ -222,7 +222,7 @@
+ 	/* Downloading the contacts can be slow and it is blocking.
+ 	 */
+ 	if ((result = gcal_get_contacts(gcal, &all_contacts))) {
+-		ResourceBase::cancelTask(QString("Failed contacts retrieving!"));
++		ResourceBase::cancelTask(i18n("Failed contacts retrieving!"));
+ 		ResourceBase::doSetOnline(false);
+ 		return;
+         }
+@@ -1140,7 +1140,7 @@
+ 					      "Failed adding new contact.");
+ 		emit error(message);
+ 		emit status(Broken, message);
+-		ResourceBase::cancelTask(QString("Failed adding contact!"));
++		ResourceBase::cancelTask(i18n("Failed adding contact!"));
+ 		ResourceBase::doSetOnline(false);
+ 		return;
+ 	}
+--- calendar/gcalresource.cpp.orig
++++ calendar/gcalresource.cpp
+@@ -60,6 +60,7 @@
+ 		QLatin1String( "/Settings" ), Settings::self(),
+ 		QDBusConnection::ExportAdaptors );
+ 
++	changeRecorder()->fetchCollection( true );
+ 	changeRecorder()->itemFetchScope().fetchFullPayload();
+ 
+ 	if (!(gcal = gcal_new(GCALENDAR)))
+@@ -202,12 +203,16 @@
+ 		temp = gcal_event_get_end(event);
+ 		end = end.fromString(temp, KDateTime::ISODate);
+ 		kevent->setDtStart(start);
++		
++		if (end.isDateOnly()) {
++			// KCal::Event::dtEnd() is inclusive, not exclusive.
++			// ( When serializing back to ICal, +1 is added internaly, to respect ical rfc )
++			end = end.addDays(-1);
++		}
+ 		kevent->setDtEnd(end);
+-
++		
+ 		qDebug() << "start: " << start.dateTime()
+ 			 << "\tend: " << end.dateTime();
+-
+-
+ 		/* remoteID: edit_url */
+ 		KUrl urlEtag(gcal_event_get_url(event));
+ 		item.setRemoteId(urlEtag.url());
+@@ -378,8 +383,15 @@
+ 			temp = gcal_event_get_end(event);
+ 			end = end.fromString(temp, KDateTime::ISODate);
+ 			kevent->setDtStart(start);
+-			kevent->setDtEnd(end);
++			
++			if (end.isDateOnly()) {
++				// KCal::Event::dtEnd() is inclusive, not exclusive.
++				// ( When serializing back to ICal, +1 is added internaly, to respect ical rfc )			  
++				end = end.addDays(-1);
++			}
+ 
++			kevent->setDtEnd(end);
++			
+ 			url = gcal_event_get_url(event);
+ 			item.setRemoteId(url.url());
+ 			item.setPayload(IncidencePtr(kevent));
+@@ -526,6 +538,12 @@
+ 	gcal_event_set_start(event, t_byte.data());
+ 
+ 	time = kevent->dtEnd();
++	
++	if (time.isDateOnly()) {
++		// KCal::Event::dtEnd() is inclusive, not exclusive.
++		time = time.addDays(1);
++	}
++	
+ 	temp = time.toString(KDateTime::ISODate);
+ 	t_byte = temp.toUtf8();
+ 	gcal_event_set_end(event, t_byte.data());
+@@ -626,6 +644,12 @@
+ 	gcal_event_set_start(event, t_byte.data());
+ 
+ 	time = kevent->dtEnd();
++
++	if (time.isDateOnly()) {
++		// KCal::Event::dtEnd() is inclusive, not exclusive.
++		time = time.addDays(1);
++	}
++
+ 	temp = time.toString(KDateTime::ISODate);
+ 	t_byte = temp.toUtf8();
+ 	gcal_event_set_end(event, t_byte.data());

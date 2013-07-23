@@ -1,0 +1,43 @@
+diff -ur xorg-server-7.1.orig/Mesa-7.0.1/configs/linux-dri xorg-server-7.1/Mesa-6.5.2/configs/linux-dri
+--- xorg-server-7.1.orig/Mesa-7.0.1/configs/linux-dri	2006-08-17 17:09:02.000000000 +0300
++++ xorg-server-7.1/Mesa-7.0.1/configs/linux-dri	2006-09-20 15:10:37.000000000 +0300
+@@ -24,7 +24,7 @@
+ 	-DPTHREADS -DUSE_EXTERNAL_DXTN_LIB=1 -DIN_DRI_DRIVER \
+ 	-DGLX_DIRECT_RENDERING -DHAVE_ALIAS -DHAVE_POSIX_MEMALIGN
+ 
+-X11_INCLUDES = -I/usr/X11R6/include
++X11_INCLUDES = -I/usr/include
+ 
+ CFLAGS = -Wall -Wmissing-prototypes -std=c99 -ffast-math \
+ 	$(OPT_FLAGS) $(PIC_FLAGS) $(ARCH_FLAGS) $(DEFINES) $(ASM_FLAGS)
+@@ -35,7 +35,7 @@
+ ASM_SOURCES = 
+ 
+ # Library/program dependencies
+-EXTRA_LIB_PATH=-L/usr/X11R6/lib
++EXTRA_LIB_PATH=-L/usr/lib
+ 
+ LIBDRM_CFLAGS = `pkg-config --cflags libdrm`
+ LIBDRM_LIB = `pkg-config --libs libdrm`
+diff -ur xorg-server-7.1.orig/Mesa-7.0.1/configs/linux-dri-x86 xorg-server-7.1/Mesa-6.5.2/configs/linux-dri-x86
+--- xorg-server-7.1.orig/Mesa-7.0.1/configs/linux-dri-x86	2005-09-12 18:03:11.000000000 +0300
++++ xorg-server-7.1/Mesa-7.0.1/configs/linux-dri-x86	2006-09-20 15:16:42.000000000 +0300
+@@ -6,12 +6,16 @@
+ CONFIG_NAME = linux-dri-x86
+ 
+ # Unnecessary on x86, generally.
+-PIC_FLAGS = 
++PIC_FLAGS = -fPIC
+ 
+ # Add -m32 to CFLAGS:
+ ARCH_FLAGS = -m32
+ 
+-ASM_FLAGS = -DUSE_X86_ASM -DUSE_MMX_ASM -DUSE_3DNOW_ASM -DUSE_SSE_ASM
++ASM_FLAGS = -DUSE_X86_ASM -DUSE_MMX_ASM -DUSE_3DNOW_ASM -DUSE_SSE_ASM -DGLX_USE_TLS
+ ASM_SOURCES = $(X86_SOURCES)
+ ASM_API = $(X86_API)
+ 
++LIB_DIR=/lib
++DRI_DRIVER_SEARCH_DIR=/usr/lib/xorg/modules/dri
++
++

@@ -1,0 +1,62 @@
+--- DEFAULTS/Defaults.linux	2007-05-08 17:56:55.000000000 +0300
++++ DEFAULTS/Defaults.linux	2007-06-26 08:02:21.000000000 +0300
+@@ -33,22 +33,22 @@
+ # LINUX_SRC_INCLUDE is used in RULES/*-linux-*cc*.rul
+ #
+ ###########################################################################
+-LINUX_INCL_PATH=	/usr/src/linux/include
++LINUX_INCL_PATH=
+ 
+ _LINUX_SRC_INCLUDE=	$(_UNIQ)$(MAY_LINUX_SRC_INCLUDE)
+ __LINUX_SRC_INCLUDE=	$(_LINUX_SRC_INCLUDE:$(_UNIQ)=$(LINUX_INCL_PATH))
+ LINUX_SRC_INCLUDE=      $(__LINUX_SRC_INCLUDE:$(_UNIQ)no%=%)
+ 
+ DEFINCDIRS=	$(SRCROOT)/include
+-LDPATH=		-L/opt/schily/lib
+-RUNPATH=	-R$(INS_BASE)/lib -R/opt/schily/lib -R$(OLIBSDIR)
++LDPATH=		-L/usr/lib
++RUNPATH=	-R$(INS_BASE)/lib -R/usr/lib -R$(OLIBSDIR)
+ 
+ ###########################################################################
+ #
+ # Installation config stuff
+ #
+ ###########################################################################
+-INS_BASE=	/opt/schily
++INS_BASE=	/usr
+ INS_KBASE=	/
+ #
+ DEFUMASK=	002
+--- librscg/scsi-remote.c	2007-06-26 07:57:56.000000000 +0300
++++ librscg/scsi-remote.c	2007-06-26 08:03:30.000000000 +0300
+@@ -572,7 +572,7 @@
+ 	rscsipeer = host;
+ 
+ 	if ((rscsi = getenv("RSCSI")) == NULL)
+-		rscsi = "/opt/schily/sbin/rscsi";
++		rscsi = "/usr/sbin/rscsi";
+ 	rsh = getenv("RSH");
+ 
+ #ifdef	USE_RCMD_RSH
+--- libfind/find.c	2007-04-04 16:08:48.000000000 +0300
++++ libfind/find.c	2007-06-26 08:06:13.000000000 +0300
+@@ -2336,7 +2336,7 @@
+ 
+ #ifdef	USE_NLS
+ 	setlocale(LC_ALL, "");
+-	bindtextdomain("SCHILY_FIND", "/opt/schily/lib/locale");
++	bindtextdomain("SCHILY_FIND", "/usr/lib/locale");
+ 	textdomain("SCHILY_FIND");
+ #endif
+ 	find_argsinit(&fa);
+--- libfind/find_main.c	2007-04-04 16:08:48.000000000 +0300
++++ libfind/find_main.c	2007-06-26 08:07:24.000000000 +0300
+@@ -144,7 +144,7 @@
+ 
+ #ifdef	USE_NLS
+ 	setlocale(LC_ALL, "");
+-	bindtextdomain("SCHILY_FIND", "/opt/schily/lib/locale");
++	bindtextdomain("SCHILY_FIND", "/usr/lib/locale");
+ 	textdomain("SCHILY_FIND");
+ #endif
+ 	find_argsinit(&fa);

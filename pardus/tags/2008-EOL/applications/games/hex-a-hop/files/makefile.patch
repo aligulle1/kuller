@@ -1,0 +1,24 @@
+diff -Nur hex-a-hop-old/Makefile hex-a-hop/Makefile
+--- hex-a-hop-old/Makefile	2007-06-19 16:50:26.054073101 +0300
++++ hex-a-hop/Makefile	2007-06-19 16:51:22.319519451 +0300
+@@ -6,17 +6,17 @@
+ GCC =g++
+ CXXSOURCES	= gfx.cpp hex_puzzzle.cpp
+ #INCLUDES	= 
+-
++DATADIR = "/usr/share/hex-a-hop/"
+ 
+ #############################################################
+ 
+ OBJS=$(CXXSOURCES:.cpp=.o)
+ 
+ %.o	: %.cpp
+-	$(GCC) $(CXXFLAGS)  `sdl-config --cflags`  -c -o $@ $<
++	$(GCC) $(CXXFLAGS) -DDATADIR=\"$(DATADIR)\" `sdl-config --cflags`  -c -o $@ $<
+ 	
+ $(NAME) : $(OBJS)
+-		$(GCC) $(CXXFLAGS) $(OBJS)  `sdl-config --libs` -lm  \
++		$(GCC) $(CXXFLAGS) -DDATADIR=\"$(DATADIR)\" $(OBJS)  `sdl-config --libs` -lm  \
+ 		-o $(NAME)
+ 
+ clean :

@@ -1,0 +1,62 @@
+Index: gcompris-9.0/src/boards/Makefile.am
+===================================================================
+--- gcompris-9.0.orig/src/boards/Makefile.am
++++ gcompris-9.0/src/boards/Makefile.am
+@@ -47,12 +47,12 @@ INCLUDES = \
+ 	$(dll_export)
+ 
+ libmenu_la_LDFLAGS = $(shared) $(no_undefined) -module -avoid-version $(gc_libs)
+-libmenu_la_LIBADD =
++libmenu_la_LIBADD = $(GCOMPRIS_LIBS)
+ libmenu_la_SOURCES = menu2.c
+ 
+ libpython_la_LDFLAGS = -export-dynamic $(shared) $(no_undefined) -module -avoid-version $(gc_libs) $(PYTHON_LIBS)
+ 
+-libpython_la_LIBADD =
++libpython_la_LIBADD = $(GCOMPRIS_LIBS)
+ libpython_la_CFLAGS = -fno-strict-aliasing $(PYGTK_CFLAGS) \
+ 	 -DPYGOOCANVAS_MAJOR_VERSION=0 \
+ 	 -DPYGOOCANVAS_MINOR_VERSION=0 \
+Index: gcompris-9.0/src/boards/Makefile.in
+===================================================================
+--- gcompris-9.0.orig/src/boards/Makefile.in
++++ gcompris-9.0/src/boards/Makefile.in
+@@ -396,10 +396,10 @@ INCLUDES = \
+ 	$(dll_export)
+ 
+ libmenu_la_LDFLAGS = $(shared) $(no_undefined) -module -avoid-version $(gc_libs)
+-libmenu_la_LIBADD = 
++libmenu_la_LIBADD = $(GCOMPRIS_LIBS)
+ libmenu_la_SOURCES = menu2.c
+ libpython_la_LDFLAGS = -export-dynamic $(shared) $(no_undefined) -module -avoid-version $(gc_libs) $(PYTHON_LIBS)
+-libpython_la_LIBADD = 
++libpython_la_LIBADD = $(GCOMPRIS_LIBS)
+ libpython_la_CFLAGS = -fno-strict-aliasing $(PYGTK_CFLAGS) \
+ 	 -DPYGOOCANVAS_MAJOR_VERSION=0 \
+ 	 -DPYGOOCANVAS_MINOR_VERSION=0 \
+Index: gcompris-9.0/src/goocanvas/src/Makefile.am
+===================================================================
+--- gcompris-9.0.orig/src/goocanvas/src/Makefile.am
++++ gcompris-9.0/src/goocanvas/src/Makefile.am
+@@ -12,7 +12,7 @@ INCLUDES = \
+ libdir = $(plugindir)
+ lib_LTLIBRARIES = libgoocanvas.la
+ 
+-libgoocanvas_la_LIBADD = @GCOMPRIS_LIBS@ $(INTLLIBS)
++libgoocanvas_la_LIBADD = @GCOMPRIS_LIBS@ $(INTLLIBS) -lm
+ 
+ if PLATFORM_WIN32
+ no_undefined = -no-undefined
+Index: gcompris-9.0/src/goocanvas/src/Makefile.in
+===================================================================
+--- gcompris-9.0.orig/src/goocanvas/src/Makefile.in
++++ gcompris-9.0/src/goocanvas/src/Makefile.in
+@@ -322,7 +322,7 @@ INCLUDES = \
+ 	@GCOMPRIS_CFLAGS@
+ 
+ lib_LTLIBRARIES = libgoocanvas.la
+-libgoocanvas_la_LIBADD = @GCOMPRIS_LIBS@ $(INTLLIBS)
++libgoocanvas_la_LIBADD = @GCOMPRIS_LIBS@ $(INTLLIBS) -lm
+ @PLATFORM_WIN32_TRUE@no_undefined = -no-undefined
+ libtool_opts = \
+   -rpath $(libdir)

@@ -1,0 +1,133 @@
+Index: libtheora-1.0beta2/lib/dec/quant.c
+===================================================================
+--- libtheora-1.0beta2.orig/lib/dec/quant.c
++++ libtheora-1.0beta2/lib/dec/quant.c
+@@ -22,8 +22,8 @@
+ 
+ 
+ 
+-unsigned OC_DC_QUANT_MIN[2]={4<<2,8<<2};
+-unsigned OC_AC_QUANT_MIN[2]={2<<2,4<<2};
++static const unsigned OC_DC_QUANT_MIN[2]={4<<2,8<<2};
++static const unsigned OC_AC_QUANT_MIN[2]={2<<2,4<<2};
+ 
+ 
+ 
+Index: libtheora-1.0beta2/lib/dec/quant.h
+===================================================================
+--- libtheora-1.0beta2.orig/lib/dec/quant.h
++++ libtheora-1.0beta2/lib/dec/quant.h
+@@ -29,16 +29,6 @@ typedef oc_quant_table oc_quant_tables[6
+ #define OC_QUANT_MAX          (1024<<2)
+ 
+ 
+-
+-/*Minimum scaled DC coefficient frame quantizer value for intra and inter
+-   modes.*/
+-extern unsigned OC_DC_QUANT_MIN[2];
+-/*Minimum scaled AC coefficient frame quantizer value for intra and inter
+-   modes.*/
+-extern unsigned OC_AC_QUANT_MIN[2];
+-
+-
+-
+ void oc_dequant_tables_init(oc_quant_table *_dequant[2][3],
+  int _pp_dc_scale[64],const th_quant_info *_qinfo);
+ 
+Index: libtheora-1.0beta2/lib/enc/encoder_lookup.h
+===================================================================
+--- libtheora-1.0beta2.orig/lib/enc/encoder_lookup.h
++++ libtheora-1.0beta2/lib/enc/encoder_lookup.h
+@@ -17,7 +17,7 @@
+ 
+ #include "codec_internal.h"
+ 
+-ogg_uint32_t MvPattern[(MAX_MV_EXTENT * 2) + 1] = {
++static const ogg_uint32_t MvPattern[(MAX_MV_EXTENT * 2) + 1] = {
+   0x000000ff, 0x000000fd, 0x000000fb, 0x000000f9,
+   0x000000f7, 0x000000f5, 0x000000f3, 0x000000f1,
+   0x000000ef, 0x000000ed, 0x000000eb, 0x000000e9,
+@@ -36,7 +36,7 @@ ogg_uint32_t MvPattern[(MAX_MV_EXTENT * 
+   0x000000fa, 0x000000fc, 0x000000fe,
+ };
+ 
+-ogg_uint32_t MvBits[(MAX_MV_EXTENT * 2) + 1] = {
++static const ogg_uint32_t MvBits[(MAX_MV_EXTENT * 2) + 1] = {
+   8, 8, 8, 8, 8, 8, 8, 8,
+   8, 8, 8, 8, 8, 8, 8, 8,
+   7, 7, 7, 7, 7, 7, 7, 7,
+@@ -47,7 +47,7 @@ ogg_uint32_t MvBits[(MAX_MV_EXTENT * 2) 
+   8, 8, 8, 8, 8, 8, 8,
+ };
+ 
+-ogg_uint32_t MvPattern2[(MAX_MV_EXTENT * 2) + 1] = {
++static const ogg_uint32_t MvPattern2[(MAX_MV_EXTENT * 2) + 1] = {
+   0x0000003f, 0x0000003d, 0x0000003b, 0x00000039,
+   0x00000037, 0x00000035, 0x00000033, 0x00000031,
+   0x0000002f, 0x0000002d, 0x0000002b, 0x00000029,
+@@ -66,7 +66,7 @@ ogg_uint32_t MvPattern2[(MAX_MV_EXTENT *
+   0x0000003a, 0x0000003c, 0x0000003e,
+ };
+ 
+-ogg_uint32_t MvBits2[(MAX_MV_EXTENT * 2) + 1] = {
++static const ogg_uint32_t MvBits2[(MAX_MV_EXTENT * 2) + 1] = {
+   6, 6, 6, 6, 6, 6, 6, 6,
+   6, 6, 6, 6, 6, 6, 6, 6,
+   6, 6, 6, 6, 6, 6, 6, 6,
+@@ -77,13 +77,13 @@ ogg_uint32_t MvBits2[(MAX_MV_EXTENT * 2)
+   6, 6, 6, 6, 6, 6, 6,
+ };
+ 
+-ogg_uint32_t ModeBitPatterns[MAX_MODES] = {
++static const ogg_uint32_t ModeBitPatterns[MAX_MODES] = {
+   0x00, 0x02, 0x06, 0x0E, 0x1E, 0x3E, 0x7E, 0x7F };
+ 
+-ogg_int32_t ModeBitLengths[MAX_MODES] =  {
++static const ogg_int32_t ModeBitLengths[MAX_MODES] =  {
+   1,    2,    3,    4,    5,    6,    7,    7 };
+ 
+-unsigned char ModeSchemes[MODE_METHODS-2][MAX_MODES] =  {
++static const unsigned char ModeSchemes[MODE_METHODS-2][MAX_MODES] =  {
+   /* Last Mv dominates */
+   { 3,    4,    2,    0,    1,    5,    6,    7 },    /* L P  M N I G GM 4 */
+   { 2,    4,    3,    0,    1,    5,    6,    7 },    /* L P  N M I G GM 4 */
+@@ -97,7 +97,7 @@ unsigned char ModeSchemes[MODE_METHODS-2
+ };
+ 
+ 
+-ogg_uint32_t MvThreshTable[Q_TABLE_SIZE] = {
++static const ogg_uint32_t MvThreshTable[Q_TABLE_SIZE] = {
+   65, 65, 65, 65, 50, 50, 50, 50,
+   40, 40, 40, 40, 40, 40, 40, 40,
+   30, 30, 30, 30, 30, 30, 30, 30,
+@@ -108,7 +108,7 @@ ogg_uint32_t MvThreshTable[Q_TABLE_SIZE]
+   0,  0,  0,  0,  0,  0,  0,  0
+ };
+ 
+-ogg_uint32_t MVChangeFactorTable[Q_TABLE_SIZE] = {
++static const ogg_uint32_t MVChangeFactorTable[Q_TABLE_SIZE] = {
+   11, 11, 11, 11, 12, 12, 12, 12,
+   13, 13, 13, 13, 13, 13, 13, 13,
+   14, 14, 14, 14, 14, 14, 14, 14,
+Index: libtheora-1.0beta2/lib/enc/misc_common.c
+===================================================================
+--- libtheora-1.0beta2.orig/lib/enc/misc_common.c
++++ libtheora-1.0beta2/lib/enc/misc_common.c
+@@ -23,7 +23,7 @@
+ #define MAX_UP_REG_LOOPS        2
+ 
+ /* Gives the initial bytes per block estimate for each Q value */
+-double BpbTable[Q_TABLE_SIZE] = {
++static const double BpbTable[Q_TABLE_SIZE] = {
+   0.42,  0.45,  0.46,  0.49,  0.51,  0.53,  0.56,  0.58,
+   0.61,  0.64,  0.68,  0.71,  0.74,  0.77,  0.80,  0.84,
+   0.89,  0.92,  0.98,  1.01,  1.04,  1.13,  1.17,  1.23,
+@@ -34,7 +34,7 @@ double BpbTable[Q_TABLE_SIZE] = {
+   5.61,  5.87,  6.11,  6.41,  6.71,  6.99,  7.36,  7.69
+ };
+ 
+-double KfBpbTable[Q_TABLE_SIZE] = {
++static const double KfBpbTable[Q_TABLE_SIZE] = {
+   0.74,  0.81,  0.88,  0.94,  1.00,  1.06,  1.14,  1.19,
+   1.27,  1.34,  1.42,  1.49,  1.54,  1.59,  1.66,  1.73,
+   1.80,  1.87,  1.97,  2.01,  2.08,  2.21,  2.25,  2.36,

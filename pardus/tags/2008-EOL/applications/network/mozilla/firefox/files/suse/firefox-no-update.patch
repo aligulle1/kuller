@@ -1,0 +1,120 @@
+Index: browser/components/preferences/advanced.js
+===================================================================
+--- browser/components/preferences/advanced.js.orig
++++ browser/components/preferences/advanced.js
+@@ -390,6 +390,8 @@ var gAdvancedPane = {
+     var enableAppUpdate = document.getElementById("enableAppUpdate");
+ 
+     enableAppUpdate.disabled = !aus.canUpdate || enabledPref.locked;
++    enableAppUpdate.disabled = true;
++    enableAppUpdate.hidden = true;
+   },
+ 
+   /**
+Index: browser/base/content/baseMenuOverlay.xul
+===================================================================
+--- browser/base/content/baseMenuOverlay.xul.orig
++++ browser/base/content/baseMenuOverlay.xul
+@@ -97,11 +97,11 @@
+                   label="&helpReleaseNotes.label;"
+                   oncommand="openReleaseNotes(event)"
+                   onclick="checkForMiddleClick(this, event);"/>
+-        <menuseparator id="updateSeparator"/>
+         <menuitem id="checkForUpdates"
+                   accesskey="&updateCmd.accesskey;"
+                   label="&updateCmd.label;"
+                   class="menuitem-iconic"
++                  hidden="true"
+                   oncommand="checkForUpdates();"/>
+         <menuseparator id="aboutSeparator"/>
+         <menuitem id="aboutName"
+Index: browser/app/profile/firefox.js
+===================================================================
+--- browser/app/profile/firefox.js.orig
++++ browser/app/profile/firefox.js
+@@ -86,66 +86,6 @@ pref("extensions.blocklist.detailsURL", 
+ // Dictionary download preference
+ pref("browser.dictionaries.download.url", "https://%LOCALE%.add-ons.mozilla.com/%LOCALE%/firefox/%VERSION%/dictionaries/");
+ 
+-// App-specific update preferences
+-
+-// Whether or not app updates are enabled
+-pref("app.update.enabled", true);
+-
+-// This preference turns on app.update.mode and allows automatic download and
+-// install to take place. We use a separate boolean toggle for this to make
+-// the UI easier to construct.
+-pref("app.update.auto", true);
+-
+-// Defines how the Application Update Service notifies the user about updates:
+-//
+-// AUM Set to:        Minor Releases:     Major Releases:
+-// 0                  download no prompt  download no prompt
+-// 1                  download no prompt  download no prompt if no incompatibilities
+-// 2                  download no prompt  prompt
+-//
+-// See chart in nsUpdateService.js.in for more details
+-//
+-pref("app.update.mode", 1);
+-
+-// If set to true, the Update Service will present no UI for any event.
+-pref("app.update.silent", false);
+-
+-// Update service URL:
+-pref("app.update.url", "https://aus2.mozilla.org/update/3/%PRODUCT%/%VERSION%/%BUILD_ID%/%BUILD_TARGET%/%LOCALE%/%CHANNEL%/%OS_VERSION%/%DISTRIBUTION%/%DISTRIBUTION_VERSION%/update.xml");
+-// app.update.url.manual is in branding section
+-// app.update.url.details is in branding section
+-
+-// User-settable override to app.update.url for testing purposes.
+-//pref("app.update.url.override", "");
+-
+-// Interval: Time between checks for a new version (in seconds)
+-//           default=1 day
+-pref("app.update.interval", 86400);
+-// Interval: Time before prompting the user again to restart to install the
+-//           latest download (in seconds) default=1 day
+-pref("app.update.nagTimer.restart", 86400);
+-// Interval: When all registered timers should be checked (in milliseconds)
+-//           default=10 minutes
+-pref("app.update.timer", 600000);
+-// Give the user x seconds to react before showing the big UI. default=12 hrs
+-pref("app.update.promptWaitTime", 43200);
+-// Show the Update Checking/Ready UI when the user was idle for x seconds
+-pref("app.update.idletime", 60);
+-
+-// Whether or not we show a dialog box informing the user that the update was
+-// successfully applied. This is off in Firefox by default since we show a 
+-// upgrade start page instead! Other apps may wish to show this UI, and supply
+-// a whatsNewURL field in their brand.properties that contains a link to a page
+-// which tells users what's new in this new update.
+-pref("app.update.showInstalledUI", false);
+-
+-// 0 = suppress prompting for incompatibilities if there are updates available
+-//     to newer versions of installed addons that resolve them.
+-// 1 = suppress prompting for incompatibilities only if there are VersionInfo
+-//     updates available to installed addons that resolve them, not newer
+-//     versions.
+-pref("app.update.incompatible.mode", 0);
+-
+ // Symmetric (can be overridden by individual extensions) update preferences.
+ // e.g.
+ //  extensions.{GUID}.update.enabled
+Index: browser/components/safebrowsing/content/report-phishing-overlay.xul
+===================================================================
+--- browser/components/safebrowsing/content/report-phishing-overlay.xul.orig
++++ browser/components/safebrowsing/content/report-phishing-overlay.xul
+@@ -1,4 +1,4 @@
+-<?xml version="1.0"?>
++<?XML VERSiON="1.0"?>
+ # ***** BEGIN LICENSE BLOCK *****
+ # Version: MPL 1.1/GPL 2.0/LGPL 2.1
+ #
+@@ -59,7 +59,7 @@
+     <menuitem id="menu_HelpPopup_reportPhishingErrortoolmenu"
+               label="&safeb.palm.notforgery.label2;"
+               accesskey="&reportPhishSiteMenu.accesskey;"
+-              insertbefore="updateSeparator"
++              insertbefore="aboutSeparator"
+               observes="reportPhishingErrorBroadcaster"
+               oncommand="openUILinkIn(safebrowsing.getReportURL('Error'), 'tab');"
+               onclick="checkForMiddleClick(this, event);"/>

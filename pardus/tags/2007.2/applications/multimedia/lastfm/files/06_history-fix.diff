@@ -1,0 +1,24 @@
+diff -urN last.fm-1.3.0.62-05/src/libLastFmTools/Settings.cpp last.fm-1.3.0.62-06/src/libLastFmTools/Settings.cpp
+--- last.fm-1.3.0.62-05/src/libLastFmTools/Settings.cpp	2007-06-27 10:12:26.000000000 -0700
++++ last.fm-1.3.0.62-06/src/libLastFmTools/Settings.cpp	2007-07-02 09:46:20.000000000 -0700
+@@ -208,7 +208,7 @@
+     foreach (QString key, s.childKeys())
+         urls[key.toInt()] = s.value( key ).toString();
+     
+-    remove( "" ); //current group
++    s.remove( "" ); //current group
+             
+     int i = 0;
+     foreach (QString url, urls)
+diff -urN last.fm-1.3.0.62-05/src/sidebarextension/SideBarModel.cpp last.fm-1.3.0.62-06/src/sidebarextension/SideBarModel.cpp
+--- last.fm-1.3.0.62-05/src/sidebarextension/SideBarModel.cpp	2007-06-27 10:12:26.000000000 -0700
++++ last.fm-1.3.0.62-06/src/sidebarextension/SideBarModel.cpp	2007-07-02 09:46:20.000000000 -0700
+@@ -378,7 +378,7 @@
+ {
+     QModelIndex const parent = index( row, 0 );
+     int const n = old_data.count() - new_data.count();
+-    if (n > 0) beginRemoveRows( parent, 0, n );
++    if (n > 0) beginRemoveRows( parent, 0, n - 1 );
+     if (n < 0) beginInsertRows( parent, 0, -n );
+     old_data = new_data;
+     if (n > 0) endRemoveRows();

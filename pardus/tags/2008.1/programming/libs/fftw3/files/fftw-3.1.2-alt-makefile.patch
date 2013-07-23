@@ -1,0 +1,34 @@
+diff -uk.orig fftw-3.1.2.orig/Makefile.am fftw-3.1.2/Makefile.am
+--- fftw-3.1.2.orig/Makefile.am	2006-01-28 00:16:22 +0000
++++ fftw-3.1.2/Makefile.am	2007-02-09 15:12:54 +0000
+@@ -10,8 +10,16 @@
+ 
+ ACLOCAL_AMFLAGS=-I ./m4
+ 
+-SUBDIRS=support $(GENFFT) kernel simd dft rdft reodft threads api	\
+-libbench2 . tests doc tools
++if THREADS
++if COMBINED_THREADS
++SUBDIRS_THREADS_ORDERED = threads .
++else
++SUBDIRS_THREADS_ORDERED = . threads
++endif
++endif
++
++SUBDIRS=support $(GENFFT) kernel simd dft rdft reodft api	\
++libbench2 $(SUBDIRS_THREADS_ORDERED) tests doc tools
+ EXTRA_DIST=COPYRIGHT bootstrap.sh CONVENTIONS fftw.pc.in m4
+ 
+ if HAVE_SIMD
+diff -uk.orig fftw-3.1.2.orig/threads/Makefile.am fftw-3.1.2/threads/Makefile.am
+--- fftw-3.1.2.orig/threads/Makefile.am	2006-01-28 00:16:22 +0000
++++ fftw-3.1.2/threads/Makefile.am	2007-02-09 14:08:20 +0000
+@@ -14,3 +14,8 @@
+ vrank-geq1-rdft2.c f77api.c f77funcs.h
+ 
+ libfftw3@PREC_SUFFIX@_threads_la_LDFLAGS = -version-info @SHARED_VERSION_INFO@
++if THREADS
++if !COMBINED_THREADS
++libfftw3@PREC_SUFFIX@_threads_la_LIBADD = $(top_builddir)/libfftw3@PREC_SUFFIX@.la $(THREADLIBS)
++endif
++endif

@@ -1,0 +1,24 @@
+diff -Nur warzone2100-2.0.7-old/src/configuration.c warzone2100-2.0.7/src/configuration.c
+--- warzone2100-2.0.7-old/src/configuration.c	2007-06-24 18:43:48.127699788 +0300
++++ warzone2100-2.0.7/src/configuration.c	2007-06-24 18:51:51.842164012 +0300
+@@ -566,10 +566,18 @@
+ 
+ 	// now load the desired res..
+ 	// note that we only do this if we havent changed renderer..
+-	if ( getWarzoneKeyNumeric("width", &val) )
++	if ( getWarzoneKeyNumeric("width", &val) ) {
+ 		pie_SetVideoBufferWidth(val);
+-	if ( getWarzoneKeyNumeric("height", &val) )
++    } else {
++        setWarzoneKeyNumeric("width", 1024);
++        pie_SetVideoBufferWidth(1024);
++    }
++	if ( getWarzoneKeyNumeric("height", &val) ) {
+ 		pie_SetVideoBufferHeight(val);
++    } else {
++        setWarzoneKeyNumeric("height", 768);
++        pie_SetVideoBufferHeight(768);
++    }
+ 
+ 	return closeWarzoneKey();
+ }

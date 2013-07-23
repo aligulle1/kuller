@@ -1,0 +1,112 @@
+--- amoebax-0.2.0/src/ControlSetupState.cxx	2007-06-25 08:15:23.000000000 +0200
++++ amoebax-0.2.0.new/src/ControlSetupState.cxx	2008-01-12 12:11:55.000000000 +0100
+@@ -20,6 +20,7 @@
+ #include <config.h>
+ #endif // !HAVE_CONFIG_H
+ #include <sstream>
++#include <stdlib.h>
+ #include "ControlSetupState.h"
+ #include "File.h"
+ #include "Joystick.h"
+@@ -241,7 +242,7 @@
+     {
+         // Is an axis.
+         std::ostringstream name;
+-        name << (control < 0 ? "-" : "+") << "Axis " << std::abs (control) - 1;
++        name << (control < 0 ? "-" : "+") << "Axis " << abs (control) - 1;
+         joyName = name.str ();
+     }
+     else
+--- amoebax-0.2.0/src/Font.cxx	2007-02-19 15:43:49.000000000 +0100
++++ amoebax-0.2.0.new/src/Font.cxx	2008-01-12 12:17:34.000000000 +0100
+@@ -23,6 +23,7 @@
+ #include <config.h>
+ #endif // HAVE_CONFIG_H
+ #include <numeric>
++#include <algorithm>
+ #include <SDL.h>
+ #include "Font.h"
+ 
+--- amoebax-0.2.0/src/Joystick.cxx	2007-07-30 08:22:41.000000000 +0200
++++ amoebax-0.2.0.new/src/Joystick.cxx	2008-01-12 12:20:24.000000000 +0100
+@@ -19,6 +19,7 @@
+ #if defined (HAVE_CONFIG_H)
+ #include <config.h>
+ #endif // !HAVE_CONFIG_H
++#include <stdlib.h>
+ #include "Joystick.h"
+ 
+ using namespace Amoebax;
+@@ -120,10 +121,10 @@
+     {
+         if ( m_PlayerControls.joystick.index == joystick )
+         {
+-            if ( std::abs (m_PlayerControls.joystick.moveLeft) - 1 == axis ||
+-                 std::abs (m_PlayerControls.joystick.moveRight) - 1 == axis )
++            if ( abs (m_PlayerControls.joystick.moveLeft) - 1 == axis ||
++                 abs (m_PlayerControls.joystick.moveRight) - 1 == axis )
+             {
+-                if ( std::abs (value) > k_DeadZone )
++                if ( abs (value) > k_DeadZone )
+                 {
+                     if ( (value < 0 && m_PlayerControls.joystick.moveLeft < 0 ||
+                           value > 0 && m_PlayerControls.joystick.moveLeft > 0 ) &&
+@@ -153,7 +154,7 @@
+                     setAxisXDirection (k_AxisCenter);
+                 }
+             }
+-            else if ( std::abs (m_PlayerControls.joystick.pushDown) - 1 == axis )
++            else if ( abs (m_PlayerControls.joystick.pushDown) - 1 == axis )
+             {
+                 if ( (m_PlayerControls.joystick.pushDown > 0 && value > k_DeadZone) ||
+                      (m_PlayerControls.joystick.pushDown < 0 && value < -k_DeadZone) )
+--- amoebax-0.2.0/src/MainMenuState.cxx	2007-06-05 13:08:12.000000000 +0200
++++ amoebax-0.2.0.new/src/MainMenuState.cxx	2008-01-12 12:21:12.000000000 +0100
+@@ -19,6 +19,7 @@
+ #if defined (HAVE_CONFIG_H)
+ #include <config.h>
+ #endif // HAVE_CONFIG_H
++#include <algorithm>
+ #include <SDL.h>
+ #include "AdvancedAIPlayer.h"
+ #include "AnticipatoryAIPlayer.h"
+--- amoebax-0.2.0/src/OptionsMenuState.cxx	2007-06-25 08:15:23.000000000 +0200
++++ amoebax-0.2.0.new/src/OptionsMenuState.cxx	2008-01-12 12:22:48.000000000 +0100
+@@ -21,6 +21,7 @@
+ #endif // HAVE_CONFIG_H
+ #include <SDL.h>
+ #include <sstream>
++#include <algorithm>
+ #include "ControlSetupState.h"
+ #include "File.h"
+ #include "Font.h"
+--- amoebax-0.2.0/src/Sound.h	2007-02-19 15:43:21.000000000 +0100
++++ amoebax-0.2.0.new/src/Sound.h	2008-01-12 12:09:37.000000000 +0100
+@@ -20,6 +20,7 @@
+ #define AMOEBAX_SOUND_H
+ 
+ #include <SDL_mixer.h>
++#include <string>
+ 
+ namespace Amoebax
+ {
+--- amoebax-0.2.0/src/System.cxx	2007-06-18 16:24:38.000000000 +0200
++++ amoebax-0.2.0.new/src/System.cxx	2008-01-12 12:24:16.000000000 +0100
+@@ -28,6 +28,7 @@
+ #include <sstream>
+ #include <stdexcept>
+ #include <string>
++#include <algorithm>
+ 
+ #if defined (IS_WIN32_HOST)
+ #include <windows.h>
+--- amoebax-0.2.0/src/TwoPlayersState.cxx	2007-07-30 08:22:41.000000000 +0200
++++ amoebax-0.2.0.new/src/TwoPlayersState.cxx	2008-01-12 12:25:06.000000000 +0100
+@@ -22,6 +22,7 @@
+ #include <cassert>
+ #include <SDL.h>
+ #include <sstream>
++#include <algorithm>
+ #include "Amoeba.h"
+ #include "DrawAmoeba.h"
+ #include "DrawChainLabel.h"

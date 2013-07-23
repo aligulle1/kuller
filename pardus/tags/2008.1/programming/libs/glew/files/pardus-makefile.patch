@@ -1,0 +1,73 @@
+--- Makefile~	2007-12-28 05:05:25.000000000 +0200
++++ Makefile	2008-07-26 15:20:15.000000000 +0300
+@@ -50,7 +50,7 @@
+ 
+ AR = ar
+ INSTALL = install
+-STRIP = strip
++STRIP =
+ RM = rm -f
+ LN = ln -sf
+ ifeq ($(MAKECMDGOALS), debug)
+@@ -59,7 +59,7 @@
+ OPT = $(POPT)
+ endif
+ INCLUDE = -Iinclude
+-CFLAGS = $(OPT) $(WARN) $(INCLUDE) $(CFLAGS.EXTRA)
++CFLAGS += $(OPT) $(WARN) $(INCLUDE) $(CFLAGS.EXTRA)
+ 
+ LIB.SRCS = src/glew.c
+ LIB.OBJS = $(LIB.SRCS:.c=.o)
+@@ -75,14 +75,11 @@
+ VISUALINFO.BIN.OBJS = $(VISUALINFO_BIN.SRCS:.c=.o)
+ BIN.LIBS = -Llib $(LDFLAGS.DYNAMIC) -l$(NAME) $(LDFLAGS.EXTRA) $(LDFLAGS.GL)
+ 
+-all debug: lib/$(LIB.SHARED) lib/$(LIB.STATIC) bin/$(GLEWINFO.BIN) bin/$(VISUALINFO.BIN)
++all debug: lib/$(LIB.SHARED) bin/$(GLEWINFO.BIN) bin/$(VISUALINFO.BIN)
+ 
+ lib:
+ 	mkdir lib
+ 
+-lib/$(LIB.STATIC): $(LIB.OBJS)
+-	$(AR) cr $@ $^
+-
+ lib/$(LIB.SHARED): $(LIB.SOBJS)
+ 	$(LD) $(LDFLAGS.SO) -o $@ $^ $(LIB.LDFLAGS) $(LIB.LIBS)
+ ifeq ($(patsubst mingw%,mingw,$(SYSTEM)), mingw)
+@@ -114,10 +111,10 @@
+ # runtime
+ ifeq ($(patsubst mingw%,mingw,$(SYSTEM)), mingw)
+ 	$(STRIP) -x lib/$(LIB.SHARED)
+-	$(INSTALL) -m 0644 lib/$(LIB.SHARED) $(BINDIR)/
++	$(INSTALL) -m 0755 lib/$(LIB.SHARED) $(BINDIR)/
+ else
+ 	$(STRIP) -x lib/$(LIB.SHARED)
+-	$(INSTALL) -m 0644 lib/$(LIB.SHARED) $(LIBDIR)/
++	$(INSTALL) -m 0755 lib/$(LIB.SHARED) $(LIBDIR)/
+ 	$(LN) $(LIB.SHARED) $(LIBDIR)/$(LIB.SONAME)
+ endif
+ # development files
+@@ -127,8 +124,6 @@
+ ifeq ($(patsubst mingw%,mingw,$(SYSTEM)), mingw)
+ 	$(INSTALL) -m 0644 lib/$(LIB.DEVLNK) $(LIBDIR)/
+ else
+-	strip -x lib/$(LIB.STATIC)
+-	$(INSTALL) -m 0644 lib/$(LIB.STATIC) $(LIBDIR)/
+ 	$(LN) $(LIB.SHARED) $(LIBDIR)/$(LIB.DEVLNK)
+ endif
+ # utilities
+@@ -144,14 +139,12 @@
+ else
+ 	$(RM) $(LIBDIR)/$(LIB.SONAME)
+ 	$(RM) $(LIBDIR)/$(LIB.SHARED)
+-	$(RM) $(LIBDIR)/$(LIB.STATIC)
+ endif
+ 	$(RM) $(BINDIR)/$(GLEWINFO.BIN) $(BINDIR)/$(VISUALINFO.BIN)
+ 
+ clean:
+ 	$(RM) $(LIB.OBJS)
+ 	$(RM) $(LIB.SOBJS)
+-	$(RM) lib/$(LIB.STATIC) lib/$(LIB.SHARED) lib/$(LIB.DEVLNK) lib/$(LIB.SONAME) $(LIB.STATIC)
+ 	$(RM) $(GLEWINFO.BIN.OBJS) bin/$(GLEWINFO.BIN) $(VISUALINFO.BIN.OBJS) bin/$(VISUALINFO.BIN)
+ # Compiler droppings
+ 	$(RM) so_locations

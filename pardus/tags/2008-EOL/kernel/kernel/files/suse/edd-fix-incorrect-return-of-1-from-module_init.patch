@@ -1,0 +1,31 @@
+From: Alexey Dobriyan <adobriyan@gmail.com>
+Date: Fri, 6 Jun 2008 05:46:03 +0000 (-0700)
+Subject: edd: fix incorrect return of 1 from module_init
+Patch-mainline: v2.6.26-rc6
+References: bnc#406637
+
+edd: fix incorrect return of 1 from module_init
+
+Signed-off-by: Alexey Dobriyan <adobriyan@gmail.com>
+Cc: Matt Domsch <Matt_Domsch@dell.com>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+Acked-by: Jeff Mahoney <jeffm@suse.com>
+---
+
+ drivers/firmware/edd.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/firmware/edd.c b/drivers/firmware/edd.c
+index 7440119..9e4f59d 100644
+--- a/drivers/firmware/edd.c
++++ b/drivers/firmware/edd.c
+@@ -753,7 +753,7 @@ edd_init(void)
+ 
+ 	if (!edd_num_devices()) {
+ 		printk(KERN_INFO "EDD information not available.\n");
+-		return 1;
++		return -ENODEV;
+ 	}
+ 
+ 	edd_kset = kset_create_and_add("edd", NULL, firmware_kobj);

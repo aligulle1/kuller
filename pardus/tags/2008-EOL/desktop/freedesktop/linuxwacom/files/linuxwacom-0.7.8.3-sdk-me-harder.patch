@@ -1,0 +1,28 @@
+---
+ configure.in         |    3 +++
+ src/xdrv/Makefile.am |    2 +-
+ 2 files changed, 4 insertions(+), 1 deletion(-)
+
+--- linuxwacom-0.8.2-1.orig/src/xdrv/Makefile.am	2009-01-15 10:50:54.000000000 -0500
++++ linuxwacom-0.8.2-1/src/xdrv/Makefile.am	2009-01-15 10:51:04.000000000 -0500
+@@ -15,7 +15,7 @@ EXTRA_DIST = xf86Wacom.c wcmXCommand.c x
+ 		../include/Xwacom.h
+ 
+ if WCM_ENV_XORGSDK
+-DRIVER_INCLUDES = -I../include -I$(WCM_XORGSDK_DIR) $(X_CFLAGS)
++DRIVER_INCLUDES = -I../include -I$(WCM_XORGSDK_DIR) $(X_CFLAGS) @XORG_CFLAGS@
+ endif
+ 
+ if WCM_ENV_XFREE86
+--- linuxwacom-0.8.2-1.orig/configure.in	2009-01-15 10:50:54.000000000 -0500
++++ linuxwacom-0.8.2-1/configure.in	2009-01-15 10:51:04.000000000 -0500
+@@ -646,6 +646,9 @@ if test -f $WCM_XLIB_DIR/libxf86config.a
+ 	fi
+ fi
+ 
++PKG_CHECK_MODULES(XORG, [xorg-server])
++AC_SUBST([XORG_CFLAGS])
++
+ # Define X_CFLAGS, X_LIBS, X_EXTRA_LIBS and X_PRELIBS as required if X
+ # is found, else defines X_DISPLAY_MISSING.  We need at least X_CFLAGS.
+ AC_PATH_XTRA

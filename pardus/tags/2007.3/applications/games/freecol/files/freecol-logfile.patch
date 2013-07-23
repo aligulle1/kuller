@@ -1,0 +1,24 @@
+--- src/net/sf/freecol/common/logging/DefaultHandler.java.orig	2007-07-14 00:28:04.000000000 +0300
++++ src/net/sf/freecol/common/logging/DefaultHandler.java	2007-07-14 00:30:22.000000000 +0300
+@@ -22,6 +22,10 @@
+ 
+     public static final String REVISION = "$Revision: 1.9 $";
+ 
++    private static File saveDirectory;
++
++    private static final String  FILE_SEP = System.getProperty("file.separator");
++
+     private static final String fileName = new String("FreeCol.log");
+ 
+     private FileWriter fileWriter;
+@@ -38,7 +42,9 @@
+      */
+     public DefaultHandler(boolean consoleLogging) throws FreeColException {
+         this.consoleLogging = consoleLogging;
+-        File file = new File(fileName);
++        // TODO: The location of the save directory should be determined by the installer.
++        saveDirectory = new File(System.getProperty("user.home"));
++        File file = new File(saveDirectory, "freecol" + FILE_SEP + fileName);
+ 
+         if (file.exists()) {
+             if (file.isDirectory()) {

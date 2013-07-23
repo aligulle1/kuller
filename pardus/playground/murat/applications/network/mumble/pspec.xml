@@ -1,0 +1,75 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>mumble</Name>
+        <Homepage>http://mumble.sourceforge.net</Homepage>
+        <Packager>
+            <Name>Murat Şenel</Name>
+            <Email>muratasenel@gmail.com</Email>
+        </Packager>
+        <License>GPLv2</License>
+        <Icon>mumble</Icon>
+        <IsA>app:gui</IsA>
+        <Summary>An open source, low-latency, high quality voice chat software primarily intended for use while gaming.</Summary>
+        <Description>Mumble is a low-latency, high quality voice chat program for gaming. It features noise suppression, automatic gain control and low latency audio with support for multiple audio standards. Mumble is just a client and uses a non-standard protocol. You will need a dedicated server to talk to other users. Server functionality is provided by the package "mumble-server".</Description>
+        <Archive sha1sum="e5d18317213d22d18f3cad9fe17d01d2dcad5544" type="targz">mirrors://sourceforge/mumble/mumble-1.1.7.tar.gz</Archive>
+        <BuildDependencies>
+            <Dependency versionFrom="4.4.3">qt4</Dependency>
+            <Dependency versionFrom="1.2_rc1">speex</Dependency>
+            <Dependency versionFrom="1.0.18">alsa-lib</Dependency>
+            <Dependency versionFrom="0.9.10">pulseaudio</Dependency>
+            <Dependency versionFrom="1.0.2">libXevie</Dependency>
+            <Dependency versionFrom="1.35.0">boost-devel</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <Patch>desktop.patch</Patch>
+            <Patch level="1">no-alsa-reread.patch</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>mumble</Name>
+        <RuntimeDependencies>
+            <Dependency versionFrom="4.4.3">qt4</Dependency>
+            <Dependency versionFrom="1.2_rc1">speex</Dependency>
+            <Dependency versionFrom="1.0.18">alsa-lib</Dependency>
+            <Dependency versionFrom="0.9.10">pulseaudio</Dependency>
+            <Dependency versionFrom="1.0.2">libXevie</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="executable">/usr/bin</Path>
+            <Path fileType="library">/usr/lib/mumble</Path>
+            <Path fileType="data">/usr/share/applications</Path>
+            <Path fileType="data">/usr/share/icons</Path>
+            <Path fileType="man">/usr/share/man</Path>
+            <Path fileType="doc">/usr/share/doc</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>mumble-server</Name>
+        <IsA>service</IsA>
+        <Summary>Server package for mumble client</Summary>
+        <RuntimeDependencies>
+            <Dependency versionFrom="4.4.3">qt4</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="executable">/usr/sbin</Path>
+            <Path fileType="man">/usr/share/man/man1/murmurd.1</Path>
+        </Files>
+       <Provides>
+             <COMAR script="service.py">System.Service</COMAR>
+        </Provides>
+    </Package>
+
+    <History>
+        <Update release="1">
+            <Date>2009-02-24</Date>
+            <Version>1.1.7</Version>
+            <Comment>First release</Comment>
+            <Name>Murat Şenel</Name>
+            <Email>muratasenel@gmail.com</Email>
+        </Update>
+    </History>
+</PISI>

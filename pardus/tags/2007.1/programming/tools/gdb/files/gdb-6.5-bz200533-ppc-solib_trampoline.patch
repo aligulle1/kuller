@@ -1,0 +1,16 @@
+https://bugzilla.redhat.com/bugzilla/show_bug.cgi?id=200533
+
+
+diff -ru gdb-6.5-orig/gdb/minsyms.c gdb-6.5/gdb/minsyms.c
+--- gdb-6.5-orig/gdb/minsyms.c	2005-12-17 17:34:01.000000000 -0500
++++ gdb-6.5/gdb/minsyms.c	2006-08-13 10:49:43.000000000 -0400
+@@ -486,6 +486,9 @@
+ 			  don't fill the bfd_section member, so don't
+ 			  throw away symbols on those platforms.  */
+ 		       && SYMBOL_BFD_SECTION (&msymbol[hi]) != NULL
++		       /* Don't ignore symbols for solib trampolines
++			  Red Hat Bug 200533 and Bug 192964.  */
++		       && MSYMBOL_TYPE (&msymbol[hi]) != mst_solib_trampoline
+ 		       && SYMBOL_BFD_SECTION (&msymbol[hi]) != section)
+ 		  --hi;
+ 

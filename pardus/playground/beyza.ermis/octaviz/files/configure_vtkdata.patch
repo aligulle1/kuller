@@ -1,0 +1,52 @@
+? _darcs
+Index: Scripts/CMakeLists.txt
+===================================================================
+RCS file: /cvsroot/octaviz/octaviz/Scripts/CMakeLists.txt,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 CMakeLists.txt
+4a5,8
+> # Insert VTK_DATA_ROOT given to cmake into vtkGetDataRoot.m
+> CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/vtkGetDataRoot.m
+>         ${CMAKE_CURRENT_BINARY_DIR}/vtkGetDataRoot.m)
+> 
+Index: Scripts/vtkGetDataRoot.m
+===================================================================
+RCS file: /cvsroot/octaviz/octaviz/Scripts/vtkGetDataRoot.m,v
+retrieving revision 1.2
+diff -r1.2 vtkGetDataRoot.m
+5c5,37
+<   f = "/usr/local/share/vtk/VTKData-release-4-4";
+---
+> 
+>   f = "";
+> 
+>   ## The file that marks the vtkdata/ directory
+>   readme = "VTKData.readme";
+> 
+>   ## check for a possible environmental variable
+>   env_data_root = getenv("VTK_DATA_ROOT");
+> 
+>   ## set at Octaviz's compile time
+>   oct_data_root = "@VTK_DATA_ROOT@";
+> 
+>   ## locally set path
+>   local_data_root = "/usr/local/share/vtkdata";
+> 
+>   data_root_path = [ env_data_root; local_data_root; oct_data_root ];
+> 
+>   ## check where we have the readme file
+>   if (! isempty(data_root_path))
+>     for i=[1:rows(data_root_path)]
+>       filename = [data_root_path(i, :), '/', readme];
+>       if (! isempty(stat(filename)))
+>         f = data_root_path(i,:);
+>         break;
+>       endif
+>     endfor
+>   else
+>     error("Empty search path for VTK_DATA_ROOT!");
+>   endif
+> 
+>   if (isempty(f))
+>     error([readme, " not found! \n\t Did you install the vtkdata package?"]);
+>   endif

@@ -1,0 +1,273 @@
+diff -ur xorg-app-7.1.orig/xauth-1.0.1/gethost.c xorg-app-7.1/xauth-1.0.1/gethost.c
+--- xorg-app-7.1.orig/xauth-1.0.1/gethost.c	2005-11-08 08:33:31.000000000 +0200
++++ xorg-app-7.1/xauth-1.0.1/gethost.c	2006-09-21 22:57:17.000000000 +0300
+@@ -258,7 +258,8 @@
+     int family,
+     char *fulldpyname,
+     int prefix,
+-    char *host)
++    char *host,
++    char *localhostname)
+ {
+     struct addrlist *retval = NULL;
+     int len = 0;
+@@ -288,7 +289,7 @@
+ 	if (prefix == 0 && (strncmp (fulldpyname, "unix:", 5) == 0 ||
+ 			    fulldpyname[0] == ':')) {
+ 
+-	    if (!get_local_hostname (buf, sizeof buf)) {
++	    if (!get_local_hostname (buf, sizeof buf, localhostname)) {
+ 		len = 0;
+ 	    } else {
+ 		src = buf;
+diff -ur xorg-app-7.1.orig/xauth-1.0.1/parsedpy.c xorg-app-7.1/xauth-1.0.1/parsedpy.c
+--- xorg-app-7.1.orig/xauth-1.0.1/parsedpy.c	2005-07-26 19:58:27.000000000 +0300
++++ xorg-app-7.1/xauth-1.0.1/parsedpy.c	2006-09-21 22:59:34.000000000 +0300
+@@ -74,20 +74,24 @@
+ 
+ 
+ char *
+-get_local_hostname (char *buf, int maxlen)
++get_local_hostname (char *buf, int maxlen, char *localhostname)
+ {
+     buf[0] = '\0';
+-    (void) XmuGetHostname (buf, maxlen);
++    if (localhostname)
++       strncpy(buf, localhostname, maxlen);
++    else
++        (void) XmuGetHostname (buf, maxlen);
++
+     return (buf[0] ? buf : NULL);
+ }
+ 
+ #ifndef UNIXCONN
+ static char *
+-copyhostname (void)
++copyhostname (char *localhostname)
+ {
+     char buf[256];
+ 
+-    return (get_local_hostname (buf, sizeof buf) ? 
++    return (get_local_hostname (buf, sizeof buf, localhostname) ? 
+ 	    copystring (buf, strlen (buf)) : NULL);
+ }
+ #endif
+@@ -97,6 +101,7 @@
+  */
+ Bool 
+ parse_displayname (char *displayname, 
++		   char *localhostname,
+ 		   int *familyp,	/* return */
+ 		   char **hostp,	/* return */
+ 		   int *dpynump,	/* return */
+@@ -138,7 +143,7 @@
+ 	    host = copystring ("0", 1);
+ 	    family = FamilyDECnet;
+ 	} else {
+-	    host = copyhostname ();
++	    host = copyhostname (localhostname);
+ 	    family = FamilyInternet;
+ 	}
+ #endif
+diff -ur xorg-app-7.1.orig/xauth-1.0.1/process.c xorg-app-7.1/xauth-1.0.1/process.c
+--- xorg-app-7.1.orig/xauth-1.0.1/process.c	2005-07-26 19:58:27.000000000 +0300
++++ xorg-app-7.1/xauth-1.0.1/process.c	2006-09-21 23:01:37.000000000 +0300
+@@ -466,7 +466,7 @@
+ }
+ 
+ static Bool 
+-get_displayname_auth(char *displayname, AuthList **authl)
++get_displayname_auth(char *displayname, AuthList **authl, char *localhostname)
+ {
+     int family;
+     char *host = NULL, *rest = NULL;
+@@ -486,11 +486,13 @@
+       prelen = (cp - displayname);
+ 
+     if (!parse_displayname (displayname + ((prelen > 0) ? prelen + 1 : 0),
++                localhostname,
+ 			    &family, &host, &dpynum, &scrnum, &rest)) {
+ 	return False;
+     }
+ 
+-    addrlist_head = get_address_info(family, displayname, prelen, host);
++    addrlist_head = get_address_info(family, displayname, prelen, host,
++                    localhostname );
+     if (addrlist_head) {
+ 	char buf[40];			/* want to hold largest display num */
+ 	unsigned short dpylen;
+@@ -1229,13 +1231,18 @@
+     Xauth *tmp_auth;
+     AuthList *proto_head, *proto;
+     AuthList *l, *next;
+-
++    /*
++     * get saved local address from environment in case the host
++     * name has changed after the credential was added.
++     */
++    char *xlocalhostname = getenv("XAUTHLOCALHOSTNAME");
++
+     /*
+      * iterate
+      */
+     for (i = start; i < argc; i++) {
+ 	char *displayname = argv[i];
+-	if (!get_displayname_auth (displayname, &proto_head)) {
++	if (!get_displayname_auth (displayname, &proto_head, xlocalhostname)) {
+ 	    prefix (inputfilename, lineno);
+ 	    baddisplayname (displayname, argv[0]);
+ 	    errors++;
+@@ -1574,7 +1581,7 @@
+ 	}
+     }
+ 
+-    if (!get_displayname_auth (dpyname, &list)) {
++    if (!get_displayname_auth (dpyname, &list, NULL)) {
+ 	prefix (inputfilename, lineno);
+ 	baddisplayname (dpyname, argv[0]);
+ 	free (key);
+diff -ur xorg-app-7.1.orig/xauth-1.0.1/xauth.h xorg-app-7.1/xauth-1.0.1/xauth.h
+--- xorg-app-7.1.orig/xauth-1.0.1/xauth.h	2004-04-23 22:54:38.000000000 +0300
++++ xorg-app-7.1/xauth-1.0.1/xauth.h	2006-09-21 23:03:20.000000000 +0300
+@@ -51,10 +51,10 @@
+ };
+ 
+ extern char *get_hostname ( Xauth *auth );
+-extern struct addrlist *get_address_info ( int family, char *fulldpyname, int prefix, char *host);
++extern struct addrlist *get_address_info ( int family, char *fulldpyname, int prefix, char *host, char *localhostname );
+ extern char *copystring ( char *src, int len );
+-extern char *get_local_hostname ( char *buf, int maxlen );
+-extern Bool parse_displayname ( char *displayname, int *familyp, char **hostp, int *dpynump, int *scrnump, char **restp );
++extern char *get_local_hostname ( char *buf, int maxlen, char *localhostname );
++extern Bool parse_displayname ( char *displayname, char *localhostname, int *familyp, char **hostp, int *dpynump, int *scrnump, char **restp );
+ extern int auth_initialize ( char *authfilename );
+ extern int auth_finalize ( void );
+ extern int process_command ( char *inputfilename, int lineno, int argc, char **argv );
+diff -ur xorg-app-7.1.orig/xdm-1.1.3/auth.c xorg-app-7.1/xdm-1.1.3/auth.c
+--- xorg-app-7.1.orig/xdm-1.1.3/auth.c	2005-11-08 08:33:31.000000000 +0200
++++ xorg-app-7.1/xdm-1.1.3/auth.c	2006-09-21 23:09:51.000000000 +0300
+@@ -680,7 +680,7 @@
+ }
+ 
+ static void
+-DefineLocal (FILE *file, Xauth *auth)
++DefineLocal (FILE *file, Xauth *auth, char **pLocalAddress)
+ {
+ 	char	displayname[100];
+ 	int	len = _XGetHostname (displayname, sizeof(displayname));
+@@ -716,6 +716,9 @@
+ #endif
+ 
+ 	writeAddr (FamilyLocal, len, displayname, file, auth);
++
++    if ( pLocalAddress && displayname )
++        *pLocalAddress = strdup( displayname );
+ }
+ 
+ #ifdef HAS_GETIFADDRS
+@@ -1148,7 +1151,7 @@
+ }
+ 
+ static void
+-writeLocalAuth (FILE *file, Xauth *auth, char *name)
++writeLocalAuth (FILE *file, Xauth *auth, char *name, char **pLocalAddress)
+ {
+     int	fd;
+ 
+@@ -1175,13 +1178,13 @@
+     DefineSelf (fd, file, auth);
+     close (fd);
+ #endif
+-    DefineLocal (file, auth);
++    DefineLocal (file, auth, pLocalAddress);
+ }
+ 
+ #ifdef XDMCP
+ 
+ static void
+-writeRemoteAuth (FILE *file, Xauth *auth, XdmcpNetaddr peer, int peerlen, char *name)
++writeRemoteAuth (FILE *file, Xauth *auth, XdmcpNetaddr peer, int peerlen, char *name, char **pLocalAddress)
+ {
+     int	    family = FamilyLocal;
+     char    *addr;
+@@ -1200,7 +1203,7 @@
+     }
+     else
+     {
+-	writeLocalAuth (file, auth, name);
++	writeLocalAuth (file, auth, name, pLocalAddress);
+     }
+ }
+ 
+@@ -1224,6 +1227,7 @@
+ #ifdef HAS_MKSTEMP
+     int		fd;
+ #endif
++    char       *localAddress = NULL;
+ 
+     Debug ("SetUserAuthorization\n");
+     auths = d->authorizations;
+@@ -1316,10 +1320,10 @@
+ 	    {
+ 		magicCookie = i;
+ 	    	if (d->displayType.location == Local)
+-	    	    writeLocalAuth (new, auths[i], d->name);
++	    	    writeLocalAuth (new, auths[i], d->name, &localAddress);
+ #ifdef XDMCP
+ 	    	else
+-	    	    writeRemoteAuth (new, auths[i], d->peer, d->peerlen, d->name);
++	    	    writeRemoteAuth (new, auths[i], d->peer, d->peerlen, d->name, &localAddress);
+ #endif
+ 		break;
+ 	    }
+@@ -1337,10 +1341,10 @@
+ 		    !strncmp (auths[i]->name, "MIT-KERBEROS-5", 14))
+ 		    auths[i]->data_length = 0;
+ 	    	if (d->displayType.location == Local)
+-	    	    writeLocalAuth (new, auths[i], d->name);
++	    	    writeLocalAuth (new, auths[i], d->name, &localAddress);
+ #ifdef XDMCP
+ 	    	else
+-	    	    writeRemoteAuth (new, auths[i], d->peer, d->peerlen, d->name);
++	    	    writeRemoteAuth (new, auths[i], d->peer, d->peerlen, d->name, &localAddress);
+ #endif
+ 		auths[i]->data_length = data_len;
+ 	    }
+@@ -1379,6 +1383,13 @@
+ 	    verify->systemEnviron = setEnv (verify->systemEnviron,
+ 				    "XAUTHORITY", envname);
+ 	}
++
++    if (localAddress) {
++        verify->userEnviron = setEnv (verify->userEnviron,
++            "XAUTHLOCALHOSTNAME",localAddress);
++        free(localAddress);
++    }
++
+ 	XauUnlockAuth (name);
+ 	if (envname)
+ 	    chown (envname, verify->uid, verify->gid);
+@@ -1417,10 +1428,10 @@
+ 	for (i = 0; i < d->authNum; i++)
+ 	{
+ 	    if (d->displayType.location == Local)
+-	    	writeLocalAuth (new, auths[i], d->name);
++	    	writeLocalAuth (new, auths[i], d->name, NULL);
+ #ifdef XDMCP
+ 	    else
+-	    	writeRemoteAuth (new, auths[i], d->peer, d->peerlen, d->name);
++	    	writeRemoteAuth (new, auths[i], d->peer, d->peerlen, d->name, NULL);
+ #endif
+ 	}
+ 	doWrite = 1;
+diff -ur xorg-app-7.1.orig/xinit-1.0.3/startx.cpp xorg-app-7.1/xinit-1.0.3/startx.cpp
+--- xorg-app-7.1.orig/xinit-1.0.3/startx.cpp	2006-02-25 17:20:06.000000000 +0200
++++ xorg-app-7.1/xinit-1.0.3/startx.cpp	2006-09-21 23:05:04.000000000 +0300
+@@ -224,6 +224,7 @@
+         XINIT $client $clientargs -- $server $display $serverargs
+ fi
+ #else
++export XAUTHLOCALHOSTNAME=`hostname`
+ XINIT $client $clientargs -- $server $display $serverargs
+ #endif
+ 

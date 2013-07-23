@@ -1,0 +1,33 @@
+Index: kdelibs-4.2.4/plasma/applet.cpp
+===================================================================
+--- kdelibs-4.2.4.orig/plasma/applet.cpp
++++ kdelibs-4.2.4/plasma/applet.cpp
+@@ -737,6 +737,10 @@ Applet::BackgroundHints Applet::backgrou
+ 
+ void Applet::setBackgroundHints(const BackgroundHints hints)
+ {
++    if (d->backgroundHints == hints) {
++        return;
++    }
++
+     d->backgroundHints = hints;
+ 
+     //Draw the standard background?
+@@ -773,6 +777,8 @@ void Applet::setBackgroundHints(const Ba
+         d->background = 0;
+         setContentsMargins(0, 0, 0, 0);
+     }
++
++    update();
+ }
+ 
+ bool Applet::hasFailedToLaunch() const
+@@ -1819,7 +1825,7 @@ AppletPrivate::AppletPrivate(KService::P
+         : appletId(uniqueID),
+           q(applet),
+           extender(0),
+-          backgroundHints(Applet::StandardBackground),
++          backgroundHints(Applet::NoBackground),
+           appletDescription(service),
+           messageOverlay(0),
+           busyWidget(0),

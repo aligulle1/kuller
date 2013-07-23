@@ -1,0 +1,36 @@
+diff -ur kdepim-3.5.6.orig/kmail/kmfolder.cpp kdepim-3.5.6/kmail/kmfolder.cpp
+--- kdepim-3.5.6.orig/kmail/kmfolder.cpp	2007-01-15 13:28:47.000000000 +0200
++++ kdepim-3.5.6/kmail/kmfolder.cpp	2007-01-27 19:42:15.000000000 +0200
+@@ -426,12 +426,12 @@
+ 
+ int KMFolder::find( const KMMsgBase* msg ) const
+ {
+-  return mStorage->find( msg );
++  return mStorage ? mStorage->find( msg ) : 0;
+ }
+ 
+ int KMFolder::find( const KMMessage* msg ) const
+ {
+-  return mStorage->find( msg );
++  return mStorage ? mStorage->find( msg ) : 0;
+ }
+ 
+ int KMFolder::count( bool cache ) const
+@@ -631,11 +631,13 @@
+         mWhoField = "From";
+       if ( this == kmkernel->outboxFolder() ||
+            this == kmkernel->sentFolder() ||
+-           this == kmkernel->draftsFolder() )
++           this == kmkernel->draftsFolder() ||
++           this == kmkernel->templatesFolder() )
+         mWhoField = "To";
+-    } else if ( identity.drafts() == idString()
+-                || identity.fcc() == idString() )
+-      // drafts or sent of the identity
++    } else if ( identity.drafts() == idString() ||
++                identity.templates() == idString() ||
++                identity.fcc() == idString() )
++      // drafts, templates or sent of the identity
+       mWhoField = "To";
+     else
+       mWhoField = "From";

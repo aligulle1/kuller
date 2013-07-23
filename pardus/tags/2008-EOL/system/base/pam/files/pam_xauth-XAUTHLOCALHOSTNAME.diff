@@ -1,0 +1,54 @@
+--- modules/pam_xauth/pam_xauth.c	8 Apr 2008 07:01:41 -0000	1.16
++++ modules/pam_xauth/pam_xauth.c	18 Nov 2008 12:30:58 -0000
+@@ -280,7 +280,7 @@
+ 			return noent_code;
+ 		default:
+ 			if (debug) {
+-				pam_syslog(pamh, LOG_ERR,
++				pam_syslog(pamh, LOG_DEBUG,
+ 					   "error opening %s: %m", path);
+ 			}
+ 			return PAM_PERM_DENIED;
+@@ -293,7 +293,8 @@
+ 		     int argc, const char **argv)
+ {
+ 	char *cookiefile = NULL, *xauthority = NULL,
+-	     *cookie = NULL, *display = NULL, *tmp = NULL;
++	     *cookie = NULL, *display = NULL, *tmp = NULL,
++	     *xauthlocalhostname = NULL;
+ 	const char *user, *xauth = NULL;
+ 	struct passwd *tpwd, *rpwd;
+ 	int fd, i, debug = 0;
+@@ -588,14 +589,30 @@
+ 
+ 		  if (asprintf(&d, "DISPLAY=%s", display) < 0)
+ 		    {
+-		      pam_syslog(pamh, LOG_DEBUG, "out of memory");
++		      pam_syslog(pamh, LOG_ERR, "out of memory");
+ 		      cookiefile = NULL;
+ 		      retval = PAM_SESSION_ERR;
+ 		      goto cleanup;
+ 		    }
+ 
+ 		  if (pam_putenv (pamh, d) != PAM_SUCCESS)
+-		    pam_syslog (pamh, LOG_DEBUG,
++		    pam_syslog (pamh, LOG_ERR,
++				"can't set environment variable '%s'", d);
++		  free (d);
++		}
++
++		/* set XAUTHLOCALHOSTNAME to make sure that su - work under gnome */
++		if ((xauthlocalhostname = getenv("XAUTHLOCALHOSTNAME")) != NULL) {
++		  char *d;
++
++		  if (asprintf(&d, "XAUTHLOCALHOSTNAME=%s", xauthlocalhostname) < 0) {
++		    pam_syslog(pamh, LOG_ERR, "out of memory");
++		    retval = PAM_SESSION_ERR;
++		    goto cleanup;
++		  }
++
++		  if (pam_putenv (pamh, d) != PAM_SUCCESS)
++		    pam_syslog (pamh, LOG_ERR,
+ 				"can't set environment variable '%s'", d);
+ 		  free (d);
+ 		}

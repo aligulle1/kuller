@@ -1,0 +1,84 @@
+Index: stream/tvi_v4l2.c
+===================================================================
+--- stream/tvi_v4l2.c	(revision 26920)
++++ stream/tvi_v4l2.c	(working copy)
+@@ -91,6 +91,8 @@
+     struct v4l2_format          format;
+     struct v4l2_standard        standard;
+     struct v4l2_tuner           tuner;
++    int                         noanalog;
++    struct v4l2_streamparm      parm;
+     struct map                  *map;
+     int                         mapcount;
+     int                         frames;
+@@ -339,8 +341,13 @@
+ // sets and sanitizes audio buffer/block sizes
+ static void setup_audio_buffer_sizes(priv_t *priv)
+ {
++    double fps;
+     int bytes_per_sample = priv->audio_in.bytes_per_sample;
+-    double fps = (double)priv->standard.frameperiod.denominator /
++    if(priv->noanalog)
++        fps = (double)priv->parm.parm.capture.timeperframe.denominator /
++        priv->parm.parm.capture.timeperframe.numerator;
++    else
++        fps = (double)priv->standard.frameperiod.denominator /
+         priv->standard.frameperiod.numerator;
+     int seconds = priv->video_buffer_size_max/fps;
+ 
+@@ -438,9 +445,14 @@
+     int i=0;
+ 
+     if (ioctl(priv->video_fd, VIDIOC_G_STD, &id) < 0) {
++        priv->parm.type=V4L2_BUF_TYPE_VIDEO_CAPTURE;
++        if(ioctl(priv->video_fd, VIDIOC_G_PARM, &priv->parm) < 0) {
+         mp_msg(MSGT_TV, MSGL_ERR, "%s: ioctl get standard failed: %s\n",
+                info.short_name, strerror(errno));
+         return -1;
++        }
++        priv->noanalog=1;
++        return 0;
+     }
+     do {
+         priv->standard.index = i++;
+@@ -701,6 +713,10 @@
+         priv->immediate_mode = 1;
+         return TVI_CONTROL_TRUE;
+     case TVI_CONTROL_VID_GET_FPS:
++        if(priv->noanalog)
++             *(float *)arg = (float)priv->parm.parm.capture.timeperframe.denominator /
++                             priv->parm.parm.capture.timeperframe.numerator;
++        else
+         *(float *)arg = (float)priv->standard.frameperiod.denominator /
+             priv->standard.frameperiod.numerator;
+         mp_msg(MSGT_TV, MSGL_V, "%s: get fps: %f\n", info.short_name,
+@@ -1089,6 +1105,13 @@
+         struct v4l2_buffer buf;
+ 
+         /* get performance */
++        if(priv->noanalog)
++            frames = 1 + (priv->curr_frame - priv->first_frame +
++                      priv->parm.parm.capture.timeperframe.numerator * 500000 /
++                      priv->parm.parm.capture.timeperframe.denominator) *
++                      priv->parm.parm.capture.timeperframe.denominator /
++                      priv->parm.parm.capture.timeperframe.numerator / 1000000;
++        else
+         frames = 1 + (priv->curr_frame - priv->first_frame +
+                       priv->standard.frameperiod.numerator * 500000 /
+                       priv->standard.frameperiod.denominator) *
+@@ -1435,7 +1458,13 @@
+ 
+     /* setup video parameters */
+     if (!priv->tv_param->noaudio) {
+-        if (priv->video_buffer_size_max < (3*priv->standard.frameperiod.denominator) /
++        if (priv->noanalog && priv->video_buffer_size_max < (3*priv->parm.parm.capture.timeperframe.denominator) /
++                                               priv->parm.parm.capture.timeperframe.numerator
++            *priv->audio_secs_per_block) {
++            mp_msg(MSGT_TV, MSGL_ERR, "Video buffer shorter than 3 times audio frame duration.\n"
++                   "You will probably experience heavy framedrops.\n");
++        }
++        if (!priv->noanalog && priv->video_buffer_size_max < (3*priv->standard.frameperiod.denominator) /
+                                                priv->standard.frameperiod.numerator
+             *priv->audio_secs_per_block) {
+             mp_msg(MSGT_TV, MSGL_ERR, "Video buffer shorter than 3 times audio frame duration.\n"
+

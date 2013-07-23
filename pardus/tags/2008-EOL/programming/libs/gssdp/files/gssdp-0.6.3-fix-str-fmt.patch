@@ -1,0 +1,44 @@
+--- libgssdp/gssdp-client.c.orig	2008-04-23 15:15:02.000000000 +0200
++++ libgssdp/gssdp-client.c	2009-01-08 23:03:07.000000000 +0100
+@@ -177,7 +177,7 @@
+                         g_set_error (error,
+                                      GSSDP_ERROR,
+                                      GSSDP_ERROR_FAILED,
+-                                     strerror (errno));
++                                     "%s", strerror (errno));
+                 }
+ 
+                 break;
+--- tools/gssdp-device-sniffer.c.orig	2008-09-22 15:06:09.000000000 +0200
++++ tools/gssdp-device-sniffer.c	2009-01-08 23:08:57.000000000 +0100
+@@ -599,7 +599,7 @@
+         error = NULL;
+         client = gssdp_client_new (NULL, &error);
+         if (error) {
+-                g_critical (error->message);
++                g_critical ("%s", error->message);
+                 g_error_free (error);
+                 return 1;
+         }
+--- tests/test-browser.c.orig	2007-11-05 13:09:00.000000000 +0100
++++ tests/test-browser.c	2009-01-08 23:15:00.000000000 +0100
+@@ -59,7 +59,7 @@
+         error = NULL;
+         client = gssdp_client_new (NULL, &error);
+         if (error) {
+-                g_critical (error->message);
++                g_critical ("%s", error->message);
+ 
+                 g_error_free (error);
+ 
+--- tests/test-publish.c.orig	2007-11-05 13:09:00.000000000 +0100
++++ tests/test-publish.c	2009-01-08 23:16:16.000000000 +0100
+@@ -35,7 +35,7 @@
+         error = NULL;
+         client = gssdp_client_new (NULL, &error);
+         if (error) {
+-                g_critical (error->message);
++                g_critical ("%s", error->message);
+ 
+                 g_error_free (error);
+ 

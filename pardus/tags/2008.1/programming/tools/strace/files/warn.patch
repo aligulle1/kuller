@@ -1,0 +1,59 @@
+--- process.c
++++ process.c
+@@ -718,12 +718,12 @@
+ {
+ #if defined (IA64)
+ 	{
+-		unsigned long *bsp, *ap;
++		unsigned long bsp, *ap;
+ 
+ 		if (upeek(tcp->pid, PT_AR_BSP, (long *) &bsp) , 0)
+ 			return -1;
+ 
+-		ap = ia64_rse_skip_regs(bsp, argnum);
++		ap = ia64_rse_skip_regs((unsigned long *) bsp, argnum);
+ 		errno = 0;
+ 		ptrace(PTRACE_POKEDATA, tcp->pid, (char *) ap, tcp->u_arg[argnum]);
+ 		if (errno)
+--- syscall.c
++++ syscall.c
+@@ -1803,7 +1803,7 @@
+ #elif defined (IA64)
+ 	{
+ 		if (!ia32) {
+-			unsigned long *out0, *rbs_end, cfm, sof, sol, i;
++			unsigned long *out0, rbs_end, cfm, sof, sol, i;
+ 			/* be backwards compatible with kernel < 2.4.4... */
+ #			ifndef PT_RBS_END
+ #			  define PT_RBS_END	PT_AR_BSP
+@@ -1816,7 +1816,7 @@
+ 
+ 			sof = (cfm >> 0) & 0x7f;
+ 			sol = (cfm >> 7) & 0x7f;
+-			out0 = ia64_rse_skip_regs(rbs_end, -sof + sol);
++			out0 = ia64_rse_skip_regs((unsigned long *)rbs_end, -sof + sol);
+ 
+ 			if (tcp->scno >= 0 && tcp->scno < nsyscalls
+ 			    && sysent[tcp->scno].nargs != -1)
+--- util.c
++++ util.c
+@@ -1172,7 +1172,7 @@
+ static int
+ arg_setup(struct tcb *tcp, arg_setup_state *state)
+ {
+-	unsigned long *bsp, cfm, sof, sol;
++	unsigned long bsp, cfm, sof, sol;
+ 
+ 	if (ia32)
+ 		return 0;
+@@ -1184,9 +1184,8 @@
+ 
+ 	sof = (cfm >> 0) & 0x7f;
+ 	sol = (cfm >> 7) & 0x7f;
+-	bsp = ia64_rse_skip_regs(bsp, -sof + sol);
++	*state = ia64_rse_skip_regs((unsigned long *) bsp, -sof + sol);
+ 
+-	*state = bsp;
+ 	return 0;
+ }
+ 

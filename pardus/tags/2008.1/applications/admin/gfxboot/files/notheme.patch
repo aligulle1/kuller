@@ -1,0 +1,47 @@
+diff -Nur gfxboot-4.0.14-old/Makefile gfxboot-4.0.14/Makefile
+--- gfxboot-4.0.14-old/Makefile	2008-06-02 17:45:38.000000000 +0300
++++ gfxboot-4.0.14/Makefile	2008-06-02 17:47:50.000000000 +0300
+@@ -2,10 +2,8 @@
+ 
+ CC	 = gcc
+ CFLAGS	 = -g -Wall -Wno-pointer-sign -O2 -fomit-frame-pointer
+-# THEMES	 = $(wildcard themes/*)
+-THEMES	 = themes/upstream themes/openSUSE
+ 
+-.PHONY: all clean distclean doc install installsrc themes
++.PHONY: all clean distclean doc install installsrc
+ 
+ all:	bin2c gfxboot-compile bincode gfxboot-font addblack
+ 
+@@ -43,30 +41,17 @@
+ install: all
+ 	install -d -m 755 $(DESTDIR)/usr/sbin
+ 	install -m 755 gfxboot gfxboot-compile gfxboot-font $(DESTDIR)/usr/sbin
+-	@for i in $(THEMES) ; do \
+-	  install -d -m 755 $(DESTDIR)/etc/bootsplash/$$i/{bootloader,cdrom} ; \
+-	  cp $$i/bootlogo $(DESTDIR)/etc/bootsplash/$$i/cdrom ; \
+-	  bin/unpack_bootlogo $(DESTDIR)/etc/bootsplash/$$i/cdrom ; \
+-          install -m 644 $$i/{message,po/*.tr,help-boot/*.hlp} $(DESTDIR)/etc/bootsplash/$$i/bootloader ; \
+-	  ./2hl --link --quiet $(DESTDIR)/etc/bootsplash/$$i/* ; \
+-	done
+ 
+ installsrc:
+ 	install -d -m 755 $(DESTDIR)/usr/share/gfxboot/themes
+-	@for i in $(THEMES) ; do \
+-	  cp -a $$i $(DESTDIR)/usr/share/gfxboot/themes ; \
+-	done
+ 	cp -a bin $(DESTDIR)/usr/share/gfxboot
+ 
+-clean: themes doc
++clean: doc
+ 	@rm -f gfxboot-compile bincode gfxboot-font addblack bincode.h bin2c *.lst *.map vocabulary.inc vocabulary.h *.o *~
+ 	@rm -rf tmp
+ 
+ distclean: clean
+ 
+-themes:
+-	@for i in $(THEMES) ; do make -C $$i $(MAKECMDGOALS) || break ; done
+-
+ doc:
+ 	make -C doc $(MAKECMDGOALS)
+ 

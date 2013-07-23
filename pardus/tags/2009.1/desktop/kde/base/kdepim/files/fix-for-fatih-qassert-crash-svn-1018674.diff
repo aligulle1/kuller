@@ -1,0 +1,153 @@
+Index: kmail/messagelistview/widget.cpp
+===================================================================
+--- kmail/messagelistview/widget.cpp	(revision 1018673)
++++ kmail/messagelistview/widget.cpp	(revision 1018674)
+@@ -251,6 +251,7 @@
+   if ( !storageModel() )
+     return 0;
+ 
++  // The call below is expensive: it's a linear search.
+   int row = static_cast< StorageModel * >( storageModel() )->msgBaseRow( msg );
+   if ( row < 0 )
+     return 0;
+@@ -261,12 +262,27 @@
+ void Widget::activateMessageItemByMsgBase( KMMsgBase * msg )
+ {
+   // This function may be expensive since it needs to perform a linear search
+-  // in the storage. We want to avoid that so we use some tricks.
++  // in the storage. We want to avoid that as much as possible so we use some tricks.
+ 
+   if ( !storageModel() )
+     return;
+ 
++  if( view()->model()->isLoading() ) // unlikely
++  {
++    // Strange things may happen if this function is called while
++    // the view is still loading. This isn't very likely but may happen
++    // with the search dialog in certain conditions.
++    //
++    // We must ask the model to do the job later.
+ 
++    int row = static_cast< StorageModel * >( storageModel() )->msgBaseRow( msg );
++    if ( row < 0 )
++      return; // not in this Folder...err...StorageModel ?
++
++    view()->model()->activateMessageAfterLoading( msg->getMsgSerNum(), row );
++    return;
++  }
++
+   Core::MessageItem * mi = 0;
+ 
+   // take care of current first
+Index: kmail/messagelistview/core/model.cpp
+===================================================================
+--- kmail/messagelistview/core/model.cpp	(revision 1018673)
++++ kmail/messagelistview/core/model.cpp	(revision 1018674)
+@@ -475,7 +475,8 @@
+ 
+ QModelIndex Model::index( Item *item, int column ) const
+ {
+-  Q_ASSERT( mModelForItemFunctions ); // should be never called with disconnected UI
++  if ( !mModelForItemFunctions )
++    return QModelIndex(); // called with disconnected UI: the item isn't known on the Qt side, yet
+ 
+   // FIXME: This function is a bottleneck
+   Item * par = item->parent();
+@@ -500,7 +501,7 @@
+ QModelIndex Model::index( int row, int column, const QModelIndex &parent ) const
+ {
+   if ( !mModelForItemFunctions )
+-    return QModelIndex(); // called with disconnected UI
++    return QModelIndex(); // called with disconnected UI: the Qt side of the view has no items yet
+ 
+ #ifdef READD_THIS_IF_YOU_WANT_TO_PASS_MODEL_TEST
+   if ( column < 0 )
+@@ -895,6 +896,47 @@
+ }
+ 
+ 
++void Model::activateMessageAfterLoading( unsigned long uniqueIdOfMessage, int row )
++{
++  Q_ASSERT( mLoading ); // you did it: read the docs in the header.
++
++  // Ok. we're still loading.
++  // We can have three cases now.
++
++  // 1) The message hasn't been read from the storage yet. We don't have a MessageItem for it.
++  //    We must then use the pre-selection mechanism to activate the message when loading finishes.
++  // 2) The message has already been read from the storage.
++  //    2a) We're in "disconnected UI" state or the message item is not viewable.
++  //        The Qt side of the model/view framework doesn't know about the MessageItem yet.
++  //        That is, we can't get a valid QModelIndex for the message.
++  //        We again must use the pre-selection method.
++  //    2b) No disconnected UI and MessageItem is viewable. Qt knows about it and we can
++  //        get the QModelIndex. We can select it NOW.
++
++  MessageItem * mi = messageItemByStorageRow( row );
++
++  if( mi )
++  {
++    if( mi->isViewable() && mModelForItemFunctions )
++    {
++      // No disconnected UI and the MessageItem is viewable. Activate it now.
++      mView->setCurrentMessageItem( mi );
++
++      // Also abort any pending pre-selection.
++      abortMessagePreSelection();
++      return;
++    }
++  }
++
++  // Use the pre-selection method.
++
++  mPreSelectionMode = PreSelectLastSelected;
++
++  mUniqueIdOfLastSelectedMessageInFolder = mi ? 0 : uniqueIdOfMessage;
++  mLastSelectedMessageInFolder = mi;
++}
++
++
+ //
+ // The "view fill" algorithm implemented in the functions below is quite smart but also quite complex.
+ // It's governed by the following goals:
+@@ -4554,6 +4596,7 @@
+ {
+   if ( !mStorageModel )
+     return 0;
++
+   ModelInvariantIndex * idx = mInvariantRowMapper->modelIndexRowToModelInvariantIndex( row );
+   if ( !idx )
+     return 0;
+Index: kmail/messagelistview/core/model.h
+===================================================================
+--- kmail/messagelistview/core/model.h	(revision 1018673)
++++ kmail/messagelistview/core/model.h	(revision 1018674)
+@@ -407,6 +407,17 @@
+   void applyMessagePreSelection( PreSelectionMode preSelectionMode );
+ 
+   /**
++   * Attempt to select the message with the specified unique id AND storage row as soon
++   * as possible (either now or when the view finishes loading). Please note that BOTH the uniqueId
++   * and the storage row are needed in order to perform the operation in all cases.
++   *
++   * This is a very special function. It can be called ONLY when the model is actually
++   * loading: it will assert if you do otherwise. This call is actually the only
++   * way to select an item that hasn't been read from the storage yet.
++   */
++  void activateMessageAfterLoading( unsigned long uniqueIdOfMessage, int row );
++
++  /**
+    * Returns the hidden root item that all the messages are (or will be) attached to.
+    * The returned value is never 0.
+    */
+@@ -422,7 +433,9 @@
+ 
+   /**
+    * Returns the message item that is at the _current_ storage row index
+-   * or zero if no such storage item is found.
++   * or zero if no such storage item is found. Please note that this may return 0
++   * also if the specified storage row hasn't been actually read yet. This may happen
++   * if isLoading() returns true. In this case the only thing you can do is to retry in a while.
+    */
+   MessageItem * messageItemByStorageRow( int row ) const;
+ 

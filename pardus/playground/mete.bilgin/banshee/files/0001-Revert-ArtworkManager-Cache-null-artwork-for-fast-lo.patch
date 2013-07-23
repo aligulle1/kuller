@@ -1,0 +1,82 @@
+From 38beaaccc53077199f4416ed62f4a0746297b602 Mon Sep 17 00:00:00 2001
+From: Chow Loong Jin <hyperair@ubuntu.com>
+Date: Mon, 22 Nov 2010 04:36:40 +0800
+Subject: [PATCH] Revert "[ArtworkManager] Cache null artwork for fast lookup"
+
+This reverts commit 768c76da611a990054ff0921f24d566de86ac749.
+---
+ .../Banshee.Collection.Gui/ArtworkManager.cs       |   15 ---------------
+ 1 files changed, 0 insertions(+), 15 deletions(-)
+
+diff --git a/src/Core/Banshee.ThickClient/Banshee.Collection.Gui/ArtworkManager.cs b/src/Core/Banshee.ThickClient/Banshee.Collection.Gui/ArtworkManager.cs
+index cba8ec8..2414ca1 100644
+--- a/src/Core/Banshee.ThickClient/Banshee.Collection.Gui/ArtworkManager.cs
++++ b/src/Core/Banshee.ThickClient/Banshee.Collection.Gui/ArtworkManager.cs
+@@ -49,7 +49,6 @@ namespace Banshee.Collection.Gui
+     {
+         private Dictionary<int, SurfaceCache> scale_caches  = new Dictionary<int, SurfaceCache> ();
+         private HashSet<int> cacheable_cover_sizes = new HashSet<int> ();
+-        private HashSet<string> null_artwork_ids = new HashSet<string> ();
+ 
+         private class SurfaceCache : LruCache<string, Cairo.ImageSurface>
+         {
+@@ -117,13 +116,8 @@ namespace Banshee.Collection.Gui
+                 return surface;
+             }
+ 
+-            if (null_artwork_ids.Contains (id)) {
+-                return null;
+-            }
+-
+             Pixbuf pixbuf = LookupScalePixbuf (id, size);
+             if (pixbuf == null || pixbuf.Handle == IntPtr.Zero) {
+-                null_artwork_ids.Add (id);
+                 return null;
+             }
+ 
+@@ -163,17 +157,12 @@ namespace Banshee.Collection.Gui
+                 return null;
+             }
+ 
+-            if (null_artwork_ids.Contains (id)) {
+-                return null;
+-            }
+-
+             // Find the scaled, cached file
+             string path = CoverArtSpec.GetPathForSize (id, size);
+             if (File.Exists (new SafeUri (path))) {
+                 try {
+                     return new Pixbuf (path);
+                 } catch {
+-                    null_artwork_ids.Add (id);
+                     return null;
+                 }
+             }
+@@ -190,7 +179,6 @@ namespace Banshee.Collection.Gui
+                         Pixbuf pixbuf = new Pixbuf (unconverted_path);
+                         if (pixbuf.Width < 50 || pixbuf.Height < 50) {
+                             Hyena.Log.DebugFormat ("Ignoring cover art {0} because less than 50x50", unconverted_path);
+-                            null_artwork_ids.Add (id);
+                             return null;
+                         }
+ 
+@@ -231,7 +219,6 @@ namespace Banshee.Collection.Gui
+                 } catch {}
+             }
+ 
+-            null_artwork_ids.Add (id);
+             return null;
+         }
+ 
+@@ -251,8 +238,6 @@ namespace Banshee.Collection.Gui
+                 scale_caches[size].Remove (id);
+             }
+ 
+-            null_artwork_ids.Remove (id);
+-
+             if (inMemoryCacheOnly) {
+                 return;
+             }
+-- 
+1.7.1
+

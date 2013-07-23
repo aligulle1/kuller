@@ -1,0 +1,86 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>net-snmp</Name>
+        <Homepage>http://net-snmp.sourceforge.net/</Homepage>
+        <Packager>
+            <Name>Ekin Meroğlu</Name>
+            <Email>ekin@pardus.org.tr</Email>
+        </Packager>
+        <License>GPL-2</License>
+        <IsA>library</IsA>
+        <IsA>app:console</IsA>
+        <Summary>A collection of SNMP protocol tools and libraries</Summary>
+        <Description>Simple Network Management Protocol tools and libraries</Description>
+        <Archive sha1sum="8edb17509eba9f8c9cfb015fe35a1024048129eb" type="targz">mirrors://sourceforge/net-snmp/net-snmp-5.4.tar.gz</Archive>
+        <Patches>
+            <Patch level="1">net-snmp-makefile.patch</Patch>
+            <Patch level="1">locale.patch</Patch>
+            <Patch>CVE-2007-5846.patch</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>net-snmp</Name>
+        <Files>
+            <Path fileType="executable">/usr/bin</Path>
+            <Path fileType="executable">/usr/sbin/snmpd</Path>
+            <Path fileType="config">/etc/conf.d/snmpd</Path>
+            <Path fileType="config">/etc/snmp/snmpd.conf.example</Path>
+            <Path fileType="library">/usr/lib</Path>
+            <Path fileType="header">/usr/include</Path>
+            <Path fileType="data">/usr/share/snmp</Path>
+            <Path fileType="data">/var/lib</Path>
+            <Path fileType="man">/usr/share/man</Path>
+            <Path fileType="doc">/usr/share/doc</Path>
+        </Files>
+        <AdditionalFiles>
+            <AdditionalFile owner="root" permission="0644" target="/etc/conf.d/snmpd">snmpd.conf</AdditionalFile>
+        </AdditionalFiles>
+        <Provides>
+            <COMAR script="snmpd.py">System.Service</COMAR>
+        </Provides>
+    </Package>
+
+    <Package>
+        <Name>net-snmptrap</Name>
+        <RuntimeDependencies>
+            <Dependency>net-snmp</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="executable">/usr/sbin/snmptrapd</Path>
+            <Path fileType="config">/etc/conf.d/snmptrapd</Path>
+        </Files>
+        <AdditionalFiles>
+            <AdditionalFile owner="root" permission="0644" target="/etc/conf.d/snmptrapd">snmptrapd.conf</AdditionalFile>
+        </AdditionalFiles>
+        <Provides>
+            <COMAR script="snmptrapd.py">System.Service</COMAR>
+        </Provides>
+    </Package>
+
+    <History>
+        <Update release="3" type="security">
+            <Date>2007-11-07</Date>
+            <Version>5.4</Version>
+            <Comment>Fix CVE-2007-5846</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="2">
+            <Date>2007-06-10</Date>
+            <Version>5.4</Version>
+            <Comment>Update service script</Comment>
+            <Name>Ekin Meroğlu</Name>
+            <Email>ekin@pardus.org.tr</Email>
+        </Update>
+        <Update release="1">
+            <Date>2007-02-09</Date>
+            <Version>5.4</Version>
+            <Comment>First release</Comment>
+            <Name>Ali Erdinç Köroğlu</Name>
+            <Email>erdinc@pardus.org.tr</Email>
+        </Update>
+    </History>
+</PISI>

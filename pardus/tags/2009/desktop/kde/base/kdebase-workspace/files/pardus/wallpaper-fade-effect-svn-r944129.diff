@@ -1,0 +1,47 @@
+Index: plasma/wallpapers/image/image.cpp
+===================================================================
+--- plasma/wallpapers/image/image.cpp	(revision 944128)
++++ plasma/wallpapers/image/image.cpp	(revision 944129)
+@@ -238,12 +234,13 @@
+ 
+     // for pixmaps we draw only the exposed part (untransformed since the
+     // bitmapBackground already has the size of the viewport)
+-    painter->drawPixmap(exposedRect, m_pixmap, exposedRect);
++    painter->drawPixmap(exposedRect, m_pixmap, exposedRect.translated(-boundingRect().topLeft()));
+ 
+     if (!m_oldFadedPixmap.isNull()) {
+         // Put old faded image on top.
+         painter->setCompositionMode(QPainter::CompositionMode_SourceAtop);
+-        painter->drawPixmap(exposedRect, m_oldFadedPixmap, exposedRect);
++        painter->drawPixmap(exposedRect, m_oldFadedPixmap,
++                            exposedRect.translated(-boundingRect().topLeft()));
+     }
+ }
+ 
+@@ -312,6 +309,10 @@
+ 
+ void Image::setSingleImage()
+ {
++    if (m_wallpaper.isEmpty()) {
++        return;
++    }
++
+     QString img;
+     BackgroundPackage b(m_wallpaper, m_ratio);
+ 
+@@ -535,9 +536,12 @@
+     if (!image.isEmpty()) {
+         m_img = image;
+     }
+-    // else re-render previous image
+-    m_rendererToken = m_renderer.render(m_img, m_color, m_resizeMethod,
+-                                        Qt::SmoothTransformation);
++
++    if (m_img.isEmpty()) {
++        return;
++    }
++
++    m_rendererToken = m_renderer.render(m_img, m_color, m_resizeMethod, Qt::SmoothTransformation);
+     suspendStartup(true); // during KDE startup, make ksmserver until the wallpaper is ready
+ }
+ 

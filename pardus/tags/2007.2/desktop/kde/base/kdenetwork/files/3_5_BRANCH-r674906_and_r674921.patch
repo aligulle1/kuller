@@ -1,0 +1,28 @@
+Index: kopete/protocols/yahoo/yahooaccount.cpp
+===================================================================
+--- kopete/protocols/yahoo/yahooaccount.cpp	(revision 674905)
++++ kopete/protocols/yahoo/yahooaccount.cpp	(revision 674906)
+@@ -675,6 +675,7 @@ void YahooAccount::slotLoginResponse( in
+ 		setBuddyIcon( myself()->property( Kopete::Global::Properties::self()->photo() ).value().toString() );
+ 		m_session->getYABEntries( m_YABLastMerge, m_YABLastRemoteRevision );
+ 		m_lastDisconnectCode = 0;
++		theHaveContactList = true;
+ 		return;
+ 	}
+ 	else if(succ == Yahoo::LoginPasswd)
+Index: kopete/protocols/yahoo/libkyahoo/client.cpp
+===================================================================
+--- kopete/protocols/yahoo/libkyahoo/client.cpp	(revision 674920)
++++ kopete/protocols/yahoo/libkyahoo/client.cpp	(revision 674921)
+@@ -183,8 +183,10 @@ void Client::close()
+ 	if( d->tasksInitialized)
+ 		deleteTasks();	
+ 	d->loginTask->reset();
+-	if( d->stream )
++	if( d->stream ) {
++		QObject::disconnect( d->stream, SIGNAL( readyRead() ), this, SLOT( streamReadyRead() ) );
+ 		d->stream->deleteLater();
++	}
+ 	d->stream = 0L;
+ 	if( m_connector )
+ 		m_connector->deleteLater();

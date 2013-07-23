@@ -1,0 +1,55 @@
+diff -ur kpowersave-0.7.3.orig/src/dbusHAL.cpp kpowersave-0.7.3/src/dbusHAL.cpp
+--- kpowersave-0.7.3.orig/src/dbusHAL.cpp	2007-09-17 20:39:45.000000000 +0300
++++ kpowersave-0.7.3/src/dbusHAL.cpp	2008-03-21 16:55:18.000000000 +0200
+@@ -922,7 +922,7 @@
+ 
+ 	DBusMessage* reply = NULL;
+ 	DBusError error;
+-	int result;
++	uint result;
+ 	bool failed = false;
+ 
+         if (!pcall) {
+@@ -939,7 +939,7 @@
+ 
+ 	dbus_error_init(&error);
+ 
+-        if (!dbus_message_get_args (reply, &error, DBUS_TYPE_INT32, &result, DBUS_TYPE_INVALID)) {
++        if (!dbus_message_get_args (reply, &error, DBUS_TYPE_UINT32, &result, DBUS_TYPE_INVALID)) {
+ 		if (dbus_error_is_set(&error)) {
+ 			kdError() << "Could not get argument from reply: " << error.message << endl;
+ 			dbus_error_free(&error);
+diff -ur kpowersave-0.7.3.orig/src/hardware.cpp kpowersave-0.7.3/src/hardware.cpp
+--- kpowersave-0.7.3.orig/src/hardware.cpp	2007-09-17 20:39:45.000000000 +0300
++++ kpowersave-0.7.3/src/hardware.cpp	2008-03-21 16:54:54.000000000 +0200
+@@ -775,10 +775,10 @@
+ 	kdDebugFuncIn(trace);
+ 
+ 	if (brightness) {
+-		int retval;
++		uint retval;
+ 		// get the current level via GetBrightness
+ 		if (dbus_HAL->dbusSystemMethodCall( HAL_SERVICE, *udis["laptop_panel"], HAL_LPANEL_IFACE, 	
+-						    "GetBrightness", &retval, DBUS_TYPE_INT32,
++						    "GetBrightness", &retval, DBUS_TYPE_UINT32,
+ 						    DBUS_TYPE_INVALID ) ) {
+ 			currentBrightnessLevel = (int) retval;
+ 		}
+@@ -1250,7 +1250,7 @@
+ 
+ 	if (dbus_HAL->isConnectedToDBUS() && dbus_HAL->isConnectedToHAL()) {
+ 		dbus_bool_t _tmp = (dbus_bool_t) on;
+-		int reply;
++		uint reply;
+ 
+ #ifdef USE_LIBHAL_POLICYCHECK
+ 		if (dbus_HAL->isUserPrivileged(PRIV_SETPOWERSAVE, HAL_COMPUTER_UDI) != 0) {
+@@ -1259,7 +1259,7 @@
+ #endif
+ 			if (!dbus_HAL->dbusSystemMethodCall( HAL_SERVICE, HAL_COMPUTER_UDI, 
+ 							     HAL_PM_IFACE, "SetPowerSave",
+-							     &reply, DBUS_TYPE_INT32,
++							     &reply, DBUS_TYPE_UINT32,
+ 							     DBUS_TYPE_BOOLEAN, &_tmp,
+ 							     DBUS_TYPE_INVALID)) {
+ 				kdError() << "Could not call/set SetPowerSave on HAL, " 

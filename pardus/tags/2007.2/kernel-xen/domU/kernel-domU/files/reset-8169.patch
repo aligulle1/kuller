@@ -1,0 +1,36 @@
+Index: linux-2.6.18/drivers/net/r8169.c
+===================================================================
+--- linux-2.6.18.orig/drivers/net/r8169.c
++++ linux-2.6.18/drivers/net/r8169.c
+@@ -1592,6 +1592,22 @@ err_out:
+ 	goto out;
+ }
+ 
++static void rtl8169_phy_reset(struct net_device *dev,
++			      struct rtl8169_private *tp)
++{
++	void __iomem *ioaddr = tp->mmio_addr;
++	int i;
++
++	tp->phy_reset_enable(ioaddr);
++	for (i = 0; i < 100; i++) {
++		if (!tp->phy_reset_pending(ioaddr))
++			return;
++		msleep(1);
++	}
++	if (netif_msg_link(tp))
++		printk(KERN_ERR "%s: PHY reset failed.\n", dev->name);
++}
++
+ static int __devinit
+ rtl8169_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
+ {
+@@ -1714,6 +1730,8 @@ rtl8169_init_one(struct pci_dev *pdev, c
+ 
+ 	rtl8169_link_option(board_idx, &autoneg, &speed, &duplex);
+ 
++	rtl8169_phy_reset(dev, tp);
++
+ 	rtl8169_set_speed(dev, autoneg, speed, duplex);
+ 	
+ 	if ((RTL_R8(PHYstatus) & TBI_Enable) && netif_msg_link(tp))

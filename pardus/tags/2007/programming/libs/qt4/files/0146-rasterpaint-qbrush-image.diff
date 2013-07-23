@@ -1,0 +1,19 @@
+qt-bugs@ issue : N129408
+Trolltech task ID : none
+applied: no
+author: Maurizio Monge <maurizio.monge@kdemail.net>
+
+When painting over a QImage using a QBrush with a texture that is an image,
+this patch avoids a useless QImage -> QPixmap -> QImage conversion.
+
+--- src/gui/painting/qpaintengine_raster.cpp	2006-10-05 01:29:24.000000000 +0200
++++ src/gui/painting/qpaintengine_raster.cpp	2006-10-05 02:40:02.652387408 +0200
+@@ -3413,7 +3413,7 @@
+             type = Texture;
+             extern QImage qt_imageForBrush(int brushStyle, bool invert);
+             QImage texture = (brushStyle == Qt::TexturePattern)
+-                             ? brush.texture().toImage()
++                             ? brush.textureImage()
+                              : qt_imageForBrush(brushStyle, true);
+ 
+             tempImage = (texture.depth() == 1)

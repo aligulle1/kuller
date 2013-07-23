@@ -1,0 +1,441 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>kdebase4-workspace</Name>
+        <Homepage>http://www.kde.org/</Homepage>
+        <Packager>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Packager>
+        <License>GPLv2</License>
+        <IsA>app:gui</IsA>
+        <Summary>The KDE Workspace consists of what is the desktop of the KDE Desktop Environment.</Summary>
+        <Description>KDE Workspace contains the main KDE components like kdm (the login manager of KDE), khotkeys (a hotkey daemon), klipper (a cut &amp; paste history utility), kmenuedit (the menu editor), krandrtray (resize and rotate X screens), krunner (a command run interface), ksysguard (a performance monitor), kwin (the window manager of KDE), kxkb (a utility to switch keyboard maps), plasma (the KDE desktop, panels and widgets workspace application) and systemsettings (the configuration editor).</Description>
+        <Archive type="tarbz2" sha1sum="9397220827f378cedf38e800e06e9ca8b1a1235d">mirrors://kde/stable/4.2.2/src/kdebase-workspace-4.2.2.tar.bz2</Archive>
+        <BuildDependencies>
+            <Dependency versionFrom="4.2.2">kdelibs4-devel</Dependency>
+            <Dependency versionFrom="4.2.2">PyKDE4</Dependency>
+            <Dependency>bluez-libs</Dependency>
+            <Dependency>libxklavier</Dependency>
+            <Dependency>libraw1394</Dependency>
+            <Dependency>liblazy</Dependency>
+            <Dependency>qimageblitz</Dependency>
+            <Dependency>libcaptury</Dependency>
+            <Dependency>openldap-client</Dependency>
+            <Dependency>qedje</Dependency>
+            <!-- lm_sensors is needed by ksysguard and system monitor plasmoid -->
+            <Dependency>lm_sensors</Dependency>
+            <!--
+            <Dependency>google-gadgets</Dependency>
+            -->
+            <Dependency>kdepimlibs-devel</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <Patch>pardus-kdm-settings.diff</Patch>
+            <Patch>brandicon.patch</Patch>
+            <Patch level="1">session-pulseaudio.patch</Patch>
+
+            <Patch>suse/kdm-cope-with-new-grub.diff</Patch>
+            <Patch>suse/kdm-make_it_cool.diff</Patch>
+            <Patch>suse/kdm-relaxed-auth.diff</Patch>
+            <!--<Patch>suse/kdm-suspend-hal.diff</Patch>-->
+            <Patch>suse/kdm-wordbreak.diff</Patch>
+            <Patch>suse/rotate-wacom-pointers.diff</Patch>
+            <!-- something like this will be needed to migrate from kde3
+            <Patch>suse/kde4-migrate.diff</Patch>
+            -->
+            <Patch>suse/lowdiskspace.patch</Patch>
+
+            <Patch>fedora/kdebase-workspace-4.1.2-rootprivs.patch</Patch>
+            <Patch>fedora/kdebase-workspace-4.0.3-krdb.patch</Patch>
+            <Patch level="1">fedora/kdebase-workspace-4.0.72-klipper-url.patch</Patch>
+            <Patch level="1">fedora/kdebase-workspace-4.1.80-session-button.patch</Patch>
+            <Patch level="1">fedora/kdebase-workspace-4.1.2-ldap.patch</Patch>
+            <!-- Fixes kdebluetooth4 0.3 build for 4.2. Patch from 4.3 svn trunk -->
+            <Patch>fedora/solid-bluetoothTrunkTo42.diff</Patch>
+            <Patch level="1">fedora/kdebase-workspace-4.2.0-kde180576.patch</Patch>
+            <Patch>fedora/kdebase-workspace-4.3.0-desktopnumbers.patch</Patch>
+
+
+            <!-- Change pidfilename of the KDM (in default kdmrc4 file) to kdm-kde4 to not conflict with KDM of KDE3 -->
+            <Patch>change-kdm-pid.diff</Patch>
+            <Patch>suse/kdm-audit-log.diff</Patch>
+
+            <Patch level="1">default-kdm-fontsize9.diff</Patch>
+
+            <!-- Kubuntu patches -->
+
+            <!-- Patch to fix ksplash blurry icon clipping -->
+            <Patch level="1">kubuntu/kubuntu_63_ksplash_fix.diff</Patch>
+            <Patch>tasks-icons-only.diff</Patch>
+        </Patches>
+    </Source>
+    <Package>
+        <Name>kdebase4-workspace</Name>
+        <RuntimeDependencies>
+            <Dependency versionFrom="4.2.2">kdelibs4</Dependency>
+            <Dependency versionFrom="4.2.2">PyKDE4</Dependency>
+            <Dependency>bluez-libs</Dependency>
+            <Dependency>libxklavier</Dependency>
+            <Dependency>libraw1394</Dependency>
+            <Dependency>xscreensaver</Dependency>
+            <Dependency versionFrom="0.98">zorg</Dependency>
+            <Dependency>qimageblitz</Dependency>
+            <Dependency>liblazy</Dependency>
+            <Dependency>libcaptury</Dependency>
+            <Dependency releaseFrom="75">comar</Dependency>
+            <Dependency>kdm-pardus-theme-kde4</Dependency>
+            <Dependency>openldap-client</Dependency>
+            <Dependency>qedje</Dependency>
+            <Dependency>lm_sensors</Dependency>
+            <!--
+            <Dependency>google-gadgets</Dependency>
+            -->
+            <Dependency>kdepimlibs</Dependency>
+            <Dependency>PolicyKit-kde4</Dependency>
+        </RuntimeDependencies>
+        <Conflicts>
+            <!-- /usr/kde/4/share/doc/HTML/en/kcontrol/mouse/ directory comes from this package now -->
+            <Package releaseTo="17">kdebase4-runtime</Package>
+            <Package versionTo="4.1.3">kdebase4</Package>
+            <Package versionTo="4.1.3">kdebindings4</Package>
+            <Package>powerdevil-kde4</Package>
+        </Conflicts>
+        <Files>
+            <Path fileType="executable">/usr/kde/4/bin</Path>
+            <Path fileType="config">/usr/kde/4/etc</Path>
+            <Path fileType="config">/etc</Path>
+            <Path fileType="config">/usr/kde/4/env</Path>
+            <Path fileType="config">/usr/kde/4/shutdown</Path>
+            <Path fileType="header">/usr/kde/4/include</Path>
+            <Path fileType="library">/usr/kde/4/lib</Path>
+            <!-- PyKDE4 plasma applet api for python -->
+            <Path fileType="library">/usr/lib</Path>
+            <Path fileType="data">/usr/kde/4/share</Path>
+        </Files>
+        <AdditionalFiles>
+            <AdditionalFile target="/etc/pam.d/kde4" permission="0644" owner="root">kde.pam</AdditionalFile>
+            <AdditionalFile target="/etc/pam.d/kde4-np" permission="0644" owner="root">kde-np.pam</AdditionalFile>
+            <AdditionalFile target="/usr/kde/4/env/agent-startup.sh" permission="0755" owner="root">agent-startup.sh</AdditionalFile>
+            <AdditionalFile target="/usr/kde/4/env/strigi-plugin-path.sh" permission="0755" owner="root">strigi-plugin-path.sh</AdditionalFile>
+            <AdditionalFile target="/usr/kde/4/shutdown/agent-shutdown.sh" permission="0755" owner="root">agent-shutdown.sh</AdditionalFile>
+            <AdditionalFile target="/usr/kde/4/share/apps/systemsettings/brandicon.png" permission="0644" owner="root">brandicon.png</AdditionalFile>
+        </AdditionalFiles>
+        <Provides>
+            <COMAR script="service.py">System.Service</COMAR>
+            <COMAR script="package.py">System.Package</COMAR>
+        </Provides>
+    </Package>
+    <History>
+        <Update release="42">
+            <Date>2009-05-04</Date>
+            <Version>4.2.2</Version>
+            <Comment>Fix low disk space patch.</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="41">
+            <Date>2009-04-16</Date>
+            <Version>4.2.2</Version>
+            <Comment>PolicyKit-kde4 is added as runtime dependency</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="40">
+            <Date>2009-04-02</Date>
+            <Version>4.2.2</Version>
+            <Comment>Version bump to new bugfix release</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="39">
+            <Date>2009-03-17</Date>
+            <Version>4.2.1</Version>
+            <Comment>lm_sensors dependency added.</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="38">
+            <Date>2009-03-16</Date>
+            <Version>4.2.1</Version>
+            <Comment>Brand icon support added to system settings with Pardus logo</Comment>
+            <Name>Gökmen GÖKSEL</Name>
+            <Email>gokmen@pardus.org.tr</Email>
+        </Update>
+        <Update release="37">
+            <Date>2009-03-05</Date>
+            <Version>4.2.1</Version>
+            <Comment>"Show only icons" option added to the tasks plasmoid</Comment>
+            <Name>Gökmen GÖKSEL</Name>
+            <Email>gokmen@pardus.org.tr</Email>
+        </Update>
+        <Update release="36">
+            <Date>2009-03-04</Date>
+            <Version>4.2.1</Version>
+            <Comment>Version bump to new bugfix release</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="35">
+            <Date>2009-02-23</Date>
+            <Version>4.2.0</Version>
+            <Comment>
+                - Workaround for a bug in qdbuscpp2xml,
+                - Fix blurry ksplash clipping,
+                - Fix kdebluetooth4 compilation with 4.2.
+            </Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="34">
+            <Date>2009-02-19</Date>
+            <Version>4.2.0</Version>
+            <Comment>Make KDM default theme fonts smaller.</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="33">
+            <Date>2009-02-07</Date>
+            <Version>4.2.0</Version>
+            <Comment>
+                * "Login Manager corrupting kdmrc" problem fixed. #9144
+                * GENKDMCONF_FLAGS is exported as environment variable instead of make parameter, a better solution according to the upstream.
+                * pyc files are removed.
+            </Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="32">
+            <Date>2009-01-29</Date>
+            <Version>4.2.0</Version>
+            <Comment>Version bump to 4.2 final release</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="31">
+            <Date>2009-01-19</Date>
+            <Version>4.1.87_907663</Version>
+            <Comment>Pid file of KDM is removed after service is stopped.</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="30">
+            <Date>2009-01-13</Date>
+            <Version>4.1.87_907663</Version>
+            <Comment>Fixed Comar service script for language issues</Comment>
+            <Name>Gökmen GÖKSEL</Name>
+            <Email>gokmen@pardus.org.tr</Email>
+        </Update>
+        <Update release="29">
+            <Date>2009-01-08</Date>
+            <Version>4.1.87_907663</Version>
+            <Comment>Sync with SVN</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="28">
+            <Date>2009-01-05</Date>
+            <Version>4.1.87</Version>
+            <Comment>Version bump</Comment>
+            <Name>Gökmen GÖKSEL</Name>
+            <Email>gokmen@pardus.org.tr</Email>
+        </Update>
+        <Update release="27">
+            <Date>2008-12-15</Date>
+            <Version>4.1.85</Version>
+            <Comment>Version bump to 4.2 beta 2</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="26">
+            <Date>2008-11-21</Date>
+            <Version>4.1.80</Version>
+            <Comment>Version bump to 4.2 beta 1</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="25">
+            <Date>2008-11-02</Date>
+            <Version>4.1.3</Version>
+            <Comment>Stable update</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="24">
+            <Date>2008-10-31</Date>
+            <Version>4.1.2</Version>
+            <Comment>Added missing dep. pardus kdm theme</Comment>
+            <Name>İşbaran Akçayır</Name>
+            <Email>isbaran@comu.edu.tr</Email>
+        </Update>
+        <Update release="23">
+            <Date>2008-10-31</Date>
+            <Version>4.1.2</Version>
+            <Comment>Add an env script to set strigi plugin paths on startup</Comment>
+            <Name>Fatih Aşıcı</Name>
+            <Email>fatih@pardus.org.tr</Email>
+        </Update>
+        <Update release="22">
+            <Date>2008-09-26</Date>
+            <Version>4.1.2</Version>
+            <Comment>
+                * Stable update to bugfix release
+                * Change PIDFILE to kdm-kde4 to not conflict with KDM of KDE3.
+                * Postinstall script added to manually change pidfile key in kdmrc4. Otherwise, new key in kdmrc4.newconfig does not take effect.
+            </Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="21">
+            <Date>2008-09-19</Date>
+            <Version>4.1.1</Version>
+            <Comment>Increase timeout of Xorg.Display&apos;s ready method call</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="20">
+            <Date>2008-09-17</Date>
+            <Version>4.1.1</Version>
+            <Comment>
+                * Add patches from Fedora
+                * Add libcaptury dep.
+            </Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="19">
+            <Date>2008-09-12</Date>
+            <Version>4.1.1</Version>
+            <Comment>Change default KDM theme to Pardus</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="18">
+            <Date>2008-09-05</Date>
+            <Version>4.1.1</Version>
+            <Comment>Stable update to new bugfix release</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="17">
+            <Date>2008-09-04</Date>
+            <Version>4.1.0</Version>
+            <Comment>Added liblazy dep needed by kdm_greet</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="16">
+            <Date>2008-09-02</Date>
+            <Version>4.1.0</Version>
+            <Comment>Add missing dependency qimageblitz</Comment>
+            <Name>Ekin Meroğlu</Name>
+            <Email>ekin@pardus.org.tr</Email>
+        </Update>
+        <Update release="15">
+            <Date>2008-08-26</Date>
+            <Version>4.1.0</Version>
+            <Comment>Fix login problem when kdebase3 is not installed</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="14">
+            <Date>2008-08-20</Date>
+            <Version>4.1.0</Version>
+            <Comment>Start pulseaudio in startkde</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="13">
+            <Date>2008-07-27</Date>
+            <Version>4.1.0</Version>
+            <Comment>Stable update</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="12">
+            <Date>2008-07-25</Date>
+            <Version>4.0.99</Version>
+            <Comment>Version Bump</Comment>
+            <Name>İşbaran Akçayır</Name>
+            <Email>isbaran@comu.edu.tr</Email>
+        </Update>
+        <Update release="11">
+            <Date>2008-07-16</Date>
+            <Version>4.0.98</Version>
+            <Comment>kdebase4-runtime dep changed to kdelibs4</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="10">
+            <Date>2008-07-15</Date>
+            <Version>4.0.98</Version>
+            <Comment>Version bump</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="9">
+            <Date>2008-07-04</Date>
+            <Version>4.0.85</Version>
+            <Comment>Version bump</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="8">
+            <Date>2008-06-24</Date>
+            <Version>4.0.83</Version>
+            <Comment>Beta 2</Comment>
+            <Name>İşbaran Akçayır</Name>
+            <Email>isbaran@comu.edu.tr</Email>
+        </Update>
+        <Update release="7">
+            <Date>2008-05-29</Date>
+            <Version>4.0.80</Version>
+            <Comment>Update service script for 2008</Comment>
+            <Name>Fatih Aşıcı</Name>
+            <Email>fatih@pardus.org.tr</Email>
+        </Update>
+        <Update release="6">
+            <Date>2008-05-28</Date>
+            <Version>4.0.80</Version>
+            <Comment>Stable update</Comment>
+            <Name>Kenan Pelit</Name>
+            <Email>kpelit@gmail.com</Email>
+        </Update>
+        <Update release="5">
+            <Date>2008-05-07</Date>
+            <Version>4.0.4</Version>
+            <Comment>Stable update</Comment>
+            <Name>Kenan Pelit</Name>
+            <Email>kpelit@gmail.com</Email>
+        </Update>
+        <Update release="4">
+            <Date>2008-04-03</Date>
+            <Version>4.0.3</Version>
+            <Comment>Stable update</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="3">
+            <Date>2008-03-05</Date>
+            <Version>4.0.2</Version>
+            <Comment>Stable update</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="2">
+            <Date>2008-01-31</Date>
+            <Version>4.0.1</Version>
+            <Comment>Stable update</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="1">
+            <Date>2008-01-05</Date>
+            <Version>4.0.0</Version>
+            <Comment>First release</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+    </History>
+</PISI>

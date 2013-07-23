@@ -1,0 +1,31 @@
+From: Adrian Bunk <bunk@stusta.de>
+Subject: [2.6 patch] add -Werror-implicit-function-declaration to CFLAGS
+Patch-mainline: breaks akpm, but helps SuSE
+
+Currently, using an undeclared function gives a compile warning, but it 
+can lead to a link or even a runtime error.
+
+With -Werror-implicit-function-declaration, we are getting an immediate 
+compile error instead.
+
+This patch also removes some unneeded spaces between two tabs in the 
+following line.
+
+
+Signed-off-by: Adrian Bunk <bunk@stusta.de>
+Signed-off-by: Olaf Hering <olh@suse.de>
+
+---
+ Makefile |    1 +
+ 1 files changed, 1 insertion(+)
+
+--- linux-2.6.17.orig/Makefile
++++ linux-2.6.17/Makefile
+@@ -308,6 +308,7 @@ LINUXINCLUDE    := -Iinclude \
+ CPPFLAGS        := -D__KERNEL__ $(LINUXINCLUDE)
+ 
+ CFLAGS          := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
++		   -Werror-implicit-function-declaration \
+                    -fno-strict-aliasing -fno-common
+ # Force gcc to behave correct even for buggy distributions
+ CFLAGS          += $(call cc-option, -fno-stack-protector-all \

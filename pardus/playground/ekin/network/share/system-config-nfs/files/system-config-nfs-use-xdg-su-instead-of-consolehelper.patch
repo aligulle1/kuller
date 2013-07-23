@@ -1,0 +1,24 @@
+diff -Nur system-config-nfs-1.3.50.orig/Makefile system-config-nfs-1.3.50/Makefile
+--- system-config-nfs-1.3.50.orig/Makefile	2010-08-05 10:59:52.287120284 +0300
++++ system-config-nfs-1.3.50/Makefile	2010-08-05 11:07:01.566057349 +0300
+@@ -50,7 +50,7 @@
+ 	install -m 0644 pixmaps/*.png $(DESTDIR)/$(PKGIMAGEDIR)
+ 	install -m 0644 pixmaps/${PKGNAME}.png $(DESTDIR)/$(DATADIR)/icons/hicolor/48x48/apps
+ 	install -m 0644 ${PKGNAME}.desktop $(DESTDIR)/$(DATADIR)/applications/${PKGNAME}.desktop
+-	ln -sf consolehelper $(DESTDIR)/$(BINDIR)/$(PKGNAME)
++	ln -sf $(PKGDATADIR)/system-config-nfs.py $(DESTDIR)/$(BINDIR)/$(PKGNAME)
+ 	for d in $(SUBDIRS); do \
+ 	(cd $$d; $(MAKE) DESTDIR=$(DESTDIR) MANDIR=$(MANDIR) install) \
+ 		|| case "$(MFLAGS)" in *k*) fail=yes;; *) exit 1;; esac; \
+diff -Nur system-config-nfs-1.3.50.orig/system-config-nfs.desktop.in system-config-nfs-1.3.50/system-config-nfs.desktop.in
+--- system-config-nfs-1.3.50.orig/system-config-nfs.desktop.in	2010-08-05 10:59:52.287120284 +0300
++++ system-config-nfs-1.3.50/system-config-nfs.desktop.in	2010-08-05 11:00:32.044183114 +0300
+@@ -3,7 +3,7 @@
+ _Comment=Create, modify, and delete NFS shares
+ Icon=system-config-nfs.png
+ Categories=System;Settings;
+-Exec=/usr/bin/system-config-nfs
++Exec=xdg-su -c /usr/bin/system-config-nfs
+ Type=Application
+ StartupNotify=true
+ Terminal=false

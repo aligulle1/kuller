@@ -1,0 +1,557 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>kdemultimedia</Name>
+        <Homepage>http://www.kde.org/</Homepage>
+        <Packager>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Packager>
+        <License>GPLv2</License>
+        <IsA>app:gui</IsA>
+        <Summary>KDE multimedia applications</Summary>
+        <Description>Contains KDE multimedia applications like KsCD, juK and base KDE multimedia libraries.</Description>
+        <Archive type="tarbz2" sha1sum="c85337b959882ec9f3bb51f5e1ee4ec74a988518">mirrors://kde/stable/3.5.10/src/kdemultimedia-3.5.10.tar.bz2</Archive>
+        <BuildDependencies>
+            <Dependency>qt3</Dependency>
+            <Dependency>kdelibs</Dependency>
+            <Dependency>cdparanoia</Dependency>
+            <Dependency>taglib</Dependency>
+            <Dependency>libogg</Dependency>
+            <Dependency>flac</Dependency>
+            <Dependency>alsa-lib</Dependency>
+            <Dependency>libvorbis</Dependency>
+            <Dependency>libtheora</Dependency>
+            <Dependency>akode</Dependency>
+            <Dependency>gstreamer</Dependency>
+            <Dependency>gst-plugins-base</Dependency>
+            <Dependency>gst-plugins-ugly</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <Patch>kmix-hidden.patch</Patch>
+            <Patch>kmix-identify.patch</Patch>
+            <Patch>jukui.patch</Patch>
+            <Patch>flac-1.1.3.patch</Patch>
+
+            <Patch level="1">play_WMA.patch</Patch>
+            <Patch level="1">kscd_volume.patch</Patch>
+            <Patch level="1">kaudiocreator_settings.patch</Patch>
+            <Patch level="1">kscd_autoplay.patch</Patch>
+
+            <!-- Mute kmix with middle mouse, sweet -->
+            <Patch>kmix-dock-icon-toggles-muting.diff</Patch>
+            <Patch level="1">newtunepimp.patch</Patch>
+            <Patch level="1">pulse.patch</Patch>
+
+            <!-- Upstream fixes for Juk -->
+            <Patch>juk-branch-fixes.patch</Patch>
+
+            <!-- http://git.savannah.gnu.org/gitweb/?p=autoconf.git;a=commit;h=46009205a943a5f5b712cc11b72e9b017141ffeb -->
+            <Patch level="1">new_autoconf.patch</Patch>
+
+            <Patch level="1">kmix-autostart.patch</Patch>
+        </Patches>
+    </Source>
+    <Package>
+        <Name>kdemultimedia-juk</Name>
+        <PartOf>multimedia.sound</PartOf>
+        <Summary>A jukebox and music manager</Summary>
+        <Description>Though an able music player, JuK is primarily an audio jukebox application, with a strong focus on management of music. Many features include collection list, dynamic search playlists, automatic directory scanning and m3u import, tag editing and musicbrainz support. In tree view mode, playlists are automatically generated for sets of albums, artists and genres.</Description>
+        <RuntimeDependencies>
+            <Dependency>kdelibs</Dependency>
+            <Dependency>qt3</Dependency>
+            <Dependency>akode</Dependency>
+            <Dependency>gstreamer</Dependency>
+            <Dependency>gst-plugins-base</Dependency>
+            <Dependency>gst-plugins-ugly</Dependency>
+            <Dependency>taglib</Dependency>
+        </RuntimeDependencies>
+        <Replaces>
+            <Package>kdemultimedia</Package>
+        </Replaces>
+        <Files>
+            <Path fileType="executable">/usr/kde/3.5/bin/juk</Path>
+            <Path fileType="data">/usr/kde/3.5/share/applications/kde/juk.desktop</Path>
+            <Path fileType="data">/usr/kde/3.5/share/apps/juk</Path>
+            <Path fileType="data">/usr/kde/3.5/share/apps/konqueror/servicemenus/jukservicemenu.desktop</Path>
+            <Path fileType="data">/usr/kde/3.5/share/icons/*/*/apps/juk*</Path>
+            <Path fileType="data">/usr/kde/3.5/share/icons/crystalsvg/*/actions/juk*</Path>
+            <Path fileType="doc">/usr/kde/3.5/share/doc/HTML/en/juk</Path>
+        </Files>
+    </Package>
+    <Package>
+        <Name>kdemultimedia-kaudiocreator</Name>
+        <PartOf>multimedia.converter</PartOf>
+        <Summary>Audio extraction tool</Summary>
+        <Description>Kaudiocreator is a utility for storing backup copies of your audio compact discs by extracting them digitally and encoding in the codec of your choosing. It also provides a job control system so you can see what files have succeeded or failed, and stop or cancel jobs as the application progresses.</Description>
+        <RuntimeDependencies>
+            <Dependency>kdemultimedia-core</Dependency>
+            <Dependency>lame</Dependency>
+            <Dependency>vorbis-tools</Dependency>
+            <Dependency>flac</Dependency>
+            <Dependency>alsa-lib</Dependency>
+            <Dependency>kdelibs</Dependency>
+            <Dependency>qt3</Dependency>
+        </RuntimeDependencies>
+        <Replaces>
+            <Package>kdemultimedia</Package>
+        </Replaces>
+        <Files>
+            <Path fileType="executable">/usr/kde/3.5/bin/kaudiocreator</Path>
+            <Path fileType="data">/usr/kde/3.5/share/applications/kde/kaudiocreator.desktop</Path>
+            <Path fileType="data">/usr/kde/3.5/share/apps/kaudiocreator</Path>
+            <Path fileType="data">/usr/kde/3.5/share/apps/kconf_update/kaudiocreator-*</Path>
+            <Path fileType="data">/usr/kde/3.5/share/apps/kconf_update/upgrade-kaudiocreator-metadata.sh</Path>
+            <Path fileType="data">/usr/kde/3.5/share/apps/konqueror/servicemenus/audiocd_extract.desktop</Path>
+            <Path fileType="data">/usr/kde/3.5/share/config.kcfg/kaudiocreator*</Path>
+            <Path fileType="data">/usr/kde/3.5/share/icons/*/*/apps/kaudiocreator.png</Path>
+            <Path fileType="doc">/usr/kde/3.5/share/doc/HTML/en/kaudiocreator</Path>
+        </Files>
+    </Package>
+    <Package>
+        <Name>kdemultimedia-kmid</Name>
+        <PartOf>multimedia.sound</PartOf>
+        <Summary>Midi player</Summary>
+        <Description>KMid is a midi player. It displays the text of karaoke files and change its colour as it is being played so that the tune can be easily followed. It uses /dev/sequencer as output device supporting external synths, AWE , GUS and also FM cards.</Description>
+        <RuntimeDependencies>
+            <Dependency>kdelibs</Dependency>
+            <Dependency>qt3</Dependency>
+        </RuntimeDependencies>
+        <Replaces>
+            <Package>kdemultimedia</Package>
+        </Replaces>
+        <Files>
+            <Path fileType="executable">/usr/kde/3.5/bin/kmid</Path>
+            <Path fileType="library">/usr/kde/3.5/lib/kde3/libkmidpart.*</Path>
+            <Path fileType="library">/usr/kde/3.5/lib/libkmidlib.*</Path>
+            <Path fileType="data">/usr/kde/3.5/share/applications/kde/kmid.desktop</Path>
+            <Path fileType="data">/usr/kde/3.5/share/apps/kmid</Path>
+            <Path fileType="data">/usr/kde/3.5/share/icons/hicolor/*/apps/kmid.png</Path>
+            <Path fileType="data">/usr/kde/3.5/share/mimelnk/audio/x-karaoke.desktop</Path>
+            <Path fileType="data">/usr/kde/3.5/share/servicetypes/audiomidi.desktop</Path>
+            <Path fileType="doc">/usr/kde/3.5/share/doc/HTML/en/kmid</Path>
+        </Files>
+    </Package>
+    <Package>
+        <Name>kdemultimedia-kmix</Name>
+        <PartOf>multimedia.sound</PartOf>
+        <Summary>Sound mixer</Summary>
+        <Description>KMix is an application to allow you to adjust the volume and manage all available channels of your sound card.</Description>
+        <RuntimeDependencies>
+            <Dependency>kdelibs</Dependency>
+            <Dependency>qt3</Dependency>
+            <Dependency>alsa-lib</Dependency>
+        </RuntimeDependencies>
+        <Replaces>
+            <Package>kdemultimedia</Package>
+        </Replaces>
+        <Files>
+            <Path fileType="executable">/usr/kde/3.5/bin/kmix*</Path>
+            <Path fileType="library">/usr/kde/3.5/lib/kde3/kmix*</Path>
+            <Path fileType="library">/usr/kde/3.5/lib/libkdeinit_kmix*</Path>
+            <Path fileType="data">/usr/kde/3.5/share/applications/kde/kmix.desktop</Path>
+            <Path fileType="data">/usr/kde/3.5/share/autostart/*kmix*.desktop</Path>
+            <Path fileType="data">/usr/kde/3.5/share/apps/kicker/applets/kmixapplet.desktop</Path>
+            <Path fileType="data">/usr/kde/3.5/share/apps/kmix</Path>
+            <Path fileType="data">/usr/kde/3.5/share/icons/hicolor/*/apps/kmix.png</Path>
+            <Path fileType="data">/usr/kde/3.5/share/services/kmixctrl_restore.desktop</Path>
+            <Path fileType="doc">/usr/kde/3.5/share/doc/HTML/en/kmix</Path>
+        </Files>
+    </Package>
+    <Package>
+        <Name>kdemultimedia-kscd</Name>
+        <PartOf>multimedia.sound</PartOf>
+        <Summary>KDE CD player</Summary>
+        <Description>KsCD is a small, fast, CDDB enabled audio CD player.</Description>
+        <RuntimeDependencies>
+            <Dependency>kdemultimedia-core</Dependency>
+            <Dependency>kdelibs</Dependency>
+            <Dependency>qt3</Dependency>
+            <Dependency>alsa-lib</Dependency>
+        </RuntimeDependencies>
+        <Replaces>
+            <Package>kdemultimedia</Package>
+        </Replaces>
+        <Files>
+            <Path fileType="executable">/usr/kde/3.5/bin/kscd</Path>
+            <Path fileType="data">/usr/kde/3.5/share/applications/kde/kscd.desktop</Path>
+            <Path fileType="data">/usr/kde/3.5/share/apps/kscd</Path>
+            <Path fileType="data">/usr/kde/3.5/share/apps/profiles/kscd.profile</Path>
+            <Path fileType="data">/usr/kde/3.5/share/config.kcfg/kscd*</Path>
+            <Path fileType="doc">/usr/kde/3.5/share/doc/HTML/en/kscd</Path>
+            <Path fileType="data">/usr/kde/3.5/share/icons/hicolor/*/apps/kscd*</Path>
+        </Files>
+    </Package>
+    <Package>
+        <Name>kdemultimedia-core</Name>
+        <IsA>library</IsA>
+        <Summary>Base files for KDE multimedia applications</Summary>
+        <RuntimeDependencies>
+            <Dependency>qt3</Dependency>
+            <Dependency>kdelibs</Dependency>
+            <Dependency>cdparanoia</Dependency>
+            <Dependency>taglib</Dependency>
+            <Dependency>libogg</Dependency>
+            <Dependency>flac</Dependency>
+            <Dependency>alsa-lib</Dependency>
+            <Dependency>libvorbis</Dependency>
+            <Dependency>libtheora</Dependency>
+        </RuntimeDependencies>
+        <Replaces>
+            <Package>kdemultimedia</Package>
+        </Replaces>
+        <Files>
+            <Path fileType="executable">/usr/kde/3.5/bin</Path>
+            <Path fileType="config">/usr/kde/3.5/etc</Path>
+            <Path fileType="header">/usr/kde/3.5/include</Path>
+            <Path fileType="library">/usr/kde/3.5/lib</Path>
+            <Path fileType="data">/usr/kde/3.5/share</Path>
+        </Files>
+    </Package>
+    <History>
+        <Update release="49">
+            <Date>2010-12-10</Date>
+            <Version>3.5.10</Version>
+            <Comment>Fix autostart issue of KMix (#15571).</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="48">
+            <Date>2010-11-02</Date>
+            <Version>3.5.10</Version>
+            <Comment>Mass rebuild for Pardus Corporate 2 Alpha 3</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="47">
+            <Date>2010-07-09</Date>
+            <Version>3.5.10</Version>
+            <Comment>Adapt to autoconf >= 2.64 changes, patch by Onur.</Comment>
+            <Name>Serdar Dalgıç</Name>
+            <Email>serdar@pardus.org.tr</Email>
+        </Update>
+        <Update release="46">
+            <Date>2010-07-08</Date>
+            <Version>3.5.10</Version>
+            <Comment>Split kscd.</Comment>
+            <Name>Serdar Dalgıç</Name>
+            <Email>serdar@pardus.org.tr</Email>
+        </Update>
+        <Update release="45">
+            <Date>2010-01-29</Date>
+            <Version>3.5.10</Version>
+            <Comment>Split juk, kaudiocreator, kmid, kmix. Remove krec, kaboodle, noatun, artsbuilder docs.</Comment>
+            <Name>Doruk Fişek</Name>
+            <Email>dfisek@fisek.com.tr</Email>
+        </Update>
+        <Update release="44">
+            <Date>2010-01-28</Date>
+            <Version>3.5.10</Version>
+            <Comment>Fix automake and Python detection</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="43">
+            <Date>2010-01-27</Date>
+            <Version>3.5.10</Version>
+            <Comment>Don't autoreconf, it breaks moc's</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="42">
+            <Date>2010-01-24</Date>
+            <Version>3.5.10</Version>
+            <Comment>Fix tunepimp detection, remove krec.desktop</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="41">
+            <Date>2009-12-18</Date>
+            <Version>3.5.10</Version>
+            <Comment>Improve pulse action's text</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="40">
+            <Date>2008-11-11</Date>
+            <Version>3.5.10</Version>
+            <Comment>Fix desktop files to make them XDG compliant</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="39">
+            <Date>2008-08-26</Date>
+            <Version>3.5.10</Version>
+            <Comment>Stable update</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="38">
+            <Date>2008-04-24</Date>
+            <Version>3.5.9</Version>
+            <Comment>Support new tunepimp</Comment>
+            <Name>Onur Küçük</Name>
+            <Email>onur@pardus.org.tr</Email>
+        </Update>
+        <Update release="37">
+            <Date>2008-02-16</Date>
+            <Version>3.5.9</Version>
+            <Comment>Version bump</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="36">
+            <Date>2008-02-11</Date>
+            <Version>3.5.8</Version>
+            <Comment>Added a masterDeviceIndex dcop call that returns the device index of the master channel</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="35">
+            <Date>2007-11-28</Date>
+            <Version>3.5.8</Version>
+            <Comment>Master channel selection fix</Comment>
+            <Name>Faik Uygur</Name>
+            <Email>faik@pardus.org.tr</Email>
+        </Update>
+        <Update release="34">
+            <Date>2007-10-09</Date>
+            <Version>3.5.8</Version>
+            <Comment>Version bump</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="33">
+            <Date>2007-05-14</Date>
+            <Version>3.5.7</Version>
+            <Comment>Version bump</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="32">
+            <Date>2007-03-13</Date>
+            <Version>3.5.6</Version>
+            <Comment>Add patch from kde-look to use middle mouse for muting</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="31">
+            <Date>2007-03-09</Date>
+            <Version>3.5.6</Version>
+            <Comment>Compile with new flac</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="30">
+            <Date>2007-01-17</Date>
+            <Version>3.5.6</Version>
+            <Comment>Version bump</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="29">
+            <Date>2006-12-11</Date>
+            <Version>3.5.5</Version>
+            <Comment>Revert dijitalPlayback (fix #4345)</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="28">
+            <Date>2006-12-03</Date>
+            <Version>3.5.5</Version>
+            <Comment>Fix #4268</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="27">
+            <Date>2006-11-19</Date>
+            <Version>3.5.5</Version>
+            <Comment>Use DijitalPlayback, fix #1343</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="26">
+            <Date>2006-11-05</Date>
+            <Version>3.5.5</Version>
+            <Comment>Don&apos;t make JuK default for music files</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="25">
+            <Date>2006-10-03</Date>
+            <Version>3.5.5</Version>
+            <Comment>New stable release</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="24">
+            <Date>2006-07-25</Date>
+            <Version>3.5.4</Version>
+            <Comment>New stable release</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="23">
+            <Date>2006-06-21</Date>
+            <Version>3.5.3</Version>
+            <Comment>Don&apos;t associate playlist files with JuK</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="22" type="security">
+            <Date>2006-06-14</Date>
+            <Version>3.5.3</Version>
+            <Comment>Check return values of setuid calls</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="21">
+            <Date>2006-05-25</Date>
+            <Version>3.5.3</Version>
+            <Comment>New stable release</Comment>
+            <Name>Barış Metin</Name>
+            <Email>baris@pardus.org.tr</Email>
+        </Update>
+        <Update release="20">
+            <Date>2006-03-21</Date>
+            <Version>3.5.2</Version>
+            <Comment>New stable release</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="19">
+            <Date>2006-03-04</Date>
+            <Version>3.5.1</Version>
+            <Comment>fix #903</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="18">
+            <Date>2006-02-05</Date>
+            <Version>3.5.1</Version>
+            <Comment>fix #1333</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="17">
+            <Date>2006-02-01</Date>
+            <Version>3.5.1</Version>
+            <Comment>New stable release</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="16">
+            <Date>2006-01-25</Date>
+            <Version>3.5.0</Version>
+            <Comment>fix #971 and #1920</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="15">
+            <Date>2006-01-18</Date>
+            <Version>3.5.0</Version>
+            <Comment>fix #1895</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="14">
+            <Date>2006-01-06</Date>
+            <Version>3.5.0</Version>
+            <Comment>Fix Juk UI in order to respect toolbar size defined by user</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="13">
+            <Date>2006-01-02</Date>
+            <Version>3.5.0</Version>
+            <Comment>Fix juk so it can play files from command line</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="12">
+            <Date>2005-12-23</Date>
+            <Version>3.5.0</Version>
+            <Comment>Open music files in JuK</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="11">
+            <Date>2005-12-23</Date>
+            <Version>3.5.0</Version>
+            <Comment>JuK now can play WMA&apos;s</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="10">
+            <Date>2005-12-13</Date>
+            <Version>3.5.0</Version>
+            <Comment>Hopefully fix cover downloading in JuK</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="9">
+            <Date>2005-12-10</Date>
+            <Version>3.5.0</Version>
+            <Comment>Disable Noatun and Kaboodle from compilation</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="8">
+            <Date>2005-12-05</Date>
+            <Version>3.5.0</Version>
+            <Comment>fix #642</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="7">
+            <Date>2005-11-29</Date>
+            <Version>3.5.0</Version>
+            <Comment>Version bump to stable release</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="6">
+            <Date>2005-11-21</Date>
+            <Version>3.5.0_rc2</Version>
+            <Comment>Version bump</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="5">
+            <Date>2005-11-21</Date>
+            <Version>3.5.0_rc1</Version>
+            <Comment>Fix http://bugs.pardus.org.tr/show_bug.cgi?id=703</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="4">
+            <Date>2005-11-15</Date>
+            <Version>3.5.0_rc1</Version>
+            <Comment>Version bump</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="3">
+            <Date>2005-10-28</Date>
+            <Version>3.5.0_beta2</Version>
+            <Comment>Speex support added</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="2">
+            <Date>2005-10-15</Date>
+            <Version>3.5.0_beta2</Version>
+            <Comment>Version bump</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="1">
+            <Date>2005-09-05</Date>
+            <Version>3.4.2</Version>
+            <Comment>First release.</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+    </History>
+</PISI>

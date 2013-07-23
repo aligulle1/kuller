@@ -1,0 +1,128 @@
+From: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>
+To: git-commits-head@vger.kernel.org
+Subject: sysrq: add show-backtrace-on-all-cpus function
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+X-Git-Commit: 5045bcae0fb466a1dbb6af0036e56901fd7aafb7
+X-Git-Parent: 6e574195b75543bc6a6240306313988b1952470c
+X-Spam-Status: No, score=-4.4 required=5.0 tests=ALL_TRUSTED,AWL,BAYES_00
+	autolearn=ham version=3.2.3
+X-Spam-Checker-Version: 	SpamAssassin 3.2.3 (2007-08-08) on hera.kernel.org
+Sender: git-commits-head-owner@vger.kernel.org
+Precedence: bulk
+List-ID: <git-commits-head.vger.kernel.org>
+X-Mailing-List: 	git-commits-head@vger.kernel.org
+X-RedHat-Spam-Score: -3.865 
+X-Scanned-By: MIMEDefang 2.58 on 172.16.52.254
+X-Scanned-By: MIMEDefang 2.63 on 172.16.48.32
+
+Gitweb:     http://git.kernel.org/git/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commit;h=5045bcae0fb466a1dbb6af0036e56901fd7aafb7
+Commit:     5045bcae0fb466a1dbb6af0036e56901fd7aafb7
+Parent:     6e574195b75543bc6a6240306313988b1952470c
+Author:     Rik van Riel <riel@redhat.com>
+AuthorDate: Tue Apr 29 00:59:21 2008 -0700
+Committer:  Linus Torvalds <torvalds@linux-foundation.org>
+CommitDate: Tue Apr 29 08:06:03 2008 -0700
+
+    sysrq: add show-backtrace-on-all-cpus function
+    
+    SysRQ-P is not always useful on SMP systems, since it usually ends up showing
+    the backtrace of a CPU that is doing just fine, instead of the backtrace of
+    the CPU that is having problems.
+    
+    This patch adds SysRQ show-all-cpus(L), which shows the backtrace of every
+    active CPU in the system.  It skips idle CPUs because some SMP systems are
+    just too large and we already know what the backtrace of the idle task looks
+    like.
+    
+    [akpm@linux-foundation.org: coding-style fixes]
+    Signed-off-by: Rik van Riel <riel@redhat.com>
+    Randy Dunlap <randy.dunlap@oracle.com>
+    Cc: <lwoodman@redhat.com>
+    Cc: Ingo Molnar <mingo@elte.hu>
+    Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+    Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+---
+ Documentation/sysrq.txt |    2 ++
+ drivers/char/sysrq.c    |   46 ++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 48 insertions(+), 0 deletions(-)
+
+Index: 2008-devel/Documentation/sysrq.txt
+===================================================================
+--- 2008-devel.orig/Documentation/sysrq.txt
++++ 2008-devel/Documentation/sysrq.txt
+@@ -85,6 +85,8 @@ On all -  write a character to /proc/sys
+ 'k'     - Secure Access Key (SAK) Kills all programs on the current virtual
+           console. NOTE: See important comments below in SAK section.
+ 
++'l'     - Shows a stack backtrace for all active CPUs.
++
+ 'm'     - Will dump current memory info to your console.
+ 
+ 'n'	- Used to make RT tasks nice-able
+Index: 2008-devel/drivers/char/sysrq.c
+===================================================================
+--- 2008-devel.orig/drivers/char/sysrq.c
++++ 2008-devel/drivers/char/sysrq.c
+@@ -196,6 +196,48 @@ static struct sysrq_key_op sysrq_showloc
+ #define sysrq_showlocks_op (*(struct sysrq_key_op *)0)
+ #endif
+ 
++#ifdef CONFIG_SMP
++static DEFINE_SPINLOCK(show_lock);
++
++static void showacpu(void *dummy)
++{
++	unsigned long flags;
++
++	/* Idle CPUs have no interesting backtrace. */
++	if (idle_cpu(smp_processor_id()))
++		return;
++
++	spin_lock_irqsave(&show_lock, flags);
++	printk(KERN_INFO "CPU%d:\n", smp_processor_id());
++	show_stack(NULL, NULL);
++	spin_unlock_irqrestore(&show_lock, flags);
++}
++
++static void sysrq_showregs_othercpus(struct work_struct *dummy)
++{
++	smp_call_function(showacpu, NULL, 0, 0);
++}
++
++static DECLARE_WORK(sysrq_showallcpus, sysrq_showregs_othercpus);
++
++static void sysrq_handle_showallcpus(int key, struct tty_struct *tty)
++{
++	struct pt_regs *regs = get_irq_regs();
++	if (regs) {
++		printk(KERN_INFO "CPU%d:\n", smp_processor_id());
++		show_regs(regs);
++	}
++	schedule_work(&sysrq_showallcpus);
++}
++
++static struct sysrq_key_op sysrq_showallcpus_op = {
++	.handler	= sysrq_handle_showallcpus,
++	.help_msg	= "aLlcpus",
++	.action_msg	= "Show backtrace of all active CPUs",
++	.enable_mask	= SYSRQ_ENABLE_DUMP,
++};
++#endif
++
+ static void sysrq_handle_showregs(int key, struct tty_struct *tty)
+ {
+ 	struct pt_regs *regs = get_irq_regs();
+@@ -341,7 +383,11 @@ static struct sysrq_key_op *sysrq_key_ta
+ 	&sysrq_kill_op,			/* i */
+ 	NULL,				/* j */
+ 	&sysrq_SAK_op,			/* k */
++#ifdef CONFIG_SMP
++	&sysrq_showallcpus_op,		/* l */
++#else
+ 	NULL,				/* l */
++#endif
+ 	&sysrq_showmem_op,		/* m */
+ 	&sysrq_unrt_op,			/* n */
+ 	/* o: This will often be registered as 'Off' at init time */

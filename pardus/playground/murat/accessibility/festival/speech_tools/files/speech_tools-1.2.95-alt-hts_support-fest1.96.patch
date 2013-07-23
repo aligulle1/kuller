@@ -1,0 +1,24 @@
+--- speech_tools/siod/siod.cc	2004-06-21 20:42:20 +0300
++++ speech_tools/siod/siod.cc	2006-11-12 21:38:21 +0200
+@@ -289,9 +289,21 @@
+ 	return (float)FLONM(car(cdr(pair)));
+     else
+     {
++      // hack around buggy scm:
++      // in hts_voices from www.cstr.ed.ac.uk 
++      // some floating values are written as strings.
++      // we allow here 'string of a float' too
++      const char *str_param=get_c_string(car(cdr(pair)));
++      char *endptr;
++      double converted_param=strtod(str_param, &endptr);
++      if (endptr == str_param) {
++	// conversion failed
+ 	cerr << "param " << name << " not of type float" << endl;
+ 	err("",NIL);
+ 	return -1;
++      } else {
++	return (float) converted_param;
++      }
+     }
+ 
+ }

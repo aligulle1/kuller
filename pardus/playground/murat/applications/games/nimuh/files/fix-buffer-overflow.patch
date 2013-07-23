@@ -1,0 +1,39 @@
+Index: nimuh-1.02/src/hash.cpp
+===================================================================
+--- nimuh-1.02.orig/src/hash.cpp
++++ nimuh-1.02/src/hash.cpp
+@@ -90,17 +90,17 @@ namespace Martian {
+ 	
+ 	void Hash::loadFromConfDirectory(string f) { 
+ 		if (Hash::pathData=="") {
+-			char *directory = NULL;
++			const char *directory = NULL;
+ 			char tmp_dir[128];
+ 			if (getenv("HOME") != NULL) {
+ 				directory = getenv("HOME");
+ 				sprintf (tmp_dir, "mkdir %s/.%s", directory, CONFIG_DIR_UNIX);
+ 				system(tmp_dir);
+-				sprintf (directory, "%s/.%s/", directory, CONFIG_DIR_UNIX);
++				snprintf (tmp_dir, 128, "%s/.%s/", directory, CONFIG_DIR_UNIX);
+ 			} else {
+-				directory = "./data/";
++				strcpy(tmp_dir, "./data/");
+ 			}
+-			Hash::pathData = directory;
++			Hash::pathData = tmp_dir;
+ 		}
+         file = Hash::pathData + f; 
+ 		
+Index: nimuh-1.02/src/application.cpp
+===================================================================
+--- nimuh-1.02.orig/src/application.cpp
++++ nimuh-1.02/src/application.cpp
+@@ -129,7 +129,7 @@ Application::Application(int w, int h, s
+ }
+ 
+ void Application::createStaticsElements_InScene () {
+-	char tmp[8];
++	char tmp[16];
+ 	
+ 	Scene::hasMsg_bg = true;
+ 	Scene::hasMsg_title = false;

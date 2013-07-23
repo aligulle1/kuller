@@ -1,0 +1,54 @@
+From 1ea0f3d0476d5e26fcbbfbf382fbef7352f10115 Mon Sep 17 00:00:00 2001
+From: Iain Lane <laney@ubuntu.com>
+Date: Sun, 5 Sep 2010 13:36:18 +0100
+Subject: [PATCH 1/2] Don't copy duplicate libraries
+
+GIO# and GTK#Beans both supply the same library, gio-sharp.dll. If we
+try to install both of these then automake falls over. Ensure that we
+only try to copy one of each library.
+---
+ build/m4/banshee/gio.m4 |    8 ++++++--
+ 1 files changed, 6 insertions(+), 2 deletions(-)
+
+Index: banshee/build/m4/banshee/gio.m4
+===================================================================
+--- banshee.orig/build/m4/banshee/gio.m4	2010-09-18 01:48:55.000000000 +0800
++++ banshee/build/m4/banshee/gio.m4	2010-09-18 02:04:25.358986523 +0800
+@@ -16,9 +16,13 @@
+ 
+ 		asms="`$PKG_CONFIG --variable=Libraries gio-sharp-2.0` `$PKG_CONFIG --variable=Libraries gtk-sharp-beans-2.0`"
+ 		for asm in $asms; do
+-			GIOSHARP_ASSEMBLIES="$GIOSHARP_ASSEMBLIES $asm"
+-			[[ -r "$asm.config" ]] && GIOSHARP_ASSEMBLIES="$GIOSHARP_ASSEMBLIES $asm.config"
+-			[[ -r "$asm.mdb" ]] && GIOSHARP_ASSEMBLIES="$GIOSHARP_ASSEMBLIES $asm.mdb"
++			FILENAME=`basename $asm`
++			if [[ "`echo $SEENBEFORE | grep $FILENAME`" = "" ]]; then
++				GIOSHARP_ASSEMBLIES="$GIOSHARP_ASSEMBLIES $asm"
++				[[ -r "$asm.config" ]] && GIOSHARP_ASSEMBLIES="$GIOSHARP_ASSEMBLIES $asm.config"
++				[[ -r "$asm.mdb" ]] && GIOSHARP_ASSEMBLIES="$GIOSHARP_ASSEMBLIES $asm.mdb"
++				SEENBEFORE="$SEENBEFORE $FILENAME"
++			fi
+ 		done
+ 		AC_SUBST(GIOSHARP_ASSEMBLIES)
+ 
+Index: banshee/configure
+===================================================================
+--- banshee.orig/configure	2010-09-18 01:48:55.000000000 +0800
++++ banshee/configure	2010-09-18 02:06:14.419521065 +0800
+@@ -17454,9 +17454,13 @@
+ 
+ 		asms="`$PKG_CONFIG --variable=Libraries gio-sharp-2.0` `$PKG_CONFIG --variable=Libraries gtk-sharp-beans-2.0`"
+ 		for asm in $asms; do
+-			GIOSHARP_ASSEMBLIES="$GIOSHARP_ASSEMBLIES $asm"
+-			[ -r "$asm.config" ] && GIOSHARP_ASSEMBLIES="$GIOSHARP_ASSEMBLIES $asm.config"
+-			[ -r "$asm.mdb" ] && GIOSHARP_ASSEMBLIES="$GIOSHARP_ASSEMBLIES $asm.mdb"
++			FILENAME=`basename $asm`
++			if [ "`echo $SEENBEFORE | grep $FILENAME`" = "" ]; then
++				GIOSHARP_ASSEMBLIES="$GIOSHARP_ASSEMBLIES $asm"
++				[ -r "$asm.config" ] && GIOSHARP_ASSEMBLIES="$GIOSHARP_ASSEMBLIES $asm.config"
++				[ -r "$asm.mdb" ] && GIOSHARP_ASSEMBLIES="$GIOSHARP_ASSEMBLIES $asm.mdb"
++				SEENBEFORE="$SEENBEFORE $FILENAME"
++			fi
+ 		done
+ 
+ 

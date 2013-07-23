@@ -1,0 +1,36 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+#
+# Copyright 2009 TUBITAK/UEKAE
+# Licensed under the GNU General Public License, version 2.
+# See the file http://www.gnu.org/licenses/old-licenses/gpl-2.0.txt
+
+from pisi.actionsapi import autotools
+from pisi.actionsapi import shelltools
+from pisi.actionsapi import pisitools
+from pisi.actionsapi import get
+
+shelltools.export("TOPDIR", "%s/ogdi-%s" % (get.workDIR(), get.srcVERSION()))
+
+def setup():
+    autotools.configure('--with-zlib --with-projlib="-L/usr/lib -lproj" --with-expat')
+
+def build():
+    shelltools.export("TARGET", "Linux")
+    shelltools.export("CFG", "release")
+    shelltools.export("LD_LIBRARY_PATH", "%s/%s/bin/linux" % (get.workDIR(),get.srcDIR()))
+    autotools.make("-j1")
+
+def install():
+    pisitools.dolib_so("bin/Linux/*.so", "/usr/lib/Linux")
+    for i in ["example1", "example2", "gltpd", "ogdi_import", "ogdi_info"]:
+        pisitools.dobin("bin/Linux/%s" % i)
+
+    pisitools.insinto("/usr/include", "ogdi/include/ecs.h")
+    pisitools.insinto("/usr/include", "ogdi/include/ecs_util.h")
+
+    pisitools.dosym("/usr/lib/Linux/libogdi31.so", "/usr/lib/libogdi.so")
+    pisitools.dosym("/usr/lib/Linux/libogdi31.so", "/usr/lib/libogdi31.so")
+
+    pisitools.dodoc("ChangeLog", "NEWS", "README")
+

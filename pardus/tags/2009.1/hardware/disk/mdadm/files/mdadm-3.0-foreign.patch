@@ -1,0 +1,299 @@
+--- mdadm-3.0-devel3/Incremental.c.foreign	2009-03-20 17:49:20.000000000 -0400
++++ mdadm-3.0-devel3/Incremental.c	2009-03-20 21:19:50.000000000 -0400
+@@ -29,12 +29,14 @@
+  */
+ 
+ #include	"mdadm.h"
++#include	<ctype.h>
+ 
+ static int count_active(struct supertype *st, int mdfd, char **availp,
+ 			struct mdinfo *info);
+ static void find_reject(int mdfd, struct supertype *st, struct mdinfo *sra,
+ 			int number, __u64 events, int verbose,
+ 			char *array_name);
++static int compare_array_name(char *conf_name, char *sb_name);
+ 
+ int Incremental(char *devname, int verbose, int runstop,
+ 		struct supertype *st, char *homehost, int autof)
+@@ -48,8 +50,10 @@ int Incremental(char *devname, int verbo
+ 	 * 2/ Find metadata, reject if none appropriate (check
+ 	 *       version/name from args)
+ 	 * 3/ Check if there is a match in mdadm.conf
+-	 * 3a/ if not, check for homehost match.  If no match, assemble as
+-	 *    a 'foreign' array.
++	 * 3a/ Evalutate the quality of match and whether or not we have a
++	 * 	 conf file at all, and make a decision about whether or not
++	 * 	 to allow this array to keep its preferred name based upon 
++	 * 	 that
+ 	 * 4/ Determine device number.
+ 	 * - If in mdadm.conf with std name, use that
+ 	 * - UUID in /dev/md/mdadm.map  use that
+@@ -78,7 +82,7 @@ int Incremental(char *devname, int verbo
+ 	 */
+ 	struct stat stb;
+ 	struct mdinfo info;
+-	struct mddev_ident_s *array_list, *match;
++	struct mddev_ident_s *array_list, *match, *match_uuid, *match_name;
+ 	char chosen_name[1024];
+ 	int rv;
+ 	struct map_ent *mp, *map = NULL;
+@@ -148,26 +152,42 @@ int Incremental(char *devname, int verbo
+ 	st->ss->getinfo_super(st, &info);
+ 	/* 3/ Check if there is a match in mdadm.conf */
+ 
++	name_to_use = strchr(info.name, ':');
++	if (name_to_use)
++		name_to_use++;
++	else
++		name_to_use = info.name;
+ 	array_list = conf_get_ident(NULL);
+ 	match = NULL;
++	match_uuid = NULL;
++	match_name = NULL;
+ 	for (; array_list; array_list = array_list->next) {
++		/* Check for matching uuid, then drop through to check and see
++		 * if we also have a matching name, and to catch cases of
++		 * matching names without a corresponding uuid match */
+ 		if (array_list->uuid_set &&
+ 		    same_uuid(array_list->uuid, info.uuid, st->ss->swapuuid)
+-		    == 0) {
+-			if (verbose >= 2 && array_list->devname)
++		    != 0)
++			match_uuid = array_list;
++		else if (array_list->uuid_set && verbose >= 2 &&
++			 array_list->devname)
+ 				fprintf(stderr, Name
+ 					": UUID differs from %s.\n",
+ 					array_list->devname);
+-			continue;
+-		}
++		/* If we match name, save it off separately so we can tell if
++		 * we matched uuid, name, or both, and if both, if they were
++		 * the same entry */
+ 		if (array_list->name[0] &&
+-		    strcasecmp(array_list->name, info.name) != 0) {
+-			if (verbose >= 2 && array_list->devname)
++		    compare_array_name(array_list->name, info.name))
++			match_name = array_list;
++		else if (array_list->name[0] && verbose >= 2 &&
++			 array_list->devname)
+ 				fprintf(stderr, Name
+ 					": Name differs from %s.\n",
+ 					array_list->devname);
++		if ((!match_uuid || match == match_uuid) &&
++		    (!match_name || match == match_name))
+ 			continue;
+-		}
+ 		if (array_list->devices &&
+ 		    !match_oneof(array_list->devices, devname)) {
+ 			if (verbose >= 2 && array_list->devname)
+@@ -197,7 +217,13 @@ int Incremental(char *devname, int verbo
+ 		/* FIXME, should I check raid_disks and level too?? */
+ 
+ 		if (match) {
+-			if (verbose >= 0) {
++			if (match_uuid != match_name) {
++				if (match_uuid->devname)
++					fprintf(stderr, Name ": more than one "
++						"match for %s, using the UUID "
++						"match\n", match_uuid->devname);
++				match = match_uuid;
++			} else if (verbose >= 0) {
+ 				if (match->devname && array_list->devname)
+ 					fprintf(stderr, Name
+ 		   ": we match both %s and %s - cannot decide which to use.\n",
+@@ -205,23 +231,52 @@ int Incremental(char *devname, int verbo
+ 				else
+ 					fprintf(stderr, Name
+ 						": multiple lines in mdadm.conf match\n");
++				return 2;
+ 			}
+-			return 2;
+ 		}
+ 		match = array_list;
+ 	}
+ 
+-	/* 3a/ if not, check for homehost match.  If no match, continue
+-	 * but don't trust the 'name' in the array. Thus a 'random' minor
+-	 * number will be assigned, and the device name will be based
+-	 * on that. */
+-	if (match)
++	/* 3a/ Decide if we got a good match, two matches, no matches, or a
++	 * likely foreign match.  I dropped the homehost test entirely because
++	 * it didn't seem to add any value whatsoever above and beyond what
++	 * these tests can do. */
++	if (match && match_uuid == match_name) {
++		/* found in conf, both name and uuid match */
+ 		trustworthy = LOCAL;
+-	else if (homehost == NULL ||
+-		 st->ss->match_home(st, homehost) != 1)
+-		trustworthy = FOREIGN;
+-	else
++	} else if (match_uuid && match_name) {
++		/* found both a name and a uuid match, but not on the same
++		 * entry, so prefer the uuid match (done above) */
+ 		trustworthy = LOCAL;
++	} else if (!match_uuid && match_name) {
++		/* no uuid match, but name match */
++		if (match_name->uuid_set) {
++			/* oops, name that matched had a uuid, it just wasn't
++			 * right, assume there is a local device with both
++			 * a matching name and uuid, so this needs a random
++			 * name */
++			trustworthy = FOREIGN;
++			match = NULL;
++		} else
++			/* matched name, and the matching entry in conf file
++			 * didn't include a uuid, and this uuid never showed
++			 * up anywhere else in the conf file, so consider it
++			 * a soft match and allow it...although users should
++			 * *REALLY* include the uuid on array lines in the
++			 * conf file */
++			trustworthy = LOCAL;
++	} else { /* no match at all */
++		if (!conf_exists())
++			/* If we don't even have a conf file, this is foreign,
++			 * but also not likely to conflict with anything
++			 * local, so let it keep its preferred name */
++			trustworthy = LOCAL;
++		else
++			/* We have a conf file, this didn't match any uuids
++			 * or names, so also not likely to conflict, let it
++			 * keep its own name */
++			trustworthy = LOCAL;
++	}
+ 
+ 	/* There are three possible sources for 'autof':  command line,
+ 	 * ARRAY line in mdadm.conf, or CREATE line in mdadm.conf.
+@@ -240,11 +295,6 @@ int Incremental(char *devname, int verbo
+ 		return Incremental_container(st, devname, verbose, runstop,
+ 					     autof, trustworthy);
+ 	}
+-	name_to_use = strchr(info.name, ':');
+-	if (name_to_use)
+-		name_to_use++;
+-	else
+-		name_to_use = info.name;
+ 
+ 	if ((!name_to_use || name_to_use[0] == 0) &&
+ 	    info.array.level == LEVEL_CONTAINER &&
+@@ -797,3 +847,45 @@ int Incremental_container(struct superty
+ 	map_unlock(&map);
+ 	return 0;
+ }
++
++static int compare_array_name(char *conf_name, char *sb_name)
++{
++	char *cptr, *sptr;
++	int conf_num = -1;
++
++	/* usage of the name variable in the superblock comes in several
++	 * flavors:
++	 * A) full md pathname (/dev/md0)
++	 * B) just the md name (md0)
++	 * C) just the md number (0)
++	 * D) all of the above, but with hostname: prefixed to it
++	 *
++	 * Depending on which of those variants we have, we need to alter
++	 * how we attempt to match the array name in the mdadm.conf file
++	 * which is always a full pathname.  We don't match on hostname:
++	 * though, so eliminate it from the equation.
++	 */
++
++	if ((sptr = strchr(sb_name, ':')) == NULL)
++		sptr = sb_name;
++	else
++		sptr++;
++
++	/* Do we have a full pathname in the superblock name field? */
++	if (strchr(sptr, '/'))
++		return !strcasecmp(conf_name, sptr);
++	/* If not, is it just a number or an md device name? */
++	else if (isdigit(sptr[0])) {
++		cptr = conf_name + strlen(conf_name);
++		while (cptr > conf_name && isdigit(cptr[-1]))
++			cptr--;
++		if (cptr[0])
++			conf_num = strtoul(cptr, NULL, 10);
++		return conf_num == strtoul(sptr, NULL, 10);
++	} /* fall through else, it's a device name but not a full path */
++
++	cptr = strcasestr(conf_name, sptr);
++	if (cptr)
++		return !strcasecmp(cptr, sptr);
++	return 0;
++}
+--- mdadm-3.0-devel3/mdadm.h.foreign	2009-03-10 01:39:41.000000000 -0400
++++ mdadm-3.0-devel3/mdadm.h	2009-03-20 17:49:20.000000000 -0400
+@@ -785,6 +785,7 @@ extern mddev_dev_t conf_get_devs(void);
+ extern int conf_test_dev(char *devname);
+ extern struct createinfo *conf_get_create_info(void);
+ extern void set_conffile(char *file);
++extern int conf_exists(void);
+ extern char *conf_get_mailaddr(void);
+ extern char *conf_get_mailfrom(void);
+ extern char *conf_get_program(void);
+--- mdadm-3.0-devel3/mdopen.c.foreign	2009-03-20 19:02:38.000000000 -0400
++++ mdadm-3.0-devel3/mdopen.c	2009-03-20 19:02:43.000000000 -0400
+@@ -159,7 +159,6 @@ int create_mddev(char *dev, char *name, 
+ 	strcpy(chosen, "/dev/md/");
+ 	cname = chosen + strlen(chosen);
+ 
+-
+ 	if (dev) {
+ 		
+ 		if (strncmp(dev, "/dev/md/", 8) == 0) {
+@@ -240,12 +239,14 @@ int create_mddev(char *dev, char *name, 
+ 	if (num < 0 && trustworthy == LOCAL && name) {
+ 		/* if name is numeric, use that for num
+ 		 * if it is not already in use */
+-		char *ep;
+-		num = strtoul(name, &ep, 10);
+-		if (ep == name || *ep)
+-			num = -1;
+-		else if (mddev_busy(use_mdp ? (-1-num) : num))
+-			num = -1;
++		char *e = name + strlen(name);
++		while (e > name && isdigit(e[-1]))
++			e--;
++		if (e[0]) {
++			num = strtoul(e, NULL, 10);
++			if (mddev_busy(use_mdp ? (-1-num) : num))
++				num = -1;
++		}
+ 	}
+ 
+ 	if (num < 0) {
+--- mdadm-3.0-devel3/config.c.foreign	2009-03-10 01:39:41.000000000 -0400
++++ mdadm-3.0-devel3/config.c	2009-03-20 17:49:20.000000000 -0400
+@@ -637,7 +637,7 @@ void homehostline(char *line)
+ 	}
+ }
+ 
+-
++int exists = 0;
+ int loaded = 0;
+ 
+ static char *conffile = NULL;
+@@ -683,6 +683,7 @@ void load_conffile(void)
+ 	if (f == NULL)
+ 		return;
+ 
++	exists = 1;
+ 	loaded = 1;
+ 	while ((line=conf_line(f))) {
+ 		switch(match_keyword(line)) {
+@@ -718,6 +719,13 @@ void load_conffile(void)
+ /*    printf("got file\n"); */
+ }
+ 
++int conf_exists(void)
++{
++	if (!loaded)
++		load_conffile();
++	return exists;
++}
++
+ char *conf_get_mailaddr(void)
+ {
+ 	load_conffile();

@@ -1,0 +1,151 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>quassel</Name>
+        <Homepage>http://quassel-irc.org</Homepage>
+        <Packager>
+            <Name>H. İbrahim Güngör</Name>
+            <Email>h.ibrahim.gungor@gmail.com</Email>
+        </Packager>
+        <License>GPLv2</License>
+        <License>GPLv3</License>
+        <Icon>quassel</Icon>
+        <IsA>app:gui</IsA>
+        <Summary>A modern, cross-platform, distributed IRC client</Summary>
+        <Description>Quassel IRC is a modern, distributed IRC client, meaning that one (or multiple) client(s) can attach to and detach from a central core --much like the popular combination of screen and a text-based IRC client such as WeeChat, but graphical.</Description>
+        <Archive sha1sum="f0f0e129f7ba4f25301332c90806f3dad9c706a9" type="tarbz2">ftp://ftp.sudrap.org/igungor/quassel-0.4.2_20090529.tar.bz2</Archive>
+        <BuildDependencies>
+             <Dependency>kdebase-runtime</Dependency>
+             <Dependency>kdelibs-devel</Dependency>
+             <Dependency>automoc4</Dependency>
+             <Dependency>phonon</Dependency>
+             <Dependency>qt</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <Patch level="1">mpris_me_rock.patch</Patch>
+            <Patch level="1">fix-alias.patch</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>quassel</Name>
+        <Summary>This package provides a complete traditional IRC client (client and core) in a single integrated package</Summary>
+        <RuntimeDependencies>
+             <Dependency>qt</Dependency>
+             <Dependency>qt-sql-sqlite</Dependency>
+             <Dependency>phonon</Dependency>
+             <Dependency>kdebase-runtime</Dependency>
+             <Dependency releaseFrom="6">quassel-data</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="executable">/usr/bin/quassel</Path>
+            <Path fileType="data">/usr/share/applications/quassel.desktop</Path>
+        </Files>
+        <AdditionalFiles>
+            <AdditionalFile owner="root" permission="0644" target="/usr/share/applications/quassel.desktop">quassel.desktop</AdditionalFile>
+        </AdditionalFiles>
+    </Package>
+
+    <Package>
+        <Name>quasselclient</Name>
+        <Summary>This package only provides Quassel's client component</Summary>
+        <RuntimeDependencies>
+             <Dependency>qt</Dependency>
+             <Dependency>kdebase-runtime</Dependency>
+             <Dependency releaseFrom="6">quasselcore</Dependency>
+             <Dependency releaseFrom="6">quassel-data</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="executable">/usr/bin/quasselclient</Path>
+            <Path fileType="data">/usr/share/applications/quasselclient.desktop</Path>
+        </Files>
+        <AdditionalFiles>
+            <AdditionalFile owner="root" permission="0644" target="/usr/share/applications/quasselclient.desktop">quasselclient.desktop</AdditionalFile>
+        </AdditionalFiles>
+    </Package>
+
+    <Package>
+        <Name>quasselcore</Name>
+        <Summary>This package only provides Quassel's core/server component</Summary>
+        <RuntimeDependencies>
+             <Dependency>qt-sql-sqlite</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="executable">/usr/bin/quasselcore</Path>
+            <Path fileType="executable">/usr/bin/manageusers.py</Path>
+            <Path fileType="executable">/var/cache/quassel</Path>
+        </Files>
+        <Provides>
+            <COMAR script="service.py">System.Service</COMAR>
+            <COMAR script="package.py">System.Package</COMAR>
+        </Provides>
+    </Package>
+
+    <Package>
+        <Name>quassel-data</Name>
+        <Summary>Quassel's common data package; provides icons, documents and config files</Summary>
+        <Files>
+            <Path fileType="data">/usr/kde/4/share/apps</Path>
+            <Path fileType="data">/usr/share/icons</Path>
+            <Path fileType="data">/usr/share/pixmaps</Path>
+            <Path fileType="doc">/usr/share/doc</Path>
+        </Files>
+        <AdditionalFiles>
+            <AdditionalFile owner="root" permission="0644" target="/usr/kde/4/share/apps/quassel/networks.ini">networks.ini</AdditionalFile>
+            <AdditionalFile owner="root" permission="755" target="/usr/kde/4/share/apps/quassel/scripts/bug">pardus_bugzilla.py</AdditionalFile>
+        </AdditionalFiles>
+    </Package>
+
+    <History>
+        <Update release="6">
+            <Date>2009-05-29</Date>
+            <Version>0.4.2_20090529</Version>
+            <Comment>Switch to master branch aka scripts are back, add missing dependencies, a simple bug search script and new languages (hungarian and italian)</Comment>
+            <Name>H. İbrahim Güngör</Name>
+            <Email>h.ibrahim.gungor@gmail.com</Email>
+        </Update>
+        <Update release="5">
+            <Date>2009-03-28</Date>
+            <Version>0.4.1</Version>
+            <Comment>Fix RealName encoding problem thanks to Gökçen.</Comment>
+            <Name>H. İbrahim Güngör</Name>
+            <Email>h.ibrahim.gungor@gmail.com</Email>
+        </Update>
+        <Update release="4">
+            <Date>2009-03-20</Date>
+            <Version>0.4.1</Version>
+            <Comment>Postgres backend, Sysinfo and NowPlaying support, updated Turkish translation</Comment>
+            <Name>H. İbrahim Güngör</Name>
+            <Email>h.ibrahim.gungor@gmail.com</Email>
+        </Update>
+        <Update release="3">
+            <Date>2009-02-17</Date>
+            <Version>0.4.0_20090311</Version>
+            <Comment>
+                * New snapshot supports knotify, phonon, webkit, coloured nicknames
+                * Core-client build is back, with mono build and package splitted into 4 pieces as core, client, core+client and data packages
+                * New icons in query/nick/channel lists and an animated systray icon
+                * Paste protection warns if you try to paste many lines
+                * Improved mouse handling, a wizard for setting up identity and networks on first run
+                * Make dependencies strict, add kdebase4-runtime dependency, add manageusers script
+            </Comment>
+            <Name>H. İbrahim Güngör</Name>
+            <Email>h.ibrahim.gungor@gmail.com</Email>
+        </Update>
+        <Update release="2">
+            <Date>2008-12-22</Date>
+            <Version>0.3.1</Version>
+            <Comment>Add qt4 sqlite dependency to fix crash as it can't find a storage backend.</Comment>
+            <Name>H. İbrahim Güngör</Name>
+            <Email>h.ibrahim.gungor@gmail.com</Email>
+        </Update>
+        <Update release="1">
+            <Date>2008-12-01</Date>
+            <Version>0.3.1</Version>
+            <Comment>First release.</Comment>
+            <Name>H. İbrahim Güngör</Name>
+            <Email>h.ibrahim.gungor@gmail.com</Email>
+        </Update>
+    </History>
+</PISI>

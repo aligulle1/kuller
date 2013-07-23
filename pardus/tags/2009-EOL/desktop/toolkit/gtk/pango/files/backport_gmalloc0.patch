@@ -1,0 +1,45 @@
+diff -Nur pango-1.26.2-old/pango/pangoft2-render.c pango-1.26.2/pango/pangoft2-render.c
+--- pango-1.26.2-old/pango/pangoft2-render.c    2011-02-08 16:05:19.607864969 +0200
++++ pango-1.26.2/pango/pangoft2-render.c    2011-02-08 16:11:30.527741226 +0200
+@@ -62,6 +62,31 @@
+                           double            x12,
+                           double            x22);
+ 
++
++/* start of backport
++ * g_malloc0_n
++ * shamelessly stolen from glib 2.24 to fix CVE-2011-0020
++ *
++ */
++
++#define BACKPORT_SIZE_OVERFLOWS(a,b) (G_UNLIKELY ((b) > 0 && (a) > G_MAXSIZE / (b)))
++
++gpointer
++backport_g_malloc0_n (gsize n_blocks,
++                      gsize n_block_bytes)
++{
++  if (BACKPORT_SIZE_OVERFLOWS (n_blocks, n_block_bytes))
++    {
++      g_error ("%s: overflow allocating %"G_GSIZE_FORMAT"*%"G_GSIZE_FORMAT" bytes",
++               G_STRLOC, n_blocks, n_block_bytes);
++    }
++
++  return g_malloc0 (n_blocks * n_block_bytes);
++}
++
++/* end of backport */
++
++
+ G_DEFINE_TYPE (PangoFT2Renderer, pango_ft2_renderer, PANGO_TYPE_RENDERER)
+ 
+ static void
+@@ -123,7 +151,7 @@
+   box->bitmap.rows = height;
+   box->bitmap.pitch = width;
+ 
+-  box->bitmap.buffer = g_malloc0_n (box->bitmap.rows, box->bitmap.pitch);
++  box->bitmap.buffer = backport_g_malloc0_n (box->bitmap.rows, box->bitmap.pitch);
+ 
+   if (G_UNLIKELY (!box->bitmap.buffer)) {
+     g_slice_free (PangoFT2RenderedGlyph, box);
+

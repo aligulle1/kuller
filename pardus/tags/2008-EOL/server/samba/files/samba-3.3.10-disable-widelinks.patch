@@ -1,0 +1,167 @@
+From 8ea34bebfe7efbb5fc270fb87589f5d1273ed003 Mon Sep 17 00:00:00 2001
+From: Jeremy Allison <jra@samba.org>
+Date: Fri, 5 Feb 2010 16:22:27 -0800
+Subject: [PATCH] Fix bug 7104 - "wide links" and "unix extensions" are incompatible.
+
+Change parameter "wide links" to default to "no".
+Ensure "wide links = no" if "unix extensions = yes" on a share.
+Fix man pages to refect this.
+
+Remove "within share" checks for a UNIX symlink set - even if
+widelinks = no. The server will not follow that link anyway.
+
+Correct DEBUG message in check_reduced_name() to add missing "\n"
+so it's really clear when a path is being denied as it's outside
+the enclosing share path.
+
+Jeremy.
+---
+ docs-xml/smbdotconf/misc/widelinks.xml          |   13 +++++--
+ docs-xml/smbdotconf/protocol/unixextensions.xml |    3 ++
+ source/param/loadparm.c                         |    2 +-
+ source/smbd/service.c                           |    8 +++++
+ source/smbd/trans2.c                            |   37 -----------------------
+ source/smbd/vfs.c                               |    2 +-
+ 6 files changed, 22 insertions(+), 43 deletions(-)
+
+diff --git a/docs-xml/smbdotconf/misc/widelinks.xml b/docs-xml/smbdotconf/misc/widelinks.xml
+index fb707c1..1c30bb7 100644
+--- a/docs-xml/smbdotconf/misc/widelinks.xml
++++ b/docs-xml/smbdotconf/misc/widelinks.xml
+@@ -9,10 +9,15 @@
+ 	server are always allowed; this parameter controls access only 
+ 	to areas that are outside the directory tree being exported.</para>
+ 
+-	<para>Note that setting this parameter can have a negative 
+-	effect on your server performance due to the extra system calls 
+-	that Samba has to  do in order to perform the link checks.</para>
++	<para>Note: Turning this parameter on when UNIX extensions are enabled
++	will allow UNIX clients to create symbolic links on the share that
++	can point to files or directories outside restricted path exported
++	by the share definition. This can cause access to areas outside of
++	the share. Due to this problem, this parameter will be automatically
++	disabled (with a message in the log file) if the
++	<smbconfoption name="unix extensions"/> option is on.
++	</para>
+ </description>
+ 
+-<value type="default">yes</value>
++<value type="default">no</value>
+ </samba:parameter>
+diff --git a/docs-xml/smbdotconf/protocol/unixextensions.xml b/docs-xml/smbdotconf/protocol/unixextensions.xml
+index da9ad10..36e72d2 100644
+--- a/docs-xml/smbdotconf/protocol/unixextensions.xml
++++ b/docs-xml/smbdotconf/protocol/unixextensions.xml
+@@ -10,6 +10,9 @@
+     by supporting features such as symbolic links, hard links, etc...
+     These extensions require a similarly enabled client, and are of
+     no current use to Windows clients.</para>
++    <para>
++    Note if this parameter is turned on, the <smbconfoption name="wide links"/>
++    parameter will automatically be disabled.
+ </description>
+ 
+ <value type="default">yes</value>
+diff --git a/source/param/loadparm.c b/source/param/loadparm.c
+index 491264e..6e8a5b7 100644
+--- a/source/param/loadparm.c
++++ b/source/param/loadparm.c
+@@ -589,7 +589,7 @@ static struct service sDefault = {
+ 	True,			/* bLevel2OpLocks */
+ 	False,			/* bOnlyUser */
+ 	True,			/* bMangledNames */
+-	True,			/* bWidelinks */
++	false,			/* bWidelinks */
+ 	True,			/* bSymlinks */
+ 	False,			/* bSyncAlways */
+ 	False,			/* bStrictAllocate */
+diff --git a/source/smbd/service.c b/source/smbd/service.c
+index 2a1ef20..481f847 100644
+--- a/source/smbd/service.c
++++ b/source/smbd/service.c
+@@ -1103,6 +1103,14 @@ static connection_struct *make_connection_snum(int snum, user_struct *vuser,
+ 	}
+ #endif
+ 
++	if (lp_unix_extensions() && lp_widelinks(snum)) {
++		DEBUG(0,("Share '%s' has wide links and unix extensions enabled. "
++			"These parameters are incompatible. "
++			"Disabling wide links for this share.\n",
++			lp_servicename(snum) ));
++		lp_do_parameter(snum, "wide links", "False");
++	}
++
+ 	/* Figure out the characteristics of the underlying filesystem. This
+ 	 * assumes that all the filesystem mounted withing a share path have
+ 	 * the same characteristics, which is likely but not guaranteed.
+diff --git a/source/smbd/trans2.c b/source/smbd/trans2.c
+index 4d6d55c..96dcc2b 100644
+--- a/source/smbd/trans2.c
++++ b/source/smbd/trans2.c
+@@ -5230,7 +5230,6 @@ static NTSTATUS smb_set_file_unix_link(connection_struct *conn,
+ {
+ 	char *link_target = NULL;
+ 	const char *newname = fname;
+-	NTSTATUS status = NT_STATUS_OK;
+ 	TALLOC_CTX *ctx = talloc_tos();
+ 
+ 	/* Set a symbolic link. */
+@@ -5251,42 +5250,6 @@ static NTSTATUS smb_set_file_unix_link(connection_struct *conn,
+ 		return NT_STATUS_INVALID_PARAMETER;
+ 	}
+ 
+-	/* !widelinks forces the target path to be within the share. */
+-	/* This means we can interpret the target as a pathname. */
+-	if (!lp_widelinks(SNUM(conn))) {
+-		char *rel_name = NULL;
+-		char *last_dirp = NULL;
+-
+-		if (*link_target == '/') {
+-			/* No absolute paths allowed. */
+-			return NT_STATUS_ACCESS_DENIED;
+-		}
+-		rel_name = talloc_strdup(ctx,newname);
+-		if (!rel_name) {
+-			return NT_STATUS_NO_MEMORY;
+-		}
+-		last_dirp = strrchr_m(rel_name, '/');
+-		if (last_dirp) {
+-			last_dirp[1] = '\0';
+-		} else {
+-			rel_name = talloc_strdup(ctx,"./");
+-			if (!rel_name) {
+-				return NT_STATUS_NO_MEMORY;
+-			}
+-		}
+-		rel_name = talloc_asprintf_append(rel_name,
+-				"%s",
+-				link_target);
+-		if (!rel_name) {
+-			return NT_STATUS_NO_MEMORY;
+-		}
+-
+-		status = check_name(conn, rel_name);
+-		if (!NT_STATUS_IS_OK(status)) {
+-			return status;
+-		}
+-	}
+-
+ 	DEBUG(10,("smb_set_file_unix_link: SMB_SET_FILE_UNIX_LINK doing symlink %s -> %s\n",
+ 			newname, link_target ));
+ 
+diff --git a/source/smbd/vfs.c b/source/smbd/vfs.c
+index 1e137dd..129014b 100644
+--- a/source/smbd/vfs.c
++++ b/source/smbd/vfs.c
+@@ -935,7 +935,7 @@ NTSTATUS check_reduced_name(connection_struct *conn, const char *fname)
+ 
+ 	/* Check for widelinks allowed. */
+ 	if (!lp_widelinks(SNUM(conn)) && (strncmp(conn->connectpath, resolved_name, con_path_len) != 0)) {
+-		DEBUG(2, ("reduce_name: Bad access attempt: %s is a symlink outside the share path", fname));
++		DEBUG(2, ("reduce_name: Bad access attempt: %s is a symlink outside the share path\n", fname));
+ 		if (free_resolved_name) {
+ 			SAFE_FREE(resolved_name);
+ 		}
+-- 
+1.6.6
+

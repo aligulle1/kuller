@@ -1,0 +1,50 @@
+#!/bin/bash
+# a tiny script to test webcams using mplayer
+# options are self explanatory :)
+
+DEVICE="video0"
+AUDIO=":noaudio"
+FILTER="-vf-add pp=hb:a/vb:a,hqdn3d,mirror"
+V4L="v4l"
+EXTRA=""
+WIDTH="640"
+HEIGHT="480"
+RESOLUTION="-x 800 -y 600"
+FPS="-fps 30"
+
+for x in $*; do
+    case "${x}" in
+        video[0-9]*)
+            DEVICE="${x}"
+        ;;
+        -v4l2)
+            V4L="v4l2"
+            EXTRA="$EXTRA -fps 60"
+        ;;
+        -audio)
+            AUDIO=""
+        ;;
+        -w[0-9]*)
+            WIDTH=`echo "${x}"|cut -c 4-`
+        ;;
+        -h[0-9]*)
+            HEIGHT=`echo "${x}"|cut -c 4-`
+        ;;
+        -nofps)
+            FPS=""
+        ;;
+        -nores)
+            RESOLUTION=""
+        ;;
+        -nofilter)
+            FILTER=""
+        ;;
+        *)
+            EXTRA="$EXTRA ${x}"
+        ;;
+    esac
+done
+
+# main
+mplayer tv:// -tv driver=$V4L:device=/dev/$DEVICE:width=$WIDTH:height=$HEIGHT$AUDIO $RESOLUTION $FILTER $FPS $EXTRA
+

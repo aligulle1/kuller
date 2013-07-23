@@ -1,0 +1,29 @@
+--- /var/pisi/libgcrypt-1.4.0-6/work/libgcrypt-1.4.0/cipher/random.c	2007-12-03 11:22:55.000000000 +0200
++++ random.c	2008-01-16 21:58:16.000000000 +0200
+@@ -1115,6 +1115,7 @@
+ add_randomness (const void *buffer, size_t length, enum random_origins origin)
+ {
+   const unsigned char *p = buffer;
++  size_t count = 0;
+ 
+   assert (pool_is_locked);
+ 
+@@ -1122,6 +1123,7 @@
+   rndstats.naddbytes++;
+   while (length-- )
+     {
++      count++;
+       rndpool[pool_writepos++] ^= *p++;
+       if (pool_writepos >= POOLSIZE )
+         {
+@@ -1132,7 +1134,9 @@
+              separately.  See also the remarks about the seed file. */
+           if (origin >= RANDOM_ORIGIN_SLOWPOLL && !pool_filled)
+             {
+-              if (++pool_filled_counter >= POOLSIZE)
++              pool_filled_counter += count;
++              count = 0;
++              if (pool_filled_counter >= POOLSIZE)
+                 pool_filled = 1;
+             }
+           pool_writepos = 0;

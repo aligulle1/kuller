@@ -1,0 +1,186 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+
+<PISI>
+    <Source>
+        <Name>kernel-domU</Name>
+        <Homepage>http://www.pardus.org.tr/</Homepage>
+        <Packager>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Packager>
+        <License>GPL-2</License>
+        <IsA>category</IsA>
+        <Summary>Xen enabled uniprocessor Linux kernel for Pardus Linux (domU)</Summary>
+        <Summary xml:lang="tr">Xen destekli Pardus için Linux çekirdeği (domU)</Summary>
+        <Description>User domain Xen-enabled kernel allows Pardus to run on the Xen virtual machine's user domain. This kernel cannot be booted as the first operating system on Xen, it must be booted from domain 0 and does not have direct access to hardware, but it's smaller than the domain 0 kernel.</Description>
+        <Description xml:lang="tr">Kullanıcı-alanı (domU) Xen çekirdeği Pardus'un, Xen üzerinde kullanıcı alanı seviyesinde çalışmasını sağlar. Bu çekirdek Xen üzerindeki ilk işletim sistemi olarak açılamaz, dom0 üzerinden açılması gerekir ve donanıma doğrudan erişim hakkı yoktur, fakat dom0 çekirdeğinden daha küçük boyuttadır.</Description>
+        <Archive sha1sum="bef21cd5063a648f33a99a26f4742dd05eb4dca2" type="tarbz2">http://www.kernel.org/pub/linux/kernel/v2.6/linux-2.6.16.tar.bz2</Archive>
+        <BuildDependencies>
+            <Dependency>cpio</Dependency>
+            <Dependency>mkinitramfs</Dependency>
+            <Dependency>diffutils</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <Patch level="1" compressionType="bz2">xen/patch-2.6.16.29-xen.patch.bz2</Patch>
+
+            <!--
+            Any change in kbuild meant that the whole kernel would be recompiled every 
+            single time you rebuild it. This patch corrects that issue (thanks to  
+            Arthur Othieno for backporting)
+            -->
+            <Patch level="1">kernel/kbuild-dont-rely-on-incorrect-gnu-make-behavior.patch</Patch>
+ 
+            <!-- Subset of Gentoo Kernel Patches -->
+            <Patch level="1">gentoo/deprecate-sk98lin.patch</Patch>
+            <Patch level="1">gentoo/libata-enable-atapi.patch</Patch>
+            <Patch level="1">gentoo/squashfs-3.0.patch</Patch>
+            <Patch level="1">gentoo/sky2-1.4.patch</Patch>
+            <Patch level="1">gentoo/sky2-jumbo-packets.patch</Patch>
+            <Patch level="1">gentoo/skge-1.5.patch</Patch>
+            <Patch level="1">gentoo/input-mod-devicetable.patch</Patch>
+            <Patch level="1">gentoo/usb-insufficient-power.patch</Patch>
+            <Patch level="1">gentoo/acpi-nsxfeval-flood.patch</Patch>
+            <Patch level="1">gentoo/ipw2200-monitor-mode.patch</Patch>
+
+            <!-- Subset of OpenSuse Kernel Patches -->
+
+            <Patch level="1">suse/acpi_asus_init_fixups.patch</Patch>
+            <Patch level="1">suse/acpi_asus_update_0_30.patch</Patch>
+            <Patch level="1">suse/acpi_asus_strict_model_check.patch</Patch>
+            <Patch level="1">suse/acpi_export_syms.patch</Patch>
+            <Patch level="1">suse/acpi_show_errors.patch</Patch>
+            <Patch level="1">suse/acpi_show_errors-fix.patch</Patch>
+            <Patch level="1">suse/acpi_processor_exit_acpi_off.patch</Patch>
+            <Patch level="1">suse/acpi-nolapic</Patch>
+            <Patch level="1">suse/acpi_ec_dummy.patch</Patch>
+            <Patch level="1">suse/acpi_handler_warning.patch</Patch>
+            <Patch level="1">suse/acpi_suppress_aetime.patch</Patch>
+            <Patch level="1">suse/ec-enable-interrupts.patch</Patch>
+            <Patch level="1">suse/always-announce-new-usb-devices.patch</Patch>
+            <Patch level="1">suse/bcm-update.patch</Patch>
+            <Patch level="1">suse/i386-apic-up.patch</Patch>
+            <Patch level="1">suse/i386-modern-apic.patch</Patch>
+            <Patch level="1">suse/ide-probe-delay.patch</Patch>
+            <Patch level="1">suse/ide-cd-quiet-cap-read.patch</Patch>
+            <Patch level="1">suse/ide-cd-confused.patch</Patch>
+            <Patch level="1">suse/ide-acpi-support.patch</Patch>
+            <Patch level="1">suse/i386-prefer-tsc.patch</Patch>
+            <Patch level="1">suse/i386-mpparse.patch</Patch>
+            <Patch level="1">suse/i386-amd-core-parsing.patch</Patch>
+            <Patch level="1">suse/i386-default-max-mp-busses.patch</Patch>
+            <Patch level="1">suse/clean-up-module.c-symbol-searching-logic.patch</Patch>
+
+            <!-- Driver Updates -->
+            <Patch level="1">suse/e100-ignore-bad-eeprom.patch</Patch>
+            <Patch level="1">suse/ieee802.11-2</Patch>
+            <Patch level="1">suse/ieee802.11-4</Patch>
+            <Patch level="1">suse/ieee802.11-6</Patch>
+            <Patch level="1">suse/ieee802.11-7</Patch>
+            <Patch level="1">suse/ieee802.11-8</Patch>
+            <Patch level="1">suse/ieee802.11-9</Patch>
+            <Patch level="1">suse/ieee802.11-10</Patch>
+            <Patch level="1">suse/ieee802.11-11</Patch>
+            <Patch level="1">suse/ieee802.11-12</Patch>
+            <Patch level="1">suse/ieee802.11-13</Patch>
+            <Patch level="1">suse/ipw2100-update</Patch>
+            <Patch level="1">suse/ipw2200-update</Patch>
+            <Patch level="1">suse/ipw2200-wep-fix</Patch>
+            <Patch level="1">suse/ipw2200-hwcrypto-off</Patch>
+
+            <!-- AppArmor -->
+            <Patch level="1">suse/apparmor</Patch>
+            <Patch level="1">suse/apparmor_audit</Patch>
+            <Patch level="1">suse/apparmor_namespacesem</Patch>
+            <Patch level="1">suse/apparmor-mmapexec.patch</Patch>
+            <Patch level="1">suse/apparmor-secureexec.patch</Patch>
+
+            <!-- Subset of Con Kolivas's patches -->
+            <Patch level="1">ck/defaultcfq.diff</Patch>
+            <Patch level="1">ck/mm-background_scan.patch</Patch>
+            <Patch level="1">ck/pdflush-tweaks.patch</Patch>
+            <Patch level="1">ck/vm-lots_watermark.diff</Patch>
+            <Patch level="1">ck/vm-mapped.patch</Patch>
+            <Patch level="1">ck/fs-fcache-v2.1.patch</Patch>
+
+            <!-- Ubuntu patches accepted by upstream -->
+            <Patch level="1">ubuntu/acer_travelmate_240_wistron_btns.patch</Patch>
+            <Patch level="1">ubuntu/asus_acpi_led_status.patch</Patch>
+            <Patch level="1">ubuntu/disable_acpi_pci_Toshiba_Tecra_A4.patch</Patch>
+            <Patch level="1">ubuntu/irda_isapnp.patch</Patch>
+
+            <!-- Pardus Part -->
+
+            <!-- http://svn.pardus.org.tr/projeler/vayo/kernel/ -->
+            <Patch>sony_acpi.patch</Patch>
+
+            <!-- Use Pardus logo instead of penguin -->
+            <Patch level="1">pardus-logo.patch</Patch>
+
+            <!-- Convert iso symbols to utf8 -->
+            <Patch level="1">pardus-utf8.patch</Patch>
+            <Patch level="1">pardus-utf8-copynpaste.patch</Patch>
+
+            <!-- Default config -->
+            <Patch>pardus-kernel-config.patch</Patch> 
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>kernel-domU</Name>
+        <RuntimeDependencies>
+            <Dependency>mkinitramfs</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="executable" permanent="true">/boot</Path>
+            <Path fileType="library" permanent="true">/lib/modules/</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>kernel-domU-source</Name>
+        <Summary>Xen enabled Pardus Linux kernel source (domU) </Summary>
+        <Description>Xen enabled Pardus Linux kernel source (domU)</Description>
+        <Files>
+            <Path fileType="header">/usr/src/</Path>
+        </Files>
+    </Package>
+
+    <History>
+        <Update release="5">
+            <Date>2006-12-01</Date>
+            <Version>2.6.16.29</Version>
+            <Comment>TPM enabled, requested by Görkem</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="4">
+            <Date>2006-10-15</Date>
+            <Version>2.6.16.29</Version>
+            <Comment>Version bump to 3.0.3-rc5, Microcode needs sys_mlock and sys_munlock that are not exported it needs to be compiled in</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="3">
+            <Date>2006-08-28</Date>
+            <Version>2.6.16.28</Version>
+            <Comment>Fix cpufreq for centrino</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="2">
+            <Date>2006-08-28</Date>
+            <Version>2.6.16.28</Version>
+            <Comment>Use correct config</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="1">
+            <Date>2006-08-26</Date>
+            <Version>2.6.16.28</Version>
+            <Comment>First release</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+    </History>
+</PISI>

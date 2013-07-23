@@ -1,0 +1,35 @@
+Index: kdepim/korganizer/koincidencetooltip.h
+===================================================================
+--- kdepim/korganizer/koincidencetooltip.h	(revision 853609)
++++ kdepim/korganizer/koincidencetooltip.h	(revision 853610)
+@@ -39,7 +39,7 @@
+ class KOIncidenceToolTip : public QToolTip
+ {
+   public:
+-    KOIncidenceToolTip(QWidget * widget, QToolTipGroup * group = 0 ):QToolTip (widget, group) {}
++    KOIncidenceToolTip(QWidget * widget, QToolTipGroup * group = 0 ):QToolTip (widget, group),mText(0) {}
+ /*    ~KOIncidenceToolTip();*/
+ 
+   public:
+Index: kdepim/korganizer/koincidencetooltip.cpp
+===================================================================
+--- kdepim/korganizer/koincidencetooltip.cpp	(revision 853609)
++++ kdepim/korganizer/koincidencetooltip.cpp	(revision 853610)
+@@ -34,7 +34,7 @@
+ */
+ 
+ void KOIncidenceToolTip::add ( QWidget * widget, Incidence *incidence,
+-        QToolTipGroup * group, const QString & longText )
++                               QToolTipGroup * group, const QString & longText )
+ {
+   if ( !widget || !incidence ) return;
+   QToolTip::add(widget, IncidenceFormatter::toolTipString( incidence ), group, longText);
+@@ -54,7 +54,7 @@
+   KOAgendaItem *item = dynamic_cast<KOAgendaItem*>( parentWidget() );
+   if ( !item )
+     return;
+-  if ( mText.isEmpty() )
++  if ( !mText )
+     mText = IncidenceFormatter::toolTipString( item->incidence() );
+   tip( QRect( QPoint( 0, 0 ), item->size() ), mText );
+ }

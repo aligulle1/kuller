@@ -1,0 +1,43 @@
+From 565c1ad65277080968c188a635dfd743be7ea2a3 Mon Sep 17 00:00:00 2001
+From: Paulo Cesar Pereira de Andrade <pcpa@mandriva.com.br>
+Date: Thu, 17 Jul 2008 18:54:17 -0300
+Subject: [PATCH] Correct unresolved symbol and incorrect assignment.
+
+  Function miPointerPosition is deprecated and not available anymore.
+  Correct "if (test = value)" -> "if (test == value)".
+---
+ src/s3_driver.c |    9 +++++----
+ 1 files changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/src/s3_driver.c b/src/s3_driver.c
+index 797e0b3..86b336c 100644
+--- xf86-video-s3-0.6.0/src/s3_driver.c
++++ xf86-video-s3-0.6.0/src/s3_driver.c
+@@ -1186,12 +1186,13 @@ static int S3GetPixMuxShift(ScrnInfoPtr pScrn)
+ 		shift = 1;	/* XXX IBMRGB */
+ 	else if (pS3->Chipset == PCI_CHIP_TRIO || 
+ 	         pS3->Chipset == PCI_CHIP_TRIO64UVP || 
+-	         pS3->Chipset == PCI_CHIP_TRIO64V2_DXGX)
++	         pS3->Chipset == PCI_CHIP_TRIO64V2_DXGX) {
+ 		if (pS3->s3Bpp == 2)
+ 			shift = -1; 
+ 		else 
+ 			shift = 0;
+-				
++	}
++
+ 	return shift;
+ }
+ 
+@@ -1220,7 +1221,7 @@ static Bool S3ModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
+ 	   Set correct blanking for S3 Trio64V2. It's also needed
+ 	   to clear cr33_5.
+ 	*/
+-	if (pS3->Chipset = PCI_CHIP_TRIO64V2_DXGX)
++	if (pS3->Chipset == PCI_CHIP_TRIO64V2_DXGX)
+ 		mode->CrtcHBlankStart = mode->CrtcHDisplay + 8;
+ 
+ 	if ((mode->HTotal == mode->CrtcHTotal) && (pS3->pixMuxShift != 0)) {
+-- 
+1.5.6.5
+

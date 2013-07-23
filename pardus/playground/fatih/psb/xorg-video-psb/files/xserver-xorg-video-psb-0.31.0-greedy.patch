@@ -1,0 +1,21 @@
+diff -p -up xserver-xorg-video-psb-0.31.0/src/psb_accel.c.greedy xserver-xorg-video-psb-0.31.0/src/psb_accel.c
+--- xserver-xorg-video-psb-0.31.0/src/psb_accel.c.greedy	2009-04-17 20:22:24.000000000 +0200
++++ xserver-xorg-video-psb-0.31.0/src/psb_accel.c	2009-10-01 18:54:54.000000000 +0200
+@@ -1331,6 +1331,17 @@ psbExaInit(ScrnInfoPtr pScrn)
+     pExa->FinishAccess = psbExaFinishAccess;
+     pExa->UploadToScreen = psbExaUploadToScreen;
+ 
++    /* from xorg-server-1.6.4/hw/xfree86/exa/examodule.c */
++    typedef enum {
++      EXAOPT_MIGRATION_HEURISTIC,
++      EXAOPT_NO_COMPOSITE,
++      EXAOPT_NO_UTS,
++      EXAOPT_NO_DFS,
++      EXAOPT_OPTIMIZE_MIGRATION
++    } EXAOpts;
++    if (!xf86GetOptValString(pScrn->options, EXAOPT_MIGRATION_HEURISTIC))
++	xf86ReplaceStrOption(pScrn->options, "MigrationHeuristic", "greedy");
++
+     if (!exaDriverInit(pScrn->pScreen, pExa)) {
+ 	goto out_err;
+     }

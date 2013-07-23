@@ -1,0 +1,31 @@
+--- parted-1.7.1/include/parted/exception.h.get_exception	2006-07-05 15:31:11.000000000 -0400
++++ parted-1.7.1/include/parted/exception.h	2006-07-05 15:31:34.000000000 -0400
+@@ -88,6 +88,8 @@
+ extern char* ped_exception_get_option_string (PedExceptionOption ex_opt);
+ 
+ extern void ped_exception_set_handler (PedExceptionHandler* handler);
++extern PedExceptionHandler *ped_exception_get_handler(void);
++
+ extern PedExceptionOption ped_exception_default_handler (PedException* ex);
+ 
+ extern PedExceptionOption	ped_exception_throw (PedExceptionType ex_type,
+--- parted-1.7.1/libparted/exception.c.get_exception	2006-07-05 15:33:33.000000000 -0400
++++ parted-1.7.1/libparted/exception.c	2006-07-05 15:33:36.000000000 -0400
+@@ -171,6 +171,17 @@
+ }
+ 
+ /**
++ * Get the current exception handler.
++ */
++PedExceptionHandler *
++ped_exception_get_handler (void)
++{
++	if (ex_handler)
++		return ex_handler;
++	return default_handler;
++}
++
++/**
+  * Assert that the current exception has been resolved.
+  */
+ void

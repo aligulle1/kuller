@@ -1,0 +1,53 @@
+qt-bugs@ issue :  none
+Trolltech task ID : none
+bugs.kde.org number :
+applied: no
+author: Dirk Mueller
+
+
+fix various obvious memory leaks etc
+
+--- src/gui/painting/qimagescale.cpp
++++ src/gui/painting/qimagescale.cpp
+@@ -1005,6 +1005,7 @@ QImage qSmoothScaleImage(const QImage &s
+     buffer = QImage(dw, dh, src.format());
+     if (buffer.isNull()) {
+         qWarning("QImage: out of memory, returning null");
++        qimageFreeScaleInfo(scaleinfo);
+         return QImage();
+     }
+ 
+Index: src/tools/uic/cpp/cppwriteicondata.cpp
+===================================================================
+--- src/tools/uic/cpp/cppwriteicondata.cpp	(revision 664532)
++++ src/tools/uic/cpp/cppwriteicondata.cpp	(working copy)
+@@ -50,7 +50,7 @@ static QByteArray transformImageData(QSt
+         ba[i] = r;
+     }
+     QByteArray ret(reinterpret_cast<const char *>(ba), baSize);
+-    delete ba;
++    delete [] ba;
+     return ret;
+ }
+ 
+Index: src/svg/qsvghandler.cpp
+===================================================================
+--- src/svg/qsvghandler.cpp	(revision 671478)
++++ src/svg/qsvghandler.cpp	(working copy)
+@@ -1116,15 +1116,9 @@ static bool parseQFont(const QSvgAttribu
+         if (!size.isEmpty()) {
+             QSvgHandler::LengthType type;
+             qreal len = parseLength(size, type, handler);
+-            //len = convertToPixels(len, false, type);
+             // ### org_module.svg shows that font size
+             // seems to be always in px...
+-            type  = QSvgHandler::PX;
+-            if (type == QSvgHandler::PX ||
+-                type == QSvgHandler::OTHER)
+-                font.setPixelSize(int(len));
+-            else
+-                font.setPointSizeF(len);
++            font.setPixelSize(int(len));
+         }
+         if (!style.isEmpty()) {
+             if (style == QLatin1String("normal")) {

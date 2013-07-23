@@ -1,0 +1,65 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>module-psb</Name>
+        <Homepage>http://ppa.launchpad.net/ubuntu-mobile/ppa/ubuntu/pool/main/p/psb-kernel-source/</Homepage>
+        <Packager>
+            <Name>Fatih Aşıcı</Name>
+            <Email>fatih@pardus.org.tr</Email>
+        </Packager>
+        <License>GPLv2</License>
+        <IsA>driver</IsA>
+        <Summary>Kernel module for Poulsbo graphics chipsets</Summary>
+        <Description>module-psb includes a DRM driver for Intel GMA500 (Poulsbo) video chipsets.</Description>
+        <Archive sha1sum="ecddf93bdcc399378e88614ae53a517284fcdbfc" type="targz">http://ppa.launchpad.net/ubuntu-mobile/ppa/ubuntu/pool/main/p/psb-kernel-source/psb-kernel-source_4.41.1.orig.tar.gz</Archive>
+        <BuildDependencies>
+            <Dependency release="131">kernel-module-headers</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <Patch level="1">psb-kmd-4.34-current_euid.patch</Patch>
+            <Patch level="1">psb-kernel-source-4.41.1-i2c-intelfb.patch</Patch>
+            <Patch level="1">psb-kmod-4.41.1_irqreturn.patch</Patch>
+            <Patch level="1">psb-kernel-source-4.41.1-agp_memory.patch</Patch>
+            <Patch level="1">psb-kernel-source-4.41.1-dev_set_name.patch</Patch>
+            <Patch level="1">psb-kernel-source-4.41.1-drmpsb.patch</Patch>
+            <Patch level="1">psb-kernel-source-4.41.1-devt.patch</Patch>
+            <Patch level="1">psb-kernel-source-4.41.1-edid-crash.patch</Patch>
+            <Patch level="1">psb-kernel-source-4.41.1-2.6.32.patch</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>module-psb</Name>
+        <RuntimeDependencies>
+            <Dependency release="131">kernel</Dependency>
+            <Dependency>module-psb-userspace</Dependency>
+            <Dependency>psb-firmware</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="library" permanent="true">/lib/modules</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>module-psb-userspace</Name>
+        <Summary>Userspace documentation, tools, udev and modprobe rules for the kernel driver psb</Summary>
+        <Files>
+            <Path fileType="data">/etc/modprobe.d</Path>
+            <Path fileType="header">/usr/include</Path>
+        </Files>
+        <AdditionalFiles>
+            <AdditionalFile owner="root" permission="0644" target="/etc/modprobe.d/psb.conf">psb.modprobe.d</AdditionalFile>
+        </AdditionalFiles>
+    </Package>
+
+    <History>
+        <Update release="1">
+            <Date>2010-04-10</Date>
+            <Version>4.41.1</Version>
+            <Comment>First release</Comment>
+            <Name>Fatih Aşıcı</Name>
+            <Email>fatih@pardus.org.tr</Email>
+        </Update>
+    </History>
+</PISI>

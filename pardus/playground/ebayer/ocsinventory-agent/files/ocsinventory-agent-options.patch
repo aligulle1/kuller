@@ -1,0 +1,28 @@
+diff -up Ocsinventory-Agent-1.1/lib/Ocsinventory/Agent/Config.pm.orig Ocsinventory-Agent-1.1/lib/Ocsinventory/Agent/Config.pm
+--- Ocsinventory-Agent-1.1/lib/Ocsinventory/Agent/Config.pm.orig	2009-11-06 16:17:45.000000000 +0100
++++ Ocsinventory-Agent-1.1/lib/Ocsinventory/Agent/Config.pm	2009-11-07 12:21:40.000000000 +0100
+@@ -125,7 +125,7 @@ sub loadUserParams {
+ 		"P|proxy=s"       =>   \$self->{config}{proxy},
+ 		"r|realm=s"       =>   \$self->{config}{realm},
+ 		"R|remotedir=s"   =>   \$self->{config}{remotedir},
+-		"s|server=s"      =>   \$self->{config}{server},
++		"s|server=s"      =>   \$self->{config}{optserver},
+ 		"stdout"          =>   \$self->{config}{stdout},
+ 		"t|tag=s"         =>   \$self->{config}{tag},
+ 		"u|user=s"        =>   \$self->{config}{user},
+--- Ocsinventory-Agent-1.1.1/lib/Ocsinventory/Agent.pm.orig	2009-12-22 19:42:45.000000000 +0100
++++ Ocsinventory-Agent-1.1.1/lib/Ocsinventory/Agent.pm	2009-12-22 19:43:37.000000000 +0100
+@@ -134,6 +134,13 @@
+         $config->{config}{nosoftware} = 1
+     }
+ 
++# allow "server" from command line when "local" in config. file
++if (defined($config->{config}{'optserver'})) {
++    $config->{config}{'server'}=$config->{config}{'optserver'};
++    undef $config->{config}{'local'};
++    undef $config->{config}{'optserver'};
++}
++
+ # TODO put that in Ocsinventory::Agent::Config
+     if (!$config->{config}{'stdout'} && !$config->{config}{'local'} && $config->{config}{server} !~ /^http(|s):\/\//) {
+         $logger->debug("the --server passed doesn't have a protocol, assume http as default");

@@ -1,0 +1,72 @@
+--- src/unixinst.mak	2007-06-14 17:29:11.000000000 +0300
++++ src/unixinst.mak	2007-06-14 18:25:15.000000000 +0300
+@@ -171,7 +171,7 @@
+ 	done
+ 
+ install-shared: $(GS_SHARED_OBJS)
+-	-mkdir -p $(gssharedir)
++	-mkdir -p $(DESTDIR)$(gssharedir)
+ 	$(SH) -c 'for obj in $(GS_SHARED_OBJS); do \
+-	    $(INSTALL_PROGRAM) $$obj $(gssharedir)/; done'
++	    $(INSTALL_PROGRAM) $$obj $(DESTDIR)$(gssharedir)/; done'
+ 
+--- cups/cups.mak	2007-06-14 17:30:57.000000000 +0300
++++ cups/cups.mak	2007-06-14 18:30:08.000000000 +0300
+@@ -38,14 +38,14 @@
+ install:	install-cups
+ 
+ install-cups:
+-	-mkdir -p $(CUPSSERVER)/filter
+-	$(INSTALL_PROGRAM) cups/pstoraster $(CUPSSERVER)/filter
+-	$(INSTALL_PROGRAM) cups/pstopxl $(CUPSSERVER)/filter
+-	-mkdir -p $(CUPSCONFIG)
+-	$(INSTALL_DATA) cups/pstoraster.convs $(CUPSCONFIG)
+-	-mkdir -p $(CUPSDATA)/model
+-	$(INSTALL_DATA) cups/pxlcolor.ppd $(CUPSDATA)/model
+-	$(INSTALL_DATA) cups/pxlmono.ppd $(CUPSDATA)/model
++	-mkdir -p $(DESTDIR)$(CUPSSERVER)/filter
++	$(INSTALL_PROGRAM) cups/pstoraster $(DESTDIR)$(CUPSSERVER)/filter
++	$(INSTALL_PROGRAM) cups/pstopxl $(DESTDIR)$(CUPSSERVER)/filter
++	-mkdir -p $(DESTDIR)$(CUPSCONFIG)
++	$(INSTALL_DATA) cups/pstoraster.convs $(DESTDIR)$(CUPSCONFIG)
++	-mkdir -p $(DESTDIR)$(CUPSDATA)/model
++	$(INSTALL_DATA) cups/pxlcolor.ppd $(DESTDIR)$(CUPSDATA)/model
++	$(INSTALL_DATA) cups/pxlmono.ppd $(DESTDIR)$(CUPSDATA)/model
+ 
+ 
+ #
+--- src/unix-dll.mak	2007-06-14 18:30:42.000000000 +0300
++++ src/unix-dll.mak	2007-06-14 18:35:17.000000000 +0300
+@@ -108,19 +108,19 @@
+ 	$(MAKE) $(SODEFS) GENOPT='-DDEBUG' CFLAGS='$(CFLAGS_DEBUG) $(CFLAGS_SO) $(GCFLAGS) $(XCFLAGS)' $(GSSOC) $(GSSOX)
+ 
+ install-so: so
+-	-mkdir -p $(prefix)
+-	-mkdir -p $(datadir)
+-	-mkdir -p $(gsdir)
+-	-mkdir -p $(gsdatadir)
+-	-mkdir -p $(bindir)
+-	-mkdir -p $(libdir)
+-	$(INSTALL_PROGRAM) $(GSSOC) $(bindir)/$(GSSOC_XENAME)
+-	$(INSTALL_PROGRAM) $(GSSOX) $(bindir)/$(GSSOX_XENAME)
+-	$(INSTALL_PROGRAM) $(BINDIR)/$(SOBINRELDIR)/$(GS_SONAME_MAJOR_MINOR) $(libdir)/$(GS_SONAME_MAJOR_MINOR)
+-	$(RM_) $(libdir)/$(GS_SONAME)
+-	ln -s $(GS_SONAME_MAJOR_MINOR) $(libdir)/$(GS_SONAME)
+-	$(RM_) $(libdir)/$(GS_SONAME_MAJOR)
+-	ln -s $(GS_SONAME_MAJOR_MINOR) $(libdir)/$(GS_SONAME_MAJOR)
++	-mkdir -p $(DESTDIR)$(prefix)
++	-mkdir -p $(DESTDIR)$(datadir)
++	-mkdir -p $(DESTDIR)$(gsdir)
++	-mkdir -p $(DESTDIR)$(gsdatadir)
++	-mkdir -p $(DESTDIR)$(bindir)
++	-mkdir -p $(DESTDIR)$(libdir)
++	$(INSTALL_PROGRAM) $(GSSOC) $(DESTDIR)$(bindir)/$(GSSOC_XENAME)
++	$(INSTALL_PROGRAM) $(GSSOX) $(DESTDIR)$(bindir)/$(GSSOX_XENAME)
++	$(INSTALL_PROGRAM) $(BINDIR)/$(SOBINRELDIR)/$(GS_SONAME_MAJOR_MINOR) $(DESTDIR)$(libdir)/$(GS_SONAME_MAJOR_MINOR)
++	$(RM_) $(DESTDIR)$(libdir)/$(GS_SONAME)
++	ln -s $(GS_SONAME_MAJOR_MINOR) $(DESTDIR)$(libdir)/$(GS_SONAME)
++	$(RM_) $(DESTDIR)$(libdir)/$(GS_SONAME_MAJOR)
++	ln -s $(GS_SONAME_MAJOR_MINOR) $(DESTDIR)$(libdir)/$(GS_SONAME_MAJOR)
+ 
+ soinstall: install-so install-scripts install-data
+ 

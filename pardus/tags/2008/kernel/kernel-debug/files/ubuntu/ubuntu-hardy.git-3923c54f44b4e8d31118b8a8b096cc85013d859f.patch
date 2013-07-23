@@ -1,0 +1,47 @@
+From: Mario Limonciello <supermario@mlimonciello.(none)>
+Date: Mon, 2 Jun 2008 16:30:32 +0000 (-0500)
+Subject: UBUNTU: SAUCE: Wakeup BT input devices that have been suspended
+X-Git-Tag: Ubuntu-2.6.24-19.33~14
+X-Git-Url: http://kernel.ubuntu.com/git?p=ubuntu%2Fubuntu-hardy.git;a=commitdiff_plain;h=3923c54f44b4e8d31118b8a8b096cc85013d859f
+
+UBUNTU: SAUCE: Wakeup BT input devices that have been suspended
+
+OriginalAuthor: Marcel Holtmann <marcel@holtmann.org>
+OriginalLocation: http://article.gmane.org/gmane.linux.bluez.devel/15745
+Bug: #175743
+
+Resolves issues where devices will not reconnect after they have timed out.
+This patch should go upstream, so it will be marked as SAUCE until then.
+
+Signed-off-by: Mario Limonciello <Mario_Limonciello@Dell.com>
+Signed-off-by: Tim Gardner <tim.gardner@canonical.com>
+---
+
+Index: 2008-devel/net/bluetooth/hidp/core.c
+===================================================================
+--- 2008-devel.orig/net/bluetooth/hidp/core.c
++++ 2008-devel/net/bluetooth/hidp/core.c
+@@ -581,6 +581,12 @@ static int hidp_session(void *arg)
+ 		hid_free_device(session->hid);
+ 	}
+ 
++	/* Wakeup user-space polling for socket errors */
++	session->intr_sock->sk->sk_err = EUNATCH;
++	session->ctrl_sock->sk->sk_err = EUNATCH;
++
++	hidp_schedule(session);
++
+ 	fput(session->intr_sock->file);
+ 
+ 	wait_event_timeout(*(ctrl_sk->sk_sleep),
+@@ -879,6 +885,10 @@ int hidp_del_connection(struct hidp_conn
+ 			skb_queue_purge(&session->ctrl_transmit);
+ 			skb_queue_purge(&session->intr_transmit);
+ 
++			/* Wakeup user-space polling for socket errors */
++			session->intr_sock->sk->sk_err = EUNATCH;
++			session->ctrl_sock->sk->sk_err = EUNATCH;
++
+ 			/* Kill session thread */
+ 			atomic_inc(&session->terminate);
+ 			hidp_schedule(session);

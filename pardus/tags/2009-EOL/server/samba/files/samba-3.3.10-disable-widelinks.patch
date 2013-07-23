@@ -1,0 +1,45 @@
+From 8ea34bebfe7efbb5fc270fb87589f5d1273ed003 Mon Sep 17 00:00:00 2001
+From: Jeremy Allison <jra@samba.org>
+Date: Fri, 5 Feb 2010 16:22:27 -0800
+Subject: [PATCH] Fix bug 7104 - "wide links" and "unix extensions" are incompatible.
+
+Change parameter "wide links" to default to "no".
+Ensure "wide links = no" if "unix extensions = yes" on a share.
+Fix man pages to refect this.
+
+Remove "within share" checks for a UNIX symlink set - even if
+widelinks = no. The server will not follow that link anyway.
+
+Correct DEBUG message in check_reduced_name() to add missing "\n"
+so it's really clear when a path is being denied as it's outside
+the enclosing share path.
+
+Jeremy.
+---
+ docs-xml/smbdotconf/misc/widelinks.xml          |   13 +++++--
+ docs-xml/smbdotconf/protocol/unixextensions.xml |    3 ++
+ source/param/loadparm.c                         |    2 +-
+ source/smbd/service.c                           |    8 +++++
+ source/smbd/trans2.c                            |   37 -----------------------
+ source/smbd/vfs.c                               |    2 +-
+ 6 files changed, 22 insertions(+), 43 deletions(-)
+
+Index: samba-3.3.14/source/smbd/service.c
+===================================================================
+--- samba-3.3.14.orig/source/smbd/service.c
++++ samba-3.3.14/source/smbd/service.c
+@@ -1118,6 +1118,14 @@ static connection_struct *make_connectio
+ 	}
+ #endif
+ 
++	if (lp_unix_extensions() && lp_widelinks(snum)) {
++		DEBUG(0,("Share '%s' has wide links and unix extensions enabled. "
++			"These parameters are incompatible. "
++			"Disabling wide links for this share.\n",
++			lp_servicename(snum) ));
++		lp_do_parameter(snum, "wide links", "False");
++	}
++
+ 	/* Figure out the characteristics of the underlying filesystem. This
+ 	 * assumes that all the filesystem mounted withing a share path have
+ 	 * the same characteristics, which is likely but not guaranteed.

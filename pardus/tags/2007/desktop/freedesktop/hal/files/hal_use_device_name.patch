@@ -1,0 +1,15 @@
+diff -ur hal-0.5.8.1_20061117.orig/tools/hal-storage-mount.c hal-0.5.8.1_20061117/tools/hal-storage-mount.c
+--- hal-0.5.8.1_20061117.orig/tools/hal-storage-mount.c	2006-11-20 21:45:52.000000000 +0200
++++ hal-0.5.8.1_20061117/tools/hal-storage-mount.c	2006-11-20 21:48:12.000000000 +0200
+@@ -592,7 +592,10 @@
+ 				label = libhal_volume_get_label (volume);
+ 			else
+ 				label = NULL;
+-			
++
++			/* Really ugly hack to prevent utf8 errors :( */
++			label = g_strsplit_set(device, "/", -1)[2];
++
+ 			if (label != NULL) {
+ 				/* best - use label */
+ 				g_strlcpy (mount_point, label, sizeof (mount_point));

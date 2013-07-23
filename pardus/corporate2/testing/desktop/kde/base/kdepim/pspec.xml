@@ -1,0 +1,902 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>kdepim</Name>
+        <Homepage>http://www.kde.org/</Homepage>
+        <Packager>
+            <Name>Gökmen Göksel</Name>
+            <Email>gokmen@pardus.org.tr</Email>
+        </Packager>
+        <License>GPLv2</License>
+        <IsA>app:gui</IsA>
+        <Summary>KDE PIM applications</Summary>
+        <Description>kdepim contains KDE Personal Information Management applications like KMail, KNode, and KOrganizer.</Description>
+        <Archive type="tarbz2" sha1sum="537da60fe3564ecc0ed2802e744fbf96386909a9">mirrors://kde/stable/3.5.10/src/kdepim-3.5.10.tar.bz2</Archive>
+        <BuildDependencies>
+            <Dependency>kdelibs</Dependency>
+            <Dependency>qt3</Dependency>
+            <Dependency>libopensync</Dependency>
+            <Dependency>cyrus-sasl</Dependency>
+            <Dependency>pilot-link</Dependency>
+            <Dependency>gnokii</Dependency>
+            <Dependency>libmal</Dependency>
+            <Dependency>gpgme</Dependency>
+            <Dependency>libXScrnSaver</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <!-- Branch diff -->
+            <Patch>3_5_BRANCH.diff</Patch>
+
+            <Patch level="1">kdepim-3.5.0-kmail-imapfetchmaxsize.patch</Patch>
+            <Patch level="1">kdepim-3.5-kmail-enablehtml.patch</Patch>
+            <Patch level="1">kdepim-3.5.0-kontact-showSidePane.patch</Patch>
+            <Patch level="1">kdepim-3.5.2-use-nestedmessages.patch</Patch>
+            <Patch level="1">kdepim-3.5.2-kontact-remove-whatsthis-button.patch</Patch>
+            <Patch>kdepim-3.5-kmail_remove_charsets.diff</Patch>
+            <Patch>kdepim-3.5.10-kmail-deletion-map-fixes.patch</Patch>
+            <Patch>kdepim-3.5.10-qgpgme-call-initlib.patch</Patch>
+            <Patch level="1">kdepim-3.5.10-kioslave-sieve-fix-cyrus-detection.patch</Patch>
+
+
+            <!-- SUSE fixes -->
+            <Patch>kmail-crash.diff</Patch>
+            <Patch>kmail_allow_tls_login_auth.diff</Patch>
+            <Patch>install-headers.diff</Patch>
+            <Patch>start-kpilot-instead-complain.diff</Patch>
+            <Patch>bug-382959_kdepim_fix_vcardparser.patch</Patch>
+
+            <!-- Fix build with gcc 4.4 -->
+            <Patch>kdepim3-gcc4.4.patch</Patch>
+
+            <!-- FIXME: Barış will correct that one :)
+            <Patch>kpart-accountwizard.patch</Patch>
+            -->
+
+            <!-- http://bugs.pardus.org.tr/show_bug.cgi?id=5037 -->
+            <Patch level="1">akregator_feeds.patch</Patch>
+
+            <Patch>knode_threaded_crash.diff</Patch>
+
+            <!-- http://websvn.kde.org/branches/work/~wstephens/ -->
+            <Patch level="1">kdepim_networkstatus_branch.diff</Patch>
+
+            <Patch>kitchensync-defaults.diff</Patch>
+            <Patch>kitchensync-xmldiffalgo.diff</Patch>
+            <Patch>unbreak-imap-filtering.patch</Patch>
+
+            <!-- Desktop file translation fix for knode (#5667) -->
+            <Patch>privacy_desktop.patch</Patch>
+
+            <!-- When automatic domain name is added, kmail bloats
+            the to: header, e.g. Foo <bar> is converted to
+            Foo@domain <bar> instead of Foo <bar@domain>. This patch
+            fixes this issue -->
+            <Patch level="1">fix-buggy-kmail-header.patch</Patch>
+
+            <!-- kubuntu patches -->
+
+            <!-- Fixes potential crash in Kmail -->
+            <Patch level="1">kubuntu_19_fix_gcal_crash.diff</Patch>
+            <Patch level="1">kubuntu_02_kmail_file_execution.diff</Patch>
+            <Patch level="1">kubuntu_17_upstream_r860376.diff</Patch>
+
+            <!-- Prevents incidence loss under certain conditions as the UID map wasn't being reloaded. -->
+            <Patch>kubuntu_20_upstream_r882942.diff</Patch>
+
+            <!-- Prevents KMail crashing due to certain malicious base64-encoded mail parts. -->
+            <Patch>kubuntu_21_upstream_r882976.diff</Patch>
+
+            <!-- Enable korgac to be launched by KOrganizer (Fixes #6488) -->
+            <Patch>korgac_no_autostart.patch</Patch>
+
+            <!-- Fix word-wrapping in kmail mailinglistproperties dialog (#2840) -->
+            <Patch level="1">set-wordwrap-kmail-mailinglistproperties.patch</Patch>
+
+            <!-- http://git.savannah.gnu.org/gitweb/?p=autoconf.git;a=commit;h=46009205a943a5f5b712cc11b72e9b017141ffeb -->
+            <Patch level="1">new_autoconf.patch</Patch>
+        </Patches>
+    </Source>
+    <Package>
+        <Name>kdepim-akregator</Name>
+        <PartOf>network.rss</PartOf>
+        <Summary>RSS/Atom Feed Reader</Summary>
+        <Description>Akregator is a news feed reader that enables you to follow news sites, blogs and other RSS/Atom-enabled web sites without the need to manually check for updates using a web browser. Akregator is designed to be both easy to use and to be powerful enough to read hundreds of news sources conveniently. It comes with Konqueror integration for adding news feeds and with an internal browser for easy news reading.</Description>
+        <RuntimeDependencies>
+            <Dependency>kdepim-core</Dependency>
+            <Dependency>kdelibs</Dependency>
+            <Dependency>qt3</Dependency>
+        </RuntimeDependencies>
+        <Replaces>
+            <Package>kdepim</Package>
+        </Replaces>
+        <Files>
+            <Path fileType="executable">/usr/kde/3.5/bin/akregator</Path>
+            <Path fileType="header">/usr/kde/3.5/include/akregator</Path>
+            <Path fileType="library">/usr/kde/3.5/lib/kde3/libakregator*</Path>
+            <Path fileType="library">/usr/kde/3.5/lib/libakregatorprivate.*</Path>
+            <Path fileType="data">/usr/kde/3.5/share/applications/kde/akregator.desktop</Path>
+            <Path fileType="data">/usr/kde/3.5/share/apps/akregator</Path>
+            <Path fileType="data">/usr/kde/3.5/share/config.kcfg/akregator.kcfg</Path>
+            <Path fileType="data">/usr/kde/3.5/share/config.kcfg/mk4config.kcfg</Path>
+            <Path fileType="data">/usr/kde/3.5/share/icons/crystalsvg/*/actions/rss_tag.png</Path>
+            <Path fileType="data">/usr/kde/3.5/share/icons/*/*/apps/akregator*</Path>
+            <Path fileType="data">/usr/kde/3.5/share/services/akregator_*</Path>
+            <Path fileType="data">/usr/kde/3.5/share/services/feed.protocol</Path>
+            <Path fileType="data">/usr/kde/3.5/share/servicetypes/akregator_plugin.desktop</Path>
+            <Path fileType="doc">/usr/kde/3.5/share/doc/HTML/en/kdepim-apidocs/akregator</Path>
+            <Path fileType="doc">/usr/kde/3.5/share/doc/HTML/en/akregator</Path>
+        </Files>
+    </Package>
+    <Package>
+        <Name>kdepim-kalarm</Name>
+        <PartOf>util.misc</PartOf>
+        <Summary>Personal alarm message, command and email scheduler</Summary>
+        <Description>KAlarm provides a graphical interface to set up personal alarm messages which pop up on the screen at the chosen time, or you can schedule commands to be executed or emails to be sent. .</Description>
+        <RuntimeDependencies>
+            <Dependency>kdepim-core</Dependency>
+            <Dependency>kdelibs</Dependency>
+            <Dependency>qt3</Dependency>
+        </RuntimeDependencies>
+        <Replaces>
+            <Package>kdepim</Package>
+        </Replaces>
+        <Files>
+            <Path fileType="executable">/usr/kde/3.5/bin/kalarm*</Path>
+            <Path fileType="data">/usr/kde/3.5/share/applications/kde/kalarm.desktop</Path>
+            <Path fileType="data">/usr/kde/3.5/share/applnk/Applications/kalarm.desktop</Path>
+            <Path fileType="data">/usr/kde/3.5/share/applnk/.hidden/kalarmd.desktop</Path>
+            <Path fileType="data">/usr/kde/3.5/share/apps/kalarm</Path>
+            <Path fileType="data">/usr/kde/3.5/share/autostart/kalarm*</Path>
+            <Path fileType="data">/usr/kde/3.5/share/icons/*/*/*/kalarm.png</Path>
+            <Path fileType="doc">/usr/kde/3.5/share/doc/HTML/en/kdepim-apidocs/kalarm</Path>
+            <Path fileType="doc">/usr/kde/3.5/share/doc/HTML/en/kalarm</Path>
+        </Files>
+    </Package>
+    <Package>
+        <Name>kdepim-karm</Name>
+        <PartOf>util.misc</PartOf>
+        <Summary>Personal Time Tracker</Summary>
+        <Description>Karm is a personal time tracker that docks your system tray. It several tasks being timed simultaneously. Tasks can be hierarchical and implicit timing of super/sub tasks is possible. Karm may detect when your keyboard and mouse have been idle for more than a certain amount of time (default 15 minutes) and suggest to you that you revert your timers, to the start of the idle period.</Description>
+        <RuntimeDependencies>
+            <Dependency>kdepim-core</Dependency>
+            <Dependency>kdelibs</Dependency>
+            <Dependency>qt3</Dependency>
+            <Dependency>libXScrnSaver</Dependency>
+        </RuntimeDependencies>
+        <Replaces>
+            <Package>kdepim</Package>
+        </Replaces>
+        <Files>
+            <Path fileType="executable">/usr/kde/3.5/bin/karm</Path>
+            <Path fileType="library">/usr/kde/3.5/lib/kde3/libkarmpart.*</Path>
+            <Path fileType="data">/usr/kde/3.5/share/applications/kde/karm.desktop</Path>
+            <Path fileType="data">/usr/kde/3.5/share/applnk/Utilities/karm.desktop</Path>
+            <Path fileType="data">/usr/kde/3.5/share/apps/karm*</Path>
+            <Path fileType="data">/usr/kde/3.5/share/icons/hicolor/*/apps/karm.png</Path>
+            <Path fileType="data">/usr/kde/3.5/share/services/karm_part.desktop</Path>
+            <Path fileType="doc">/usr/kde/3.5/share/doc/HTML/en/kdepim-apidocs/karm/html</Path>
+            <Path fileType="doc">/usr/kde/3.5/share/doc/HTML/en/karm</Path>
+        </Files>
+    </Package>
+    <Package>
+        <Name>kdepim-kitchensync</Name>
+        <IsA>library</IsA>
+        <PartOf>hardware.mobile</PartOf>
+        <Summary>Synchronization framework</Summary>
+        <Description>Kitchensync is a synchronization framework, still under heavy development. It also contains the multisync GUI frontend.</Description>
+        <RuntimeDependencies>
+            <Dependency>kdepim-core</Dependency>
+            <Dependency>kdelibs</Dependency>
+            <Dependency>qt3</Dependency>
+            <Dependency>libopensync</Dependency>
+        </RuntimeDependencies>
+        <Replaces>
+            <Package>kdepim</Package>
+        </Replaces>
+        <Files>
+            <Path fileType="executable">/usr/kde/3.5/bin/kitchensync</Path>
+            <Path fileType="library">/usr/kde/3.5/lib/kde3/libkitchensyncpart.*</Path>
+            <Path fileType="library">/usr/kde/3.5/lib/libkitchensync.*</Path>
+            <Path fileType="library">/usr/kde/3.5/lib/libqopensync.*</Path>
+            <Path fileType="data">/usr/kde/3.5/share/applications/kde/kitchensync.desktop</Path>
+            <Path fileType="data">/usr/kde/3.5/share/apps/kitchensync</Path>
+            <Path fileType="data">/usr/kde/3.5/share/icons/hicolor/*/apps/kitchensync.png</Path>
+            <Path fileType="doc">/usr/kde/3.5/share/doc/HTML/en/kdepim-apidocs/kitchensync/html</Path>
+        </Files>
+    </Package>
+    <Package>
+        <Name>kdepim-kmail</Name>
+        <PartOf>network.mail</PartOf>
+        <Summary>Fully featured KDE e-mail client</Summary>
+        <Description>KMail is a fully-featured email client that fits nicely into KDE. It has features such as support for powerful filters, PGP/GnuPG privacy, inline attachments, drag and drop support of messages and attachments, support for multiple POP3 and IMAP accounts, and integration into the Kontact personal information management suite.</Description>
+        <RuntimeDependencies>
+            <Dependency>kdepim-core</Dependency>
+            <Dependency>kdelibs</Dependency>
+            <Dependency>qt3</Dependency>
+            <Dependency>gnupg</Dependency>
+        </RuntimeDependencies>
+        <Replaces>
+            <Package>kdepim</Package>
+        </Replaces>
+        <Files>
+            <Path fileType="executable">/usr/kde/3.5/bin/kmail*</Path>
+            <Path fileType="header">/usr/kde/3.5/include/kmail*</Path>
+            <Path fileType="library">/usr/kde/3.5/lib/kde3/kcm_kmail.*</Path>
+            <Path fileType="library">/usr/kde/3.5/lib/kde3/libkmail*</Path>
+            <Path fileType="library">/usr/kde/3.5/lib/libkmailprivate.*</Path>
+            <Path fileType="data">/usr/kde/3.5/share/applications/kde/KMail.desktop</Path>
+            <Path fileType="data">/usr/kde/3.5/share/applications/kde/kmail_view.desktop</Path>
+            <Path fileType="data">/usr/kde/3.5/share/applnk/Utilities/kmailcvt.desktop</Path>
+            <Path fileType="data">/usr/kde/3.5/share/apps/kconf_update/kmail*</Path>
+            <Path fileType="data">/usr/kde/3.5/share/apps/kconf_update/upgrade-signature.pl</Path>
+            <Path fileType="data">/usr/kde/3.5/share/apps/kconf_update/upgrade-transport.pl</Path>
+            <Path fileType="data">/usr/kde/3.5/share/apps/kmail</Path>
+            <Path fileType="data">/usr/kde/3.5/share/apps/konqueror/servicemenus/email.desktop</Path>
+            <Path fileType="data">/usr/kde/3.5/share/config.kcfg/custommimeheader.kcfg</Path>
+            <Path fileType="data">/usr/kde/3.5/share/config.kcfg/customtemplates_kfg.kcfg</Path>
+            <Path fileType="data">/usr/kde/3.5/share/config.kcfg/kmail.kcfg</Path>
+            <Path fileType="data">/usr/kde/3.5/share/config.kcfg/replyphrases.kcfg</Path>
+            <Path fileType="data">/usr/kde/3.5/share/config.kcfg/templatesconfiguration_kfg.kcfg</Path>
+            <Path fileType="data">/usr/kde/3.5/share/config/kmail.*</Path>
+            <Path fileType="data">/usr/kde/3.5/share/icons/*/*/apps/kmail*</Path>
+            <Path fileType="data">/usr/kde/3.5/share/services/kmail_config_*</Path>
+            <Path fileType="data">/usr/kde/3.5/share/servicetypes/dcopimap.desktop</Path>
+            <Path fileType="data">/usr/kde/3.5/share/servicetypes/dcopmail.desktop</Path>
+            <Path fileType="doc">/usr/kde/3.5/share/doc/HTML/en/kdepim-apidocs/kmail/html</Path>
+            <Path fileType="doc">/usr/kde/3.5/share/doc/HTML/en/kmail</Path>
+        </Files>
+        <AdditionalFiles>
+            <AdditionalFile target="/usr/kde/3.5/share/apps/konqueror/servicemenus/email.desktop" permission="0644" owner="root">email.desktop</AdditionalFile>
+        </AdditionalFiles>
+    </Package>
+    <Package>
+        <Name>kdepim-knode</Name>
+        <PartOf>network.rss</PartOf>
+        <Summary>News/NNTP Reader</Summary>
+        <Description>KNode is an easy-to-use GNKSA compilant NNTP newsreader with support for MIME and multiple servers.</Description>
+        <RuntimeDependencies>
+            <Dependency>kdepim-core</Dependency>
+            <Dependency>kdelibs</Dependency>
+            <Dependency>qt3</Dependency>
+        </RuntimeDependencies>
+        <Replaces>
+            <Package>kdepim</Package>
+        </Replaces>
+        <Files>
+            <Path fileType="executable">/usr/kde/3.5/bin/knode</Path>
+            <Path fileType="library">/usr/kde/3.5/lib/kde3/kcm_knode.*</Path>
+            <Path fileType="library">/usr/kde/3.5/lib/kde3/libknodepart.*</Path>
+            <Path fileType="library">/usr/kde/3.5/lib/libknodecommon.*</Path>
+            <Path fileType="data">/usr/kde/3.5/share/applications/kde/KNode.desktop</Path>
+            <Path fileType="data">/usr/kde/3.5/share/apps/knode</Path>
+            <Path fileType="data">/usr/kde/3.5/share/icons/hicolor/*/apps/knode*</Path>
+            <Path fileType="data">/usr/kde/3.5/share/services/knewsservice.protocol</Path>
+            <Path fileType="data">/usr/kde/3.5/share/services/knode_config_*</Path>
+            <Path fileType="doc">/usr/kde/3.5/share/doc/HTML/en/knode</Path>
+        </Files>
+    </Package>
+    <Package>
+        <Name>kdepim-kontact</Name>
+        <PartOf>office.misc</PartOf>
+        <Summary>Personal Information Manager and Groupware Suite</Summary>
+        <Description>Kontact is a personal information manager and groupware software suite for KDE. It supports calendars, contacts, notes, to-do lists, news, and email. It uses KParts to embed the various applications (KMail, KAddressBook, Akregator, etc.) into the container application.</Description>
+        <RuntimeDependencies>
+            <Dependency>kdepim-core</Dependency>
+            <Dependency>kdepim-kmail</Dependency>
+            <Dependency>kdepim-korganizer</Dependency>
+            <Dependency>kdepim-akregator</Dependency>
+            <Dependency>kdepim-kpilot</Dependency>
+            <Dependency>kdelibs</Dependency>
+            <Dependency>qt3</Dependency>
+        </RuntimeDependencies>
+        <Replaces>
+            <Package>kdepim</Package>
+        </Replaces>
+        <Files>
+            <Path fileType="executable">/usr/kde/3.5/bin/kontact</Path>
+            <Path fileType="header">/usr/kde/3.5/include/kontact</Path>
+            <Path fileType="library">/usr/kde/3.5/lib/kde3/kcm_kmailsummary.*</Path>
+            <Path fileType="library">/usr/kde/3.5/lib/kde3/kcm_kontact*</Path>
+            <Path fileType="library">/usr/kde/3.5/lib/kde3/kcm_korgsummary.*</Path>
+            <Path fileType="library">/usr/kde/3.5/lib/kde3/kcm_sdsummary.*</Path>
+            <Path fileType="library">/usr/kde/3.5/lib/kde3/libkontact_*</Path>
+            <Path fileType="library">/usr/kde/3.5/lib/libkontact.*</Path>
+            <Path fileType="library">/usr/kde/3.5/lib/libkpinterfaces.*</Path>
+            <Path fileType="data">/usr/kde/3.5/share/applications/kde/kontactdcop.desktop</Path>
+            <Path fileType="data">/usr/kde/3.5/share/applications/kde/Kontact.desktop</Path>
+            <Path fileType="data">/usr/kde/3.5/share/apps/knotes/knotes_part.rc</Path>
+            <Path fileType="data">/usr/kde/3.5/share/apps/kontact*</Path>
+            <Path fileType="data">/usr/kde/3.5/share/config.kcfg/kontact.kcfg</Path>
+            <Path fileType="data">/usr/kde/3.5/share/icons/*/*/*/kontact*</Path>
+            <Path fileType="data">/usr/kde/3.5/share/services/kcmkmailsummary.desktop</Path>
+            <Path fileType="data">/usr/kde/3.5/share/services/kcmkontact*</Path>
+            <Path fileType="data">/usr/kde/3.5/share/services/kcmkorgsummary.desktop</Path>
+            <Path fileType="data">/usr/kde/3.5/share/services/kcmsdsummary.desktop</Path>
+            <Path fileType="data">/usr/kde/3.5/share/services/kontact*</Path>
+            <Path fileType="data">/usr/kde/3.5/share/servicetypes/kontactplugin.desktop</Path>
+            <Path fileType="doc">/usr/kde/3.5/share/doc/HTML/en/kontact</Path>
+            <Path fileType="doc">/usr/kde/3.5/share/doc/HTML/en/kdepim-apidocs/kontact/html</Path>
+        </Files>
+    </Package>
+    <Package>
+        <Name>kdepim-korganizer</Name>
+        <PartOf>office.misc</PartOf>
+        <Summary>Calendar/scheduling tool</Summary>
+        <Description>KOrganizer provides management of events and tasks, alarm notification, web export, network transparent handling of data, group scheduling, import and export of calendar files and more. It is able to work together with a wide variety of groupware servers. It supports the two dominant standards for storing and exchanging calendar data, vCalendar and iCalendar.</Description>
+        <RuntimeDependencies>
+            <Dependency>kdepim-core</Dependency>
+            <Dependency>kdelibs</Dependency>
+            <Dependency>qt3</Dependency>
+        </RuntimeDependencies>
+        <Replaces>
+            <Package>kdepim</Package>
+        </Replaces>
+        <Files>
+            <Path fileType="executable">/usr/kde/3.5/bin/ical2vcal</Path>
+            <Path fileType="executable">/usr/kde/3.5/bin/korga*</Path>
+            <Path fileType="header">/usr/kde/3.5/include/calendar</Path>
+            <Path fileType="header">/usr/kde/3.5/include/korganizer</Path>
+            <Path fileType="library">/usr/kde/3.5/lib/kde3/kcm_korganizer.*</Path>
+            <Path fileType="library">/usr/kde/3.5/lib/kde3/libkorg*</Path>
+            <Path fileType="library">/usr/kde/3.5/lib/libkocorehelper.*</Path>
+            <Path fileType="library">/usr/kde/3.5/lib/libkorg*</Path>
+            <Path fileType="data">/usr/kde/3.5/share/applications/kde/korganizer.desktop</Path>
+            <Path fileType="data">/usr/kde/3.5/share/apps/kconf_update/korganizer.upd</Path>
+            <Path fileType="data">/usr/kde/3.5/share/apps/korga*</Path>
+            <Path fileType="data">/usr/kde/3.5/share/autostart/korgac.desktop</Path>
+            <Path fileType="data">/usr/kde/3.5/share/config.kcfg/korganizer.kcfg</Path>
+            <Path fileType="data">/usr/kde/3.5/share/icons/hicolor/*/apps/korganizer.png</Path>
+            <Path fileType="data">/usr/kde/3.5/share/services/korganizer*</Path>
+            <Path fileType="data">/usr/kde/3.5/share/services/webcal.protocol</Path>
+            <Path fileType="data">/usr/kde/3.5/share/servicetypes/calendar*</Path>
+            <Path fileType="data">/usr/kde/3.5/share/servicetypes/dcopcalendar.desktop</Path>
+            <Path fileType="data">/usr/kde/3.5/share/servicetypes/korg*</Path>
+            <Path fileType="doc">/usr/kde/3.5/share/doc/HTML/en/korganizer</Path>
+            <Path fileType="doc">/usr/kde/3.5/share/doc/HTML/en/kdepim-apidocs/korganizer/html</Path>
+        </Files>
+    </Package>
+    <Package>
+        <Name>kdepim-kpilot</Name>
+        <PartOf>hardware.mobile</PartOf>
+        <Summary>Synchronization for Palm-based devices</Summary>
+        <Description>KPilot connects your Palm device and integrates a number of fine KDE applications into a package that can do everything the Palm can and more. It has plugins that can exchange information between your device and other applications like KOrganizer or POP3/SMTP mail servers. In KPilot you can display and edit your contacts, write notes or install new programs on your device.</Description>
+        <RuntimeDependencies>
+            <Dependency>kdepim-core</Dependency>
+            <Dependency>kdelibs</Dependency>
+            <Dependency>qt3</Dependency>
+            <Dependency>pilot-link</Dependency>
+            <Dependency>libmal</Dependency>
+            <Dependency>gnokii</Dependency>
+        </RuntimeDependencies>
+        <Replaces>
+            <Package>kdepim</Package>
+        </Replaces>
+        <Files>
+            <Path fileType="executable">/usr/kde/3.5/bin/kpalmdoc</Path>
+            <Path fileType="executable">/usr/kde/3.5/bin/kpilot*</Path>
+            <Path fileType="header">/usr/kde/3.5/include/kpilot</Path>
+            <Path fileType="library">/usr/kde/3.5/lib/kde3/conduit_*</Path>
+            <Path fileType="library">/usr/kde/3.5/lib/kde3/kcm_kpilot.*</Path>
+            <Path fileType="library">/usr/kde/3.5/lib/libkpilot.*</Path>
+            <Path fileType="data">/usr/kde/3.5/share/applications/kde/kpalmdoc.desktop</Path>
+            <Path fileType="data">/usr/kde/3.5/share/applications/kde/kpilot*</Path>
+            <Path fileType="data">/usr/kde/3.5/share/apps/kaddressbook/contacteditorpages/KPilotCustomFieldEditor.ui</Path>
+            <Path fileType="data">/usr/kde/3.5/share/apps/kconf_update/kpalmdoc.upd</Path>
+            <Path fileType="data">/usr/kde/3.5/share/apps/kconf_update/kpilot.upd</Path>
+            <Path fileType="data">/usr/kde/3.5/share/apps/kpilot</Path>
+            <Path fileType="data">/usr/kde/3.5/share/config.kcfg/abbrowserconduit.kcfg</Path>
+            <Path fileType="data">/usr/kde/3.5/share/config.kcfg/docconduit.kcfg</Path>
+            <Path fileType="data">/usr/kde/3.5/share/config.kcfg/knotesconduit.kcfg</Path>
+            <Path fileType="data">/usr/kde/3.5/share/config.kcfg/kpalmdoc.kcfg</Path>
+            <Path fileType="data">/usr/kde/3.5/share/config.kcfg/kpilot*</Path>
+            <Path fileType="data">/usr/kde/3.5/share/config.kcfg/malconduit.kcfg</Path>
+            <Path fileType="data">/usr/kde/3.5/share/config.kcfg/memofileconduit.kcfg</Path>
+            <Path fileType="data">/usr/kde/3.5/share/config.kcfg/popmail.kcfg</Path>
+            <Path fileType="data">/usr/kde/3.5/share/config.kcfg/sysinfoconduit.kcfg</Path>
+            <Path fileType="data">/usr/kde/3.5/share/config.kcfg/timeconduit.kcfg</Path>
+            <Path fileType="data">/usr/kde/3.5/share/config.kcfg/vcalconduitbase.kcfg</Path>
+            <Path fileType="data">/usr/kde/3.5/share/icons/crystalsvg/*/apps/kpalmdoc.png</Path>
+            <Path fileType="data">/usr/kde/3.5/share/icons/*/*/apps/kpilot*</Path>
+            <Path fileType="data">/usr/kde/3.5/share/services/abbrowser_conduit.desktop</Path>
+            <Path fileType="data">/usr/kde/3.5/share/services/doc_conduit.desktop</Path>
+            <Path fileType="data">/usr/kde/3.5/share/services/knotes-conduit.desktop</Path>
+            <Path fileType="data">/usr/kde/3.5/share/services/kpilot_config.desktop</Path>
+            <Path fileType="data">/usr/kde/3.5/share/services/mal_conduit.desktop</Path>
+            <Path fileType="data">/usr/kde/3.5/share/services/memofile-conduit.desktop</Path>
+            <Path fileType="data">/usr/kde/3.5/share/services/notepad-conduit.desktop</Path>
+            <Path fileType="data">/usr/kde/3.5/share/services/popmail-conduit.desktop</Path>
+            <Path fileType="data">/usr/kde/3.5/share/services/sysinfo_conduit.desktop</Path>
+            <Path fileType="data">/usr/kde/3.5/share/services/time_conduit.desktop</Path>
+            <Path fileType="data">/usr/kde/3.5/share/services/todo-conduit.desktop</Path>
+            <Path fileType="data">/usr/kde/3.5/share/services/vcal-conduit.desktop</Path>
+            <Path fileType="data">/usr/kde/3.5/share/servicetypes/kpilotconduit.desktop</Path>
+            <Path fileType="doc">/usr/kde/3.5/share/doc/HTML/en/kpilot</Path>
+            <Path fileType="doc">/usr/kde/3.5/share/doc/HTML/en/kdepim-apidocs/kpilot</Path>
+        </Files>
+    </Package>
+    <Package>
+        <Name>kdepim-core</Name>
+        <IsA>library</IsA>
+        <Summary>Base KDE Personal Information Manager (PIM) applications and libraries</Summary>
+        <RuntimeDependencies>
+            <Dependency>kdelibs</Dependency>
+            <Dependency>qt3</Dependency>
+            <Dependency>gpgme</Dependency>
+            <Dependency>cyrus-sasl</Dependency>
+            <Dependency>pilot-link</Dependency>
+        </RuntimeDependencies>
+        <Replaces>
+            <Package>kdepim</Package>
+        </Replaces>
+        <Files>
+            <Path fileType="executable">/usr/kde/3.5/bin</Path>
+            <Path fileType="library">/usr/kde/3.5/lib</Path>
+            <Path fileType="data">/usr/kde/3.5/share</Path>
+            <Path fileType="header">/usr/kde/3.5/include</Path>
+        </Files>
+        <AdditionalFiles>
+            <AdditionalFile target="/usr/kde/3.5/share/apps/libkholidays/holiday_tr" permission="0644" owner="root">holiday_tr</AdditionalFile>
+        </AdditionalFiles>
+    </Package>
+    <History>
+        <Update release="64">
+            <Date>2011-10-20</Date>
+            <Version>3.5.10</Version>
+            <Comment>Add Turkish holidays from 2011 for holiday support in KOrganizer.</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="63">
+            <Date>2011-06-17</Date>
+            <Version>3.5.10</Version>
+            <Comment>
+                * Remove size column in kmail foldertree by default, thanks to Renan (pb#18432)
+                * Fix attachment trigger keyword logic in kmail and add a hardcoded keyword (ekteki) as well (pb#18433)
+            </Comment>
+            <Name>H. İbrahim Güngör</Name>
+            <Email>ibrahim@pardus.org.tr</Email>
+        </Update>
+        <Update release="62">
+            <Date>2011-02-10</Date>
+            <Version>3.5.10</Version>
+            <Comment>Add missing akregator dependency to kontact (#16793)</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="61">
+            <Date>2010-11-02</Date>
+            <Version>3.5.10</Version>
+            <Comment>Mass rebuild for Pardus Corporate 2 Alpha 3</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="60">
+            <Date>2010-07-09</Date>
+            <Version>3.5.10</Version>
+            <Comment>adapt to autoconf >= 2.64 changes, patch by Onur.</Comment>
+            <Name>Serdar Dalgıç</Name>
+            <Email>serdar@pardus.org.tr</Email>
+        </Update>
+        <Update release="59">
+            <Date>2010-06-07</Date>
+            <Version>3.5.10</Version>
+            <Comment>Split akregator, kalarm, karm, kitchensync, kmail, knode, kontact, korganizer, kpilot. Remove kandy and korn docs.</Comment>
+            <Name>Doruk Fişek</Name>
+            <Email>dfisek@fisek.com.tr</Email>
+        </Update>
+        <Update release="58">
+            <Date>2010-06-07</Date>
+            <Version>3.5.10</Version>
+            <Comment>Set wordwrap in k-mail's mailing list properties dialog (#2840)</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="57">
+            <Date>2010-01-28</Date>
+            <Version>3.5.10</Version>
+            <Comment>Fix automake and Python detection</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="56" type="security">
+            <Date>2009-03-05</Date>
+            <Version>3.5.10</Version>
+            <Comment>Added 3 more ubuntu patches for various bugfixes.</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="55">
+            <Date>2008-12-01</Date>
+            <Version>3.5.10</Version>
+            <Comment>
+                - Add new patches which:
+                    - Fixes a potential crash in Kmail,
+                    - Makes sure that the inbox folder doesn't stay hidden if content is added,
+                    - Prevents incidence loss under certain conditions as the UID map wasn't being reloaded,
+                    - Prevents KMail crashing due to certain malicious base64-encoded mail parts,
+                - Don't delete korgac desktop file, instead avoid it from autostarting by default (Fixes #6488).
+            </Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="54">
+            <Date>2008-11-07</Date>
+            <Version>3.5.10</Version>
+            <Comment>Fix buggy "To:" header generation issue</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+        <Update release="53">
+            <Date>2008-10-16</Date>
+            <Version>3.5.10</Version>
+            <Comment>Desktop file translation fix for #5667.</Comment>
+            <Name>Semen Cirit</Name>
+            <Email>semen@pardus.org.tr</Email>
+        </Update>
+        <Update release="52">
+            <Date>2008-08-26</Date>
+            <Version>3.5.10</Version>
+            <Comment>Stable update</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="51">
+            <Date>2008-04-16</Date>
+            <Version>3.5.9</Version>
+            <Comment>Bug fix due to #7116</Comment>
+            <Name>Pınar Yanardağ</Name>
+            <Email>pinar@pardus.org.tr</Email>
+        </Update>
+        <Update release="50">
+            <Date>2008-02-20</Date>
+            <Version>3.5.9</Version>
+            <Comment>Version bump</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="49">
+            <Date>2007-10-09</Date>
+            <Version>3.5.8</Version>
+            <Comment>Update to new snapshot</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="48">
+            <Date>2007-10-07</Date>
+            <Version>3.5.7</Version>
+            <Comment>Fix KDE bug #150389</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="47">
+            <Date>2007-09-28</Date>
+            <Version>3.5.7</Version>
+            <Comment>New Enterprise snapshot</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="46">
+            <Date>2007-09-21</Date>
+            <Version>3.5.7</Version>
+            <Comment>Depend libopensyn and enable kitchensync</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="45">
+            <Date>2007-09-21</Date>
+            <Version>3.5.7</Version>
+            <Comment>New Enterprise snapshot</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="44">
+            <Date>2007-09-11</Date>
+            <Version>3.5.7</Version>
+            <Comment>Try to fix POP3 problems</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="43">
+            <Date>2007-09-03</Date>
+            <Version>3.5.7</Version>
+            <Comment>Revert enterprise branch merge</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="42">
+            <Date>2007-08-31</Date>
+            <Version>3.5.7</Version>
+            <Comment>Branch update to fix some POP3 problems</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="41">
+            <Date>2007-08-28</Date>
+            <Version>3.5.7</Version>
+            <Comment>Update to 3.5 branch</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="40">
+            <Date>2007-06-23</Date>
+            <Version>3.5.7</Version>
+            <Comment>Add networkstatus properties to akregator</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="39">
+            <Date>2007-06-17</Date>
+            <Version>3.5.7</Version>
+            <Comment>Grab networkstatus branch patch set from KDE SVN and some crash fixes from OpenSuse</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="38">
+            <Date>2007-05-14</Date>
+            <Version>3.5.7</Version>
+            <Comment>Version bump</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="37">
+            <Date>2007-04-30</Date>
+            <Version>3.5.6</Version>
+            <Comment>Enable Gnokii</Comment>
+            <Name>Barış Metin</Name>
+            <Email>baris@pardus.org.tr</Email>
+        </Update>
+        <Update release="36">
+            <Date>2007-04-15</Date>
+            <Version>3.5.6</Version>
+            <Comment>Re-sync with 3.5 branch</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="35">
+            <Date>2007-03-21</Date>
+            <Version>3.5.6</Version>
+            <Comment>Sync with 3.5 branch</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="34">
+            <Date>2007-02-28</Date>
+            <Version>3.5.6</Version>
+            <Comment>Kpilot Fix</Comment>
+            <Name>Gökmen Göksel</Name>
+            <Email>gokmen@pardus.org.tr</Email>
+        </Update>
+        <Update release="33">
+            <Date>2007-02-19</Date>
+            <Version>3.5.6</Version>
+            <Comment>Fix #5037</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="32">
+            <Date>2007-01-27</Date>
+            <Version>3.5.6</Version>
+            <Comment>Fix http://bugs.kde.org/show_bug.cgi?id=140660</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="31">
+            <Date>2007-01-17</Date>
+            <Version>3.5.6</Version>
+            <Comment>Version bump</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="30">
+            <Date>2006-11-19</Date>
+            <Version>3.5.5</Version>
+            <Comment>Depend on new gpgme/gnupg for S/MIME support</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="29">
+            <Date>2006-10-31</Date>
+            <Version>3.5.5</Version>
+            <Comment>Disable unneeded debugging</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="28">
+            <Date>2006-10-21</Date>
+            <Version>3.5.5</Version>
+            <Comment>Sync with 3.5 branch</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="27">
+            <Date>2006-10-03</Date>
+            <Version>3.5.5</Version>
+            <Comment>Version bump</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="26">
+            <Date>2006-09-22</Date>
+            <Version>3.5.4</Version>
+            <Comment>Sync to 3.5 branch only including kmail and imap4 kioslave</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="25">
+            <Date>2006-09-12</Date>
+            <Version>3.5.4</Version>
+            <Comment>Sync to 3.5 branch</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="24">
+            <Date>2006-08-14</Date>
+            <Version>3.5.4</Version>
+            <Comment>Sync KMail to 3.5.5 branch</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="23">
+            <Date>2006-07-25</Date>
+            <Version>3.5.4</Version>
+            <Comment>New stable release</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="22">
+            <Date>2006-07-08</Date>
+            <Version>3.5.3</Version>
+            <Comment>Use networkstatus for whole KMail</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="21">
+            <Date>2006-07-06</Date>
+            <Version>3.5.3</Version>
+            <Comment>Merge some upstream fixes for KMail, add networkstatus support for KMail</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="20">
+            <Date>2006-06-30</Date>
+            <Version>3.5.3</Version>
+            <Comment>Install networkstatus</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="19">
+            <Date>2006-04-24</Date>
+            <Version>3.5.3</Version>
+            <Comment>new version</Comment>
+            <Name>Barış Metin</Name>
+            <Email>baris@pardus.org.tr</Email>
+        </Update>
+        <Update release="18">
+            <Date>2006-04-06</Date>
+            <Version>3.5.2</Version>
+            <Comment>Use nested messages, bug #1467. Remove whatstis button, bug #1352.</Comment>
+            <Name>Barış Metin</Name>
+            <Email>baris@pardus.org.tr</Email>
+        </Update>
+        <Update release="17">
+            <Date>2006-03-28</Date>
+            <Version>3.5.2</Version>
+            <Comment>Send files with kmail service menu added</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="16">
+            <Date>2006-03-22</Date>
+            <Version>3.5.2</Version>
+            <Comment>New stable release</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="15">
+            <Date>2006-02-01</Date>
+            <Version>3.5.1</Version>
+            <Comment>New stable relase</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="14">
+            <Date>2006-01-31</Date>
+            <Version>3.5.0</Version>
+            <Comment>Add showSidePane patch, which adds an option for hiding Side Pane</Comment>
+            <Name>Barış Metin</Name>
+            <Email>baris@pardus.org.tr</Email>
+        </Update>
+        <Update release="13">
+            <Date>2005-12-12</Date>
+            <Version>3.5.0</Version>
+            <Comment>Backport David Faure&apos;s IMAP slowness fixes</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="12">
+            <Date>2005-12-10</Date>
+            <Version>3.5.0</Version>
+            <Comment>Disable Kandy and Korn</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="11">
+            <Date>2005-12-09</Date>
+            <Version>3.5.0</Version>
+            <Comment>Update KMail to 1.9.1</Comment>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Update>
+        <Update release="10">
+            <Date>2005-12-06</Date>
+            <Version>3.5.0</Version>
+            <Comment>fix #892</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="9">
+            <Date>2005-11-29</Date>
+            <Version>3.5.0</Version>
+            <Comment>Version bump to stable release</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="8">
+            <Date>2005-11-26</Date>
+            <Version>3.5.0_rc2</Version>
+            <Comment>--enable-indexlib disabled, see #904</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="7">
+            <Date>2005-11-24</Date>
+            <Version>3.5.0_rc2</Version>
+            <Comment>imapfetchmaxsize patch added</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="6">
+            <Date>2005-11-24</Date>
+            <Version>3.5.0_rc2</Version>
+            <Comment>compiles with --enable-indexlib</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="5">
+            <Date>2005-11-21</Date>
+            <Version>3.5.0_rc2</Version>
+            <Comment>Version bump</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="4">
+            <Date>2005-11-18</Date>
+            <Version>3.5.0_rc1</Version>
+            <Comment>remove korganizer from autostart</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="3">
+            <Date>2005-11-15</Date>
+            <Version>3.5.0_rc1</Version>
+            <Comment>Version bump</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="2">
+            <Date>2005-10-15</Date>
+            <Version>3.5.0_beta2</Version>
+            <Comment>Version bump</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+        <Update release="1">
+            <Date>2005-09-05</Date>
+            <Version>3.4.2</Version>
+            <Comment>First release.</Comment>
+            <Name>S.Çağlar Onur</Name>
+            <Email>caglar@pardus.org.tr</Email>
+        </Update>
+    </History>
+</PISI>

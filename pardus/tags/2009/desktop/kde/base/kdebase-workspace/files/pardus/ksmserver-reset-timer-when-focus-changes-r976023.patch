@@ -1,0 +1,31 @@
+--- a/ksmserver/shutdowndlg.cpp	(revision 976022)
++++ b/ksmserver/shutdowndlg.cpp	(revision 976023)
+@@ -337,6 +337,7 @@
+ KSMShutdownDlg::KSMShutdownDlg( QWidget* parent,
+                                 bool maysd, KWorkSpace::ShutdownType sdtype )
+   : QDialog( parent, Qt::Popup ), //krazy:exclude=qclasses
++    m_lastButton(0),
+     m_btnLogout(0),
+     m_btnHalt(0),
+     m_btnReboot(0),
+@@ -524,6 +525,10 @@
+ void KSMShutdownDlg::automaticallyDoTimeout()
+ {
+     QPushButton *focusedButton = qobject_cast<QPushButton *>(focusWidget());
++    if (focusedButton != m_lastButton) {
++        m_lastButton = focusedButton;
++        m_automaticallyDoSeconds = 30;
++    }
+     if (focusedButton) {
+         if (m_automaticallyDoSeconds <= 0) { // timeout is at 0, do selected action
+                 focusedButton->click();
+--- a/ksmserver/shutdowndlg.h	(revision 976022)
++++ b/ksmserver/shutdowndlg.h	(revision 976023)
+@@ -129,6 +129,7 @@
+     QPixmap m_renderedSvg;
+     Plasma::FrameSvg* m_svg;
+     QLabel *m_automaticallyDoLabel;
++    QPushButton *m_lastButton;
+     KSMPushButton *m_btnLogout;
+     KSMPushButton *m_btnHalt;
+     KSMPushButton *m_btnReboot;

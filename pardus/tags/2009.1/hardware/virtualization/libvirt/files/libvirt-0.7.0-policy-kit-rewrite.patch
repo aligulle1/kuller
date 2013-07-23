@@ -1,0 +1,469 @@
+diff -rupN libvirt-0.7.0/configure.in libvirt-0.7.0.new/configure.in
+--- libvirt-0.7.0/configure.in	2009-08-05 08:53:49.000000000 -0400
++++ libvirt-0.7.0.new/configure.in	2009-08-13 08:37:22.393897620 -0400
+@@ -641,40 +641,61 @@ AC_SUBST([SASL_LIBS])
+ dnl PolicyKit library
+ POLKIT_CFLAGS=
+ POLKIT_LIBS=
++PKCHECK_PATH=
+ AC_ARG_WITH([polkit],
+   [  --with-polkit         use PolicyKit for UNIX socket access checks],
+   [],
+   [with_polkit=check])
+ 
++with_polkit0=no
++with_polkit1=no
+ if test "x$with_polkit" = "xyes" -o "x$with_polkit" = "xcheck"; then
+-  PKG_CHECK_MODULES(POLKIT, polkit-dbus >= $POLKIT_REQUIRED,
+-    [with_polkit=yes], [
+-    if test "x$with_polkit" = "xcheck" ; then
+-       with_polkit=no
+-    else
+-       AC_MSG_ERROR(
+-         [You must install PolicyKit >= $POLKIT_REQUIRED to compile libvirt])
+-    fi
+-  ])
+-  if test "x$with_polkit" = "xyes" ; then
++  dnl Check for new polkit first - just a binary
++  AC_PATH_PROG([PKCHECK_PATH],[pkcheck], [], [/usr/sbin:$PATH])
++  if test "x$PKCHECK_PATH" != "x" ; then
++    AC_DEFINE_UNQUOTED([PKCHECK_PATH],["$PKCHECK_PATH"],[Location of pkcheck program])
+     AC_DEFINE_UNQUOTED([HAVE_POLKIT], 1,
+-      [use PolicyKit for UNIX socket access checks])
+-
+-    old_CFLAGS=$CFLAGS
+-    old_LDFLAGS=$LDFLAGS
+-    CFLAGS="$CFLAGS $POLKIT_CFLAGS"
+-    LDFLAGS="$LDFLAGS $POLKIT_LIBS"
+-    AC_CHECK_FUNCS([polkit_context_is_caller_authorized])
+-    CFLAGS="$old_CFLAGS"
+-    LDFLAGS="$old_LDFLAGS"
+-
+-    AC_PATH_PROG([POLKIT_AUTH], [polkit-auth])
+-    if test "x$POLKIT_AUTH" != "x"; then
+-      AC_DEFINE_UNQUOTED([POLKIT_AUTH],["$POLKIT_AUTH"],[Location of polkit-auth program])
++        [use PolicyKit for UNIX socket access checks])
++    AC_DEFINE_UNQUOTED([HAVE_POLKIT1], 1,
++        [use PolicyKit for UNIX socket access checks])
++    with_polkit="yes"
++    with_polkit1="yes"
++  else
++    dnl Check for old polkit second - library + binary
++    PKG_CHECK_MODULES(POLKIT, polkit-dbus >= $POLKIT_REQUIRED,
++      [with_polkit=yes], [
++      if test "x$with_polkit" = "xcheck" ; then
++         with_polkit=no
++      else
++         AC_MSG_ERROR(
++           [You must install PolicyKit >= $POLKIT_REQUIRED to compile libvirt])
++      fi
++    ])
++    if test "x$with_polkit" = "xyes" ; then
++      AC_DEFINE_UNQUOTED([HAVE_POLKIT], 1,
++        [use PolicyKit for UNIX socket access checks])
++      AC_DEFINE_UNQUOTED([HAVE_POLKIT0], 1,
++        [use PolicyKit for UNIX socket access checks])
++
++      old_CFLAGS=$CFLAGS
++      old_LDFLAGS=$LDFLAGS
++      CFLAGS="$CFLAGS $POLKIT_CFLAGS"
++      LDFLAGS="$LDFLAGS $POLKIT_LIBS"
++      AC_CHECK_FUNCS([polkit_context_is_caller_authorized])
++      CFLAGS="$old_CFLAGS"
++      LDFLAGS="$old_LDFLAGS"
++
++      AC_PATH_PROG([POLKIT_AUTH], [polkit-auth])
++      if test "x$POLKIT_AUTH" != "x"; then
++        AC_DEFINE_UNQUOTED([POLKIT_AUTH],["$POLKIT_AUTH"],[Location of polkit-auth program])
++      fi
++      with_polkit0="yes"
+     fi
+   fi
+ fi
+ AM_CONDITIONAL([HAVE_POLKIT], [test "x$with_polkit" = "xyes"])
++AM_CONDITIONAL([HAVE_POLKIT0], [test "x$with_polkit0" = "xyes"])
++AM_CONDITIONAL([HAVE_POLKIT1], [test "x$with_polkit1" = "xyes"])
+ AC_SUBST([POLKIT_CFLAGS])
+ AC_SUBST([POLKIT_LIBS])
+ 
+@@ -1695,7 +1716,11 @@ else
+ AC_MSG_NOTICE([   avahi: no])
+ fi
+ if test "$with_polkit" = "yes" ; then
+-AC_MSG_NOTICE([  polkit: $POLKIT_CFLAGS $POLKIT_LIBS])
++if test "$with_polkit0" = "yes" ; then
++AC_MSG_NOTICE([  polkit: $POLKIT_CFLAGS $POLKIT_LIBS (version 0)])
++else
++AC_MSG_NOTICE([  polkit: $PKCHECK_PATH (version 1)])
++fi
+ else
+ AC_MSG_NOTICE([  polkit: no])
+ fi
+diff -rupN libvirt-0.7.0/qemud/libvirtd.policy libvirt-0.7.0.new/qemud/libvirtd.policy
+--- libvirt-0.7.0/qemud/libvirtd.policy	2009-07-22 09:37:32.000000000 -0400
++++ libvirt-0.7.0.new/qemud/libvirtd.policy	1969-12-31 19:00:00.000000000 -0500
+@@ -1,42 +0,0 @@
+-<!DOCTYPE policyconfig PUBLIC
+- "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+- "http://www.freedesktop.org/standards/PolicyKit/1.0/policyconfig.dtd">
+-
+-<!--
+-Policy definitions for libvirt daemon
+-
+-Copyright (c) 2007 Daniel P. Berrange <berrange redhat com>
+-
+-libvirt is licensed to you under the GNU Lesser General Public License
+-version 2. See COPYING for details.
+-
+-NOTE: If you make changes to this file, make sure to validate the file
+-using the polkit-policy-file-validate(1) tool. Changes made to this
+-file are instantly applied.
+--->
+-
+-<policyconfig>
+-    <action id="org.libvirt.unix.monitor">
+-      <description>Monitor local virtualized systems</description>
+-      <message>System policy prevents monitoring of local virtualized systems</message>
+-      <defaults>
+-        <!-- Any program can use libvirt in read-only mode for monitoring,
+-             even if not part of a session -->
+-        <allow_any>yes</allow_any>
+-        <allow_inactive>yes</allow_inactive>
+-        <allow_active>yes</allow_active>
+-      </defaults>
+-    </action>
+-
+-    <action id="org.libvirt.unix.manage">
+-      <description>Manage local virtualized systems</description>
+-      <message>System policy prevents management of local virtualized systems</message>
+-      <defaults>
+-        <!-- Only a program in the active host session can use libvirt in
+-             read-write mode for management, and we require user password -->
+-        <allow_any>no</allow_any>
+-        <allow_inactive>no</allow_inactive>
+-        <allow_active>auth_admin_keep_session</allow_active>
+-      </defaults>
+-    </action>
+-</policyconfig>
+diff -rupN libvirt-0.7.0/qemud/libvirtd.policy-0 libvirt-0.7.0.new/qemud/libvirtd.policy-0
+--- libvirt-0.7.0/qemud/libvirtd.policy-0	1969-12-31 19:00:00.000000000 -0500
++++ libvirt-0.7.0.new/qemud/libvirtd.policy-0	2009-08-13 08:37:22.408883879 -0400
+@@ -0,0 +1,42 @@
++<!DOCTYPE policyconfig PUBLIC
++ "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
++ "http://www.freedesktop.org/standards/PolicyKit/1.0/policyconfig.dtd">
++
++<!--
++Policy definitions for libvirt daemon
++
++Copyright (c) 2007 Daniel P. Berrange <berrange redhat com>
++
++libvirt is licensed to you under the GNU Lesser General Public License
++version 2. See COPYING for details.
++
++NOTE: If you make changes to this file, make sure to validate the file
++using the polkit-policy-file-validate(1) tool. Changes made to this
++file are instantly applied.
++-->
++
++<policyconfig>
++    <action id="org.libvirt.unix.monitor">
++      <description>Monitor local virtualized systems</description>
++      <message>System policy prevents monitoring of local virtualized systems</message>
++      <defaults>
++        <!-- Any program can use libvirt in read-only mode for monitoring,
++             even if not part of a session -->
++        <allow_any>yes</allow_any>
++        <allow_inactive>yes</allow_inactive>
++        <allow_active>yes</allow_active>
++      </defaults>
++    </action>
++
++    <action id="org.libvirt.unix.manage">
++      <description>Manage local virtualized systems</description>
++      <message>System policy prevents management of local virtualized systems</message>
++      <defaults>
++        <!-- Only a program in the active host session can use libvirt in
++             read-write mode for management, and we require user password -->
++        <allow_any>no</allow_any>
++        <allow_inactive>no</allow_inactive>
++        <allow_active>auth_admin_keep_session</allow_active>
++      </defaults>
++    </action>
++</policyconfig>
+diff -rupN libvirt-0.7.0/qemud/libvirtd.policy-1 libvirt-0.7.0.new/qemud/libvirtd.policy-1
+--- libvirt-0.7.0/qemud/libvirtd.policy-1	1969-12-31 19:00:00.000000000 -0500
++++ libvirt-0.7.0.new/qemud/libvirtd.policy-1	2009-08-13 08:37:22.412905763 -0400
+@@ -0,0 +1,42 @@
++<!DOCTYPE policyconfig PUBLIC
++ "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
++ "http://www.freedesktop.org/standards/PolicyKit/1.0/policyconfig.dtd">
++
++<!--
++Policy definitions for libvirt daemon
++
++Copyright (c) 2007 Daniel P. Berrange <berrange redhat com>
++
++libvirt is licensed to you under the GNU Lesser General Public License
++version 2. See COPYING for details.
++
++NOTE: If you make changes to this file, make sure to validate the file
++using the polkit-policy-file-validate(1) tool. Changes made to this
++file are instantly applied.
++-->
++
++<policyconfig>
++    <action id="org.libvirt.unix.monitor">
++      <description>Monitor local virtualized systems</description>
++      <message>System policy prevents monitoring of local virtualized systems</message>
++      <defaults>
++        <!-- Any program can use libvirt in read-only mode for monitoring,
++             even if not part of a session -->
++        <allow_any>yes</allow_any>
++        <allow_inactive>yes</allow_inactive>
++        <allow_active>yes</allow_active>
++      </defaults>
++    </action>
++
++    <action id="org.libvirt.unix.manage">
++      <description>Manage local virtualized systems</description>
++      <message>System policy prevents management of local virtualized systems</message>
++      <defaults>
++        <!-- Only a program in the active host session can use libvirt in
++             read-write mode for management, and we require user password -->
++        <allow_any>no</allow_any>
++        <allow_inactive>no</allow_inactive>
++        <allow_active>auth_admin_keep</allow_active>
++      </defaults>
++    </action>
++</policyconfig>
+diff -rupN libvirt-0.7.0/qemud/Makefile.am libvirt-0.7.0.new/qemud/Makefile.am
+--- libvirt-0.7.0/qemud/Makefile.am	2009-07-22 09:37:32.000000000 -0400
++++ libvirt-0.7.0.new/qemud/Makefile.am	2009-08-13 08:37:22.398915449 -0400
+@@ -21,7 +21,8 @@ EXTRA_DIST =						\
+ 	remote_protocol.x				\
+ 	libvirtd.conf					\
+ 	libvirtd.init.in				\
+-	libvirtd.policy					\
++	libvirtd.policy-0				\
++	libvirtd.policy-1				\
+ 	libvirtd.sasl					\
+ 	libvirtd.sysconf				\
+ 	libvirtd.aug                                    \
+@@ -147,7 +148,13 @@ endif
+ libvirtd_LDADD += ../src/libvirt.la
+ 
+ if HAVE_POLKIT
++if HAVE_POLKIT0
+ policydir = $(datadir)/PolicyKit/policy
++policyfile = libvirtd.policy-0
++else
++policydir = $(datadir)/polkit-1/actions
++policyfile = libvirtd.policy-1
++endif
+ endif
+ 
+ if HAVE_AVAHI
+@@ -197,7 +204,7 @@ endif
+ if HAVE_POLKIT
+ install-data-polkit:: install-init
+ 	mkdir -p $(DESTDIR)$(policydir)
+-	$(INSTALL_DATA) $(srcdir)/libvirtd.policy $(DESTDIR)$(policydir)/org.libvirt.unix.policy
++	$(INSTALL_DATA) $(srcdir)/$(policyfile) $(DESTDIR)$(policydir)/org.libvirt.unix.policy
+ uninstall-data-polkit:: install-init
+ 	rm -f $(DESTDIR)$(policydir)/org.libvirt.unix.policy
+ else
+diff -rupN libvirt-0.7.0/qemud/qemud.c libvirt-0.7.0.new/qemud/qemud.c
+--- libvirt-0.7.0/qemud/qemud.c	2009-07-22 09:37:32.000000000 -0400
++++ libvirt-0.7.0.new/qemud/qemud.c	2009-08-13 08:37:22.419878018 -0400
+@@ -895,7 +895,7 @@ static struct qemud_server *qemudNetwork
+     }
+ #endif
+ 
+-#ifdef HAVE_POLKIT
++#if HAVE_POLKIT0
+     if (auth_unix_rw == REMOTE_AUTH_POLKIT ||
+         auth_unix_ro == REMOTE_AUTH_POLKIT) {
+         DBusError derr;
+@@ -982,7 +982,7 @@ static struct qemud_server *qemudNetwork
+             sock = sock->next;
+         }
+ 
+-#ifdef HAVE_POLKIT
++#if HAVE_POLKIT0
+         if (server->sysbus)
+             dbus_connection_unref(server->sysbus);
+ #endif
+diff -rupN libvirt-0.7.0/qemud/qemud.h libvirt-0.7.0.new/qemud/qemud.h
+--- libvirt-0.7.0/qemud/qemud.h	2009-07-23 12:33:02.000000000 -0400
++++ libvirt-0.7.0.new/qemud/qemud.h	2009-08-13 08:37:22.425909852 -0400
+@@ -34,7 +34,7 @@
+ #include <sasl/sasl.h>
+ #endif
+ 
+-#ifdef HAVE_POLKIT
++#if HAVE_POLKIT0
+ #include <dbus/dbus.h>
+ #endif
+ 
+@@ -253,7 +253,7 @@ struct qemud_server {
+ #if HAVE_SASL
+     char **saslUsernameWhitelist;
+ #endif
+-#if HAVE_POLKIT
++#if HAVE_POLKIT0
+     DBusConnection *sysbus;
+ #endif
+ };
+diff -rupN libvirt-0.7.0/qemud/remote.c libvirt-0.7.0.new/qemud/remote.c
+--- libvirt-0.7.0/qemud/remote.c	2009-07-23 12:33:02.000000000 -0400
++++ libvirt-0.7.0.new/qemud/remote.c	2009-08-13 08:37:22.431865087 -0400
+@@ -43,7 +43,7 @@
+ #include <fnmatch.h>
+ #include "virterror_internal.h"
+ 
+-#ifdef HAVE_POLKIT
++#if HAVE_POLKIT0
+ #include <polkit/polkit.h>
+ #include <polkit-dbus/polkit-dbus.h>
+ #endif
+@@ -3106,7 +3106,80 @@ remoteDispatchAuthSaslStep (struct qemud
+ #endif /* HAVE_SASL */
+ 
+ 
+-#if HAVE_POLKIT
++#if HAVE_POLKIT1
++static int
++remoteDispatchAuthPolkit (struct qemud_server *server,
++                          struct qemud_client *client,
++                          virConnectPtr conn ATTRIBUTE_UNUSED,
++                          remote_error *rerr,
++                          void *args ATTRIBUTE_UNUSED,
++                          remote_auth_polkit_ret *ret)
++{
++    pid_t callerPid;
++    uid_t callerUid;
++    const char *action;
++    int status = -1;
++    char pidbuf[50];
++    int rv;
++
++    virMutexLock(&server->lock);
++    virMutexLock(&client->lock);
++    virMutexUnlock(&server->lock);
++
++    action = client->readonly ?
++        "org.libvirt.unix.monitor" :
++        "org.libvirt.unix.manage";
++
++    const char * const pkcheck [] = {
++      PKCHECK_PATH,
++      "--action-id", action,
++      "--process", pidbuf,
++      "--allow-user-interaction",
++      NULL
++    };
++
++    REMOTE_DEBUG("Start PolicyKit auth %d", client->fd);
++    if (client->auth != REMOTE_AUTH_POLKIT) {
++        VIR_ERROR0(_("client tried invalid PolicyKit init request"));
++        goto authfail;
++    }
++
++    if (qemudGetSocketIdentity(client->fd, &callerUid, &callerPid) < 0) {
++        VIR_ERROR0(_("cannot get peer socket identity"));
++        goto authfail;
++    }
++
++    VIR_INFO(_("Checking PID %d running as %d"), callerPid, callerUid);
++
++    rv = snprintf(pidbuf, sizeof pidbuf, "%d", callerPid);
++    if (rv < 0 || rv >= sizeof pidbuf) {
++        VIR_ERROR(_("Caller PID was too large %d"), callerPid);
++	goto authfail;
++    }
++
++    if (virRun(NULL, pkcheck, &status) < 0) {
++        VIR_ERROR(_("Cannot invoke %s"), PKCHECK_PATH);
++	goto authfail;
++    }
++    if (status != 0) {
++        VIR_ERROR(_("Policy kit denied action %s from pid %d, uid %d, result: %d\n"),
++                  action, callerPid, callerUid, status);
++        goto authfail;
++    }
++    VIR_INFO(_("Policy allowed action %s from pid %d, uid %d"),
++             action, callerPid, callerUid);
++    ret->complete = 1;
++    client->auth = REMOTE_AUTH_NONE;
++
++    virMutexUnlock(&client->lock);
++    return 0;
++
++authfail:
++    remoteDispatchAuthError(rerr);
++    virMutexUnlock(&client->lock);
++    return -1;
++}
++#elif HAVE_POLKIT0
+ static int
+ remoteDispatchAuthPolkit (struct qemud_server *server,
+                           struct qemud_client *client,
+@@ -3217,7 +3290,7 @@ authfail:
+     return -1;
+ }
+ 
+-#else /* HAVE_POLKIT */
++#else /* !HAVE_POLKIT0 & !HAVE_POLKIT1*/
+ 
+ static int
+ remoteDispatchAuthPolkit (struct qemud_server *server ATTRIBUTE_UNUSED,
+@@ -3231,7 +3304,7 @@ remoteDispatchAuthPolkit (struct qemud_s
+     remoteDispatchAuthError(rerr);
+     return -1;
+ }
+-#endif /* HAVE_POLKIT */
++#endif /* HAVE_POLKIT1 */
+ 
+ 
+ /***************************************************************
+diff -rupN libvirt-0.7.0/src/remote_internal.c libvirt-0.7.0.new/src/remote_internal.c
+--- libvirt-0.7.0/src/remote_internal.c	2009-07-29 10:42:15.000000000 -0400
++++ libvirt-0.7.0.new/src/remote_internal.c	2009-08-13 10:55:57.607899170 -0400
+@@ -6201,6 +6201,7 @@ remoteAuthPolkit (virConnectPtr conn, st
+                   virConnectAuthPtr auth)
+ {
+     remote_auth_polkit_ret ret;
++#if HAVE_POLKIT0
+     int i, allowcb = 0;
+     virConnectCredential cred = {
+         VIR_CRED_EXTERNAL,
+@@ -6210,8 +6211,10 @@ remoteAuthPolkit (virConnectPtr conn, st
+         NULL,
+         0,
+     };
++#endif
+     DEBUG0("Client initialize PolicyKit authentication");
+ 
++#if HAVE_POLKIT0
+     if (auth && auth->cb) {
+         /* Check if the necessary credential type for PolicyKit is supported */
+         for (i = 0 ; i < auth->ncredtype ; i++) {
+@@ -6220,6 +6223,7 @@ remoteAuthPolkit (virConnectPtr conn, st
+         }
+ 
+         if (allowcb) {
++            DEBUG0("Client run callback for PolicyKit authentication");
+             /* Run the authentication callback */
+             if ((*(auth->cb))(&cred, 1, auth->cbdata) < 0) {
+                 virRaiseError (in_open ? NULL : conn, NULL, NULL, VIR_FROM_REMOTE,
+@@ -6233,6 +6237,9 @@ remoteAuthPolkit (virConnectPtr conn, st
+     } else {
+         DEBUG0("No auth callback provided");
+     }
++#else
++    DEBUG0("No auth callback required for PolicyKit-1");
++#endif
+ 
+     memset (&ret, 0, sizeof ret);
+     if (call (conn, priv, in_open, REMOTE_PROC_AUTH_POLKIT,

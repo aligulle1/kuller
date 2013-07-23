@@ -1,0 +1,30 @@
+Unregister serio drivers on shutdown
+
+Signed-off-by: Thomas Renninger <trenn@suse.de>
+
+Unproved theory:
+It seems that the Embedded Controller needs this at ACPI shutdown time:
+    psmouse_set_state(psmouse, PSMOUSE_CMD_MODE);
+    psmouse_set_state(psmouse, PSMOUSE_IGNORE);
+done in psmouse_disconnect in psmouse module.
+
+If this is not done on shutdown it leads to very strange BIOS/EC behaviour
+on latest HP laptops which even survives a reboot (cpufreq cannot reach max freq, BIOS takes long to boot, etc.)
+Ref: http://bugzilla.kernel.org/show_bug.cgi?id=7689 or
+
+
+ drivers/input/serio/serio.c |    1 +
+ 1 files changed, 1 insertion(+)
+
+Index: pardus-2.6/drivers/input/serio/serio.c
+===================================================================
+--- pardus-2.6.orig/drivers/input/serio/serio.c
++++ pardus-2.6/drivers/input/serio/serio.c
+@@ -779,6 +779,7 @@ static struct bus_type serio_bus = {
+ 	.name =	"serio",
+ 	.probe = serio_driver_probe,
+ 	.remove = serio_driver_remove,
++	.shutdown = serio_driver_remove,
+ };
+ 
+ static void serio_add_driver(struct serio_driver *drv)

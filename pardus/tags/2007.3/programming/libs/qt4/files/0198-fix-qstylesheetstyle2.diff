@@ -1,0 +1,42 @@
+qt-bugs@ issue : none
+bugs.kde.org number : none
+applied: yes
+author: Trolltech
+
+it is a patch from Girish Ramakrishnan <girish@trolltech.com>
+fixes eg kcombobox with a clean button
+
+Index: src/gui/styles/default.qss
+===================================================================
+--- src/gui/styles/default.qss	(revision 721894)
++++ src/gui/styles/default.qss	(working copy)
+@@ -11,6 +11,10 @@
+     -qt-style-features: background-color;
+ }
+ 
++QLineEdit:no-frame {
++    border: none;
++}
++
+ QFrame {
+     border: native;
+ }
+Index: src/gui/styles/qstylesheetstyle.cpp
+===================================================================
+--- src/gui/styles/qstylesheetstyle.cpp	(revision 721894)
++++ src/gui/styles/qstylesheetstyle.cpp	(working copy)
+@@ -1702,8 +1702,13 @@
+ #endif // QT_NO_TOOLBAR
+ #ifndef QT_NO_LINEEDIT
+         // LineEdit sets Sunken flag to indicate Sunken frame (argh)
+-        if (qobject_cast<const QLineEdit *>(w)) {
++        if (const QLineEdit *lineEdit = qobject_cast<const QLineEdit *>(w)) {
+             state &= ~QStyle::State_Sunken;
++            if (lineEdit->frame()) {
++                extraClass &= ~PseudoClass_Frameless;
++            } else {
++                extraClass |= PseudoClass_Frameless;
++            }
+         } else
+ #endif
+         { } // required for the above ifdef'ery

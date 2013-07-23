@@ -1,0 +1,234 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>kernel-rt</Name>
+        <Homepage>http://www.pardus.org.tr/</Homepage>
+        <Packager>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Packager>
+        <License>GPLv2</License>
+        <IsA>kernel</IsA>
+        <Summary>The Linux kernel (the core of the Linux operating system) for Pardus Linux</Summary>
+        <Description>kernel-rt contains the real-time Linux kernel, the core of any Linux operating system. The kernel handles the basic functions of the operating system: memory allocation, process allocation, device input and output, etc.</Description>
+        <Archive sha1sum="0640a2f4bea3fc272541f322b74ea365ad7f2349" type="tarbz2">http://www.kernel.org/pub/linux/kernel/v2.6/linux-2.6.29.tar.bz2</Archive>
+        <BuildDependencies>
+            <Dependency>cpio</Dependency>
+            <Dependency>unifdef</Dependency>
+            <Dependency>diffutils</Dependency>
+            <Dependency>bootsplash</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <!-- .29 patch -->
+            <Patch level="1" compressionType="bz2">kernel/patch-2.6.29.6.bz2</Patch>
+
+            <!-- RT patch -->
+            <Patch level="1" compressionType="bz2">kernel/patch-2.6.29.6-rt23.bz2</Patch>
+
+            <!-- Mark e_powersaver as EXPERIMENTAL and DANGEROUS, enable acpi-cpufreq for
+                 VIA Centaur family -->
+            <Patch level="1">kernel/acpi-cpufreq-mark-e_powersaver-as-experimental.patch</Patch>
+            <Patch level="1">kernel/enable-acpi-cpufreq-for-VIA-Centaur.patch</Patch>
+
+            <!-- bnx2*: Fix link state before bringing up interface (2.6.31) -->
+            <Patch level="1">kernel/0001-bnx2x-Fix-the-behavior-of-ethtool-when-ONBOOT-no.patch</Patch>
+            <Patch level="1">kernel/0002-bnx2-Fix-the-behavior-of-ethtool-when-ONBOOT-no.patch</Patch>
+
+            <!-- drm/i915: Enable MCHBAR if needed -->
+            <Patch level="1">kernel/drm-intel-pnp-add-pnp-resource-checking.patch</Patch>
+            <Patch level="1">kernel/drm-intel-i915-enable-MCHBAR-if-needed.patch</Patch>
+            <Patch level="1">kernel/drm-intel-fix-previous-commit.patch</Patch>
+
+
+            <!-- Moblin patches -->
+
+            <!-- sreadahead kernel open() tracer patch-->
+            <!--<Patch level="1">fastboot/0001-kernel-trace-open.patch</Patch>-->
+
+            <!-- fastboot: retry mounting / if it fails first time -->
+            <Patch level="1">fastboot/linux-2.6.29-retry-root-mount.patch</Patch>
+
+            <!-- fastboot: try mounting / before all devices  (the mouse) are
+            done probing. This saves several seconds of boot time. -->
+            <Patch level="1">fastboot/linux-2.6.29-dont-wait-for-mouse.patch</Patch>
+
+            <!-- Subset of Fedora Kernel Patches -->
+
+            <!-- toshiba_acpi: Get away from having to poll Toshibas -->
+            <Patch level="1">fedora/linux-2.6-input-fix-toshiba-hotkeys.patch</Patch>
+
+            <!-- Use UTF-8 by default on VFAT -->
+            <Patch level="1">fedora/linux-2.6-defaults-fat-utf8.patch</Patch>
+
+            <!-- input: The input layer spews crap no-one cares about -->
+            <Patch level="1">fedora/linux-2.6-input-kill-stupid-messages.patch</Patch>
+
+            <!-- pci: disable message signaled interrupts  -->
+            <Patch level="1">fedora/linux-2.6-defaults-pci_no_msi.patch</Patch>
+
+            <!-- Silence some useless messages that still get printed with 'quiet' -->
+            <Patch level="1">fedora/linux-2.6-silence-noise.patch</Patch>
+
+            <!-- Allow to use 480600 baud on 16C950 UARTs -->
+            <Patch level="1">fedora/linux-2.6-serial-460800.patch</Patch>
+
+            <!-- ia64 ata quirk -->
+            <Patch level="1">fedora/linux-2.6-ata-quirk.patch</Patch>
+            <Patch level="1">fedora/linux-2.6-e1000-ich9.patch</Patch>
+
+            <!-- DRM patches -->
+            <!--
+            <Patch level="1">fedora/drm/drm-modesetting-radeon.patch</Patch>
+            <Patch level="1">fedora/drm/drm-radeon-pm.patch</Patch>
+            <Patch level="1">fedora/drm/drm-nouveau.patch</Patch>
+            <Patch level="1">fedora/drm/drm-i915-resume-force-mode.patch</Patch>
+            <Patch level="1">fedora/drm/drm-intel-big-hammer.patch</Patch>
+            <Patch level="1">fedora/drm/drm-intel-gen3-fb-hack.patch</Patch>
+            <Patch level="1">fedora/drm/drm-intel-hdmi-edid-fix.patch</Patch>
+            <Patch level="1">fedora/drm/drm-intel-gem-use-dma32-on-pae.patch</Patch>
+            <Patch level="1">fedora/drm/drm-intel-disable-kms-i8xx.patch</Patch>
+            <Patch level="1">fedora/drm/drm-modesetting-radeon-fixes.patch</Patch>
+            <Patch level="1">fedora/drm/drm-radeon-new-pciids.patch</Patch>
+            <Patch level="1">fedora/drm/drm-dont-frob-i2c.patch</Patch>
+            <Patch level="1">fedora/drm/drm-intel-tv-fix.patch</Patch>
+            <Patch level="1">fedora/drm/drm-radeon-cs-oops-fix.patch</Patch>
+
+            <Patch level="1">fedora/drm/drm-radeon-remove-_DRM_DRIVER-from-the-preadded-sarea-map.patch</Patch>
+            -->
+
+            <!-- Add VIA MMC driver (Post 2.6.30) -->
+            <Patch level="1">fedora/via-sdmmc.patch</Patch>
+
+            <!-- Fix port= option in CIFS (Post 2.6.30) -->
+            <Patch level="1">fedora/linux-2.6-fs-cifs-fix-port-numbers.patch</Patch>
+
+            <!-- Fix inaccurate delay calculation with tsc (Post 2.6.30) -->
+            <Patch level="1">fedora/linux-2.6-x86-delay-tsc-barrier.patch</Patch>
+
+
+            <!-- Subset of Ubuntu Kernel Patches -->
+
+            <!-- Restore VT fonts on switch -->
+            <Patch level="1">ubuntu/ubuntu-intrepid.git-0e1f6f9df557fe4c7d5523275c25c166ee15efb5.patch</Patch>
+
+            <!-- frame buffer regression - screen blank except for blinking -->
+            <Patch level="1">ubuntu/ubuntu-intrepid.git-ba0d60fcc049028112c7ae493f5df9e863ea660d.patch</Patch>
+
+            <!-- ata: blacklist FUJITSU MHW2160BH PL -->
+            <Patch level="1">ubuntu/ubuntu-intrepid.git-3522f638ddff561fb46c1056fcb8c678e9e649ab.patch</Patch>
+
+            <!-- Several SAUCE patches from jaunty and karmic -->
+            <Patch level="1">ubuntu/0002-UBUNTU-SAUCE-Dell-XPS710-reboot-quirk.patch</Patch>
+            <Patch level="1">ubuntu/0006-UBUNTU-SAUCE-ipw2200-Enable-LED-by-default.patch</Patch>
+
+
+            <!-- Subset of OpenSuSE Kernel Patches -->
+
+            <!-- Module use count must be updated as bridges are created/destroyed -->
+            <Patch level="1">suse/bridge-module-get-put.patch</Patch>
+
+            <!-- FIXME: Make tsc disabling optional -->
+            <!-- <Patch level="1">suse/seccomp-disable-tsc-option.patch</Patch>-->
+
+            <!-- Enable apm=power_off on uniprocessors (Fixes #4519) -->
+            <Patch level="1">suse/apm_setup_UP.patch</Patch>
+
+            <!-- Don't force select AES in wireless -->
+            <Patch level="1">suse/wireless-no-aes-select.patch</Patch>
+
+            <!-- Ext2 should force the FS readonly for metadata write errors -->
+            <Patch level="1">suse/ext2-fsync-err.patch</Patch>
+
+            <!-- Make ext3 mount default to barrier=1 -->
+            <Patch level="1">suse/ext3-barrier-default.patch</Patch>
+
+            <!-- Change default delay time for usb-storage devices -->
+            <Patch level="1">suse/usb-storage-disable-delay.patch</Patch>
+
+            <!-- NFS4ACL for ext3 -->
+            <!--
+            <Patch level="1">suse/parser-match_string.patch</Patch>
+            <Patch level="1">suse/nfs4acl-ext3.patch</Patch>
+            -->
+
+            <!-- Bootsplash for current kernel -->
+            <Patch level="1">suse/bootsplash.patch</Patch>
+
+
+            <!-- Pardus patches & specific changes -->
+
+            <!-- Drop a PCI_ID from zc0301 webcam driver -->
+            <Patch level="1">pardus/zc0301-remove-spca-conflicts.patch</Patch>
+
+            <!-- hid-apple: Invert Fn+F? behaviour on apple keyboards -->
+            <Patch level="1">pardus/invert-hidapple-fnkey-behaviour.patch</Patch>
+
+            <!-- Patch lmpcm_usb driver into the kernel -->
+            <Patch>pardus/linux-2.6-add-lmpcm_usb-driver.patch</Patch>
+
+            <!-- Patch acerhk driver into the kernel -->
+            <Patch>pardus/linux-2.6-add-acerhk-driver.patch</Patch>
+
+            <!-- Patch acx100 driver into the kernel -->
+            <Patch>pardus/linux-2.6-add-acx-driver.patch</Patch>
+
+            <!-- Use buildfarm.pardus.org.tr and pardus for /proc/version -->
+            <Patch level="1">pardus/buildhost.patch</Patch>
+
+            <!-- Pardus Logo Enhancements -->
+            <Patch level="1">pardus/logo.patch</Patch>
+            <Patch level="1">pardus/logo-vga16.patch</Patch>
+            <Patch level="1">pardus/logo-mono.patch</Patch>
+
+            <!-- Remove 2 PCI ID from tulip driver as they work with dmfe (Fixes #4216)-->
+            <Patch level="1">pardus/tulip_patch.patch</Patch>
+
+            <!-- Fallback to vesa 640x480x16 on undefined video mode number (Fixes #7117)-->
+            <Patch level="1">pardus/vesa_fallback_on_fail.patch</Patch>
+
+            <!-- AuFS-2 patch -->
+            <Patch level="1">aufs/aufs2-29-20090408.patch</Patch>
+
+            <!-- Kernel configuration patches -->
+
+            <!-- Generic kernel configuration -->
+            <Patch>pardus/kernel-config.patch</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>kernel-rt</Name>
+        <RuntimeDependencies>
+            <Dependency releaseFrom="15">module-init-tools</Dependency>
+            <Dependency releaseFrom="54">mkinitramfs</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="executable" permanent="true">/boot</Path>
+            <Path fileType="library" permanent="true">/lib/modules</Path>
+            <Path fileType="data">/etc/kernel</Path>
+        </Files>
+        <Provides>
+            <COMAR script="package.py">System.Package</COMAR>
+        </Provides>
+    </Package>
+
+    <Package>
+        <Name>kernel-module-headers-rt</Name>
+        <Summary>Real-time kernel header files for external module building</Summary>
+        <Description>kernel-module-headers-rt includes the C header files and the necessary Kbuild files for being able to build external modules for the real-time kernel flavour.</Description>
+        <Files>
+            <Path fileType="header">/usr/src/linux-headers*</Path>
+        </Files>
+    </Package>
+
+    <History>
+            <Update release="1">
+            <Date>2009-07-29</Date>
+            <Version>2.6.29.6_23</Version>
+            <Comment>First release.</Comment>
+            <Name>Ozan Çağlayan</Name>
+            <Email>ozan@pardus.org.tr</Email>
+        </Update>
+    </History>
+</PISI>

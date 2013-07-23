@@ -1,0 +1,59 @@
+--- ext/mysql/php_mysql.c	2006-04-13 14:36:32.000000000 +0200
++++ ext/mysql/php_mysql.c	2006-04-13 18:12:29.000000000 +0200
+@@ -33,6 +33,7 @@
+ #include "php_globals.h"
+ #include "ext/standard/info.h"
+ #include "ext/standard/php_string.h"
++#include "SAPI.h"
+ 
+ #ifdef ZEND_ENGINE_2
+ # include "zend_exceptions.h"
+@@ -490,7 +491,7 @@
+ static void php_mysql_do_connect(INTERNAL_FUNCTION_PARAMETERS, int persistent)
+ {
+ 	char *user=NULL, *passwd=NULL, *host_and_port=NULL, *socket=NULL, *tmp=NULL, *host=NULL;
+-	char *hashed_details=NULL;
++	char *hashed_details=NULL, *option_section=NULL;
+ 	int hashed_details_length, port = MYSQL_PORT;
+ 	int client_flags = 0;
+ 	php_mysql_conn *mysql=NULL;
+@@ -686,6 +687,12 @@
+ 			if (connect_timeout != -1)
+ 				mysql_options(&mysql->conn, MYSQL_OPT_CONNECT_TIMEOUT, (const char *)&connect_timeout);
+ 
++			/* Read settings from my.cnf */
++			option_section = emalloc(strlen("php-%s") + strlen(sapi_module.name));
++			sprintf(option_section, "php-%s", sapi_module.name);
++			mysql_options(&mysql->conn, MYSQL_READ_DEFAULT_GROUP, option_section);
++			efree(option_section);
++
+ 			if (mysql_real_connect(&mysql->conn, host, user, passwd, NULL, port, socket, client_flags)==NULL) {
+ #else
+ 			if (mysql_connect(&mysql->conn, host, user, passwd)==NULL) {
+@@ -729,6 +736,13 @@
+ #endif
+ 				signal(SIGPIPE, handler);
+ #endif /* end mysql_ping */
++
++			/* Read settings from my.cnf */
++			option_section = emalloc(strlen("php-%s") + strlen(sapi_module.name));
++			sprintf(option_section, "php-%s", sapi_module.name);
++			mysql_options(le->ptr, MYSQL_READ_DEFAULT_GROUP, option_section);
++			efree(option_section);
++
+ #if MYSQL_VERSION_ID > 32199 /* this lets us set the port number */
+ 				if (mysql_real_connect(le->ptr, host, user, passwd, NULL, port, socket, client_flags)==NULL) {
+ #else
+@@ -791,6 +805,12 @@
+ 		if (connect_timeout != -1)
+ 				mysql_options(&mysql->conn, MYSQL_OPT_CONNECT_TIMEOUT, (const char *)&connect_timeout);
+ 
++		/* Read settings from my.cnf */
++		option_section = emalloc(strlen("php-%s") + strlen(sapi_module.name));
++		sprintf(option_section, "php-%s", sapi_module.name);
++		mysql_options(&mysql->conn, MYSQL_READ_DEFAULT_GROUP, option_section);
++		efree(option_section);
++
+ 		if (mysql_real_connect(&mysql->conn, host, user, passwd, NULL, port, socket, client_flags)==NULL) {
+ #else
+ 		if (mysql_connect(&mysql->conn, host, user, passwd)==NULL) {

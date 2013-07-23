@@ -1,0 +1,19 @@
+#!/bin/bash
+
+db_backup="/tmp/bz-bugs-$(date +%Y%m%d).sql"
+db_pass=$(grep db_pass /etc/bugzilla/localconfig|sed -e "s:^\$db_pass.*=.*'\(.*\)';$:\1:")
+
+if [ -z $db_pass ]; then
+    echo "You have to set your db_pass in /etc/bugzilla/localconfig"
+    exit 1
+fi
+
+if [ ! -S /var/run/mysqld/mysqld.sock ]; then
+    echo "It seems that MySQL is not running, exiting."
+    exit 1
+fi
+
+echo "Dumping compressed bugzilla database into $db_backup.xz.."
+mysqldump --opt -u bugs -p$db_pass bugs > $db_backup
+lzma -9 -z -e -f -v $db_backup
+echo "DONE."

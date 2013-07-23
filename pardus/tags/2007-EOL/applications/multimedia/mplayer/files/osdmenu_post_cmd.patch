@@ -1,0 +1,120 @@
+diff -Nur mplayer-20071230-old/libmenu/menu_chapsel.c mplayer-20071230/libmenu/menu_chapsel.c
+--- mplayer-20071230-old/libmenu/menu_chapsel.c	2007-12-30 16:32:20.119570533 +0200
++++ mplayer-20071230/libmenu/menu_chapsel.c	2007-12-30 16:47:28.825426245 +0200
+@@ -48,14 +48,14 @@
+ struct menu_priv_s {
+   menu_list_priv_t p;
+   char* title;
+-  int auto_close;
++  char* post_cmd;
+   char* fmt_with_time;
+ };
+ 
+ static struct menu_priv_s cfg_dflt = {
+   MENU_LIST_PRIV_DFLT,
+   "Select chapter",
+-  0,
++  NULL,
+   "${chapter_name}  [${start}]"
+ };
+ 
+@@ -64,7 +64,7 @@
+ static m_option_t cfg_fields[] = {
+   MENU_LIST_PRIV_FIELDS,
+   { "title", ST_OFF (title),  CONF_TYPE_STRING, 0, 0, 0, NULL },
+-  { "auto-close", ST_OFF (auto_close), CONF_TYPE_FLAG, 0, 0, 1, NULL },
++  { "post-cmd", ST_OFF (post_cmd), CONF_TYPE_STRING, 0, 0, 0, NULL },
+   { "fmt-with-time", ST_OFF (fmt_with_time),  CONF_TYPE_STRING, 0, 0, 0, NULL },
+   { NULL, NULL, NULL, 0, 0, 0, NULL }
+ };
+@@ -142,8 +142,8 @@
+       char cmdbuf[26];
+       sprintf(cmdbuf, "seek_chapter %d 1", menu->priv->p.current->cid);
+       mp_input_queue_cmd(mp_input_parse_cmd(cmdbuf));
+-      if (menu->priv->auto_close)
+-        mp_input_queue_cmd(mp_input_parse_cmd("menu hide"));
++      if (menu->priv->post_cmd)
++        mp_input_parse_and_queue_cmds(menu->priv->post_cmd);
+       break;
+     }
+     default:
+diff -Nur mplayer-20071230-old/libmenu/menu_dvbin.c mplayer-20071230/libmenu/menu_dvbin.c
+--- mplayer-20071230-old/libmenu/menu_dvbin.c	2007-12-30 16:32:20.119570533 +0200
++++ mplayer-20071230/libmenu/menu_dvbin.c	2007-12-30 16:47:28.825426245 +0200
+@@ -39,7 +39,7 @@
+   char* file;
+   int card;
+   int level;
+-  int auto_close;
++  char* post_cmd;
+   dvb_config_t *config;
+ };
+ 
+@@ -50,7 +50,7 @@
+ static m_option_t cfg_fields[] = {
+   MENU_LIST_PRIV_FIELDS,
+   { "title", ST_OFF(title), CONF_TYPE_STRING, 0, 0, 0, NULL },
+-  { "auto-close", ST_OFF(auto_close), CONF_TYPE_FLAG, 0, 0, 1, NULL },
++  { "post-cmd", ST_OFF(post_cmd), CONF_TYPE_STRING, 0, 0, 0, NULL },
+   { NULL, NULL, NULL, 0,0,0,NULL },
+ };
+ 
+@@ -61,7 +61,7 @@
+   "channels.conf",
+   0,
+   0,
+-  1,
++  "menu hide",
+   NULL,
+ };
+ 
+@@ -214,8 +214,8 @@
+ 			free(cmd_name);
+ 			if(c)
+ 			{
+-				if(mpriv->auto_close)
+-					mp_input_queue_cmd (mp_input_parse_cmd ("menu hide"));
++				if (mpriv->post_cmd)
++					mp_input_parse_and_queue_cmds(mpriv->post_cmd);
+ 				mp_input_queue_cmd(c);
+ 			}
+ 		}
+diff -Nur mplayer-20071230-old/libmenu/menu_pt.c mplayer-20071230/libmenu/menu_pt.c
+--- mplayer-20071230-old/libmenu/menu_pt.c	2007-12-30 16:32:20.118570685 +0200
++++ mplayer-20071230/libmenu/menu_pt.c	2007-12-30 16:47:28.826426093 +0200
+@@ -32,11 +32,13 @@
+ struct menu_priv_s {
+   menu_list_priv_t p;
+   char* title;
++  char* post_cmd;
+ };
+ 
+ static struct menu_priv_s cfg_dflt = {
+   MENU_LIST_PRIV_DFLT,
+-  "Jump to"
++  "Jump to",
++  NULL
+ };
+ 
+ #define ST_OFF(m) M_ST_OFF(struct menu_priv_s,m)
+@@ -44,6 +46,7 @@
+ static m_option_t cfg_fields[] = {
+   MENU_LIST_PRIV_FIELDS,
+   { "title", ST_OFF(title),  CONF_TYPE_STRING, 0, 0, 0, NULL },
++  { "post-cmd", ST_OFF(post_cmd),  CONF_TYPE_STRING, 0, 0, 0, NULL },
+   { NULL, NULL, NULL, 0,0,0,NULL }
+ };
+ 
+@@ -85,8 +88,11 @@
+       snprintf(str,15,"pt_step %d",d);
+     }
+     c = mp_input_parse_cmd(str);
+-    if(c)
++    if (c) {
++      if (mpriv->post_cmd)
++        mp_input_parse_and_queue_cmds(mpriv->post_cmd);
+       mp_input_queue_cmd(c);
++    }
+     else
+       mp_msg(MSGT_GLOBAL,MSGL_WARN,MSGTR_LIBMENU_FailedToBuildCommand,str);
+   } break;

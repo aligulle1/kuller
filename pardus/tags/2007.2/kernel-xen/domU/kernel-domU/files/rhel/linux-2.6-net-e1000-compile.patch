@@ -1,0 +1,15 @@
+Index: linux-2.6.18/drivers/net/e1000/e1000_main.c
+===================================================================
+--- linux-2.6.18.orig/drivers/net/e1000/e1000_main.c
++++ linux-2.6.18/drivers/net/e1000/e1000_main.c
+@@ -4744,8 +4744,8 @@ e1000_resume(struct pci_dev *pdev)
+ 	pci_enable_wake(pdev, PCI_D3hot, 0);
+ 	pci_enable_wake(pdev, PCI_D3cold, 0);
+ 
+-	if (netif_running(netdev) && (ret_val = e1000_request_irq(adapter)))
+-		return ret_val;
++	if (netif_running(netdev) && (err = e1000_request_irq(adapter)))
++		return err;
+ 
+ 	e1000_power_up_phy(adapter);
+ 	e1000_reset(adapter);

@@ -1,0 +1,13 @@
+diff -ur udev-103.orig/etc/udev/rules.d/60-persistent-storage.rules udev-103/etc/udev/rules.d/60-persistent-storage.rules
+--- udev-103.orig/etc/udev/rules.d/60-persistent-storage.rules	2006-10-20 15:43:35.000000000 +0300
++++ udev-103/etc/udev/rules.d/60-persistent-storage.rules	2006-12-08 11:47:53.000000000 +0200
+@@ -28,6 +28,9 @@
+ KERNEL=="sd*[0-9]|dasd*[0-9]", ENV{ID_SERIAL}=="?*", SYMLINK+="disk/by-id/$env{ID_BUS}-$env{ID_SERIAL}-part%n"
+ KERNEL=="st*", ENV{ID_SERIAL}=="?*", SYMLINK+="tape/by-id/$env{ID_BUS}-$env{ID_SERIAL}"
+ 
++KERNEL=="mmcblk[0-9]", ATTR{name}=="?*", ATTR{serial}=="?*", ENV{ID_NAME}="$attr{name}", ENV{ID_SERIAL}="$attr{serial}", SYMLINK+="disk/by-id/mmc-$env{ID_NAME}_$env{ID_SERIAL}, GROUP="disk", MODE="0660"
++KERNEL=="mmcblk[0-9]p[0-9]", ATTR{name}=="?*", ATTR{serial}=="?*", ENV{ID_NAME}="$attr{name}", ENV{ID_SERIAL}="$attr{serial}", SYMLINK+="disk/by-id/mmc-$env{ID_NAME}_$env{ID_SERIAL}-part%n, GROUP="disk", MODE="0660"
++
+ # by-path (shortest physical path)
+ KERNEL=="*[!0-9]|sr*", IMPORT{program}="path_id %p", SYMLINK+="disk/by-path/$env{ID_PATH}"
+ KERNEL=="st*", IMPORT{program}="path_id %p", SYMLINK+="tape/by-path/$env{ID_PATH}"

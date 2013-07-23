@@ -1,0 +1,65 @@
+diff -Naur printoxx-2.0.2.orig/Makefile printoxx-2.0.2/Makefile
+--- printoxx-2.0.2.orig/Makefile	2009-09-12 15:03:49.608186414 +0300
++++ printoxx-2.0.2/Makefile	2009-09-12 15:08:27.005061346 +0300
+@@ -6,7 +6,7 @@
+ VERSION = 2.0.2
+ 
+ ifeq "$(PREFIX)" ""
+-	PREFIX = /usr/local
++	PREFIX = /usr
+ endif
+ 
+ SOURCE = $(PROGRAM)-$(VERSION).cpp
+@@ -15,18 +15,18 @@
+ DOCDIR = $(PREFIX)/share/doc/$(PROGRAM)
+ DESKTOP = $(DATADIR)/kornelix-$(PROGRAM).desktop
+ 
+-CFLAGS = -O -Wall -c `pkg-config --cflags gtk+-2.0`
+-LFLAGS = -O -Wall -rdynamic `pkg-config --libs gtk+-2.0 gthread-2.0`
++CFLAGS += -Wall -c `pkg-config --cflags gtk+-2.0`
++LFLAGS = -rdynamic `pkg-config --libs gtk+-2.0 gthread-2.0`
+ 
+ $(PROGRAM): $(PROGRAM).o zfuncs.o
+-	@ g++ $(LFLAGS) -o $(PROGRAM) $(PROGRAM).o zfuncs.o
++	@ $(CXX) $(LDFLAGS) $(PROGRAM).o zfuncs.o -o $(PROGRAM) $(LFLAGS)
+ 
+ $(PROGRAM).o: $(SOURCE) zfuncs.h
+-	@ g++ $(CFLAGS) -o $(PROGRAM).o $(SOURCE)		\
++	@ $(CXX) $(CFLAGS) -o $(PROGRAM).o $(SOURCE)        \
+ 	  -D "DATADIR=\"$(DATADIR)\"" -D "DOCDIR=\"$(DOCDIR)\""
+ 
+ zfuncs.o: zfuncs.cpp zfuncs.h
+-	@ g++ $(CFLAGS) zfuncs.cpp	\
++	@ $(CXX) $(CFLAGS) zfuncs.cpp   \
+ 	  -D "DATADIR=\"$(DATADIR)\"" -D "DOCDIR=\"$(DOCDIR)\"" -D "BINDIR=\"$(BINDIR)\""
+ 
+ install: $(PROGRAM)
+@@ -39,17 +39,17 @@
+ 	cp $(PROGRAM) $(DESTDIR)$(BINDIR)
+ 	cp -R locales/* $(DESTDIR)$(DATADIR)/locales
+ #  install .desktop file (menu entry)
+-	@rm -f $(DESKTOP)
+-	@echo "[Desktop Entry]" > $(DESKTOP)
+-	@echo "Name=$(PROGRAM)" >> $(DESKTOP)
+-	@echo "Categories=Graphics" >> $(DESKTOP)
+-	@echo "Type=Application" >> $(DESKTOP)
+-	@echo "Terminal=false" >> $(DESKTOP)
+-	@echo "Exec=$(BINDIR)/$(PROGRAM)" >> $(DESKTOP)
+-	@echo "Icon=$(DATADIR)/icons/$(PROGRAM).png" >> $(DESKTOP)
+-	@echo "GenericName=Image Layout and Print" >> $(DESKTOP)
+-	@chown $(USER): $(DESKTOP)
+-	@xdg-desktop-menu install $(DESKTOP)
++# 	@rm -f $(DESKTOP)
++# 	@echo "[Desktop Entry]" > $(DESKTOP)
++# 	@echo "Name=$(PROGRAM)" >> $(DESKTOP)
++# 	@echo "Categories=Graphics" >> $(DESKTOP)
++# 	@echo "Type=Application" >> $(DESKTOP)
++# 	@echo "Terminal=false" >> $(DESKTOP)
++# 	@echo "Exec=$(BINDIR)/$(PROGRAM)" >> $(DESKTOP)
++# 	@echo "Icon=$(DATADIR)/icons/$(PROGRAM).png" >> $(DESKTOP)
++# 	@echo "GenericName=Image Layout and Print" >> $(DESKTOP)
++# 	@chown $(USER): $(DESKTOP)
++# 	@xdg-desktop-menu install $(DESKTOP)
+ 
+ uninstall:
+ 	xdg-desktop-menu uninstall $(DESTDIR)$(DATADIR)/kornelix-$(PROGRAM).desktop

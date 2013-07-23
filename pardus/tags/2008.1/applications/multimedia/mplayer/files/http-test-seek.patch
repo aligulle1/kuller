@@ -1,0 +1,53 @@
+Index: stream/http.c
+===================================================================
+--- stream/http.c	(revision 27288)
++++ stream/http.c	(working copy)
+@@ -733,6 +733,38 @@
+ 		mp_msg(MSGT_NETWORK,MSGL_INFO,"Bitrate: %skbit/s\n", field_data);
+ }
+ 
++static int http_test_seek(stream_t *stream, off_t pos) {
++	HTTP_header_t *http_hdr = NULL;
++	int fd;
++	int res;
++
++	if (stream == NULL) return 0;
++	fd = http_send_request(stream->streaming_ctrl->url, pos);
++	if (fd < 0) return 0;
++	http_hdr = http_read_response(fd);
++	if (http_hdr == NULL) {
++		close(fd);
++		return 0;
++	}
++
++	switch( http_hdr->status_code ) {
++		case 200:
++		case 206: // OK
++			mp_msg(MSGT_NETWORK,MSGL_V,"Content-Type: [%s]\n", http_get_field(http_hdr, "Content-Type") );
++			mp_msg(MSGT_NETWORK,MSGL_V,"Content-Length: [%s]\n", http_get_field(http_hdr, "Content-Length") );
++			res = 1;
++			break;
++		default:
++			mp_msg(MSGT_NETWORK,MSGL_ERR,MSGTR_MPDEMUX_NW_ErrServerReturned, http_hdr->status_code, http_hdr->reason_phrase );
++			res = 0;
++			break;
++	}
++
++	http_free(http_hdr);
++	close(fd);
++	return res;
++}
++
+ //! If this function succeeds you must closesocket stream->fd
+ static int http_streaming_start(stream_t *stream, int* file_format) {
+ 	HTTP_header_t *http_hdr = NULL;
+@@ -821,6 +853,8 @@
+ 					if( (content_length = http_get_field(http_hdr, "Content-Length")) != NULL) {
+ 						mp_msg(MSGT_NETWORK,MSGL_V,"Content-Length: [%s]\n", http_get_field(http_hdr, "Content-Length"));
+ 						stream->end_pos = atoi(content_length);
++						mp_msg(MSGT_NETWORK,MSGL_V,"Testing if the stream is seekable\n");
++						seekable = http_test_seek(stream, stream->end_pos-1);
+ 					}
+ 					// Check in the mime type table for a demuxer type
+ 					i = 0;
+

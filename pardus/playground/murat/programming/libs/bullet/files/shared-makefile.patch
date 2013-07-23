@@ -1,0 +1,15 @@
+--- /dev/null	2007-11-24 13:04:54.067450351 +0200
++++ lib/Makefile	2007-11-24 20:13:26.000000000 +0200
+@@ -0,0 +1,12 @@
++VERSION = 2.66
++
++SHARED_LIBS = libbulletcollision libbulletdynamics libbulletmath
++
++shared:
++	for lib in $? $(SHARED_LIBS); do \
++		ar x ../out/linuxx86/optimize/libs/$$lib.a; \
++		$(CC) $(CFLAGS) -fPIC -shared -Wl,-soname=$$lib.so.2 -o $$lib.so.$(VERSION) *.o -lm -ldl -lnsl -lICE -lc; \
++		ln -s $$lib.so.$(VERSION) $$lib.so.2; \
++		ln -s $$lib.so.$(VERSION) $$lib.so; \
++		rm -f *.o; \
++	done

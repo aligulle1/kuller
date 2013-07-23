@@ -1,0 +1,57 @@
+diff -u -p ../../../../xorg-server-1.4.0.90.orig/hw/xfree86/common//xf86Helper.c ./xf86Helper.c
+--- ../../../../xorg-server-1.4.0.90.orig/hw/xfree86/common//xf86Helper.c	2008-05-26 16:53:50.000000000 +0000
++++ xorg-server-1.4.2/hw/xfree86/common/xf86Helper.c	2008-05-26 17:09:52.000000000 +0000
+@@ -1017,12 +1017,22 @@ xf86SetDpi(ScrnInfoPtr pScrn, int x, int
+     } else if (pScrn->widthmm > 0 || pScrn->heightmm > 0) {
+ 	from = X_CONFIG;
+ 	if (pScrn->widthmm > 0) {
+-	   pScrn->xDpi =
+-		(int)((double)pScrn->virtualX * MMPERINCH / pScrn->widthmm);
++	   if (pScrn->modes && pScrn->modes->HDisplay > 0) {
++		pScrn->xDpi = 
++		    (int)((double) pScrn->modes->HDisplay * MMPERINCH / pScrn->widthmm);
++	   } else {
++		pScrn->xDpi =
++		    (int)((double)pScrn->virtualX * MMPERINCH / pScrn->widthmm);
++	   }
+ 	}
+ 	if (pScrn->heightmm > 0) {
+-	   pScrn->yDpi =
+-		(int)((double)pScrn->virtualY * MMPERINCH / pScrn->heightmm);
++	   if (pScrn->modes && pScrn->modes->VDisplay > 0) {
++		pScrn->yDpi =
++		    (int)((double)pScrn->modes->VDisplay * MMPERINCH / pScrn->heightmm);
++	   } else {
++		pScrn->yDpi =
++		    (int)((double)pScrn->virtualY * MMPERINCH / pScrn->heightmm);
++	   }
+ 	}
+ 	if (pScrn->xDpi > 0 && pScrn->yDpi <= 0)
+ 	    pScrn->yDpi = pScrn->xDpi;
+@@ -1057,12 +1067,22 @@ xf86SetDpi(ScrnInfoPtr pScrn, int x, int
+ 	pScrn->widthmm = ddcWidthmm;
+ 	pScrn->heightmm = ddcHeightmm;
+ 	if (pScrn->widthmm > 0) {
+-	   pScrn->xDpi =
+-		(int)((double)pScrn->virtualX * MMPERINCH / pScrn->widthmm);
++	    if (pScrn->modes && pScrn->modes->HDisplay > 0) {
++		pScrn->xDpi =
++                   (int)((double) pScrn->modes->HDisplay * MMPERINCH / pScrn->widthmm);
++	    } else {
++		pScrn->xDpi =
++		   (int)((double)pScrn->virtualX * MMPERINCH / pScrn->widthmm);
++	    }
+ 	}
+ 	if (pScrn->heightmm > 0) {
+-	   pScrn->yDpi =
+-		(int)((double)pScrn->virtualY * MMPERINCH / pScrn->heightmm);
++	   if (pScrn->modes && pScrn->modes->VDisplay > 0) {
++		pScrn->yDpi =
++		   (int)((double)pScrn->modes->VDisplay * MMPERINCH / pScrn->heightmm);
++	   } else {
++		pScrn->yDpi =
++		   (int)((double)pScrn->virtualY * MMPERINCH / pScrn->heightmm);
++	   }
+ 	}
+ 	if (pScrn->xDpi > 0 && pScrn->yDpi <= 0)
+ 	    pScrn->yDpi = pScrn->xDpi;

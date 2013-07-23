@@ -1,0 +1,83 @@
+diff -Nur 915resolution-0.5.2-old/915resolution.c 915resolution-0.5.2/915resolution.c
+--- 915resolution-0.5.2-old/915resolution.c	2006-11-05 21:29:43.004613425 +0200
++++ 915resolution-0.5.2/915resolution.c	2006-11-05 21:29:48.434787913 +0200
+@@ -630,6 +630,58 @@
+     }
+ }
+ 
++int find_mode(vbios_map *map, int x_wanted) {
++    cardinal i, x, y;
++    int best = 0, valid = 0;
++
++    for (i=0; i < map->mode_table_size; i++) {
++        switch(map->bios) {
++        case BT_1:
++            {
++                vbios_resolution_type1 * res = map_type1_resolution(map, map->mode_table[i].resolution);
++
++                x = ((((cardinal) res->x2) & 0xf0) << 4) | res->x1;
++                y = ((((cardinal) res->y2) & 0xf0) << 4) | res->y1;
++
++                if (x != 0 && y != 0) {
++        valid = i;
++        if (!best && x == x_wanted) best = i;
++                }
++            }
++            break;
++        case BT_2:
++            {
++                vbios_resolution_type2 * res = map_type2_resolution(map, map->mode_table[i].resolution);
++
++                x = res->modelines[0].x1+1;
++                y = res->modelines[0].y1+1;
++
++                if (x != 0 && y != 0) {
++        valid = i;
++        if (!best && x == x_wanted) best = i;
++                }
++            }
++            break;
++        case BT_3:
++            {
++                vbios_resolution_type3 * res = map_type3_resolution(map, map->mode_table[i].resolution);
++
++                x = res->modelines[0].x1+1;
++                y = res->modelines[0].y1+1;
++
++                if (x != 0 && y != 0) {
++        valid = i;
++        if (!best && x == x_wanted) best = i;
++                }
++            }
++            break;
++        case BT_UNKWN:
++            break;
++        }
++    }
++    return map->mode_table[best ? best : valid].mode;
++}
++
+ void set_mode(vbios_map * map, cardinal mode, cardinal x, cardinal y, cardinal bp, cardinal htotal, cardinal vtotal) {
+     cardinal i, j;
+ 
+@@ -834,7 +886,10 @@
+         return -1;
+     }
+ 
+-    *mode = (cardinal) strtol(argv[index], NULL, 16);
++    if (strcmp(argv[index], "best") == 0)
++      *mode = -1;
++    else
++      *mode = (cardinal) strtol(argv[index], NULL, 16);
+     *x = (cardinal)atoi(argv[index+1]);
+     *y = (cardinal)atoi(argv[index+2]);
+ 
+@@ -899,6 +954,8 @@
+     }
+ 
+     if (mode!=0 && x!=0 && y!=0) {
++        if (mode == -1) mode = find_mode(map, x);
++
+         unlock_vbios(map);
+         set_mode(map, mode, x, y, bp, htotal, vtotal);
+         relock_vbios(map);

@@ -1,0 +1,60 @@
+Index: server/control/main.cpp
+===================================================================
+--- server/control/main.cpp	(révision 1088318)
++++ server/control/main.cpp	(révision 1088319)
+@@ -53,6 +53,7 @@
+   app.parseCommandLine();
+ 
+   // try to aquire the lock first, that means there is no second instance trying to start up at the same time
++  // registering the real service name happens in AgentManager::continueStartup(), when everything is in fact up and running
+   if ( !QDBusConnection::sessionBus().registerService( AKONADI_DBUS_CONTROL_SERVICE_LOCK ) ) {
+     // We couldn't register. Most likely, it's already running.
+     const QString lastError = QDBusConnection::sessionBus().lastError().message();
+@@ -71,12 +72,6 @@
+   sAgentManager = new AgentManager;
+   AkonadiCrash::setEmergencyMethod( crashHandler );
+ 
+-  // register the real service name once everything is up an running
+-  if ( !QDBusConnection::sessionBus().registerService( AKONADI_DBUS_CONTROL_SERVICE ) ) {
+-    // besides a race with an older Akonadi server I have no idea how we could possibly get here...
+-    akFatal() << "Unable to register service as" << AKONADI_DBUS_CONTROL_SERVICE << "despite having the lock. Error was:" << QDBusConnection::sessionBus().lastError().message();
+-  }
+-
+   int retval = app.exec();
+ 
+   delete sAgentManager;
+Index: server/control/agentmanager.cpp
+===================================================================
+--- server/control/agentmanager.cpp	(révision 1088318)
++++ server/control/agentmanager.cpp	(révision 1088319)
+@@ -28,6 +28,7 @@
+ #include "akdebug.h"
+ #include "resource_manager.h"
+ #include "preprocessor_manager.h"
++#include "libs/protocol_p.h"
+ 
+ #include <QtCore/QCoreApplication>
+ #include <QtCore/QDir>
+@@ -55,7 +56,7 @@
+            this, SLOT( serviceOwnerChanged( const QString&, const QString&, const QString& ) ) );
+ 
+   if ( QDBusConnection::sessionBus().interface()->isServiceRegistered( "org.freedesktop.Akonadi" ) )
+-    qFatal( "akonadiserver already running!" );
++    akFatal() << "akonadiserver already running!";
+ 
+   mStorageController = new Akonadi::ProcessControl;
+   connect( mStorageController, SIGNAL(unableToStart()),
+@@ -90,6 +91,13 @@
+   load();
+   foreach ( const AgentType &info, mAgents )
+     ensureAutoStart( info );
++
++  // register the real service name once everything is up an running
++  if ( !QDBusConnection::sessionBus().registerService( AKONADI_DBUS_CONTROL_SERVICE ) ) {
++    // besides a race with an older Akonadi server I have no idea how we could possibly get here...
++    akFatal() << "Unable to register service as" << AKONADI_DBUS_CONTROL_SERVICE << "despite having the lock. Error was:" << QDBusConnection::sessionBus().lastError().message();
++  }
++  akDebug() << "Akonadi server is now operational.";
+ }
+ 
+ AgentManager::~AgentManager()

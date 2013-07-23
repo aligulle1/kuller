@@ -1,0 +1,39 @@
+From 9e113e0014204bfb44a2baa29b2a141ede41b074 Mon Sep 17 00:00:00 2001
+From: Harvey Harrison <harvey.harrison@gmail.com>
+Date: Mon, 22 Sep 2008 14:37:29 -0700
+Subject: [PATCH 258/365] ACPI: toshiba_acpi.c fix sparse signedness mismatch warnings
+
+set_bit expects unsigned int, and we start with a u32 anyway.
+drivers/acpi/toshiba_acpi.c:397:14: warning: incorrect type in argument 1 (different signedness)
+drivers/acpi/toshiba_acpi.c:397:14:    expected unsigned int [usertype] *word
+drivers/acpi/toshiba_acpi.c:397:14:    got int *<noident>
+drivers/acpi/toshiba_acpi.c:399:14: warning: incorrect type in argument 1 (different signedness)
+drivers/acpi/toshiba_acpi.c:399:14:    expected unsigned int [usertype] *word
+drivers/acpi/toshiba_acpi.c:399:14:    got int *<noident>
+drivers/acpi/toshiba_acpi.c:401:14: warning: incorrect type in argument 1 (different signedness)
+drivers/acpi/toshiba_acpi.c:401:14:    expected unsigned int [usertype] *word
+drivers/acpi/toshiba_acpi.c:401:14:    got int *<noident>
+
+Signed-off-by: Harvey Harrison <harvey.harrison@gmail.com>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Len Brown <len.brown@intel.com>
+---
+ drivers/acpi/toshiba_acpi.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/acpi/toshiba_acpi.c b/drivers/acpi/toshiba_acpi.c
+index 0a43c8e..4172d29 100644
+--- a/drivers/acpi/toshiba_acpi.c
++++ b/drivers/acpi/toshiba_acpi.c
+@@ -392,7 +392,7 @@ static unsigned long write_video(const char *buffer, unsigned long count)
+ 
+ 	hci_read1(HCI_VIDEO_OUT, &video_out, &hci_result);
+ 	if (hci_result == HCI_SUCCESS) {
+-		int new_video_out = video_out;
++		unsigned int new_video_out = video_out;
+ 		if (lcd_out != -1)
+ 			_set_bit(&new_video_out, HCI_VIDEO_OUT_LCD, lcd_out);
+ 		if (crt_out != -1)
+-- 
+1.6.2
+

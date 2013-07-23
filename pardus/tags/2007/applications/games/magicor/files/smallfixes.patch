@@ -1,0 +1,136 @@
+diff -Nur 1.0-rc1/magicor/editor/__init__.py trunk/magicor/editor/__init__.py
+--- 1.0-rc1/magicor/editor/__init__.py	2006-11-05 19:18:58.000000000 +0200
++++ trunk/magicor/editor/__init__.py	2006-11-05 19:16:55.000000000 +0200
+@@ -150,6 +150,7 @@
+                         IceBrush("connect-left"),
+                         IceBrush("connect-right"),
+                         LavaBrush(),
++                        TileBrush("tiles/default-tile"),
+                         TubeBrush("left"),
+                         TubeBrush("up"),
+                         TubeBrush("right"),
+diff -Nur 1.0-rc1/magicor/__init__.py trunk/magicor/__init__.py
+--- 1.0-rc1/magicor/__init__.py	2006-11-05 19:19:01.000000000 +0200
++++ trunk/magicor/__init__.py	2006-11-05 19:17:02.000000000 +0200
+@@ -230,8 +230,7 @@
+             )
+         self.config = config
+         paths = []
+-        if config.get("user_path"):
+-            paths.append(config.get("user_path"))
++        paths.append(config.get("user_path", "~/.magicor"))
+         paths.append(config.get("data_path", "data"))
+         self.resources = getResources(paths=paths,
+                                       sound=config.getBool("sound"),
+diff -Nur 1.0-rc1/magicor/resources.py trunk/magicor/resources.py
+--- 1.0-rc1/magicor/resources.py	2006-11-05 19:19:01.000000000 +0200
++++ trunk/magicor/resources.py	2006-11-05 19:17:02.000000000 +0200
+@@ -145,6 +145,7 @@
+             p = "%s%s%s"%(path, os.path.sep, prefix)
+         else:
+             p = path
++        # print "using path %s"%p
+         if os.path.isdir(p):
+             for f in os.listdir(p):
+                 if (os.path.isfile("%s%s%s"%(p, os.path.sep, f))
+@@ -179,11 +180,14 @@
+         for path in self.paths:
+             self._addResources(self._resources, path, prefix)
+ 
+-    def addLevelResources(self, path):
++    def addLevelResources(self, filename):
++        path = os.path.dirname(filename)
+         s = path.split(os.sep)
+-        self._addResources(self._level,
+-                           os.sep.join(s[:-1]),
+-                           s[-1])
++        d = os.sep.join(s[:-1])
++        pre = s[-1]
++        self._addResources(self._level, d, pre)
++        for p in ("%s/levels"%s for s in self.paths):
++            self._addResources(self._level, p, pre)
+ 
+     def clearLevelResources(self):
+         self._level = {}
+@@ -210,6 +214,7 @@
+     def loadLevelData(self):
+         ret = []
+         for path in ("%s%slevels"%(p, os.path.sep) for p in self.paths):
++            # print "searching levels in path %s"%path
+             ret += self._loadLevelData(path)
+         return ret
+ 
+diff -Nur 1.0-rc1/magicor/sprites/__init__.py trunk/magicor/sprites/__init__.py
+--- 1.0-rc1/magicor/sprites/__init__.py	2006-11-05 19:19:00.000000000 +0200
++++ trunk/magicor/sprites/__init__.py	2006-11-05 19:16:57.000000000 +0200
+@@ -439,7 +439,9 @@
+     def blockedBelow(self):
+         x, y = self.x / 32, (self.y + self.height) / 32
+         xr = (self.x + self.width - 1) / 32
+-        if (y < self.level.height
++        if (xr < 0 or xr > 19):
++            return True
++        elif (y < self.level.height
+             and (self.level[x, y]
+                  or self.level[xr, y]
+                  or self.blocksGroup.getSprite(self.x,
+@@ -453,12 +455,13 @@
+     def blockedAbove(self):
+         x, y = self.x / 32, (self.y - 1) / 32
+         xr = (self.x + self.width - 1) / 32
+-        if (y > 0
+-            and (self.level[x, y]
+-                 or self.level[xr, y]
+-                 or self.blocksGroup.getSprite(self.x,
+-                                               self.y - 1,
+-                                               self.width, 0, self)
++        if (xr < 0 or xr > 19 or self.level[xr, y]):
++            return True
++        elif (y >= 0
++              and (self.level[x, y]                   
++                   or self.blocksGroup.getSprite(self.x,
++                                                 self.y - 1,
++                                                 self.width, 0, self)
+                  )
+             ):
+             return True
+@@ -468,6 +471,7 @@
+         x, y = (self.x + self.width) / 32, (self.y + self.height) / 32
+         if (y < self.level.height
+             and (self.x + self.width >= self.level.width * 32
++                 or x > 19
+                  or self.level[x, y]
+                  or self.blocksGroup.getSprite(self.x + self.width,
+                                                self.y + self.height,
+@@ -481,6 +485,7 @@
+         x, y = (self.x - 1) / 32, (self.y + self.height) / 32
+         if (y < self.level.height
+             and (self.x <= 0
++                 or x < 0
+                  or self.level[x, y]
+                  or self.blocksGroup.getSprite(self.x - 1,
+                                                self.y + self.height,
+diff -Nur 1.0-rc1/magicor/states/title.py trunk/magicor/states/title.py
+--- 1.0-rc1/magicor/states/title.py	2006-11-05 19:18:55.000000000 +0200
++++ trunk/magicor/states/title.py	2006-11-05 19:16:53.000000000 +0200
+@@ -195,9 +195,8 @@
+                 try:
+                     if not self.loaded:
+                         self.resources.clearLevelResources()
+-                        d = os.path.dirname(
+-                            self.levelPaths[self.levels[self.selected]])
+-                        self.resources.addLevelResources(d)
++                        lp = self.levelPaths[self.levels[self.selected]]
++                        self.resources.addLevelResources(lp)
+                         self.loaded = True
+                     self.data.lastLevel = self.levels[self.selected].id
+                     self.renderLevel(self.renderSurface)
+@@ -205,7 +204,7 @@
+                 except (ValueError, ResourceNotFound), e:
+                     warnings.warn("unable to init level: %s"%e)
+                     del self.levels[self.selected]
+-                    raise e
++                    raise
+ 
+     def run(self):
+         self.control()

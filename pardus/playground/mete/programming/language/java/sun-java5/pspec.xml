@@ -1,0 +1,106 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>sun-java</Name>
+        <Homepage>https://jdk-distros.dev.java.net</Homepage>
+        <Packager>
+            <Name>İsmail Dönmez</Name>
+            <Email>ismail@pardus.org.tr</Email>
+        </Packager>
+        <License>dlj-1.1</License>
+        <IsA>app:console</IsA>
+        <IsA>library</IsA>
+        <Summary>Sun's J2SE Development Kit</Summary>
+        <Description>Java Platform, Standard Edition (also known as Java 2 Platform) lets you develop and deploy Java applications on desktops and servers, as well as today's demanding Embedded and Real-Time environments.</Description>
+        <Archive sha1sum="128aa89d06c3f39bee7866882ff2b4d4d33bfaa4" type="binary">http://download.java.net/dlj/binaries/jdk-5.0u20-dlj-linux-i586.bin</Archive>
+        <Patches>
+            <Patch>construct.patch</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>sun-jre5</Name>
+        <RuntimeDependencies>
+            <Dependency>xorg-server</Dependency>
+            <Dependency>alsa-lib</Dependency>
+            <Dependency>unixODBC</Dependency>
+        </RuntimeDependencies>
+        <Conflicts>
+            <Package>sun-jre6</Package>
+        </Conflicts>
+        <Files>
+            <Path fileType="config">/etc/env.d/20java_jre</Path>
+            <Path fileType="data">/opt/sun-jdk5/jre</Path>
+            <Path fileType="data">/opt/sun-jdk5/db</Path>
+            <Path fileType="executable">/opt/sun-jre5</Path>
+            <Path fileType="data">/usr/lib/nsbrowser/plugins</Path>
+            <Path fileType="doc">/usr/share/doc</Path>
+            <Path fileType="data">/usr/share/applications</Path>
+        </Files>
+        <AdditionalFiles>
+            <AdditionalFile owner="root" permission="0644" target="/etc/env.d/20java_jre">20java_jre</AdditionalFile>
+            <AdditionalFile owner="root" permission="0644" target="/usr/share/applications/javaws.desktop">javaws.desktop</AdditionalFile>
+        </AdditionalFiles>
+        <Provides>
+            <COMAR script="package.py">System.Package</COMAR>
+        </Provides>
+    </Package>
+
+    <Package>
+        <Name>sun-jdk5</Name>
+        <RuntimeDependencies>
+            <Dependency>sun-jre5</Dependency>
+        </RuntimeDependencies>
+        <Conflicts>
+            <Package>sun-jdk6</Package>
+        </Conflicts>
+        <Files>
+            <Path fileType="executable">/opt/sun-jdk5/bin</Path>
+            <Path fileType="header">/opt/sun-jdk5/include</Path>
+            <Path fileType="library">/opt/sun-jdk5/lib</Path>
+            <Path fileType="data">/opt/sun-jdk5/src.zip</Path>
+            <Path fileType="man">/opt/sun-jdk5/man</Path>
+            <Path fileType="config">/etc/env.d/21java_jdk</Path>
+        </Files>
+        <AdditionalFiles>
+            <AdditionalFile owner="root" permission="0644" target="/etc/env.d/21java_jdk">21java_jdk</AdditionalFile>
+        </AdditionalFiles>
+    </Package>
+
+    <Package>
+        <Name>sun-jdk5-demo</Name>
+        <RuntimeDependencies>
+            <Dependency versionFrom="1.5.0">sun-jdk5</Dependency>
+        </RuntimeDependencies>
+        <Conflicts>
+            <Package>sun-jdk6-demo</Package>
+        </Conflicts>
+        <Files>
+            <Path fileType="executable">/opt/sun-jdk5/demo</Path>
+        </Files>
+    </Package>
+
+    <Package>
+        <Name>sun-jdk5-samples</Name>
+        <RuntimeDependencies>
+            <Dependency versionFrom="1.5.0">sun-jdk5</Dependency>
+        </RuntimeDependencies>
+        <Conflicts>
+            <Package>sun-jdk5-samples</Package>
+        </Conflicts>
+        <Files>
+            <Path fileType="data">/opt/sun-jdk5/sample</Path>
+        </Files>
+    </Package>
+
+    <History>
+        <Update release="1">
+            <Date>2009-08-17</Date>
+            <Version>1.5.20</Version>
+            <Comment>First release</Comment>
+            <Name>Mete Alpaslan</Name>
+            <Email>mete@pardus.org.tr</Email>
+        </Update>
+    </History>
+</PISI>

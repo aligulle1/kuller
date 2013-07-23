@@ -1,0 +1,52 @@
+Index: yali4/installer.py
+===================================================================
+--- yali4/installer.py	(revision 21266)
++++ yali4/installer.py	(working copy)
+@@ -560,7 +560,8 @@ class Yali:
+                         guestGrubConf.parseConf(guest_grub_conf)
+                         for entry in guestGrubConf.entries:
+                             # if entry has root value we can use it in our grub.conf
+-                            if entry.getCommand("root"):
++                            # some distros uses uuid instead of root
++                            if entry.getCommand("root") or entry.getCommand("uuid"):
+                                 entry.title = entry.title + " [ %s ]" % p.getName()
+ 
+                                 # if device order changed we should update device order in foreign grub.conf
+@@ -573,13 +574,13 @@ class Yali:
+ 
+                                 # update device order for kernel command if already defined
+                                 _kernel = entry.getCommand("kernel")
+-                                if _kernel:
++                                if _kernel and _root.value:
+                                     if _kernel.value.startswith('('):
+                                         _kernel.value = ''.join([_root.value, _kernel.value.split(')')[1]])
+ 
+                                 # update device order for initrd command if already defined
+                                 _initrd = entry.getCommand("initrd")
+-                                if _initrd:
++                                if _initrd and _root.value:
+                                     if _initrd.value.startswith('('):
+                                         _initrd.value = ''.join([_root.value, _initrd.value.split(')')[1]])
+ 
+Index: yali4/gui/ScrPartitionAuto.py
+===================================================================
+--- yali4/gui/ScrPartitionAuto.py	(revision 21266)
++++ yali4/gui/ScrPartitionAuto.py	(working copy)
+@@ -130,7 +130,7 @@ about disk partitioning.
+         if ctx.installData.autoPartMethod == methodEraseAll:
+             self.ui.accept_auto_2.toggle()
+         if ctx.installData.autoPartMethod == methodManual:
+-            self.ui.manual.toggle()
++            self.slotSelectManual()
+         self.update()
+ 
+     def execute(self):
+@@ -149,6 +149,8 @@ about disk partitioning.
+                 ctx.mainScreen.moveInc = 0
+             else:
+                 self.execute_()
++        else:
++            ctx.installData.autoPartMethod = methodManual
+         ctx.selectedDisk = self.ui.device_list.currentRow()
+         return True
+ 

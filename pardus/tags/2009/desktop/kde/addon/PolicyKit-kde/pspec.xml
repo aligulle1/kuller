@@ -1,0 +1,83 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PISI SYSTEM "http://www.pardus.org.tr/projeler/pisi/pisi-spec.dtd">
+<PISI>
+    <Source>
+        <Name>PolicyKit-kde</Name>
+        <Homepage>http://websvn.kde.org/trunk/extragear/base/PolicyKit-kde/</Homepage>
+        <Packager>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Packager>
+        <License>GPLv2</License>
+        <IsA>app:gui</IsA>
+        <Summary>Authentication agent for PolicyKit to use in KDE4</Summary>
+        <Description>PolicyKit-kde provides a D-Bus session bus service that is used to bring up authentication dialogs used for obtaining privileges.</Description>
+        <Archive sha1sum="00bbe7cd5d526860e18b2524e95fe02d2635ea83" type="tarbz2">http://cekirdek.pardus.org.tr/~gokcen/files/PolicyKit-kde-r967596.tar.bz2</Archive>
+        <BuildDependencies>
+            <Dependency>kdelibs-devel</Dependency>
+            <Dependency>polkit-qt</Dependency>
+        </BuildDependencies>
+        <Patches>
+            <Patch level="1">backport-kde43.diff</Patch>
+            <Patch level="1">translations.diff</Patch>
+
+            <!-- Application name in main dialog is not necessary, it's been shown in details section already -->
+            <Patch level="1">do-not-show-appname.diff</Patch>
+
+            <!-- Make remember options as in old Policykit-kde -->
+            <Patch level="1">do-not-remember-default.diff</Patch>
+        </Patches>
+    </Source>
+
+    <Package>
+        <Name>PolicyKit-kde</Name>
+        <RuntimeDependencies>
+            <Dependency>kdelibs</Dependency>
+            <Dependency>polkit-qt</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="executable">/usr/kde/4/bin</Path>
+            <Path fileType="library">/usr/kde/4/lib</Path>
+            <Path fileType="data">/usr/kde/4/share</Path>
+            <Path fileType="localedata">/usr/kde/4/share/locale</Path>
+        </Files>
+    </Package>
+
+    <History>
+        <Update release="5">
+            <Date>2009-05-27</Date>
+            <Version>0.2</Version>
+            <Comment>Forwardport patch I've committed for 2008: PolicyKit-kde was unintentionally keeping password even if user selects 'do not remember option'.</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="4">
+            <Date>2009-05-17</Date>
+            <Version>0.2</Version>
+            <Comment>Backport PolicyKit-kde from KDE 4.3</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="3">
+            <Date>2009-03-19</Date>
+            <Version>0.2</Version>
+            <Comment>Conflict with PolicyKit-kde is removed. PolicyKit-kde >= release 11 is not started in KDE4 and PolicyKit-kde4 does not activated in KDE3. No conflicts any more.</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="2">
+            <Date>2009-02-17</Date>
+            <Version>0.2</Version>
+            <Comment>Remember options are set to same as the old PolicyKit-kde, remember is not checked by default, and if it's selected there are two options below it.</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+        <Update release="1">
+            <Date>2009-02-12</Date>
+            <Version>0.2</Version>
+            <Comment>First release.</Comment>
+            <Name>Gökçen Eraslan</Name>
+            <Email>gokcen@pardus.org.tr</Email>
+        </Update>
+    </History>
+</PISI>

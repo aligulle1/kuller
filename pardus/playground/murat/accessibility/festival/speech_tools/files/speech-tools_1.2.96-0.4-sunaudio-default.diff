@@ -1,0 +1,60 @@
+--- speech-tools-1.2.3.orig/audio/gen_audio.cc
++++ speech-tools-1.2.3/audio/gen_audio.cc
+@@ -97,6 +97,10 @@
+             protocol = "macosxaudio";
+ 	else if (win32audio_supported)
+ 	    protocol = "win32audio";
++	else if (esd_supported)
++	    protocol = "esdaudio";
++	else if (nas_supported)
++	    protocol = "netaudio";
+ 	else if (mplayer_supported)
+ 	    protocol = "mplayeraudio";
+ 	else
+@@ -238,10 +238,6 @@
+     audios += "sunaudio";  // we always support this inspite of the hardware
+ 
+     audios += " audio_command";
+-    if (nas_supported)
+-	audios += " netaudio";
+-    else if (esd_supported)
+-	audios += " esdaudio";
+     if (sun16_supported)
+ 	audios += " sun16audio";
+     if (freebsd16_supported)
+@@ -257,6 +253,11 @@
+     if (os2audio_supported)
+ 	audios += " os2audio";
+ 
++    if (nas_supported)
++	audios += " netaudio";
++    else if (esd_supported)
++	audios += " esdaudio";
++
+     return audios;
+ }
+ 
+@@ -278,11 +279,7 @@
+ 	protocol = sr;
+     else if (protocol == "")
+     {
+-	if (nas_supported)
+-	    protocol = "netaudio";  // the default protocol
+-	else if (esd_supported)
+-	    protocol = "esdaudio";  // the default protocol
+-	else if (sun16_supported)
++	if (sun16_supported)
+ 	    protocol = "sun16audio";
+ 	else if (freebsd16_supported)
+ 	    protocol = "freebsd16audio";
+@@ -292,6 +289,10 @@
+ 	    protocol = "irixaudio";
+ 	else if (win32audio_supported)
+ 	    protocol = "win32audio";
++	else if (esd_supported)
++	    protocol = "esdaudio";
++	else if (nas_supported)
++	    protocol = "netaudio";
+ 	else if (mplayer_supported)
+ 	    protocol = "mplayeraudio";
+ 	else

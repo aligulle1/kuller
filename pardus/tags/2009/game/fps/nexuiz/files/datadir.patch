@@ -1,0 +1,46 @@
+diff -Nur nexuiz-2.4-old/darkplaces/fs.c nexuiz-2.4/darkplaces/fs.c
+--- nexuiz-2.4-old/darkplaces/fs.c	2008-03-14 02:27:43.980822251 +0200
++++ nexuiz-2.4/darkplaces/fs.c	2008-03-14 02:31:28.184738075 +0200
+@@ -1138,10 +1138,10 @@
+ 	FS_ClearSearchPath();
+ 
+ 	// add the game-specific paths
+-	// gamedirname1 (typically id1)
+-	FS_AddGameHierarchy (gamedirname1);
++	// "nexuiz" (typically id1)
++	FS_AddGameHierarchy ("nexuiz");
+ 	// update the com_modname (used for server info)
+-	strlcpy(com_modname, gamedirname1, sizeof(com_modname));
++	strlcpy(com_modname, "nexuiz", sizeof(com_modname));
+ 
+ 	// add the game-specific path, if any
+ 	// (only used for mission packs and the like, which should set fs_modified)
+@@ -1165,7 +1165,7 @@
+ 
+ 	// set the default screenshot name to either the mod name or the
+ 	// gamemode screenshot name
+-	if (strcmp(com_modname, gamedirname1))
++	if (strcmp(com_modname, "nexuiz"))
+ 		Cvar_SetQuick (&scr_screenshot_name, com_modname);
+ 	else
+ 		Cvar_SetQuick (&scr_screenshot_name, gamescreenshotname);
+@@ -1345,7 +1345,7 @@
+ #ifdef DP_FS_BASEDIR
+ 	strlcpy(fs_basedir, DP_FS_BASEDIR, sizeof(fs_basedir));
+ #else
+-	strlcpy(fs_basedir, "", sizeof(fs_basedir));
++	strlcpy(fs_basedir, "/usr/share/quake1", sizeof(fs_basedir));
+ 
+ #ifdef MACOSX
+ 	// FIXME: is there a better way to find the directory outside the .app?
+@@ -1380,8 +1380,8 @@
+ 	if (fs_basedir[0] && fs_basedir[strlen(fs_basedir) - 1] != '/' && fs_basedir[strlen(fs_basedir) - 1] != '\\')
+ 		strlcat(fs_basedir, "/", sizeof(fs_basedir));
+ 
+-	if (!FS_CheckGameDir(gamedirname1))
+-		Con_Printf("WARNING: base gamedir %s%s/ not found!\n", fs_basedir, gamedirname1);
++	if (!FS_CheckGameDir("nexuiz"))
++		Con_Printf("WARNING: base gamedir %s%s/ not found!\n", fs_basedir, "nexuiz");
+ 
+ 	if (gamedirname2 && !FS_CheckGameDir(gamedirname2))
+ 		Con_Printf("WARNING: base gamedir %s%s/ not found!\n", fs_basedir, gamedirname2);

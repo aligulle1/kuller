@@ -1,0 +1,131 @@
+--- xf86-video-vermilion-1.0.0/src/vermilion.c.jx	2007-03-28 10:08:27.000000000 -0400
++++ xf86-video-vermilion-1.0.0/src/vermilion.c	2007-05-21 16:52:09.000000000 -0400
+@@ -171,12 +171,6 @@
+     NULL
+ };
+ 
+-static const char *wfbSymbols[] = {
+-    "wfbPictureInit",
+-    "wfbScreenInit",
+-    NULL
+-};
+-
+ static const char *shadowSymbols[] = {
+     "shadowAdd",
+     "shadowAlloc",
+@@ -234,7 +228,7 @@
+     if (!Initialised) {
+ 	Initialised = TRUE;
+ 	xf86AddDriver(&VERMILION, Module, 0);
+-	LoaderRefSymLists(fbSymbols, wfbSymbols, ddcSymbols, shadowSymbols, xaaSymbols,
++	LoaderRefSymLists(fbSymbols, ddcSymbols, shadowSymbols, xaaSymbols,
+ 	    NULL);
+ 	return (pointer) TRUE;
+     }
+@@ -520,7 +514,7 @@
+     int mbxCount;
+     MessageType from;
+     unsigned ssVendor, ssDevice;
+-    const char *ssName, *fbmod, **fbsym;
++    const char *ssName;
+ 
+     ClockRangePtr clockRanges;
+ 
+@@ -593,29 +587,21 @@
+ 	return FALSE;
+     }
+ 
+-    if (!xf86SetDepthBpp(pScrn, 15, 0, 0, Support32bppFb)) {
++    if (!xf86SetDepthBpp(pScrn, 24, 0, 0, Support32bppFb)) {
+ 	return (FALSE);
+     }
+-    if (pScrn->depth != 15 && pScrn->depth != 24) {
++    if (pScrn->depth != 24) {
+ 	xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
+-	    "Invalid depth %d, only 15 and 24 supported\n", pScrn->depth);
++	    "Invalid depth %d, only 24 supported\n", pScrn->depth);
+ 	return (FALSE);
+     }
+     xf86PrintDepthBpp(pScrn);
+ 
+-    if (pScrn->depth == 15) {
+-	fbmod = "wfb";
+-	fbsym = wfbSymbols;
+-    } else {
+-	fbmod = "fb";
+-	fbsym = fbSymbols;
+-    }
+-
+     /* Load (w)fb module */
+-    if (!xf86LoadSubModule(pScrn, fbmod))
++    if (!xf86LoadSubModule(pScrn, "fb"))
+ 	return (FALSE);
+ 
+-    xf86LoaderReqSymLists(fbsym, NULL);
++    xf86LoaderReqSymLists(fbSymbols, NULL);
+ 
+     pScrn->chipset = "vermilion";
+     pScrn->monitor = pScrn->confScreen->monitor;
+@@ -965,36 +951,6 @@
+     memcpy(dst, &value, size);
+ }
+ 
+-static void
+-VERMILIONSetupWrap(ReadMemoryProcPtr *pRead, WriteMemoryProcPtr *pWrite,
+-			DrawablePtr pDraw)
+-{
+-    ScreenPtr pScreen = pDraw->pScreen;
+-    ScrnInfoPtr pScrn = xf86Screens[pDraw->pScreen->myNum];
+-    VERMILIONPtr pVermilion = VERMILIONGetRec(pScrn);
+-    PixmapPtr pPixmap;
+-
+-    if (pDraw->type == DRAWABLE_WINDOW)
+-	pPixmap = pScreen->GetWindowPixmap((WindowPtr)pDraw);
+-    else
+-	pPixmap = (PixmapPtr)pDraw;
+-
+-    if (pScrn->depth == 15 && pPixmap->devPrivate.ptr >= pVermilion->fbMap &&
+-	(char*)pPixmap->devPrivate.ptr < ((char*)pVermilion->fbMap +
+-					   pVermilion->fbSize)) {
+-	*pWrite = VERMILIONWriteMemorySetAlpha;
+-    } else {
+-	*pWrite = VERMILIONWriteMemoryPassthru;
+-    }
+-
+-    *pRead = VERMILIONReadMemory;
+-}
+-
+-static void
+-VERMILIONFinishWrap(DrawablePtr pDraw) 
+-{
+-}
+-
+ static Bool
+ VERMILIONScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
+ {
+@@ -1072,12 +1028,7 @@
+ 	fbstart = pVermilion->fbMap;
+     }
+ 
+-    if (!(pScrn->depth == 15 ?
+-	  wfbScreenInit(pScreen, fbstart, pScrn->virtualX, pScrn->virtualY,
+-			pScrn->xDpi, pScrn->yDpi, pScrn->displayWidth,
+-			pScrn->bitsPerPixel, VERMILIONSetupWrap,
+-			VERMILIONFinishWrap) :
+-	  fbScreenInit(pScreen, fbstart, pScrn->virtualX, pScrn->virtualY,
++    if (!(fbScreenInit(pScreen, fbstart, pScrn->virtualX, pScrn->virtualY,
+ 		       pScrn->xDpi, pScrn->yDpi, pScrn->displayWidth,
+ 		       pScrn->bitsPerPixel)))
+ 	return (FALSE);
+@@ -1096,10 +1047,7 @@
+     }
+ 
+     /* must be after RGB ordering fixed */
+-    if (pScrn->depth == 15)
+-        wfbPictureInit(pScreen, 0, 0);
+-    else
+-    	fbPictureInit(pScreen, 0, 0);
++    fbPictureInit(pScreen, 0, 0);
+ 
+     if (pVermilion->shadowFB &&
+ 	(!shadowSetup(pScreen) || !shadowAdd(pScreen, NULL,

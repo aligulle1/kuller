@@ -1,0 +1,15 @@
+Index: gtk-qt-engine/kcm_gtk/kcmgtk.cpp
+===================================================================
+--- gtk-qt-engine.orig/kcm_gtk/kcmgtk.cpp
++++ gtk-qt-engine/kcm_gtk/kcmgtk.cpp
+@@ -127,8 +127,10 @@ void KcmGtk::save()
+ 	file.open(QIODevice::WriteOnly);
+ 	QTextStream stream(&file);
+ 	stream << "#!/bin/bash\n\n";
++	stream << "if [ -e /usr/kde/4/lib/kde4/kcm_kcmgtk4.so ]; then\n";
+ 	stream << "# Make sure our customised gtkrc file is loaded.\n";
+ 	stream << "export GTK2_RC_FILES=" + k_gtkRcFileName + "\n";
++	stream << "fi\n";
+ 	file.close();
+ 	
+ 	// Make it executable

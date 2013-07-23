@@ -1,0 +1,1038 @@
+Index: src/client/Decibel/Decibel.pc.in
+===================================================================
+--- src/client/Decibel/Decibel.pc.in	(revision 891686)
++++ src/client/Decibel/Decibel.pc.in	(revision 961549)
+@@ -7,5 +7,5 @@
+ Description: Decibel Client Library
+ Version: ${VERSION}
+ Requires: QtCore QtDBus QtTapioca
+-Libs: -L${CMAKE_INSTALL_PREFIX}/${LIB_INSTALL_DIR} -ldecibel
++Libs: -L${CMAKE_INSTALL_PREFIX}/${LIB_INSTALL_DIR} -lDecibel
+ Cflags: -I${CMAKE_INSTALL_PREFIX}/${INCLUDE_INSTALL_DIR} -I${CMAKE_INSTALL_PREFIX}/include/
+Index: tests/server/accountmanagertc.cpp
+===================================================================
+--- tests/server/accountmanagertc.cpp	(revision 891686)
++++ tests/server/accountmanagertc.cpp	(revision 961549)
+@@ -27,63 +27,94 @@
+ 
+ #include <QtCore/QDebug>
+ 
+-AccountManagerTC::AccountManagerTC() { }
++AccountManagerTC::AccountManagerTC()
++{
++}
+ 
+-AccountManagerTC::~AccountManagerTC() { }
++AccountManagerTC::~AccountManagerTC()
++{
++}
+ 
+-void AccountManagerTC::test_addAccount()
++void AccountManagerTC::checkAddEmptyAccountError()
+ {
+-    org::kde::Decibel::AccountManager
+-            account_mgr(Decibel::daemon_service,
+-                        Decibel::daemon_accountmanager_path,
+-                        QDBusConnection::sessionBus());
++    org::kde::Decibel::AccountManager accountManager( Decibel::daemon_service,
++                                                      Decibel::daemon_accountmanager_path,
++                                                      QDBusConnection::sessionBus() );
++//emptyAccountData
++    QVariantMap emptyAccountData;
+ 
+-    QVariantMap account_data;
+-    QDBusReply<quint32> reply(account_mgr.addAccount(account_data));
+-    QVERIFY2(!reply.isValid(),
+-             "Received valid reply to addAccount (empty account data).");
++    QDBusPendingReply<quint32> reply( accountManager.addAccount(emptyAccountData) );
++    reply.waitForFinished();
++
+     QDBusError error = reply.error();
+-    qDebug() << "error type:" << error.type()
+-             << "error name:" << error.name();
+-    QVERIFY2(error.type() == QDBusError::Other,
+-             "Wrong error type was returned.");
+-    QVERIFY2(error.name() == Decibel::ErrorDataIncomplete,
+-             "Wrong error name was returned.");
++    QVERIFY2(error.type() != QDBusError::NoError,
++             "QDBusPendingReply has no error and this is not expected for addEmptyAccount with empty account data.");
+ 
+-    QTest::qWait(15000);
+-    QList<DBusSignal> dbus_signals = recentSignals();
++    bool isExpectDbusError(error.type() == QDBusError::Other);
++    bool isExpectDecibelDbusErrorName(error.name() == Decibel::ErrorDataIncomplete);
++    if(!isExpectDbusError || !isExpectDecibelDbusErrorName)
++    {
++        qWarning() << "\tQDBusPendingReply error - type: " << error.type()
++                                             << ", name: " << error.name()
++                                             << ", message: " << error.message();
++    }
++    QVERIFY2(isExpectDbusError, "Wrong error type was returned.");
++    QVERIFY2(isExpectDecibelDbusErrorName, "Wrong error name was returned.");
++    QVERIFY(expectNumberOfRecentSignalsCheck(1)); //error reply is an unexpected error
++}
+ 
+-    QVERIFY2(dbus_signals.isEmpty(), "Received unexpected signals");
++void AccountManagerTC::addAccountTest()
++{
++    org::kde::Decibel::AccountManager accountManager( Decibel::daemon_service,
++                                                      Decibel::daemon_accountmanager_path,
++                                                      QDBusConnection::sessionBus() );
++
++    QVariantMap accountData;
++    accountData.insert(Decibel::name_protocol, "addAccountTestProtocol");
++    accountData.insert(Decibel::name_presence, 3);
++    accountData.insert(Decibel::name_presence_parameters, QVariantMap());
++    accountData.insert(Decibel::name_current_presence, 1);
++    accountData.insert(Decibel::name_autoreconnect, false);
++    accountData.insert( Decibel::name_display_name,
++                        "addAccountTestProtocol://account@server:port/" );
++    accountData.insert("name", "value");
++    accountData.insert("int", 1);
++    accountData.insert("float", 2.0);
++    accountData.insert("FIND_ME", "FIND_ME"); //special pair for next test (findAccount test)
++
++    QDBusPendingReply<quint32> reply( accountManager.addAccount(accountData) );
++    reply.waitForFinished();
++
++    QVERIFY(reply.error().type() == QDBusError::NoError);
++    QVERIFY(expectNumberOfRecentSignalsCheck(0));
+ }
+ 
+-void AccountManagerTC::test_persistence()
++void AccountManagerTC::findAccountTest()
+ {
+-    QVariantMap account_data;
+-    account_data.insert(Decibel::name_protocol, "testproto");
+-    account_data.insert(Decibel::name_presence, 3);
+-    account_data.insert(Decibel::name_presence_parameters, QVariantMap());
+-    account_data.insert(Decibel::name_current_presence, 1);
+-    account_data.insert(Decibel::name_autoreconnect, false);
+-    account_data.insert(Decibel::name_display_name, "testproto://unknown@unknown/");
+-    account_data.insert("name", "value");
+-    account_data.insert("int", 1);
+-    account_data.insert("float", 2.0);
++    org::kde::Decibel::AccountManager accountManager( Decibel::daemon_service,
++                                                      Decibel::daemon_accountmanager_path,
++                                                      QDBusConnection::sessionBus() );
+ 
+-    quint32 handle;
+-    {
+-        org::kde::Decibel::AccountManager
+-            account_mgr(Decibel::daemon_service,
+-                        Decibel::daemon_accountmanager_path,
+-                        QDBusConnection::sessionBus());
+-        QDBusReply<quint32> reply(account_mgr.addAccount(account_data));
+-        QVERIFY2(reply.isValid(), "Received invalid reply to addAccount.");
+-        handle = reply.value();
++    QVariantMap queryValuePair;
++    queryValuePair.insert("FIND_ME", "FIND_ME");
+ 
+-        QTest::qWait(1500); // Wait for signals...
+-        QList<DBusSignal> dbus_signals = recentSignals();
++    QDBusPendingReply< QList<quint32> > reply( accountManager.findAccounts(queryValuePair) );
++    reply.waitForFinished();
+ 
+-        QVERIFY2(dbus_signals.isEmpty(), "Received unexpected signals");
+-    }
++    QList<quint32> accountIdList( reply.value() );
++
++    QVERIFY2( accountIdList.count() >= 1,
++              "No account was found, did you add a account first? (void AccountManagerTC::addAccountTest())");
++
++    foreach(quint32 accountId, accountIdList)
++    { QVERIFY( accountId>0 ); }
++
++    QVERIFY2( accountIdList.count() >= 1,
++              "No account was found, did you add a account first? (void AccountManagerTC::addAccountTest())");
++
++    QVERIFY(reply.error().type() == QDBusError::NoError);
++    QVERIFY(expectNumberOfRecentSignalsCheck(0));
+ }
+ 
+-QTEST_MAIN(AccountManagerTC)
++
++//QTEST_MAIN(AccountManagerTC)  //main is in main.cpp ;)
+Index: tests/server/accountmanagertc.h
+===================================================================
+--- tests/server/accountmanagertc.h	(revision 891686)
++++ tests/server/accountmanagertc.h	(revision 961549)
+@@ -23,17 +23,28 @@
+ 
+ #include "decibeltestcase.h"
+ 
++#include <QDBusError>
++#include <QDBusMessage>
++
++/**
++ * @brief Test class for the AccountManager.
++ * @author Tobias Hunger and Tim Jenssen <info@basyskom.de>
++ * @todo rename into AccountManagerTest <- no abbreviation
++ */
+ class AccountManagerTC : public DecibelTestCase
+ {
+     Q_OBJECT
+-    public:
+-        AccountManagerTC();
++public:
++    AccountManagerTC();
+ 
+-        ~AccountManagerTC();
++    ~AccountManagerTC();
+ 
+-    private Q_SLOTS:
+-        void test_addAccount();
+-        void test_persistence();
++private Q_SLOTS:
++    void checkAddEmptyAccountError();
++    void addAccountTest();
++    void findAccountTest();
++
++private:
+ };
+ 
+ #endif // header guard
+Index: tests/server/decibeltestcase.cpp
+===================================================================
+--- tests/server/decibeltestcase.cpp	(revision 891686)
++++ tests/server/decibeltestcase.cpp	(revision 961549)
+@@ -19,7 +19,7 @@
+  */
+ 
+ #include "decibeltestcase.h"
+-#include "config.h"
++#include "config.h" //cmake
+ 
+ #include <Decibel/Types>
+ 
+@@ -30,7 +30,7 @@
+ // ---------------------------------------------------------------------------
+ 
+ DecibelTestCase::DecibelTestCase(QObject * parent) :
+-    DBusTestCase(true, parent)
++    DBusTestCase(true, parent), m_decibelProcess(0)
+ { }
+ 
+ 
+@@ -45,15 +45,70 @@
+ 
+ void DecibelTestCase::startDecibel()
+ {
++//old - cmake
+     // change home environment variable so that decibel
+     // will pick up its configuration data from a "save"
+     // place during the tests.
+-    qputenv("HOME", TEST_HOME_PATH);
+-    startAUT("../../src/server/decibel");
++    //qputenv("HOME", TEST_HOME_PATH);
++    qputenv("HOME", QDir::currentPath().toAscii());
+ 
+-    // Register types we are going to use:
++    //arg "--runInTestMode" filter the messages from decibel
++    m_decibelProcess = startAUT("../../src/server/decibel", QStringList()<<"--runInTestMode");
++
++
++    connect( m_decibelProcess, SIGNAL(error(QProcess::ProcessError)),
++             this, SLOT(slotError(QProcess::ProcessError)) );
++    connect( m_decibelProcess, SIGNAL(readyReadStandardError()),
++             this, SLOT(slotReadyReadStandardError()) );
++
++
+     Decibel::registerTypes();
++    QTest::qWait(4000);
++}
+ 
+-    // Give decibel a chance to start up properly:
+-    QTest::qWait(5000);
++void DecibelTestCase::cleanupTestCase()
++{
++    //QTest::qWait(30000);
++    QVERIFY2(m_decibelProcess->error() != QProcess::Crashed, "Decibel is crashed ...");
++
++    DBusTestCase::cleanupTestCase(); //stop the process
++    cleanupDecibel(); //clean test config files
+ }
++
++void DecibelTestCase::cleanupDecibel()
++{
++    QString configHome( qgetenv("HOME") );
++    QString completeConfigFileName( QString("%1%2").arg(configHome).arg("/.config/org.kde/Decibel.conf") );
++    QFile configFile( completeConfigFileName );
++
++    QVERIFY2( configFile.remove(), QString("No old config file could be found for cleanup(%1).").arg(configFile.fileName()).toAscii() );
++}
++
++
++void DecibelTestCase::slotError(QProcess::ProcessError processError)
++{
++    if( processError == QProcess::Crashed)
++    {
++        QByteArray outPut;
++        outPut = m_decibelProcess->readAllStandardError();
++        if(!outPut.isEmpty())
++        { qDebug() << __PRETTY_FUNCTION__ << "\t crashed output: \n" << outPut; }
++    }
++
++}
++
++/**
++  * In some cases assert messages are not available in slotError therefore we need this
++  */
++void DecibelTestCase::slotReadyReadStandardError()
++{
++    //qDebug()<<__PRETTY_FUNCTION__;
++    QByteArray outPut;
++    outPut = m_decibelProcess->readAllStandardError();
++    if(
++            outPut.contains("Test debug: ") ||
++            outPut.contains("ASSERT") ||
++            true
++       )
++    { qDebug() << "\n" << outPut; }
++}
+Index: tests/server/main.cpp
+===================================================================
+--- tests/server/main.cpp	(revision 0)
++++ tests/server/main.cpp	(revision 961549)
+@@ -0,0 +1,36 @@
++#include <QtCore/QCoreApplication>
++#include <QtTest/QTest>
++
++//#include "firsttestcase.h"
++#include "accountmanagertc.h"
++
++int main(int argc, char *argv[])
++{
++    QCoreApplication app(argc, argv);
++
++    QList<QObject*> testCaseList;
++    int result = 0;
++
++    //qInstallMsgHandler(FilterMessageOutput); //sorry in QTest  app is no MsgHandler available
++
++//    testCaseList << new AccountManagerTC()
++//                 << new AccountManagerTC()
++//                 << new AccountManagerTC()
++//                 << new AccountManagerTC()
++//                 << new AccountManagerTC()
++//                 << new AccountManagerTC()
++//                 << new AccountManagerTC()
++//                 << new AccountManagerTC()
++//                 << new AccountManagerTC();
++    testCaseList << new AccountManagerTC();
++
++
++    while (!testCaseList.isEmpty())
++    {
++        QObject* testCase = testCaseList.takeFirst();
++        result |= QTest::qExec(testCase, argc, argv);
++        delete testCase;
++    }
++
++    return result;
++}
+Index: tests/server/decibeltestcase.h
+===================================================================
+--- tests/server/decibeltestcase.h	(revision 891686)
++++ tests/server/decibeltestcase.h	(revision 961549)
+@@ -23,6 +23,9 @@
+ 
+ #include <dbustestcase.h>
+ 
++#include <QPointer>
++#include <QProcess>
++
+ class DecibelTestCase : public DBusTestCase
+ {
+     Q_OBJECT
+@@ -32,9 +35,16 @@
+ 
+ protected:
+     void startDecibel();
++    void cleanupDecibel();
++    QPointer<QProcess> m_decibelProcess;
+ 
+-protected Q_SLOTS:
++public slots: //public == no test slot
+     virtual void initTestCase();
++    virtual void cleanupTestCase();
++
++    void slotError(QProcess::ProcessError processError);
++    void slotReadyReadStandardError();
++
+ };
+ 
+ #endif // header guard
+Index: tests/server/CMakeLists.txt
+===================================================================
+--- tests/server/CMakeLists.txt	(revision 891686)
++++ tests/server/CMakeLists.txt	(revision 961549)
+@@ -1,4 +1,6 @@
+-SET(QT_DONT_USE_QTGUI "YES")
++SET(QT_USE_QTDBUS ON)
++SET(QT_USE_QTTEST ON)
++SET(QT_DONT_USE_QTGUI ON)
+ INCLUDE(${QT_USE_FILE})
+ 
+ INCLUDE_DIRECTORIES(${QT_QTCORE_INCLUDE_DIR}
+@@ -20,6 +22,7 @@
+ # ########## code common to all tests ##########
+ 
+ SET(common_SRCS
++    main.cpp
+     decibeltestcase.cpp
+ )
+ 
+@@ -32,6 +35,7 @@
+ SET(common_LIBS
+     dbustest
+     decibellib
++    ${QT_LIBRARIES}
+ )
+ 
+ # ######### accountmanagertc #########
+Index: tests/CMakeLists.txt
+===================================================================
+--- tests/CMakeLists.txt	(revision 891686)
++++ tests/CMakeLists.txt	(revision 961549)
+@@ -1,5 +1,5 @@
+ # ToDo: Fix unit tests again. Most are broken due to D-Bus usage,
+ #       the rest died when removing the static decibel lib.
+-# ADD_SUBDIRECTORY(dbustest)
++ADD_SUBDIRECTORY(dbustest)
+ ADD_SUBDIRECTORY(server)
+ 
+Index: tests/dbustest/dbustestcase.h
+===================================================================
+--- tests/dbustest/dbustestcase.h	(revision 891686)
++++ tests/dbustest/dbustestcase.h	(revision 961549)
+@@ -30,9 +30,15 @@
+ #include <QtCore/QStringList>
+ #include <QtCore/QVariant>
+ #include <QtCore/QTime>
++#include <QtCore/QDebug>
+ 
++class QProcess;
++
+ class DBusTestCasePrivate;
+ 
++//debugging define, for starting dbus-monitor and stop at the end of a c++ block(brackets)
++#define DBUSMONITOR QProcess dbusMonitorProcess; dbusMonitorOn(dbusMonitorProcess);
++
+ class DBusTestCase : public QObject
+ {
+     Q_OBJECT
+@@ -40,22 +46,25 @@
+     struct DBusSignal
+     {
+         QTime time_stamp;
+-        QObject * object;
++        QPointer<QObject> object;
+         QByteArray signal;
+         QList<QVariant> parameters;
+     };
+ 
+-    DBusTestCase(bool private_dbus = true,
+-                 QObject * parent = 0);
++    DBusTestCase(bool isPrivateDbus = true, QObject * parent = 0);
+     virtual ~DBusTestCase();
+ 
+ protected:
+     QList<DBusSignal> recentSignals();
+-    void startAUT(const QString & app,
+-                  const QStringList & arguments = QStringList());
++    bool expectNumberOfRecentSignalsCheck(int expectNumberOfRecentSignals);
++
++    QProcess* startAUT(const QString & app, const QStringList & arguments = QStringList());
+     void stopAUTs();
+ 
+-protected Q_SLOTS:
++//helper function for debugging in the test cases
++    void dbusMonitorOn(QProcess & dbusMonitorProcess);
++
++public slots:
+     virtual void initTestCase();
+     virtual void cleanupTestCase();
+ 
+@@ -63,4 +72,6 @@
+     DBusTestCasePrivate * const d;
+ };
+ 
++QDebug operator<<(QDebug dbg, const DBusTestCase::DBusSignal & dbusSignal);
++
+ #endif // header guard
+Index: tests/dbustest/dbustestcase.cpp
+===================================================================
+--- tests/dbustest/dbustestcase.cpp	(revision 891686)
++++ tests/dbustest/dbustestcase.cpp	(revision 961549)
+@@ -20,7 +20,6 @@
+ 
+ #include "dbustestcase.h"
+ 
+-#include <QtCore/QDebug>
+ #include <QtCore/QMetaObject>
+ #include <QtCore/QMetaMethod>
+ 
+@@ -69,131 +68,26 @@
+ class DBusTestCasePrivate
+ {
+ public:
+-    DBusTestCasePrivate(const bool priv_bus) :
+-        private_dbus(priv_bus)
+-    {
+-        QSignalSpyCallbackSet callbacks;
+-        callbacks.signal_begin_callback = &DBusTestCasePrivate::beginCallBackSignal;
+-        callbacks.slot_begin_callback = 0;
+-        callbacks.signal_end_callback = 0;
+-        callbacks.slot_end_callback = 0;
++    DBusTestCasePrivate(const bool isPrivateDbus);
++    ~DBusTestCasePrivate();
+ 
+-        qt_register_signal_spy_callbacks(callbacks);
+-    }
++    static void beginCallBackSignal(QObject * caller, int method_index, void ** argv);
++    void startDBus();
++    void stopDBus();
+ 
+-    ~DBusTestCasePrivate()
+-    { }
+-
+-    static void beginCallBackSignal(QObject * caller,
+-                             int method_index,
+-                             void ** argv)
+-    {
+-        if (0 == qobject_cast<QDBusAbstractInterface*>(caller)) { return; }
+-
+-        const QMetaObject * mo(caller->metaObject());
+-        QMetaMethod method(mo->method(method_index));
+-
+-        DBusTestCase::DBusSignal signal;
+-        signal.time_stamp = QTime::currentTime();
+-        signal.object = caller;
+-        signal.signal = method.signature();
+-
+-        QList<QByteArray> type_names;
+-        for (int i = 0; i < type_names.size(); ++i)
+-        {
+-            int type = QMetaType::type(type_names[i]);
+-            if (QMetaType::Void == type)
+-            { qFatal("Don't know how to handle type."); }
+-            signal.parameters << QVariant(type, argv[i + 1]);
+-        }
+-        signal_queue.append(signal);
+-    }
+-
+-    void startDBus()
+-    {
+-#ifdef Q_OS_WIN
+-        // Windows does not allow to have more than one D-Bus daemon.
+-#else
+-        if (!private_dbus) { return; }
+-
+-        // Start D-Bus process:
+-        QProcess dbus_proc;
+-        dbus_proc.start("dbus-launch");
+-        if (!dbus_proc.waitForStarted() || !dbus_proc.waitForFinished())
+-        { qFatal("Failed to start up private D-Bus session bus."); }
+-
+-        if (dbus_proc.exitCode() != 0)
+-        { qFatal("Failed to set up private D-Bus session bus."); }
+-
+-        // Read output of dbus-launch and store it into our environment:
+-        QByteArray line(dbus_proc.readLine());
+-        while(!line.isEmpty())
+-        {
+-            // Remove newline...
+-            line.chop(1);
+-
+-            int index(line.indexOf('='));
+-            if (-1 == index)
+-            { qFatal("Failed to parse D-Bus session data."); }
+-
+-            env_to_clean << line.mid(0, index);
+-            qDebug() << "    " << line.mid(0, index) << "="
+-                     << line.mid(index + 1);
+-            qputenv(line.mid(0, index).constData(), line.mid(index + 1));
+-
+-            // read next line...
+-            line = dbus_proc.readLine();
+-        }
+-
+-        // make sure we have a PID to kill:-)
+-        QVERIFY2(env_to_clean.contains(QByteArray("DBUS_SESSION_BUS_PID")),
+-                 "D-Bus did not set session bus PID.");
+-#endif
+-
+-        // Start dbusviewer application (if set up in environment):
+-        QString dbusviewer_name(qgetenv("DBUSTEST_DBUSVIEWER"));
+-        if (!dbusviewer_name.isEmpty())
+-        {
+-            qDebug() << "Starting dbusviewer:" << dbusviewer_name;
+-            dbusviewer.start(dbusviewer_name);
+-        }
+-    }
+-
+-    void stopDBus()
+-    {
+-#ifdef Q_OS_WIN
+-        // Windows does not allow to have more than one D-Bus daemon.
+-#else
+-        if (!private_dbus) { return; }
+-
+-        bool ok(false);
+-        QByteArray value = qgetenv("DBUS_SESSION_BUS_PID");
+-        pid_t pid_to_kill(value.toInt(&ok));
+-        if (!ok) { qFatal("Failed to get PID of DBus session to kill."); }
+-        kill(pid_to_kill, 9);
+-
+-        // clean up our environment again:
+-        foreach (const QByteArray & key, env_to_clean)
+-        { unsetenv(key.constData()); }
+-#endif
+-
+-        // Stop dbusviewer (if it is running):
+-        if (dbusviewer.state() == QProcess::Running)
+-        {
+-            dbusviewer.terminate();
+-            if (!dbusviewer.waitForFinished())
+-            { dbusviewer.kill(); }
+-        }
+-    }
+-
+-    const bool private_dbus;
++    const bool m_IsPrivateDbus;
+     QList<QByteArray> env_to_clean;
+ 
+-    QProcess dbusviewer;
+-
+     QList<QProcess *> auts;
+ 
+     static QList<DBusTestCase::DBusSignal> signal_queue;
++
++private:
++    void startDbusViewer();
++    QProcess m_dbusViewerProcess;
++
++    static QString getDbusErrorAsString( const QDBusError & dbusError);
++    static QString getDbusMessageAsString( const QDBusMessage & dbusMessage);
+ };
+ 
+ QList<DBusTestCase::DBusSignal> DBusTestCasePrivate::signal_queue;
+@@ -202,65 +96,360 @@
+ // DBusTestCase implementation:
+ // ---------------------------------------------------------------------------
+ 
+-DBusTestCase::DBusTestCase(bool private_dbus,
+-                           QObject * parent) :
++DBusTestCase::DBusTestCase(bool isPrivateDbus, QObject * parent) :
+     QObject(parent),
+-    d(new DBusTestCasePrivate(private_dbus))
+-{ Q_ASSERT(0 != d); }
++    d(new DBusTestCasePrivate(isPrivateDbus))
++{
++    Q_ASSERT(0 != d);
++}
+ 
+ 
+ DBusTestCase::~DBusTestCase()
+-{ delete d; }
++{
++    delete d;
++}
+ 
++/**
++  * @todo check: if it is unused -> delete it
++  */
+ QList<DBusTestCase::DBusSignal> DBusTestCase::recentSignals()
+ {
+-    QList<DBusTestCase::DBusSignal> result(d->signal_queue);
+-    d->signal_queue.clear();
+-    return result;
++//    QList<DBusTestCase::DBusSignal> result(d->signal_queue);
++//    d->signal_queue.clear(); //clear will happen in cleanupTestCase
++//    return result;
++    return d->signal_queue;
+ }
+ 
+-void DBusTestCase::startAUT(const QString & app, const QStringList & arguments)
++bool DBusTestCase::expectNumberOfRecentSignalsCheck(int expectNumberOfRecentSignals)
+ {
+-    if (app.isEmpty()) { return; }
++    int waitCount = 0;
++    while(waitCount++ < 20 && //max wait cycles
++          //if 0 we want to wait all cycles
++          //or wait if count not the expect number
++          (expectNumberOfRecentSignals == 0 ||
++           d->signal_queue.count() < expectNumberOfRecentSignals)
++          )
++    {
++        //qDebug()<<"QTest::qWait(100)";
++        QTest::qWait(100);
++    }
+ 
++    if(d->signal_queue.count() != expectNumberOfRecentSignals)
++    {
++        if( d->signal_queue.isEmpty() )
++        { qWarning()<<"no DBus-Signal was arrived"; }
++        else
++        { qWarning()<<"wrong DBus-Signal -> content: "; }
++
++        foreach(DBusSignal dbusSignal, d->signal_queue)
++        { qWarning() << dbusSignal; }
++
++        d->signal_queue.clear();
++        return false;
++    }
++    else
++    {
++        d->signal_queue.clear();
++        return true;
++    }
++}
++
++//start "application under test" (AUT)
++//return value for connect to error signal - you don't have to delete this process, DBusTestCase object do it for you
++QProcess* DBusTestCase::startAUT( const QString & app,
++                                  const QStringList & arguments )
++{
++    if(app.isEmpty())
++    { return 0; }
++
+     QString app_path = QCoreApplication::applicationDirPath();
+     QProcess * new_aut = new QProcess();
+ 
++    Q_ASSERT_X( QFileInfo(app).exists(),
++                "execute application under test",
++                QString("file couldn't be found here: %1").arg(app).toAscii() );
++
+     new_aut->setWorkingDirectory(app_path);
+ 
+     new_aut->start(app, arguments);
+-    if (!new_aut->waitForStarted()) { qFatal("Failed to start the AUT."); }
++    if(!new_aut->waitForStarted())
++    { qFatal("Failed to start the application under test."); }
+ 
+     // prepend so that we terminate the processes in the right order later:
+     d->auts.prepend(new_aut);
+ 
+-    QVERIFY2(QProcess::Running == new_aut->state(),
+-             "AUT did not start up properly.");
++    if(QProcess::Running != new_aut->state())
++    { qFatal( "application under test did not start up properly." ); }
+ 
+-    qDebug() << "AUT" << app << "started!";
++    qDebug() << "application under test: " << app << "started!";
++
++    return new_aut;
+ }
+ 
++//stop all "application under test" (AUTs)
+ void DBusTestCase::stopAUTs()
+ {
+-    foreach (QProcess * current_aut, d->auts)
++    foreach(QProcess * current_aut, d->auts)
+     {
+         QVERIFY2(QProcess::Running == current_aut->state(),
+-                 "AUT was no longer running when trying to shut it down.");
++                 "Application under test was no longer running when trying to shut it down.");
+ 
+         current_aut->terminate();
+-        if (!current_aut->waitForFinished()) { current_aut->kill(); }
++        if(!current_aut->waitForFinished())
++        { current_aut->kill(); }
+ 
+         delete current_aut;
+     }
+     d->auts.clear();
+ }
+ 
++void DBusTestCase::dbusMonitorOn(QProcess & dbusMonitorProcess)
++{
++    dbusMonitorProcess.setWorkingDirectory( QCoreApplication::applicationDirPath() );
++    dbusMonitorProcess.setProcessChannelMode(QProcess::ForwardedChannels);
++    dbusMonitorProcess.start("dbus-monitor");
++}
+ 
+ void DBusTestCase::initTestCase()
+-{ d->startDBus(); }
++{
++    d->startDBus();
++}
+ 
+ void DBusTestCase::cleanupTestCase()
+ {
+     stopAUTs();
+     d->stopDBus();
++    d->signal_queue.clear();
+ }
++
++
++
++DBusTestCasePrivate::DBusTestCasePrivate(const bool isPrivateDbus) :
++    m_IsPrivateDbus(isPrivateDbus)
++{
++    QSignalSpyCallbackSet callbacks;
++    callbacks.signal_begin_callback = &DBusTestCasePrivate::beginCallBackSignal;
++    callbacks.slot_begin_callback = 0;
++    callbacks.signal_end_callback = 0;
++    callbacks.slot_end_callback = 0;
++
++    qt_register_signal_spy_callbacks(callbacks);
++}
++
++DBusTestCasePrivate::~DBusTestCasePrivate()
++{}
++
++void DBusTestCasePrivate::beginCallBackSignal( QObject * caller,
++                                               int method_index,
++                                               void ** argv )
++{
++    if (0 == qobject_cast<QDBusAbstractInterface*>(caller))
++    { return; }
++
++    const QMetaObject * mo(caller->metaObject());
++    QMetaMethod method(mo->method(method_index));
++
++    DBusTestCase::DBusSignal signal;
++    signal.time_stamp = QTime::currentTime();
++    signal.object = caller;
++    signal.signal = method.signature();
++
++    QList<QByteArray> argumentTypeList = method.parameterTypes();
++    for (int i = 0; i < argumentTypeList.size(); ++i)
++    {
++        int type = QMetaType::type( argumentTypeList.at(i) );
++
++        Q_ASSERT_X( QMetaType::Void != type, "QMetaType::Void", "Don't know how to handle this type." );
++        Q_ASSERT_X( QMetaType::isRegistered( type ), "QMetaType::isRegistered", "Current type is not registered." );
++
++        QString typeNameString( QMetaType::typeName( type ) );
++
++        //qDebug()<<__PRETTY_FUNCTION__<<" "<<typeNameString;
++
++        if(typeNameString == "QDBusError")
++        {
++            QDBusError* dbusError( static_cast<QDBusError*>(argv[i + 1]) );
++            if(dbusError)
++            { signal.parameters << getDbusErrorAsString(*dbusError); }
++        }
++        else if(typeNameString == "QDBusMessage")
++        {
++            QDBusMessage* dbusMessage( static_cast<QDBusMessage*>(argv[i + 1]) );
++            if(dbusMessage)
++            { signal.parameters << getDbusMessageAsString(*dbusMessage); }
++        }
++        else
++        {
++            QVariant value(type, argv[i + 1]);
++            if(value.isValid())
++            { signal.parameters << QVariant(type, argv[i + 1]); } //get the value
++        }
++    }
++    signal_queue.append(signal);
++}
++
++void DBusTestCasePrivate::startDBus()
++{
++#ifdef Q_OS_WIN
++    // Windows does not allow to have more than one D-Bus daemon.
++#else
++    if (!m_IsPrivateDbus)
++    { return; }
++
++    // Start D-Bus process:
++    QProcess dbusProcess;
++    dbusProcess.start("dbus-launch");
++    if (!dbusProcess.waitForStarted() || !dbusProcess.waitForFinished())
++    { qFatal("Failed to start up private D-Bus session bus."); }
++
++    if (dbusProcess.exitCode() != 0)
++    { qFatal("Failed to set up private D-Bus session bus."); }
++
++    // Read output of dbus-launch and store it into our environment:
++    QByteArray line(dbusProcess.readLine());
++    while(!line.isEmpty())
++    {
++        // Remove newline...
++        line.chop(1);
++
++        int index(line.indexOf('='));
++        if (-1 == index)
++        { qFatal("Failed to parse D-Bus session data."); }
++
++        env_to_clean << line.mid(0, index);
++//            qDebug() << "    " << line.mid(0, index) << "="
++//                     << line.mid(index + 1);
++        qputenv(line.mid(0, index).constData(), line.mid(index + 1));
++
++        // read next line...
++        line = dbusProcess.readLine();
++    }
++
++    // make sure we have a PID to kill:-)
++    QVERIFY2(env_to_clean.contains(QByteArray("DBUS_SESSION_BUS_PID")),
++             "D-Bus did not set session bus PID.");
++#endif
++    startDbusViewer();
++}
++
++
++
++void DBusTestCasePrivate::stopDBus()
++{
++#ifdef Q_OS_WIN
++    // Windows does not allow to have more than one D-Bus daemon.
++#else
++    if (!m_IsPrivateDbus)
++    { return; }
++
++    bool ok(false);
++    QByteArray value = qgetenv("DBUS_SESSION_BUS_PID");
++    pid_t pid_to_kill(value.toInt(&ok));
++    if (!ok)
++    { qFatal("Failed to get PID of DBus session to kill."); }
++    kill(pid_to_kill, 9);
++
++    // clean up our environment again:
++    foreach (const QByteArray & key, env_to_clean)
++    { unsetenv(key.constData()); }
++#endif
++}
++
++QString DBusTestCasePrivate::getDbusErrorAsString( const QDBusError & dbusError)
++{
++    QStringList dbusErrorContent("QDBusError content: ");
++
++    if(dbusError.isValid())
++    {
++        dbusErrorContent << dbusError.message ();
++        dbusErrorContent << dbusError.name ();
++        dbusErrorContent << QDBusError::errorString (dbusError.type () );
++    }
++    else
++    { dbusErrorContent << "no valid QDBusError"; }
++
++    dbusErrorContent.removeDuplicates();
++    return dbusErrorContent.join(" | ");
++}
++
++QString DBusTestCasePrivate::getDbusMessageAsString( const QDBusMessage & dbusMessage)
++{
++    QStringList dBusMessageContent("QDBusMessage content: ");
++    dBusMessageContent << dbusMessage.errorName();
++    dBusMessageContent << dbusMessage.errorMessage ();
++    dBusMessageContent << dbusMessage.errorName ();
++    dBusMessageContent << dbusMessage.interface ();
++    dBusMessageContent << dbusMessage.member ();
++    dBusMessageContent << dbusMessage.path ();
++    dBusMessageContent << dbusMessage.service ();
++    dBusMessageContent << dbusMessage.signature ();
++
++    switch(dbusMessage.type())
++    {
++        case QDBusMessage::MethodCallMessage:
++            dBusMessageContent<<"MethodCallMessage";// - representing an outgoing or incoming method call";
++            break;
++        case QDBusMessage::SignalMessage:
++            dBusMessageContent<<"SignalMessage";// - representing an outgoing or incoming signal emission";
++            break;
++        case QDBusMessage::ReplyMessage:
++            dBusMessageContent<<"ReplyMessage";// - representing the return values of a method call";
++            break;
++        case QDBusMessage::ErrorMessage:
++            dBusMessageContent<<"ErrorMessage";// - representing an error condition in response to a method call";
++            break;
++        case QDBusMessage::InvalidMessage:
++            dBusMessageContent<<"InvalidMessage";//: this is never set on messages received from D-Bus";
++            break;
++        default:
++            qWarning()<<"warning no type for QDBusMessage";
++    }
++    dBusMessageContent.removeDuplicates();
++    return dBusMessageContent.join(" | ");
++}
++
++void DBusTestCasePrivate::startDbusViewer()
++{
++    m_dbusViewerProcess.setWorkingDirectory( QCoreApplication::applicationDirPath() );
++    m_dbusViewerProcess.setProcessChannelMode(QProcess::ForwardedChannels);
++
++    // Start dbusviewer application (if set up in environment):
++    QString dbusviewer_name(qgetenv("DBUSTEST_DBUSVIEWER"));
++    if (!dbusviewer_name.isEmpty())
++    {
++        qDebug() << "Starting dbusviewer:" << dbusviewer_name;
++        m_dbusViewerProcess.start(dbusviewer_name);
++    }
++    else
++    {
++        //qWarning() << "no dbusviewer was set - Starting default dbusviewer:";
++        m_dbusViewerProcess.start("qdbusviewer");
++    }
++
++    m_dbusViewerProcess.waitForStarted();
++    QTest::qWait(10);
++    Q_ASSERT_X(m_dbusViewerProcess.state() == QProcess::Running,
++               "dbusviewer is not started correctly",
++               "- in some case(inside test functions) he couldn't find the X Server");
++}
++
++
++//DBusSignal
++//        QTime time_stamp;
++//        QObject * object;
++//        QByteArray signal;
++//        QList<QVariant> parameters;
++QDebug operator<<(QDebug dbg, const DBusTestCase::DBusSignal & dbusSignal)
++{
++    Q_ASSERT_X(dbusSignal.object, "debug operator for DBusTestCase::DBusSignal", "No QObject was set for this signal.");
++    dbg.nospace() << "\n";
++    dbg.nospace() << "\t" << dbusSignal.time_stamp.toString();
++    dbg.nospace() << "\t" << "className: " << dbusSignal.object->staticMetaObject.className() << " ";
++    dbg.nospace() << "\t" << "signal: " << dbusSignal.signal << " ";
++    dbg.nospace() << "\n\t\t" << "parameters.count: " << dbusSignal.parameters.count() << " ";
++    foreach(QVariant value, dbusSignal.parameters)
++    { dbg.nospace() << "\n\t\t\t" << value.toString(); }
++
++    return dbg.space();
++}
++
+Index: tests/dbustest/CMakeLists.txt
+===================================================================
+--- tests/dbustest/CMakeLists.txt	(revision 891686)
++++ tests/dbustest/CMakeLists.txt	(revision 961549)
+@@ -1,5 +1,5 @@
+ SET(QT_USE_QTDBUS ON)
+-SET(QT_USE_QTTEST ON)
++#SET(QT_USE_QTTEST ON)
+ SET(QT_DONT_USE_QTGUI ON)
+ INCLUDE(${QT_USE_FILE})
+ 
+@@ -23,9 +23,9 @@
+             ${dbustest_SRCS}
+             ${dbustest_MOC_SRCS}
+ )
+-SET_TARGET_PROPERTIES(dbustest
+-                      PROPERTIES VERSION "0.0.1"
+-                                 SOVERSION "0"
+-)
+-TARGET_LINK_LIBRARIES(dbustest ${QT_LIBRARIES})
++# SET_TARGET_PROPERTIES(dbustest
++#                       PROPERTIES VERSION "0.0.1"
++#                                  SOVERSION "0"
++# )
++# TARGET_LINK_LIBRARIES(dbustest ${QT_LIBRARIES})
+ 
+Index: demos/accounthandling/registeraccount.cpp
+===================================================================
+--- demos/accounthandling/registeraccount.cpp	(revision 891686)
++++ demos/accounthandling/registeraccount.cpp	(revision 961549)
+@@ -61,7 +61,7 @@
+     QVariantMap data;
+     for (int i = 1; i < argc; ++i)
+     {
+-        QStringList keyValue(QString(argv[i]).split("="));
++        QStringList keyValue = QString(argv[i]).split("=");
+ 
+         // instead of proper error handling:
+         Q_ASSERT(keyValue.size() == 2);

@@ -1,0 +1,55 @@
+From 095850596114178119a8cc854716ce0cc6e05121 Mon Sep 17 00:00:00 2001
+From: Michel Dänzer <michel@tungstengraphics.com>
+Date: Fri, 24  Aug  2007  11:04:48  +0000
+Subject: __glXDRIbindTexImage: Fail if no texture bound to pixmap's texture target.
+
+We would most likely crash somewhere in Mesa if we tried to continue in this
+case.
+---
+Index: xorg-server-1.4.2/GL/glx/glxdri.c
+===================================================================
+--- xorg-server-1.4.2/GL/glx/glxdri.c.orig
++++ xorg-server-1.4.2/GL/glx/glxdri.c
+@@ -374,12 +374,20 @@ __glXDRIbindTexImage(__GLXcontext *baseC
+ {
+     RegionPtr	pRegion = NULL;
+     PixmapPtr	pixmap;
+-    int		bpp, override = 0;
++    int		bpp, override = 0, texname;
+     GLenum	format, type;
+     ScreenPtr pScreen = glxPixmap->pScreen;
+     __GLXDRIscreen * const screen =
+ 	(__GLXDRIscreen *) __glXgetActiveScreen(pScreen->myNum);
+ 
++    CALL_GetIntegerv(GET_DISPATCH(), (glxPixmap->target == GL_TEXTURE_2D ?
++				      GL_TEXTURE_BINDING_2D :
++				      GL_TEXTURE_BINDING_RECTANGLE_NV,
++				      &texname));
++
++    if (!texname)
++	return __glXError(GLXBadContextState);
++
+     /* When the GLX_EXT_texture_from_pixmap is used, as it's
+      * implemented here, we want to pull pixmap out of video memory
+      * and into host memory. */
+@@ -397,7 +405,7 @@ __glXDRIbindTexImage(__GLXcontext *baseC
+ 
+     if (screen->texOffsetStart && screen->driScreen.setTexOffset) {
+ 	__GLXpixmap **texOffsetOverride = screen->texOffsetOverride;
+-	int i, firstEmpty = 16, texname;
++	int i, firstEmpty = 16;
+ 
+ 	for (i = 0; i < 16; i++) {
+ 	    if (texOffsetOverride[i] == glxPixmap)
+@@ -422,11 +430,6 @@ alreadyin:
+ 
+ 	glxPixmap->pDRICtx = &((__GLXDRIcontext*)baseContext)->driContext;
+ 
+-	CALL_GetIntegerv(GET_DISPATCH(), (glxPixmap->target == GL_TEXTURE_2D ?
+-					  GL_TEXTURE_BINDING_2D :
+-					  GL_TEXTURE_BINDING_RECTANGLE_NV,
+-					  &texname));
+-
+ 	if (texname == glxPixmap->texname)
+ 	    return Success;
+ 

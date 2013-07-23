@@ -1,0 +1,18 @@
+--- security/nss/lib/freebl/unix_rand.c	2007-02-15 03:48:36.000000000 +0200
++++ security/nss/lib/freebl/unix_rand.c	2007-07-12 11:03:55.000000000 +0300
+@@ -858,10 +858,11 @@
+ 
+     /* if the child hasn't exited, kill it -- we're done with its output */
+     while ((rv = waitpid(pid, &status, WNOHANG)) == -1 && errno == EINTR)
+-	;
+-    if (rv == 0 && kill(pid, SIGKILL) == 0) {
+-	while ((rv = waitpid(pid, &status, 0)) == -1 && errno == EINTR)
+-	    ;
++        ;
++    if (rv == 0) {
++        kill(pid, SIGKILL);
++        while ((rv = waitpid(pid, &status, 0)) == -1 && errno == EINTR)
++            ;
+     }
+ 
+     /* Reset SIGCHLD signal hander before returning */

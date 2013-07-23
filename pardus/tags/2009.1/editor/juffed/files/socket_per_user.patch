@@ -1,0 +1,21 @@
+--- src/AppInfo.nix.h.cmake.orig	2009-05-20 22:52:41.479792925 +0200
++++ src/AppInfo.nix.h.cmake	2009-05-20 23:19:30.878798125 +0200
+@@ -10,6 +10,9 @@ of configure script.
+ #include <QtCore/QDir>
+ #include <QtCore/QString>
+ 
++#include <unistd.h>
++#include <pwd.h>
++
+ class AppInfo {
+ public:
+ 		static QString name()            { return "JuffEd"; }
+@@ -18,7 +21,7 @@ public:
+ 		static QString configFile()      { return configDirPath() + "/" + name().toLower() + ".conf"; }
+ 		static QString version()         { return "@JUFFED_VERSION@"; }
+ 		static QString logFile()         { return configDirPath() + "/juffed.log"; }
+-		static QString socketPath()      { return "/tmp/juffed"; }
++		static QString socketPath()      { return QString("/tmp/juffed-%1").arg(getpwuid(geteuid())->pw_name);; }
+ 		static QString appDirPath()      { return "@DATA_INSTALL_DIR@"; }
+ 		static QString translationPath() { return appDirPath() + "/l10n"; }
+ };

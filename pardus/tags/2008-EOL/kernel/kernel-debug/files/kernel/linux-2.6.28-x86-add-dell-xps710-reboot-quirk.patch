@@ -1,0 +1,37 @@
+From: Leann Ogasawara <leann.ogasawara <at> canonical.com>
+
+commit dd4124a8a06bca89c077a16437edac010f0bb993 upstream.
+
+Dell XPS710 will hang on reboot.  This is resolved by adding a quirk to
+set bios reboot.
+
+Signed-off-by: Leann Ogasawara <leann.ogasawara <at> canonical.com>
+Signed-off-by: Tim Gardner <tim.gardner <at> canonical.com>
+Cc: "manoj.iyer" <manoj.iyer <at> canonical.com>
+LKML-Reference: <1236196380.3231.89.camel <at> emiko>
+Signed-off-by: Ingo Molnar <mingo <at> elte.hu>
+Signed-off-by: Greg Kroah-Hartman <gregkh <at> suse.de>
+
+---
+ arch/x86/kernel/reboot.c |    8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+Index: linux-2.6.25/arch/x86/kernel/reboot.c
+===================================================================
+--- linux-2.6.25.orig/arch/x86/kernel/reboot.c
++++ linux-2.6.25/arch/x86/kernel/reboot.c
+@@ -186,6 +186,14 @@ static struct dmi_system_id __initdata r
+ 			DMI_MATCH(DMI_PRODUCT_NAME, "HP Compaq"),
+ 		},
+ 	},
++    {   /* Handle problems with rebooting on Dell XPS710 */
++        .callback = set_bios_reboot,
++        .ident = "Dell XPS710",
++        .matches = {
++            DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
++            DMI_MATCH(DMI_PRODUCT_NAME, "Dell XPS710"),
++        },
++    },
+ 	{ }
+ };
+ 

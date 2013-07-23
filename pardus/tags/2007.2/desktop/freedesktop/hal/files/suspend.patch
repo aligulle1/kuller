@@ -1,0 +1,13 @@
+diff -ur hal-0.5.8.1_20061101.orig/hald/linux/osspec.c hal-0.5.8.1_20061101/hald/linux/osspec.c
+--- hal-0.5.8.1_20061101.orig/hald/linux/osspec.c	2006-11-06 16:11:24.000000000 +0200
++++ hal-0.5.8.1_20061101/hald/linux/osspec.c	2006-11-06 16:12:04.000000000 +0200
+@@ -474,7 +474,8 @@
+ 	if (strstr (poweroptions, "mem"))
+ 		can_suspend = TRUE;
+ 	if (strstr (poweroptions, "disk"))
+-		can_hibernate = TRUE;
++		if ( strstr (hal_util_get_string_from_file("/proc", "cmdline"), "resume="))
++			can_hibernate = TRUE;
+ 	if (strstr (poweroptions, "standby"))
+ 		can_standby = TRUE;
+ 	free (poweroptions);

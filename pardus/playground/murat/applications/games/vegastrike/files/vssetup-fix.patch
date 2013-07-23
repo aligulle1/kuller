@@ -1,0 +1,51 @@
+--- vegastrike-source-0.5.0/setup/src/Makefile.vssetup	2008-12-29 22:52:06.000000000 +0100
++++ vegastrike-source-0.5.0/setup/src/Makefile	2008-12-29 22:52:06.000000000 +0100
+@@ -0,0 +1,37 @@
++
++CC = gcc
++CXX = g++
++
++LIBS = `pkg-config gtk+-2.0 --libs`
++RPM_OPT_FLAGS =
++CFLAGS = -Wall -O3 $(RPM_OPT_FLAGS) `pkg-config gtk+-2.0 --cflags` -g -DGTK
++CXXFLAGS = $(CFLAGS)
++
++bindir = /usr/bin 
++PROGNAME = vssetup.bin
++
++INSTALL = install
++DESTDIR =
++
++OBJECTS =      include/general.o \
++               include/central.o \
++               include/display_dialog.o \
++               include/display_gtk.o \
++               include/file.o \
++               c/setup.o
++
++
++
++all: $(PROGNAME)
++
++$(PROGNAME):   $(OBJECTS)
++		$(CXX) -o $@ $^ $(LIBS)
++
++install:
++	$(INSTALL) -d -m 755 $(bindir)
++	$(INSTALL) -m 755 $(PROGNAME) $(bindir)
++
++clean:
++	rm -f $(PROGNAME) $(OBJECTS)
++
++
+--- vegastrike-source-0.5.0/setup/src/include/display_gtk.cpp.vssetup	2008-04-24 05:44:00.000000000 +0200
++++ vegastrike-source-0.5.0/setup/src/include/display_gtk.cpp	2008-12-29 22:52:06.000000000 +0100
+@@ -66,7 +66,7 @@
+ #ifdef _WIN32
+ 	int err=(int)ShellExecute(NULL,"open","documentation\\readme.txt","","",1);
+ #else
+-	execlp("less", "less","readme.txt", NULL); //Will this work in Linux?
++	execlp("xdg-open", "xdg-open","/usr/share/vegastrike/documentation/readme.txt", NULL); //Will this work in Linux?
+ #endif
+ 	exit(0);//exitval);
+ }

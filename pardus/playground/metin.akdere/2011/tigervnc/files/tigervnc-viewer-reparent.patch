@@ -1,0 +1,128 @@
+Index: tigervnc-1.0.90/unix/tx/TXViewport.cxx
+===================================================================
+--- tigervnc-1.0.90.orig/unix/tx/TXViewport.cxx
++++ tigervnc-1.0.90/unix/tx/TXViewport.cxx
+@@ -44,6 +44,20 @@ TXViewport::~TXViewport()
+   delete vScrollbar;
+ }
+ 
++void TXViewport::reparent(long embed_window)
++{
++    XReparentWindow(dpy, win(), (Window)embed_window, 0, 0);
++    XSelectInput(dpy, embed_window, child->eventMask);
++    if (!eventHandler)
++       this->setEventHandler(this);
++}
++
++void TXViewport::handleEvent(TXWindow* w, XEvent* ev)
++{
++    if (child && child->eventHandler)
++       ((TXEventHandler *)child->eventHandler)->handleEvent(child, ev);
++}
++
+ void TXViewport::setChild(TXWindow* child_)
+ {
+   child = child_;
+Index: tigervnc-1.0.90/unix/tx/TXViewport.h
+===================================================================
+--- tigervnc-1.0.90.orig/unix/tx/TXViewport.h
++++ tigervnc-1.0.90/unix/tx/TXViewport.h
+@@ -32,8 +32,9 @@
+ #include "TXWindow.h"
+ #include "TXScrollbar.h"
+ 
+-class TXViewport : public TXWindow, public TXScrollbarCallback,
+-                   public rfb::Timer::Callback {
++class TXViewport : public TXWindow, public TXScrollbarCallback, 
++                   public TXEventHandler, public rfb::Timer::Callback {
++
+ public:
+   TXViewport(Display* dpy_, int width, int height, TXWindow* parent_=0);
+   virtual ~TXViewport();
+@@ -59,6 +60,13 @@ public:
+   // normally.
+   bool bumpScrollEvent(XMotionEvent* ev);
+ 
++  // reparent the viewport into a new window
++  void reparent(long embed_window);
++
++  // event handler
++  void handleEvent(TXWindow* w, XEvent* ev);
++
++
+ private:
+   virtual void resizeNotify();
+   virtual void scrollbarPos(int x, int y, TXScrollbar* sb);
+Index: tigervnc-1.0.90/unix/tx/TXWindow.h
+===================================================================
+--- tigervnc-1.0.90.orig/unix/tx/TXWindow.h
++++ tigervnc-1.0.90/unix/tx/TXWindow.h
+@@ -185,6 +185,9 @@ public:
+ 
+   Display* const dpy;
+ 
++  TXEventHandler* eventHandler;
++  long eventMask;
++
+   int xPad, yPad, bevel;
+ 
+ private:
+@@ -197,9 +200,7 @@ private:
+   TXWindow* parent;
+   Window win_;
+   int width_, height_;
+-  TXEventHandler* eventHandler;
+   TXDeleteWindowCallback* dwc;
+-  long eventMask;
+   XSizeHints sizeHints;
+   std::map<Atom,Time> selectionOwnTime;
+   std::map<Atom,bool> selectionOwner_;
+Index: tigervnc-1.0.90/unix/vncviewer/CConn.cxx
+===================================================================
+--- tigervnc-1.0.90.orig/unix/vncviewer/CConn.cxx
++++ tigervnc-1.0.90/unix/vncviewer/CConn.cxx
+@@ -904,10 +904,18 @@ void CConn::recreateViewport()
+ 
+ void CConn::reconfigureViewport()
+ {
++  const char * par = embedParent.getValueStr();
+   viewport->setMaxSize(cp.width, cp.height);
+   if (fullScreen) {
+     viewport->resize(DisplayWidth(dpy,DefaultScreen(dpy)),
+                      DisplayHeight(dpy,DefaultScreen(dpy)));
++ } else if (strlen(par) != 0) {
++   XWindowAttributes win_attr;
++   Window w = strtol(par, (char **)NULL, 0);
++
++   XGetWindowAttributes(dpy, w, &win_attr);
++   viewport->reparent(w);
++   viewport->resize(win_attr.width, win_attr.height);
+   } else {
+     int w = cp.width;
+     int h = cp.height;
+Index: tigervnc-1.0.90/unix/vncviewer/parameters.h
+===================================================================
+--- tigervnc-1.0.90.orig/unix/vncviewer/parameters.h
++++ tigervnc-1.0.90/unix/vncviewer/parameters.h
+@@ -42,6 +42,7 @@ extern rfb::BoolParameter customCompress
+ extern rfb::IntParameter compressLevel;
+ extern rfb::BoolParameter noJpeg;
+ extern rfb::IntParameter qualityLevel;
++extern rfb::StringParameter embedParent;
+ 
+ extern char aboutText[];
+ extern char* programName;
+Index: tigervnc-1.0.90/unix/vncviewer/vncviewer.cxx
+===================================================================
+--- tigervnc-1.0.90.orig/unix/vncviewer/vncviewer.cxx
++++ tigervnc-1.0.90/unix/vncviewer/vncviewer.cxx
+@@ -111,6 +111,9 @@ StringParameter displayname("display", "
+ 
+ StringParameter via("via", "Gateway to tunnel via", "");
+ 
++/* Support for reparenting */
++StringParameter embedParent("Parent", "X Window to use as a parent", "");
++
+ BoolParameter customCompressLevel("CustomCompressLevel",
+ 				 "Use custom compression level. "
+ 				 "Default if CompressLevel is specified.", false);

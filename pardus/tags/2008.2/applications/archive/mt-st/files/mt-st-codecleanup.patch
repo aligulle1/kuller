@@ -1,0 +1,163 @@
+--- mt.c	2005-08-21 20:48:06.000000000 +0200
++++ mt.c	2007-03-14 17:06:12.000000000 +0100
+@@ -29,9 +29,11 @@
+ 
+ #define VERSION "0.9b"
+ 
+-typedef int (* cmdfunc)(/* int, struct cmdef_tr *, int, char ** */);
++typedef struct cmdef_tr cmdef_tr;
+ 
+-typedef struct cmdef_tr {
++typedef int (* cmdfunc)(int, struct cmdef_tr *, int, char **);
++
++struct cmdef_tr {
+     char *cmd_name;
+     int cmd_code;
+     cmdfunc cmd_function;
+@@ -39,7 +41,7 @@ typedef struct cmdef_tr {
+     unsigned char cmd_fdtype;
+     unsigned char arg_cnt;
+     int error_tests;
+-} cmdef_tr;
++};
+ 
+ #define NO_FD      0
+ #define FD_RDONLY  1
+@@ -159,7 +161,7 @@ static cmdef_tr cmds[] = {
+     ET_ONLINE },
+     { "asf",		0,         do_asf, MTREW,  FD_RDONLY, ONE_ARG,
+     ET_ONLINE },
+-    { NULL, 0, 0, 0 }
++    { NULL, 0, 0, 0, NO_FD, NO_ARGS, 0 }
+ };
+ 
+ 
+@@ -259,7 +261,8 @@ static struct booleans {
+     {"sysv",	      MT_ST_SYSV,	   "enable the SystemV semantics"},
+ #endif
+     {"cleaning",      MT_ST_SET_CLN,	   "set the cleaning bit location and mask"},
+-    {NULL, 0}};
++    {NULL, 0, ""}
++};
+ 
+ static char *tape_name;   /* The tape name for messages */
+ 
+@@ -267,7 +270,8 @@ static char *tape_name;   /* The tape na
+ 	int
+ main(int argc, char **argv)
+ {
+-    int mtfd, cmd_code, i, argn, len, oflags;
++    int mtfd, cmd_code, i, argn, oflags;
++    size_t len;
+     char *cmdstr;
+     cmdef_tr *comp, *comp2;
+ 
+@@ -464,7 +468,8 @@ do_drvbuffer(int mtfd, cmdef_tr *cmd, in
+ 	static int
+ do_options(int mtfd, cmdef_tr *cmd, int argc, char **argv)
+ {
+-    int i, an, len;
++    int i, an;
++    size_t len;
+     struct mtop mt_com;
+ 
+     mt_com.mt_op = MTSETDRVBUFFER;
+@@ -518,7 +523,8 @@ do_options(int mtfd, cmdef_tr *cmd, int 
+ 
+ /* Tell where the tape is */
+ 	static int
+-do_tell(int mtfd, cmdef_tr *cmd, int argc, char **argv)
++do_tell(int mtfd, cmdef_tr *cmd __attribute__((unused)),
++	int argc __attribute__((unused)), char **argv __attribute__((unused)))
+ {
+     struct mtpos mt_pos;
+ 
+@@ -533,7 +539,7 @@ do_tell(int mtfd, cmdef_tr *cmd, int arg
+ 
+ /* Position the tape to a specific location within a specified partition */
+ 	static int
+-do_partseek(int mtfd, cmdef_tr *cmd, int argc, char **argv)
++do_partseek(int mtfd, cmdef_tr *cmd __attribute__((unused)), int argc, char **argv)
+ {
+     struct mtop mt_com;
+ 
+@@ -556,7 +562,7 @@ do_partseek(int mtfd, cmdef_tr *cmd, int
+ /* Position to start of file n. This might be implemented more intelligently
+    some day. */
+ 	static int
+-do_asf(int mtfd, cmdef_tr *cmd, int argc, char **argv)
++do_asf(int mtfd, cmdef_tr *cmd __attribute__((unused)), int argc, char **argv)
+ {
+     struct mtop mt_com;
+ 
+@@ -581,10 +587,13 @@ do_asf(int mtfd, cmdef_tr *cmd, int argc
+ /*** Decipher the status ***/
+ 
+ 	static int
+-do_status(int mtfd, cmdef_tr *cmd, int argc, char **argv)
++do_status(int mtfd, cmdef_tr *cmd __attribute__((unused)),
++	  int argc __attribute__((unused)), 
++	  char **argv __attribute__((unused)))
+ {
+     struct mtget status;
+-    int dens, i;
++    int dens;
++    size_t i;
+     char *type, *density;
+ 
+     if (ioctl(mtfd, MTIOCGET, (char *)&status) < 0) {
+@@ -675,7 +684,11 @@ do_status(int mtfd, cmdef_tr *cmd, int a
+ 
+ /* Print a list of possible density codes */
+ 	static int
+-print_densities(int fd, cmdef_tr *cmd, int argc, char **argv)
++print_densities(int fd __attribute__((unused)),
++		cmdef_tr *cmd __attribute__((unused)),
++		int argc __attribute__((unused)),
++		char **argv __attribute__((unused)))
++		
+ {
+     int i, offset;
+ 
+@@ -683,7 +696,7 @@ print_densities(int fd, cmdef_tr *cmd, i
+     offset = (NBR_DENSITIES + 1) / 2;
+     for (i=0; i < offset; i++) {
+ 	printf("0x%02x   %-28s", density_tbl[i].code, density_tbl[i].name);
+-	if (i + offset < NBR_DENSITIES)
++	if ((size_t)(i + offset) < NBR_DENSITIES)
+ 	    printf("  0x%02x   %s\n", density_tbl[i + offset].code, density_tbl[i + offset].name);
+ 	else
+ 	    printf("\n");
+--- stinit.c	2005-08-21 20:47:51.000000000 +0200
++++ stinit.c	2007-03-14 17:09:25.000000000 +0100
+@@ -163,7 +163,7 @@ find_string(char *s, char *target, char 
+ 		if (buf == NULL)
+ 		    buf = strdup(argp);
+ 		else {
+-		    if (strlen(argp) < buflen)
++		    if (strlen(argp) < (size_t)buflen)
+ 			strcpy(buf, argp);
+ 		    else {
+ 			strncpy(buf, argp, buflen);
+@@ -208,7 +208,7 @@ num_arg(char *t)
+ 
+ 
+ 	static int
+-next_block(FILE *dbf, char *buf, int buflen, int limiter)
++next_block(FILE *dbf, char *buf, int buflen __attribute__((unused)), int limiter)
+ {
+     int len;
+     char *cp, *bp;
+@@ -521,10 +521,10 @@ do_inquiry(char *tname, char *company, c
+ 	}
+ 	if (result) {
+ 	    close(fn);
+-	    sprintf(buffer,
++	    sprintf((char *)buffer,
+ 		    "The SCSI INQUIRY for device '%s' failed (power off?)",
+ 		    tname);
+-	    perror(buffer);
++	    perror((char *)buffer);
+ 	    return FALSE;
+ 	}
+     }

@@ -1,0 +1,73 @@
+From 6989e58df40771bed76e9130929494fa7d61ba32 Mon Sep 17 00:00:00 2001
+From: Jesse Barnes <jbarnes@virtuousgeek.org>
+Date: Tue, 19 Aug 2008 15:05:00 -0700
+Subject: [PATCH 08/20] Add quirk for pre-915s with working PFIT regs
+
+The regs are undocumented, but on some machines they work fine, so add this
+quirk to indicate it.
+(cherry picked from commit 646bbdc4b6a7b887ee8f0e51fdff5d07c4586329)
+---
+ src/i830.h        |    1 +
+ src/i830_lvds.c   |    4 ++--
+ src/i830_quirks.c |   11 +++++++++++
+ 3 files changed, 14 insertions(+), 2 deletions(-)
+
+diff --git xf86-video-intel-2.4.3/src/i830.h xf86-video-intel-2.4.3/src/i830.h
+index b2e339a..07f2b69 100644
+--- xf86-video-intel-2.4.3/src/i830.h
++++ xf86-video-intel-2.4.3/src/i830.h
+@@ -939,6 +939,7 @@ extern const int I830CopyROP[16];
+ #define QUIRK_PIPEA_FORCE		0x00000008
+ #define QUIRK_IVCH_NEED_DVOB		0x00000010
+ #define QUIRK_RESET_MODES		0x00000020
++#define QUIRK_PFIT_SAFE			0x00000040
+ extern void i830_fixup_devices(ScrnInfoPtr);
+ 
+ #endif /* _I830_H_ */
+diff --git xf86-video-intel-2.4.3/src/i830_lvds.c xf86-video-intel-2.4.3/src/i830_lvds.c
+index dee8531..d04bfc4 100644
+--- xf86-video-intel-2.4.3/src/i830_lvds.c
++++ xf86-video-intel-2.4.3/src/i830_lvds.c
+@@ -1001,8 +1001,8 @@ i830_lvds_create_resources(xf86OutputPtr output)
+      * Panel fitting control
+      */
+ 
+-    /* XXX Disable panel fitting setting on pre-915. */
+-    if (!IS_I9XX(pI830))
++    /* Disable panel fitting setting on untested pre-915 chips */
++    if (!IS_I9XX(pI830) && !(pI830->quirk_flag & QUIRK_PFIT_SAFE))
+ 	return;
+ 
+     panel_fitting_atom = MakeAtom(PANEL_FITTING_NAME,
+diff --git xf86-video-intel-2.4.3/src/i830_quirks.c xf86-video-intel-2.4.3/src/i830_quirks.c
+index df6baf3..723bd76 100644
+--- xf86-video-intel-2.4.3/src/i830_quirks.c
++++ xf86-video-intel-2.4.3/src/i830_quirks.c
+@@ -162,6 +162,15 @@ static void i830_dmi_dump(void)
+ }
+ 
+ /*
++ * Old chips have undocumented panel fitting registers.  Some of them actually
++ * work; this quirk indicates that.
++ */
++static void quirk_pfit_safe (I830Ptr pI830)
++{
++    pI830->quirk_flag |= QUIRK_PFIT_SAFE;
++}
++
++/*
+  * Some machines hose the display regs regardless of the ACPI DOS
+  * setting, so we need to reset modes at ACPI event time.
+  */
+@@ -297,6 +306,8 @@ static i830_quirk i830_quirk_list[] = {
+     /* HP Pavilion ze4944ea needs pipe A force quirk (See LP: #242389) */
+     { PCI_CHIP_I855_GM, 0x103c, 0x3084, quirk_pipea_force },
+ 
++    { PCI_CHIP_I855_GM, 0x161f, 0x2030, quirk_pfit_safe },
++
+     /* ThinkPad X40 needs pipe A force quirk */
+     { PCI_CHIP_I855_GM, 0x1014, 0x0557, quirk_pipea_force },
+ 
+-- 
+1.6.2
+

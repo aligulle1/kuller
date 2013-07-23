@@ -1,0 +1,28 @@
+--- src/DeviceHandler.cpp.orig	2011-01-28 12:12:26.743000098 +0200
++++ src/DeviceHandler.cpp	2011-01-28 12:14:03.987000098 +0200
+@@ -53,6 +53,7 @@
+ #include "drivers/GenericDevice.h"
+ #include "drivers/UpekDevice.h"
+ #include "../include/DeviceHandler.h"
++#include <time.h>
+ 
+ using namespace std;
+ 
+@@ -178,6 +179,8 @@
+     }
+     attachedUSBDevices=NULL;
+     
++    sleep(0.00001);
++
+     if(findAttachedUSBDevices()>0){
+         if(discoveredFpDevices!=NULL)
+             fp_dscv_devs_free(discoveredFpDevices);
+@@ -293,7 +296,7 @@
+     USBDevice* lastDevice=NULL;
+ 
+     //libusb_init was called by libfprint already
+-//    libusb_init(NULL);
++    libusb_init(NULL);
+     libusb_get_device_list(NULL,&devs);
+     if(devs==NULL){
+         syslog(LOG_ERR,"failed to get usb device list");
